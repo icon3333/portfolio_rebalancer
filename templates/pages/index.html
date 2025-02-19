@@ -1,0 +1,313 @@
+{% extends "base.html" %}
+
+{% block title %}Portfolio Manager - Welcome{% endblock %}
+
+{% block content %}
+    {% if session.account_id %}
+        <!-- Logged in state - Dashboard -->
+        <div class="columns is-multiline">
+            <!-- Welcome Banner -->
+            <div class="column is-12">
+                <div class="notification is-info is-light">
+                    <button class="delete"></button>
+                    <div class="columns is-vcentered">
+                        <div class="column">
+                            <h1 class="title">
+                                Welcome back, {{ session.username }}!
+                            </h1>
+                            <p class="subtitle">
+                                Here's your portfolio overview.
+                            </p>
+                        </div>
+                        <div class="column is-narrow">
+                            <a href="{{ url_for('portfolio.enrich') }}" class="button is-info">
+                                <span class="icon">
+                                    <i class="fas fa-table"></i>
+                                </span>
+                                <span>View Portfolio</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Portfolio Summary -->
+            {% if portfolios %}
+                <div class="column is-12">
+                    <div class="card">
+                        <header class="card-header">
+                            <p class="card-header-title">
+                                <span class="icon-text">
+                                    <span class="icon">
+                                        <i class="fas fa-folder-open"></i>
+                                    </span>
+                                    <span>Your Portfolios</span>
+                                </span>
+                            </p>
+                        </header>
+                        <div class="card-content">
+                            <div class="content">
+                                <div class="table-container">
+                                    <table class="table is-fullwidth is-hoverable">
+                                        <thead>
+                                            <tr>
+                                                <th>Portfolio</th>
+                                                <th>Companies</th>
+                                                <th>Value</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for portfolio in portfolios %}
+                                                <tr>
+                                                    <td>
+                                                        <span class="icon-text">
+                                                            <span class="icon">
+                                                                <i class="fas fa-briefcase"></i>
+                                                            </span>
+                                                            <span>{{ portfolio.name }}</span>
+                                                        </span>
+                                                    </td>
+                                                    <td>{{ portfolio.company_count }}</td>
+                                                    <td>
+                                                        {% if portfolio.total_value %}
+                                                            €{{ '{:,.2f}'.format(portfolio.total_value) }}
+                                                        {% else %}
+                                                            -
+                                                        {% endif %}
+                                                    </td>
+                                                    <td>
+                                                        <div class="buttons are-small">
+                                                            <a href="{{ url_for('analysis.index') }}?portfolio={{ portfolio.name }}" class="button is-info is-small">
+                                                                <span class="icon">
+                                                                    <i class="fas fa-chart-bar"></i>
+                                                                </span>
+                                                                <span>Analyse</span>
+                                                            </a>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <div class="column is-12">
+                    <div class="notification is-warning">
+                        <p>You don't have any portfolios yet. Get started by importing your data.</p>
+                        <a href="{{ url_for('portfolio.enrich') }}" class="button is-warning is-light mt-2">
+                            <span class="icon">
+                                <i class="fas fa-upload"></i>
+                            </span>
+                            <span>Import Data</span>
+                        </a>
+                    </div>
+                </div>
+            {% endif %}
+
+            <!-- Quick Links -->
+            <div class="column is-12">
+                <h2 class="title is-4">Quick Actions</h2>
+                <div class="columns is-multiline">
+                    <div class="column is-3">
+                        <div class="card">
+                            <div class="card-content has-text-centered">
+                                <span class="icon is-large has-text-primary">
+                                    <i class="fas fa-gem fa-2x"></i>
+                                </span>
+                                <p class="title is-5 mt-3">Enrich Data</p>
+                                <p class="subtitle is-6">Import and update your portfolio</p>
+                            </div>
+                            <footer class="card-footer">
+                                <a href="{{ url_for('portfolio.enrich') }}" class="card-footer-item">Go</a>
+                            </footer>
+                        </div>
+                    </div>
+                    <div class="column is-3">
+                        <div class="card">
+                            <div class="card-content has-text-centered">
+                                <span class="icon is-large has-text-info">
+                                    <i class="fas fa-chart-pie fa-2x"></i>
+                                </span>
+                                <p class="title is-5 mt-3">Merton Share</p>
+                                <p class="subtitle is-6">Calculate optimal allocation</p>
+                            </div>
+                            <footer class="card-footer">
+                                <a href="{{ url_for('merton.index') }}" class="card-footer-item">Go</a>
+                            </footer>
+                        </div>
+                    </div>
+                    <div class="column is-3">
+                        <div class="card">
+                            <div class="card-content has-text-centered">
+                                <span class="icon is-large has-text-success">
+                                    <i class="fas fa-search fa-2x"></i>
+                                </span>
+                                <p class="title is-5 mt-3">Analyse</p>
+                                <p class="subtitle is-6">View portfolio analytics</p>
+                            </div>
+                            <footer class="card-footer">
+                                <a href="{{ url_for('analysis.index') }}" class="card-footer-item">Go</a>
+                            </footer>
+                        </div>
+                    </div>
+                    <div class="column is-3">
+                        <div class="card">
+                            <div class="card-content has-text-centered">
+                                <span class="icon is-large has-text-warning">
+                                    <i class="fas fa-cog fa-2x"></i>
+                                </span>
+                                <p class="title is-5 mt-3">Account</p>
+                                <p class="subtitle is-6">Manage your account</p>
+                            </div>
+                            <footer class="card-footer">
+                                <a href="{{ url_for('account.index') }}" class="card-footer-item">Go</a>
+                            </footer>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% else %}
+        <!-- Not logged in state - Account selection -->
+        <section class="hero is-light is-bold">
+            <div class="hero-body">
+                <div class="container">
+                    <h1 class="title">
+                        Welcome to Portfolio Manager
+                    </h1>
+                    <h2 class="subtitle">
+                        Manage and optimize your investment portfolio
+                    </h2>
+                </div>
+            </div>
+        </section>
+
+        <div class="section">
+            {% if accounts %}
+                <h3 class="title is-4">Select an Account</h3>
+                <div class="columns is-multiline">
+                    {% for account in accounts %}
+                        <div class="column is-3">
+                            <div class="card">
+                                <div class="card-content">
+                                    <div class="content has-text-centered">
+                                        <span class="icon is-large">
+                                            <i class="fas fa-user-circle fa-3x"></i>
+                                        </span>
+                                        <p class="title is-4 mt-3">{{ account.username }}</p>
+                                    </div>
+                                </div>
+                                <footer class="card-footer">
+                                    <a href="{{ url_for('main.select_account', account_id=account.id) }}" class="card-footer-item">
+                                        <span class="icon">
+                                            <i class="fas fa-sign-in-alt"></i>
+                                        </span>
+                                        <span>Select</span>
+                                    </a>
+                                </footer>
+                            </div>
+                        </div>
+                    {% endfor %}
+                    
+                    <!-- Create new account card -->
+                    <div class="column is-3">
+                        <div class="card">
+                            <div class="card-content">
+                                <div class="content has-text-centered">
+                                    <span class="icon is-large has-text-grey-light">
+                                        <i class="fas fa-plus-circle fa-3x"></i>
+                                    </span>
+                                    <p class="title is-4 mt-3">New Account</p>
+                                </div>
+                            </div>
+                            <footer class="card-footer">
+                                <a class="card-footer-item js-modal-trigger" data-target="create-account-modal">
+                                    <span class="icon">
+                                        <i class="fas fa-plus"></i>
+                                    </span>
+                                    <span>Create</span>
+                                </a>
+                            </footer>
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <div class="notification is-info is-light">
+                    <p>Welcome to Portfolio Manager! To get started, create your first account.</p>
+                    <button class="button is-info mt-3 js-modal-trigger" data-target="create-account-modal">
+                        <span class="icon">
+                            <i class="fas fa-user-plus"></i>
+                        </span>
+                        <span>Create Account</span>
+                    </button>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Features section -->
+        <div class="section">
+            <h3 class="title is-4">Features</h3>
+            <div class="columns">
+                <div class="column">
+                    <div class="box">
+                        <h4 class="title is-5">
+                            <span class="icon-text">
+                                <span class="icon has-text-primary">
+                                    <i class="fas fa-chart-line"></i>
+                                </span>
+                                <span>Portfolio Tracking</span>
+                            </span>
+                        </h4>
+                        <p>Track your investments across multiple portfolios and categories. Import your data easily from CSV files.</p>
+                    </div>
+                </div>
+                <div class="column">
+                    <div class="box">
+                        <h4 class="title is-5">
+                            <span class="icon-text">
+                                <span class="icon has-text-info">
+                                    <i class="fas fa-balance-scale"></i>
+                                </span>
+                                <span>Merton Optimization</span>
+                            </span>
+                        </h4>
+                        <p>Calculate optimal portfolio allocation using the Merton share model based on historical returns and risk preferences.</p>
+                    </div>
+                </div>
+                <div class="column">
+                    <div class="box">
+                        <h4 class="title is-5">
+                            <span class="icon-text">
+                                <span class="icon has-text-success">
+                                    <i class="fas fa-chart-pie"></i>
+                                </span>
+                                <span>Visual Analytics</span>
+                            </span>
+                        </h4>
+                        <p>Visualize your portfolio with interactive charts and comprehensive analytics to make informed decisions.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // Handle notification delete button
+        const deleteButtons = document.querySelectorAll('.notification .delete');
+        deleteButtons.forEach(button => {
+            const notification = button.parentNode;
+            button.addEventListener('click', () => {
+                notification.remove();
+            });
+        });
+    });
+</script>
+{% endblock %}

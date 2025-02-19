@@ -4,9 +4,9 @@ __pycache__/
 *$py.class
 *.so
 .Python
+env/
 venv/
 ENV/
-env/
 build/
 develop-eggs/
 dist/
@@ -18,12 +18,11 @@ lib64/
 parts/
 sdist/
 var/
-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
 
-# Flask
+# Flask stuff
 instance/
 .webassets-cache
 
@@ -31,17 +30,27 @@ instance/
 *.db
 *.sqlite
 *.sqlite3
-database/backups/
+app/database/backups/
 
-# OS specific
-.DS_Store
-Thumbs.db
+# Virtual Environment
+venv/
+.env
 
-# IDE specific
+# IDE specific files
 .idea/
 .vscode/
 *.swp
 *.swo
 
-# Environment variables
-.env
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/

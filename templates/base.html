@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Portfolio Manager{% endblock %}</title>
+    
+    <!-- Bulma CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
+    
+    <!-- Plotly.js -->
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+    
+    {% block head_extras %}{% endblock %}
+</head>
+<body>
+    <!-- Navigation -->
+    {% include 'components/navbar.html' %}
+    
+    <div class="columns is-gapless" style="min-height: calc(100vh - 3.25rem);">
+        <!-- Sidebar -->
+        <div class="column is-narrow sidebar">
+            {% include 'components/sidebar.html' %}
+        </div>
+        
+        <!-- Main Content -->
+        <div class="column">
+            <main class="section">
+                <div class="container">
+                    <!-- Flash Messages -->
+                    {% include 'components/messages.html' %}
+                    
+                    <!-- Page Content -->
+                    {% block content %}{% endblock %}
+                </div>
+            </main>
+        </div>
+    </div>
+    
+    <!-- Footer -->
+    {% include 'components/footer.html' %}
+    
+    <!-- Vue.js (for components that need it) -->
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.min.js"></script>
+    
+    <!-- Axios for AJAX requests -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    
+    <!-- Main JavaScript -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html>

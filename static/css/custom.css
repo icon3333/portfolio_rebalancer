@@ -1,0 +1,205 @@
+/* Custom CSS for Portfolio Manager */
+
+/* Sidebar adjustments */
+.sidebar {
+    min-width: 250px;
+    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+}
+
+.menu-label {
+    font-size: 0.9em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+/* Flash message animations */
+.message-notification {
+    transition: opacity 0.5s ease-out;
+}
+
+.is-fading-out {
+    opacity: 0;
+}
+
+/* Card hover effects */
+.card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* Table styles */
+.table-container {
+    overflow-x: auto;
+}
+
+.table thead th {
+    background-color: #f5f5f5;
+    border-bottom: 2px solid #dbdbdb;
+}
+
+.table.is-hoverable tr:hover {
+    background-color: #f0f8ff !important;
+}
+
+/* Form styles */
+.input:focus, .textarea:focus, .select select:focus {
+    border-color: #3273dc;
+    box-shadow: 0 0 0 0.125em rgba(50, 115, 220, 0.25);
+}
+
+/* Button adjustments */
+.button {
+    font-weight: 500;
+}
+
+.button.is-primary {
+    background-color: #00d1b2;
+}
+
+.button.is-primary:hover {
+    background-color: #00c4a7;
+}
+
+/* Notification positioning */
+.notification {
+    margin-bottom: 1.5rem;
+}
+
+/* Modal adjustments */
+.modal-card-title {
+    font-weight: 600;
+}
+
+/* Dashboard styles */
+.dashboard-tile {
+    height: 100%;
+}
+
+.dashboard-tile .title {
+    margin-bottom: 0.5rem;
+}
+
+/* Chart container styles */
+.chart-container {
+    height: 400px;
+    width: 100%;
+    margin: 1rem 0;
+}
+
+/* Data tables */
+.data-table-container {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+/* Responsive adjustments */
+@media screen and (max-width: 768px) {
+    .sidebar {
+        min-width: auto;
+    }
+    
+    .column.is-3 {
+        width: 50%;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .column.is-3 {
+        width: 100%;
+    }
+}
+
+/* Vue.js component styles */
+[v-cloak] {
+    display: none;
+}
+
+.vue-loading {
+    text-align: center;
+    padding: 2rem;
+}
+
+/* Animation utilities */
+.fade-enter-active, .fade-leave-active {
+    transition: opacity 0.5s;
+}
+
+.fade-enter, .fade-leave-to {
+    opacity: 0;
+}
+
+/* Positive/negative value colors */
+.is-positive {
+    color: #48c774 !important;
+}
+
+.is-negative {
+    color: #f14668 !important;
+}
+
+/* Loading indicator */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255, 255, 255, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 999;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #dbdbdb;
+    border-top-color: #3273dc;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Portfolio page specific styles */
+.portfolio-header {
+    background-color: #f5f7fa;
+    padding: 1.5rem;
+    border-radius: 4px;
+    margin-bottom: 1.5rem;
+}
+
+.portfolio-metrics {
+    margin-bottom: 2rem;
+}
+
+/* Analysis page */
+.analysis-sidebar {
+    position: sticky;
+    top: 20px;
+}
+
+/* Merton page styles */
+.parameter-card {
+    height: 100%;
+}
+
+.parameter-card .card-content {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.parameter-input {
+    flex-grow: 1;
+}
