@@ -44,7 +44,8 @@ def get_portfolio_data_api():
     account_id = session['account_id']
     portfolio_data = get_portfolio_data(account_id)
     
-    return jsonify(portfolio_data)
+    # Always return a valid JSON array, even if empty
+    return jsonify(portfolio_data if portfolio_data else [])
 
 @portfolio_bp.route('/api/update_portfolio', methods=['POST'])
 def update_portfolio_api():

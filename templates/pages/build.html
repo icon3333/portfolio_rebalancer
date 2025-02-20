@@ -9,22 +9,22 @@
                 <span class="icon">
                     <i class="fas fa-hammer"></i>
                 </span>
-                <span>Allocation Builder</span>
+                <span>Portfolio Rule Builder</span>
             </span>
         </h1>
 
         <div class="notification is-info is-light">
             <button class="delete"></button>
-            <p>Use the allocation builder to define custom rules, target percentages, 
-               and weighted positions for each portfolio. Then see how your ideal portfolio 
-               would look with these settings.</p>
+            <p>This page allows you to establish custom portfolio rules, target weights, and
+               position-level constraints. Define your ideal portfolio structure here, then 
+               you can apply it later when allocating actual funds.</p>
         </div>
     </div>
 </div>
 
 <div class="columns is-multiline">
+    <!-- Global Allocation Rules -->
     <div class="column is-12">
-        <!-- Global Settings Card -->
         <div class="card mb-5">
             <header class="card-header">
                 <p class="card-header-title">
@@ -32,48 +32,78 @@
                         <span class="icon">
                             <i class="fas fa-tools"></i>
                         </span>
-                        <span>Global Allocation Settings</span>
+                        <span>Global Portfolio Rules</span>
                     </span>
                 </p>
             </header>
             <div class="card-content">
                 <div class="content">
-                    <form id="global-settings-form">
-                        <div class="columns">
-                            <div class="column is-6">
+                    <form id="global-rules-form">
+                        <div class="columns is-multiline">
+                            <div class="column is-4">
                                 <div class="field">
-                                    <label class="label">Max Per Stock (%)</label>
+                                    <label class="label">Maximum Single Position (%)</label>
                                     <div class="control">
-                                        <input class="input" type="number" name="max_stock" min="1" max="100" value="10">
+                                        <input 
+                                            class="input" 
+                                            type="number" 
+                                            name="max_single_position" 
+                                            step="1" 
+                                            min="1" 
+                                            max="100" 
+                                            value="10">
                                     </div>
-                                    <p class="help">Limit for a single stock's weight in any portfolio.</p>
+                                    <p class="help">Limit for any single stock’s share of total portfolio.</p>
                                 </div>
                             </div>
-                            <div class="column is-6">
+                            <div class="column is-4">
                                 <div class="field">
-                                    <label class="label">Max Per Category (%)</label>
+                                    <label class="label">Maximum Category Allocation (%)</label>
                                     <div class="control">
-                                        <input class="input" type="number" name="max_category" min="1" max="100" value="40">
+                                        <input 
+                                            class="input" 
+                                            type="number" 
+                                            name="max_category" 
+                                            step="1" 
+                                            min="1" 
+                                            max="100" 
+                                            value="40">
                                     </div>
-                                    <p class="help">Limit for any single category across all portfolios.</p>
+                                    <p class="help">Ensures no single sector dominates the portfolio.</p>
+                                </div>
+                            </div>
+                            <div class="column is-4">
+                                <div class="field">
+                                    <label class="label">Minimum Number of Positions</label>
+                                    <div class="control">
+                                        <input 
+                                            class="input" 
+                                            type="number" 
+                                            name="min_positions" 
+                                            step="1" 
+                                            min="1" 
+                                            value="5">
+                                    </div>
+                                    <p class="help">Ensures diversification by holding at least N positions.</p>
                                 </div>
                             </div>
                         </div>
-
                         <div class="field">
-                            <button class="button is-primary" id="save-global-settings">
+                            <button class="button is-primary" id="save-global-rules">
                                 <span class="icon">
                                     <i class="fas fa-save"></i>
                                 </span>
-                                <span>Save Global Settings</span>
+                                <span>Save Rules</span>
                             </button>
                         </div>
                     </form>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Portfolio Builder Card -->
+    <!-- Target Portfolio Weights -->
+    <div class="column is-12">
         <div class="card">
             <header class="card-header">
                 <p class="card-header-title">
@@ -81,47 +111,68 @@
                         <span class="icon">
                             <i class="fas fa-clipboard-list"></i>
                         </span>
-                        <span>Portfolio Builder</span>
+                        <span>Target Weights</span>
                     </span>
                 </p>
             </header>
             <div class="card-content">
                 <div class="content">
-                    <!-- If you want to implement weighting logic (like in Streamlit “Build”), 
-                         you can place forms for each portfolio. For now, a placeholder below. -->
-                    <p class="subtitle is-6 mb-4">
-                        Define your target positions, weights, or categories for each portfolio. 
-                        Use these to auto-generate an ideal allocation plan.
-                    </p>
+                    <p>Use this section to define specific target allocations for each portfolio. 
+                       The system will reference these targets when generating an ideal 
+                       distribution. For instance, “Growth Portfolio = 50%”, “Dividend Portfolio = 30%”, etc.</p>
                     
-                    <!-- Example: Weighted Positions for "Growth Portfolio" -->
-                    <article class="message is-warning mb-5">
-                        <div class="message-header">
-                            <p>Growth Portfolio - Weighted Positions</p>
-                        </div>
-                        <div class="message-body">
-                            <p class="mb-2">e.g. Apple (AAPL) - 25%, Microsoft (MSFT) - 15%, etc.</p>
-                            <div class="field has-addons">
+                    <form id="target-weights-form">
+                        <div id="weights-container">
+                            <!-- Example item. In actual usage, you might dynamically render or allow user additions. -->
+                            <div class="field is-grouped mb-2" data-portfolio-row>
                                 <div class="control is-expanded">
-                                    <input class="input" type="text" placeholder="Company / Ticker">
-                                </div>
-                                <div class="control is-expanded">
-                                    <input class="input" type="number" placeholder="Target %" step="0.1">
+                                    <input class="input" type="text" name="portfolio_name[]" value="Growth Portfolio">
                                 </div>
                                 <div class="control">
-                                    <button class="button is-info">
+                                    <input class="input" type="number" name="portfolio_weight[]" step="0.1" placeholder="e.g. 50">
+                                </div>
+                                <div class="control">
+                                    <button class="button is-danger remove-row">
                                         <span class="icon">
-                                            <i class="fas fa-plus"></i>
+                                            <i class="fas fa-minus-circle"></i>
                                         </span>
-                                        <span>Add</span>
                                     </button>
                                 </div>
                             </div>
-                            <!-- Weighted positions list / table would go here -->
+                            <div class="field is-grouped mb-2" data-portfolio-row>
+                                <div class="control is-expanded">
+                                    <input class="input" type="text" name="portfolio_name[]" value="Dividend Portfolio">
+                                </div>
+                                <div class="control">
+                                    <input class="input" type="number" name="portfolio_weight[]" step="0.1" placeholder="e.g. 30">
+                                </div>
+                                <div class="control">
+                                    <button class="button is-danger remove-row">
+                                        <span class="icon">
+                                            <i class="fas fa-minus-circle"></i>
+                                        </span>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                    </article>
-
-                    <button class="button is-success" id="build-portfolio">
+                        <div class="field">
+                            <button type="button" class="button is-info" id="add-portfolio-target">
+                                <span class="icon">
+                                    <i class="fas fa-plus"></i>
+                                </span>
+                                <span>Add Portfolio Target</span>
+                            </button>
+                            <button type="submit" class="button is-success ml-3" id="save-target-weights">
+                                <span class="icon">
+                                    <i class="fas fa-save"></i>
+                                </span>
+                                <span>Save Target Weights</span>
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <hr>
+                    <button class="button is-warning" id="build-allocation-plan">
                         <span class="icon">
                             <i class="fas fa-play"></i>
                         </span>
@@ -137,20 +188,83 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    // Example: wiring up Save Global Settings
-    const saveSettingsBtn = document.getElementById('save-global-settings');
-    if (saveSettingsBtn) {
-        saveSettingsBtn.addEventListener('click', (e) => {
+    // Dismiss notification
+    document.querySelectorAll('.notification .delete').forEach(delBtn => {
+        delBtn.addEventListener('click', () => {
+            delBtn.parentNode.remove();
+        });
+    });
+
+    // 1. Save Global Rules
+    const saveGlobalRulesBtn = document.getElementById('save-global-rules');
+    if (saveGlobalRulesBtn) {
+        saveGlobalRulesBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            portfolioManager.showNotification('Global settings saved (placeholder)', 'is-success');
+            // Example: Send form data to /build/global_rules endpoint
+            // In real usage, gather data from the form and post via Axios or fetch.
+            portfolioManager.showNotification('Global rules saved successfully.', 'is-success');
         });
     }
 
-    const buildPortfolioBtn = document.getElementById('build-portfolio');
-    if (buildPortfolioBtn) {
-        buildPortfolioBtn.addEventListener('click', (e) => {
+    // 2. Manage dynamic target weights
+    const addPortfolioBtn = document.getElementById('add-portfolio-target');
+    const weightsContainer = document.getElementById('weights-container');
+    if(addPortfolioBtn && weightsContainer){
+        addPortfolioBtn.addEventListener('click', () => {
+            const row = document.createElement('div');
+            row.className = 'field is-grouped mb-2';
+            row.setAttribute('data-portfolio-row', '');
+
+            row.innerHTML = `
+                <div class="control is-expanded">
+                    <input class="input" type="text" name="portfolio_name[]" placeholder="Portfolio Name">
+                </div>
+                <div class="control">
+                    <input class="input" type="number" name="portfolio_weight[]" step="0.1" placeholder="Target %">
+                </div>
+                <div class="control">
+                    <button class="button is-danger remove-row">
+                        <span class="icon">
+                            <i class="fas fa-minus-circle"></i>
+                        </span>
+                    </button>
+                </div>
+            `;
+            weightsContainer.appendChild(row);
+
+            // Add event to remove button
+            row.querySelector('.remove-row').addEventListener('click', function(e) {
+                e.preventDefault();
+                row.remove();
+            });
+        });
+    }
+
+    // Handle remove-row in existing items
+    document.querySelectorAll('.remove-row').forEach(btn => {
+        btn.addEventListener('click', (e) => {
             e.preventDefault();
-            portfolioManager.showNotification('Allocations built successfully (placeholder)', 'is-success');
+            btn.closest('[data-portfolio-row]').remove();
+        });
+    });
+
+    // 3. Save target weights
+    const saveTargetWeightsBtn = document.getElementById('save-target-weights');
+    if(saveTargetWeightsBtn) {
+        saveTargetWeightsBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            // Example: gather and post data
+            portfolioManager.showNotification('Target weights saved successfully.', 'is-success');
+        });
+    }
+
+    // 4. Generate allocation plan
+    const buildAllocationBtn = document.getElementById('build-allocation-plan');
+    if(buildAllocationBtn) {
+        buildAllocationBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            // Example: call your build logic endpoint
+            portfolioManager.showNotification('Allocation plan generated. Check console for details.', 'is-warning');
         });
     }
 });

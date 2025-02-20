@@ -1,4 +1,3 @@
-{# templates/pages/analyse.html #}
 {% extends "base.html" %}
 
 {% block title %}Portfolio Analysis - Portfolio Manager{% endblock %}
@@ -17,71 +16,207 @@
 
         <div class="notification is-info is-light">
             <button class="delete"></button>
-            <p>This page shows detailed analytics and charts for your portfolio(s). 
-               You can explore allocation, performance, risk metrics, and more.</p>
+            <p>This page provides insights into your portfolio performance, category breakdowns,
+               and potential rebalancing strategies.</p>
         </div>
     </div>
 </div>
 
-<!-- Example: Overall Metrics -->
-<div class="columns">
-    <div class="column is-4">
-        <div class="box has-text-centered">
-            <p class="title is-5">Total Portfolio Value</p>
-            <p class="subtitle is-3" id="analysis-total-value">
-                €{{ '{:,.2f}'.format(analysis_data.total_value) if analysis_data else '0.00' }}
-            </p>
+<!-- Portfolio Metrics Section -->
+<div class="columns is-multiline">
+    <div class="column is-12">
+        <div class="card mb-5">
+            <header class="card-header">
+                <p class="card-header-title">
+                    <span class="icon-text">
+                        <span class="icon">
+                            <i class="fas fa-info-circle"></i>
+                        </span>
+                        <span>Key Metrics</span>
+                    </span>
+                </p>
+            </header>
+            <div class="card-content">
+                <div class="content">
+                    <!-- Example container for summary statistics (populated by analysis API) -->
+                    <div class="columns is-multiline">
+                        <div class="column is-3 has-text-centered">
+                            <p class="heading">Total Value (EUR)</p>
+                            <p class="title" id="analysis-total-value">-</p>
+                        </div>
+                        <div class="column is-3 has-text-centered">
+                            <p class="heading">Total Invested (EUR)</p>
+                            <p class="title" id="analysis-total-invested">-</p>
+                        </div>
+                        <div class="column is-3 has-text-centered">
+                            <p class="heading">Unrealized Gain (EUR)</p>
+                            <p class="title" id="analysis-unrealized-gain">-</p>
+                        </div>
+                        <div class="column is-3 has-text-centered">
+                            <p class="heading">Positions Count</p>
+                            <p class="title" id="analysis-positions-count">-</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div class="column is-4">
-        <div class="box has-text-centered">
-            <p class="title is-5">Unrealized Gain (%)</p>
-            <p class="subtitle is-3" id="analysis-unrealized-gain">
-                {{ '{:.1f}'.format(analysis_data.unrealized_gain_percent) if analysis_data else '0' }}%
-            </p>
+    <!-- Category Breakdown Chart -->
+    <div class="column is-12">
+        <div class="card mb-5">
+            <header class="card-header">
+                <p class="card-header-title">
+                    <span class="icon-text">
+                        <span class="icon">
+                            <i class="fas fa-chart-pie"></i>
+                        </span>
+                        <span>Category Breakdown</span>
+                    </span>
+                </p>
+            </header>
+            <div class="card-content">
+                <div class="content">
+                    <div id="category-breakdown-chart" style="height: 400px;"></div>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div class="column is-4">
-        <div class="box has-text-centered">
-            <p class="title is-5">Concentration Score</p>
-            <p class="subtitle is-3" id="analysis-concentration">
-                {{ '{:.1f}'.format(analysis_data.concentration_score) if analysis_data else '0' }}
-            </p>
-        </div>
-    </div>
-</div>
-
-<!-- Allocation Charts Placeholder -->
-<div class="columns">
+    <!-- Rebalancing / Concentration Section -->
     <div class="column is-12">
         <div class="card">
             <header class="card-header">
-                <p class="card-header-title">Allocations by Portfolio</p>
+                <p class="card-header-title">
+                    <span class="icon-text">
+                        <span class="icon">
+                            <i class="fas fa-sync-alt"></i>
+                        </span>
+                        <span>Rebalancing & Concentration</span>
+                    </span>
+                </p>
             </header>
             <div class="card-content">
-                <div id="chart-allocations" class="chart-container">
-                    <!-- Plotly or other chart logic goes here -->
+                <div class="content">
+                    <p>Below is a sample view of your concentration score and suggested
+                       rebalancing approach. This helps ensure you don’t exceed your desired
+                       allocation in any one stock or sector.</p>
+
+                    <article class="message is-warning mb-4">
+                        <div class="message-header">
+                            <p>Concentration Score</p>
+                        </div>
+                        <div class="message-body">
+                            <span id="analysis-concentration-score">N/A</span> 
+                            <small>(Herfindahl Index * 100)</small>
+                        </div>
+                    </article>
+
+                    <button class="button is-info" id="analysis-rebalance-btn">
+                        <span class="icon">
+                            <i class="fas fa-balance-scale"></i>
+                        </span>
+                        <span>Suggest Rebalancing</span>
+                    </button>
+                    <div class="notification is-light mt-4" id="analysis-rebalance-suggestion" style="display:none;">
+                        <!-- This could be populated with dynamic rebalancing suggestions from the backend. -->
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Additional analysis: categories, risk metrics, etc. -->
-<div class="columns">
-    <div class="column is-12">
-        <div class="card">
-            <header class="card-header">
-                <p class="card-header-title">Category Breakdown</p>
-            </header>
-            <div class="card-content">
-                <div id="chart-categories" class="chart-container">
-                    <!-- Another chart placeholder -->
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // Sample placeholders to fetch analysis data via AJAX
+    // Adjust or remove as desired for your actual implementation.
+
+    // 1. Fetch key metrics
+    axios.get('/analysis/api/metrics')
+        .then(response => {
+            if(response.data) {
+                const metrics = response.data;
+                document.getElementById('analysis-total-value').textContent =
+                    portfolioManager.formatCurrency(metrics.total_value || 0);
+                document.getElementById('analysis-total-invested').textContent =
+                    portfolioManager.formatCurrency(metrics.total_invested || 0);
+                document.getElementById('analysis-unrealized-gain').textContent =
+                    portfolioManager.formatCurrency(metrics.unrealized_gain || 0);
+                document.getElementById('analysis-positions-count').textContent =
+                    metrics.position_count || '-';
+                if(metrics.concentration_score !== undefined) {
+                    document.getElementById('analysis-concentration-score').textContent =
+                        metrics.concentration_score.toFixed(2);
+                }
+            }
+        })
+        .catch(err => {
+            console.error('Error fetching analysis metrics:', err);
+        });
+
+    // 2. Fetch category breakdown for chart
+    axios.get('/analysis/api/metrics')
+        .then(response => {
+            if(response.data && response.data.category_breakdown) {
+                const chartData = response.data.category_breakdown;
+                // Build arrays for a pie chart
+                const labels = [];
+                const values = [];
+                chartData.forEach(cat => {
+                    labels.push(cat);
+                    values.push(chartData[cat].value);
+                });
+
+                const data = [{
+                    labels: labels,
+                    values: values,
+                    type: 'pie',
+                    textinfo: 'label+percent',
+                    hoverinfo: 'label+value'
+                }];
+
+                Plotly.newPlot('category-breakdown-chart', data, {
+                    margin: { t: 30, b: 30 }
+                });
+            }
+        })
+        .catch(err => {
+            console.error('Error building category breakdown chart:', err);
+        });
+
+    // 3. Rebalancing suggestions
+    const rebalanceBtn = document.getElementById('analysis-rebalance-btn');
+    const suggestionDiv = document.getElementById('analysis-rebalance-suggestion');
+    if(rebalanceBtn) {
+        rebalanceBtn.addEventListener('click', () => {
+            axios.get('/analysis/api/rebalance_suggestion')
+                .then(response => {
+                    if(response.data && response.data.suggestion) {
+                        suggestionDiv.style.display = 'block';
+                        suggestionDiv.innerHTML = `
+                            <p><strong>Suggested Rebalance:</strong></p>
+                            <p>${response.data.suggestion}</p>
+                        `;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching rebalancing suggestion:', error);
+                    portfolioManager.showNotification('Failed to fetch rebalancing suggestion.', 'is-danger');
+                });
+        });
+    }
+
+    // Auto-dismiss notifications
+    const notifs = document.querySelectorAll('.notification .delete');
+    notifs.forEach(del => {
+        del.addEventListener('click', () => {
+            del.parentNode.remove();
+        });
+    });
+});
+</script>
 {% endblock %}

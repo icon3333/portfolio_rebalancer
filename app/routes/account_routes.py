@@ -2,7 +2,7 @@ from flask import (
     Blueprint, render_template, redirect, url_for, 
     request, flash, session, jsonify
 )
-from app.database.db_manager import query_db, execute_db, backup_database
+from app.database.db_manager import query_db, execute_db, backup_database, get_db
 import sqlite3
 from datetime import datetime
 
@@ -127,6 +127,7 @@ def delete_account():
         flash('Please type DELETE to confirm account deletion', 'error')
         return redirect(url_for('account.index'))
     
+    db = None
     try:
         # Create backup before making changes
         backup_database()
@@ -167,7 +168,8 @@ def delete_account():
         
     except Exception as e:
         # Rollback in case of error
-        db.rollback()
+        if db is not None:
+            db.rollback()
         flash(f'Error deleting account: {str(e)}', 'error')
     
     return redirect(url_for('main.index'))

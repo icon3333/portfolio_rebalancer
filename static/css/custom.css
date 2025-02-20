@@ -1,54 +1,203 @@
-/* Custom CSS for Portfolio Manager */
+/* Custom CSS for Portfolio Manager - Minimalist Theme */
 
-/* Sidebar adjustments */
+/* Navbar */
+.navbar {
+    background-color: var(--blue-500) !important;
+}
+
+.navbar-item,
+.navbar-link,
+.navbar-dropdown .navbar-item {
+    color: var(--white) !important;
+}
+
+.navbar-item:hover,
+.navbar-link:hover {
+    background-color: var(--blue-700) !important;
+    color: var(--white) !important;
+}
+
+.navbar-burger {
+    color: var(--white) !important;
+}
+
+.navbar-menu.is-active {
+    background-color: var(--blue-500) !important;
+}
+
+/* Base theme colors */
+:root {
+    --white: #ffffff;
+    --light-grey: #f8f9fa;
+    --grey: #e9ecef;
+    --dark-grey: #343a40;
+    --blue-100: #e3f2fd;
+    --blue-200: #90caf9;
+    --blue-500: #2196f3;
+    --blue-700: #1976d2;
+    --green-500: #4caf50;
+    --red-500: #f44336;
+}
+
+/* Global Resets */
+*, .card, .button, .notification, .input, .textarea, .select select, .table {
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
+/* Sidebar */
 .sidebar {
-    min-width: 250px;
-    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+    min-width: 250px !important;
+    background: var(--white) !important;
+    border-right: 1px solid var(--grey) !important;
+    box-shadow: none !important;
 }
 
 .menu-label {
-    font-size: 0.9em;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
+    color: var(--dark-grey) !important;
+    font-size: 0.8em !important;
+    font-weight: 500 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.1em !important;
 }
 
-/* Flash message animations */
-.message-notification {
-    transition: opacity 0.5s ease-out;
+.menu-list a {
+    color: var(--dark-grey) !important;
+    border-radius: 0 !important;
 }
 
-.is-fading-out {
-    opacity: 0;
+.menu-list a:hover {
+    background-color: var(--blue-100) !important;
 }
 
-/* Card hover effects */
+.menu-list a.is-active {
+    background-color: var(--blue-500) !important;
+    color: var(--white) !important;
+}
+
+/* Cards */
 .card {
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    background: var(--white) !important;
+    border: 1px solid var(--grey) !important;
+    margin-bottom: 1rem !important;
 }
 
 .card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    border-color: var(--blue-200) !important;
+    transform: none !important;
 }
 
-/* Table styles */
-.table-container {
-    overflow-x: auto;
+.card-header {
+    background: var(--white) !important;
+    border-bottom: 1px solid var(--grey) !important;
+    box-shadow: none !important;
+}
+
+.card-header-title {
+    color: var(--dark-grey) !important;
+    font-weight: 500 !important;
+}
+
+/* Tables */
+.table {
+    background: var(--white) !important;
+    border: 1px solid var(--grey) !important;
 }
 
 .table thead th {
-    background-color: #f5f5f5;
-    border-bottom: 2px solid #dbdbdb;
+    background: var(--light-grey) !important;
+    border-bottom: 1px solid var(--grey) !important;
+    color: var(--dark-grey) !important;
+    font-weight: 500 !important;
 }
 
-.table.is-hoverable tr:hover {
-    background-color: #f0f8ff !important;
+.table.is-hoverable tbody tr:hover {
+    background-color: var(--blue-100) !important;
 }
 
-/* Form styles */
+/* Forms */
+.input, .textarea, .select select {
+    background-color: var(--white) !important;
+    border: 1px solid var(--grey) !important;
+    color: var(--dark-grey) !important;
+}
+
 .input:focus, .textarea:focus, .select select:focus {
-    border-color: #3273dc;
+    border-color: var(--blue-500) !important;
+    box-shadow: none !important;
+}
+
+/* Buttons */
+.button {
+    background: var(--white) !important;
+    border: 1px solid var(--grey) !important;
+    color: var(--dark-grey) !important;
+}
+
+.button.is-info {
+    background: var(--blue-500) !important;
+    border-color: var(--blue-500) !important;
+    color: var(--white) !important;
+}
+
+.button.is-info:hover {
+    background: var(--blue-700) !important;
+    border-color: var(--blue-700) !important;
+}
+
+.button.is-success {
+    background: var(--green-500) !important;
+    border-color: var(--green-500) !important;
+    color: var(--white) !important;
+}
+
+.button.is-danger {
+    background: var(--red-500) !important;
+    border-color: var(--red-500) !important;
+    color: var(--white) !important;
+}
+
+/* Notifications and Messages */
+.notification {
+    background: var(--light-grey) !important;
+    border: 1px solid var(--grey) !important;
+    padding: 1rem !important;
+}
+
+.notification.is-info {
+    background: var(--blue-100) !important;
+    color: var(--dark-grey) !important;
+    border: 1px solid var(--blue-200) !important;
+}
+
+.notification.is-success {
+    background: var(--green-500) !important;
+    color: var(--white) !important;
+}
+
+.notification.is-danger {
+    background: var(--red-500) !important;
+    color: var(--white) !important;
+}
+
+/* Layout */
+.section {
+    padding: 1.5rem !important;
+    background: var(--white) !important;
+}
+
+.container {
+    max-width: 1200px !important;
+}
+
+/* Transitions */
+.message-notification {
+    transition: opacity 0.3s ease-out !important;
+}
+
+.is-fading-out {
+    opacity: 0 !important;
+}
     box-shadow: 0 0 0 0.125em rgba(50, 115, 220, 0.25);
 }
 

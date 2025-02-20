@@ -186,25 +186,31 @@
                                 <div class="level-item has-text-centered">
                                     <div>
                                         <p class="heading">Total Companies</p>
-                                        <p class="title">${ metrics.total }</p>
+                                        <p class="title">{{ metrics.total }}</p>
                                     </div>
                                 </div>
                                 <div class="level-item has-text-centered">
                                     <div>
                                         <p class="heading">Portfolio Health</p>
-                                        <p class="title">${ metrics.health }%</p>
+                                        <p class="title">{{ metrics.health }}%</p>
                                     </div>
                                 </div>
                                 <div class="level-item has-text-centered">
                                     <div>
                                         <p class="heading">Missing Prices</p>
-                                        <p class="title">${ metrics.missing }</p>
+                                        <p class="title">{{ metrics.missing }}</p>
+                                    </div>
+                                </div>
+                                <div class="level-item has-text-centered">
+                                    <div>
+                                        <p class="heading">Total Value</p>
+                                        <p class="title">{{ formatCurrency(metrics.totalValue) }}</p>
                                     </div>
                                 </div>
                                 <div class="level-item has-text-centered">
                                     <div>
                                         <p class="heading">Last Update</p>
-                                        <p class="title is-6">${ metrics.lastUpdate }</p>
+                                        <p class="title is-6">{{ metrics.lastUpdate }}</p>
                                     </div>
                                 </div>
                             </div>
@@ -219,62 +225,61 @@
                                             <input type="checkbox" v-model="selectAll" @change="toggleSelectAll">
                                         </label>
                                     </th>
+                                    <th>Ticker</th>
                                     <th>Company</th>
                                     <th>Portfolio</th>
                                     <th>Category</th>
-                                    <th>Ticker</th>
                                     <th>Shares</th>
-                                    <th>Override</th>
                                     <th>Price (EUR)</th>
-                                    <th>Currency</th>
+                                    <th>Total Value</th>
                                     <th>Last Updated</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr v-for="(item, index) in filteredData" :key="index" :class="{'has-background-warning-light': !item.price_eur}">
+                                <tr v-for="(item, index) in filteredData" :key="item.id">
                                     <td v-if="showSelector">
                                         <label class="checkbox">
                                             <input type="checkbox" v-model="selectedItems" :value="index">
                                         </label>
                                     </td>
-                                    <td>${ item.company }</td>
+                                    <td>{{ item.ticker }}</td>
+                                    <td>{{ item.company }}</td>
                                     <td>
                                         <div class="select is-small">
                                             <select v-model="item.portfolio">
-                                                <option value="-">None</option>
-                                                <option v-for="p in portfolioOptions" :value="p">${ p }</option>
+                                                <option value="">-</option>
+                                                <option v-for="p in portfolioOptions" :key="p" :value="p">{{ p }}</option>
                                             </select>
                                         </div>
                                     </td>
                                     <td>
                                         <input class="input is-small" type="text" v-model="item.category">
                                     </td>
-                                    <td>
-                                        <input class="input is-small" type="text" v-model="item.ticker">
-                                    </td>
-                                    <td>${ formatNumber(item.shares) }</td>
-                                    <td>
-                                        <input class="input is-small" type="number" v-model.number="item.override_share">
-                                    </td>
+                                    <td>{{ formatNumber(item.shares) }}</td>
                                     <td :class="{'has-text-danger': !item.price_eur}">
-                                        ${ item.price_eur ? formatCurrency(item.price_eur) : 'No price' }
+                                        {{ item.price_eur ? formatCurrency(item.price_eur) : 'No price' }}
+                                        <button class="button is-small" 
+                                                @click="updatePrice(item)"
+                                                :class="{'is-loading': updating}"
+                                                :disabled="updating">
+                                            <span class="icon is-small">
+                                                <i class="fas fa-sync-alt"></i>
+                                            </span>
+                                        </button>
                                     </td>
-                                    <td>${ item.currency || '-' }</td>
+                                    <td>{{ formatCurrency(item.price_eur * item.shares) }}</td>
                                     <td>
                                         <span v-if="item.last_updated" :title="formatDateTime(item.last_updated)">
-                                            ${ formatDateAgo(item.last_updated) }
+                                            {{ formatDateAgo(item.last_updated) }}
                                         </span>
                                         <span v-else>-</span>
                                     </td>
                                     <td>
                                         <div class="buttons are-small">
-                                            <button class="button is-info is-small" @click="updatePrice(item)" :disabled="updating">
-                                                <span class="icon is-small">
-                                                    <i class="fas fa-sync-alt"></i>
-                                                </span>
-                                            </button>
-                                            <button class="button is-danger is-small" @click="confirmDelete(item)" :disabled="updating">
+                                            <button class="button is-danger" 
+                                                    @click="confirmDelete(item)"
+                                                    :disabled="updating">
                                                 <span class="icon is-small">
                                                     <i class="fas fa-trash-alt"></i>
                                                 </span>
@@ -427,12 +432,13 @@
                     </span>
                     <p>Loading data...</p>
                 </div>
+                
                 <div v-else>
                     <!-- Filter -->
                     <div class="field">
                         <label class="label">Filter Companies</label>
                         <div class="control has-icons-left">
-                            <input class="input" type="text" v-model="filter" placeholder="Type to filter companies">
+                            <input class="input" type="text" v-model="searchQuery" placeholder="Type to filter companies">
                             <span class="icon is-small is-left">
                                 <i class="fas fa-search"></i>
                             </span>
@@ -442,11 +448,12 @@
                     <!-- Companies selector grouped by portfolio -->
                     <div v-for="(companies, portfolio) in groupedCompanies" :key="portfolio" class="mb-5">
                         <div class="is-flex is-justify-content-space-between is-align-items-center mb-2">
-                            <h5 class="title is-5">${ portfolio }</h5>
+                            <h5 class="title is-5">{{ portfolio }}</h5>
                             <label class="checkbox">
-                                <input type="checkbox" @change="togglePortfolio(portfolio)" 
+                                <input type="checkbox" 
+                                       @change="togglePortfolio(portfolio)"
                                        :checked="isPortfolioSelected(portfolio)">
-                                Select all
+                                Select All
                             </label>
                         </div>
                         
@@ -454,7 +461,7 @@
                             <div v-for="company in companies" :key="company.id" class="column is-6">
                                 <label class="checkbox">
                                     <input type="checkbox" v-model="selectedCompanies" :value="company.id">
-                                    ${ company.name } (${ company.ticker })
+                                    {{ company.name }} ({{ company.ticker }})
                                 </label>
                             </div>
                         </div>
@@ -468,7 +475,7 @@
                     
                     <!-- Selection Summary -->
                     <div class="notification is-info is-light" v-if="selectedCompanies.length > 0">
-                        <p><strong>${ selectedCompanies.length }</strong> companies selected</p>
+                        <p><strong>{{ selectedCompanies.length }}</strong> companies selected</p>
                     </div>
                     
                     <div class="tabs">
@@ -490,7 +497,7 @@
                                 <div class="select is-fullwidth">
                                     <select v-model="targetPortfolio">
                                         <option value="">Select portfolio</option>
-                                        <option v-for="p in portfolioOptions" :value="p">${ p }</option>
+                                        <option v-for="p in portfolioOptions" :value="p">{{ p }}</option>
                                     </select>
                                 </div>
                             </div>
@@ -533,77 +540,36 @@
 
 {% block scripts %}
 <script>
-document.addEventListener('DOMContentLoaded', () => {
-    // File input handling
-    const fileInput = document.getElementById('csv_file');
-    const fileLabel = document.querySelector('.file-name');
-    const uploadButton = document.getElementById('upload-button');
-    
-    if (fileInput) {
-        fileInput.addEventListener('change', (e) => {
-            if (fileInput.files.length > 0) {
-                fileLabel.textContent = fileInput.files[0].name;
-                uploadButton.disabled = false;
-            } else {
-                fileLabel.textContent = 'No file selected';
-                uploadButton.disabled = true;
-            }
-        });
+// Initialize portfolio manager utility
+const portfolioManager = {
+    showNotification(message, type = 'is-info') {
+        // Implementation for showing notifications
+        console.log(`${type}: ${message}`);
     }
-    
-    // Tabs functionality
-    const tabs = document.querySelectorAll('.tabs li');
-    const tabContents = document.querySelectorAll('.tab-content');
-    
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            tabs.forEach(t => t.classList.remove('is-active'));
-            tab.classList.add('is-active');
-            
-            const target = tab.querySelector('a').dataset.target;
-            tabContents.forEach(content => {
-                content.classList.add('is-hidden');
-            });
-            
-            if (target) {
-                document.getElementById(target).classList.remove('is-hidden');
-            }
-        });
-    });
-    
-    // Delete portfolio confirmation
-    const deletePortfolioForm = document.getElementById('delete-portfolio-form');
-    if (deletePortfolioForm) {
-        deletePortfolioForm.addEventListener('submit', (e) => {
-            const portfolioSelect = deletePortfolioForm.querySelector('select[name="portfolio_name"]');
-            if (portfolioSelect.value) {
-                if (!confirm(`Are you sure you want to delete the portfolio "${portfolioSelect.value}"?`)) {
-                    e.preventDefault();
-                }
-            }
-        });
-    }
-});
+};
 
 // Portfolio Table Vue Application
 const portfolioTableApp = new Vue({
     el: '#portfolio-table-app',
-    delimiters: ['${', '}'],
-    data: {
-        data: [],
-        loading: true,
-        updating: false,
-        showSelector: false,
-        selectAll: false,
-        selectedItems: [],
-        portfolioOptions: {{ portfolios|map(attribute='name')|list|tojson }},
-        filterPortfolio: '',
-        metrics: {
-            total: 0,
-            health: 0,
-            missing: 0,
-            lastUpdate: 'Never'
-        }
+    data() {
+        return {
+            data: [],
+            loading: true,
+            updating: false,
+            showSelector: false,
+            selectAll: false,
+            selectedItems: [],
+            portfolioOptions: JSON.parse('{{ portfolios|map(attribute="name")|list|tojson|safe }}'),
+            filterPortfolio: '',
+            metrics: {
+                total: 0,
+                health: 0,
+                missing: 0,
+                lastUpdate: 'Never',
+                totalValue: 0
+            },
+            error: null
+        };
     },
     computed: {
         filteredData() {
@@ -611,27 +577,30 @@ const portfolioTableApp = new Vue({
             return this.data.filter(item => item.portfolio === this.filterPortfolio);
         },
         healthColorClass() {
+            if (!this.data.length) return 'is-info';
             const health = this.metrics.health;
             if (health >= 90) return 'is-success';
             if (health >= 70) return 'is-warning';
             return 'is-danger';
+        },
+        hasSelectedItems() {
+            return this.selectedItems.length > 0;
         }
     },
     methods: {
-        loadData() {
-            this.loading = true;
-            axios.get('/api/portfolio_data')
-                .then(response => {
-                    this.data = response.data;
-                    this.calculateMetrics();
-                })
-                .catch(error => {
-                    console.error('Error loading portfolio data:', error);
-                    portfolioManager.showNotification('Failed to load portfolio data', 'is-danger');
-                })
-                .finally(() => {
-                    this.loading = false;
-                });
+        async loadData() {
+            try {
+                this.loading = true;
+                const response = await fetch('/api/portfolio/data');
+                if (!response.ok) throw new Error('Failed to load portfolio data');
+                this.data = await response.json();
+                this.calculateMetrics();
+            } catch (err) {
+                this.error = err.message;
+                portfolioManager.showNotification(err.message, 'is-danger');
+            } finally {
+                this.loading = false;
+            }
         },
         calculateMetrics() {
             if (!this.data.length) {
@@ -639,52 +608,44 @@ const portfolioTableApp = new Vue({
                     total: 0,
                     health: 0,
                     missing: 0,
-                    lastUpdate: 'Never'
+                    lastUpdate: 'Never',
+                    totalValue: 0
                 };
                 return;
             }
             
-            const total = this.data.length;
             const missing = this.data.filter(item => !item.price_eur).length;
+            const total = this.data.length;
             const health = Math.round(((total - missing) / total) * 100);
-            
-            // Find most recent update
-            const dates = this.data
-                .filter(item => item.last_updated)
-                .map(item => new Date(item.last_updated));
-            
-            let lastUpdate = 'Never';
-            if (dates.length > 0) {
-                const mostRecent = new Date(Math.max.apply(null, dates));
-                lastUpdate = this.formatDateTime(mostRecent);
-            }
+            const totalValue = this.data.reduce((sum, item) => {
+                return sum + (item.price_eur || 0) * (item.shares || 0);
+            }, 0);
             
             this.metrics = {
                 total,
                 health,
                 missing,
-                lastUpdate
+                totalValue,
+                lastUpdate: this.data[0]?.last_updated || 'Never'
             };
         },
         formatNumber(value) {
             if (!value) return '0';
-            return parseFloat(value).toLocaleString();
+            return Number(value).toLocaleString();
         },
         formatCurrency(value) {
             if (!value) return '€0.00';
-            return '€' + parseFloat(value).toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            });
+            return new Intl.NumberFormat('de-DE', {
+                style: 'currency',
+                currency: 'EUR'
+            }).format(value);
         },
         formatDateTime(dateStr) {
-            if (!dateStr) return '';
-            const date = new Date(dateStr);
-            return date.toLocaleString();
+            if (!dateStr) return '-';
+            return new Date(dateStr).toLocaleString('de-DE');
         },
         formatDateAgo(dateStr) {
-            if (!dateStr) return '';
-            
+            if (!dateStr) return '-';
             const date = new Date(dateStr);
             const now = new Date();
             const diffMs = now - date;
@@ -697,67 +658,86 @@ const portfolioTableApp = new Vue({
                     return `${diffMinutes} min ago`;
                 }
                 return `${diffHours} hours ago`;
-            } else if (diffDays === 1) {
-                return 'Yesterday';
-            } else if (diffDays < 7) {
-                return `${diffDays} days ago`;
-            } else {
-                return date.toLocaleDateString();
+            }
+            if (diffDays === 1) return 'Yesterday';
+            if (diffDays < 7) return `${diffDays} days ago`;
+            return this.formatDateTime(dateStr);
+        },
+        async updatePrice(item) {
+            if (this.updating) return;
+            try {
+                this.updating = true;
+                const response = await fetch('/api/portfolio/update-price', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ticker: item.ticker })
+                });
+                
+                if (!response.ok) throw new Error('Failed to update price');
+                const data = await response.json();
+                
+                Object.assign(item, data);
+                this.calculateMetrics();
+                portfolioManager.showNotification('Price updated successfully', 'is-success');
+            } catch (err) {
+                portfolioManager.showNotification(err.message, 'is-danger');
+            } finally {
+                this.updating = false;
             }
         },
-        updatePrice(item) {
+        async updateAllPrices() {
             if (this.updating) return;
-            this.updating = true;
-            
-            axios.post('/api/update_price', { ticker: item.ticker })
-                .then(response => {
-                    if (response.data.success) {
-                        // Update item with new price data
-                        Object.assign(item, response.data.price_data);
-                        portfolioManager.showNotification('Price updated successfully', 'is-success');
-                        this.calculateMetrics();
-                    } else {
-                        portfolioManager.showNotification(`Failed to update price: ${response.data.error}`, 'is-warning');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error updating price:', error);
-                    portfolioManager.showNotification('Error updating price', 'is-danger');
-                })
-                .finally(() => {
-                    this.updating = false;
+            try {
+                this.updating = true;
+                const response = await fetch('/api/portfolio/update-all-prices', {
+                    method: 'POST'
                 });
-        },
-        confirmDelete(item) {
-            if (confirm(`Are you sure you want to delete ${item.company}?`)) {
-                this.deleteItem(item);
+                
+                if (!response.ok) throw new Error('Failed to update prices');
+                await this.loadData();
+                portfolioManager.showNotification('All prices updated successfully', 'is-success');
+            } catch (err) {
+                portfolioManager.showNotification(err.message, 'is-danger');
+            } finally {
+                this.updating = false;
             }
         },
-        deleteItem(item) {
-            if (this.updating) return;
-            this.updating = true;
-            
-            axios.post('/api/delete_company', { company_id: item.id })
-                .then(response => {
-                    if (response.data.success) {
-                        // Remove from data array
-                        const index = this.data.findIndex(i => i.id === item.id);
-                        if (index !== -1) {
-                            this.data.splice(index, 1);
-                        }
-                        portfolioManager.showNotification('Company deleted successfully', 'is-success');
-                        this.calculateMetrics();
-                    } else {
-                        portfolioManager.showNotification(`Failed to delete company: ${response.data.error}`, 'is-warning');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error deleting company:', error);
-                    portfolioManager.showNotification('Error deleting company', 'is-danger');
-                })
-                .finally(() => {
-                    this.updating = false;
+        async updateMissingPrices() {
+            if (this.updating || !this.metrics.missing) return;
+            try {
+                this.updating = true;
+                const response = await fetch('/api/portfolio/update-missing-prices', {
+                    method: 'POST'
                 });
+                
+                if (!response.ok) throw new Error('Failed to update missing prices');
+                await this.loadData();
+                portfolioManager.showNotification('Missing prices updated successfully', 'is-success');
+            } catch (err) {
+                portfolioManager.showNotification(err.message, 'is-danger');
+            } finally {
+                this.updating = false;
+            }
+        },
+        async confirmDelete(item) {
+            if (!confirm(`Are you sure you want to delete ${item.company}?`)) return;
+            try {
+                this.updating = true;
+                const response = await fetch('/api/portfolio/delete-company', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: item.id })
+                });
+                
+                if (!response.ok) throw new Error('Failed to delete company');
+                this.data = this.data.filter(i => i.id !== item.id);
+                this.calculateMetrics();
+                portfolioManager.showNotification('Company deleted successfully', 'is-success');
+            } catch (err) {
+                portfolioManager.showNotification(err.message, 'is-danger');
+            } finally {
+                this.updating = false;
+            }
         },
         toggleSelectAll() {
             if (this.selectAll) {
@@ -765,157 +745,20 @@ const portfolioTableApp = new Vue({
             } else {
                 this.selectedItems = [];
             }
-        },
-        saveChanges() {
-            if (this.updating) return;
-            this.updating = true;
-            
-            const changedData = this.data.map(item => {
-                return {
-                    id: item.id,
-                    company: item.company,
-                    ticker: item.ticker,
-                    portfolio: item.portfolio,
-                    category: item.category,
-                    override_share: item.override_share
-                };
-            });
-            
-            axios.post('/api/update_portfolio', changedData)
-                .then(response => {
-                    if (response.data.success) {
-                        portfolioManager.showNotification('Changes saved successfully', 'is-success');
-                        // Reload data to reflect all changes
-                        this.loadData();
-                    } else {
-                        portfolioManager.showNotification(`Failed to save changes: ${response.data.error}`, 'is-warning');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error saving changes:', error);
-                    portfolioManager.showNotification('Error saving changes', 'is-danger');
-                })
-                .finally(() => {
-                    this.updating = false;
-                });
         }
     },
     mounted() {
         this.loadData();
         
-        // Initialize filter from URL or select element
-        const urlParams = new URLSearchParams(window.location.search);
-        const portfolioParam = urlParams.get('portfolio');
+        // Event listeners
+        document.getElementById('refresh-data').addEventListener('click', () => this.loadData());
+        document.getElementById('update-prices').addEventListener('click', () => this.updateAllPrices());
+        document.getElementById('update-missing-prices').addEventListener('click', () => this.updateMissingPrices());
+        
         const filterSelect = document.getElementById('filter-portfolio');
-        
-        if (portfolioParam) {
-            this.filterPortfolio = portfolioParam;
-            if (filterSelect) {
-                filterSelect.value = portfolioParam;
-            }
-        }
-        
-        // Set up filter select change event
         if (filterSelect) {
-            filterSelect.addEventListener('change', () => {
-                this.filterPortfolio = filterSelect.value;
-            });
-        }
-        
-        // Set up action buttons
-        const refreshButton = document.getElementById('refresh-data');
-        if (refreshButton) {
-            refreshButton.addEventListener('click', () => this.loadData());
-        }
-        
-        const saveButton = document.getElementById('save-changes');
-        if (saveButton) {
-            saveButton.addEventListener('click', () => this.saveChanges());
-        }
-        
-        const bulkEditButton = document.querySelector('[data-target="bulk-edit-modal"]');
-        if (bulkEditButton) {
-            bulkEditButton.addEventListener('click', () => {
-                this.showSelector = true;
-            });
-        }
-        
-        // Update prices buttons
-        const updatePricesButton = document.getElementById('update-prices');
-        if (updatePricesButton) {
-            updatePricesButton.addEventListener('click', () => {
-                if (confirm('Update prices for all companies?')) {
-                    this.updating = true;
-                    const loading = portfolioManager.createLoadingOverlay();
-                    loading.show();
-                    
-                    axios.post('/api/update_all_prices')
-                        .then(response => {
-                            if (response.data.success) {
-                                portfolioManager.showNotification(
-                                    `Updated ${response.data.updated} prices successfully. ` +
-                                    `Failed: ${response.data.failed}`, 
-                                    'is-success'
-                                );
-                                this.loadData();
-                            } else {
-                                portfolioManager.showNotification(
-                                    `Price update failed: ${response.data.error}`,
-                                    'is-warning'
-                                );
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Error updating prices:', error);
-                            portfolioManager.showNotification('Error updating prices', 'is-danger');
-                        })
-                        .finally(() => {
-                            this.updating = false;
-                            loading.hide();
-                        });
-                }
-            });
-        }
-        
-        const updateMissingButton = document.getElementById('update-missing-prices');
-        if (updateMissingButton) {
-            updateMissingButton.addEventListener('click', () => {
-                const missingCount = this.metrics.missing;
-                if (missingCount === 0) {
-                    portfolioManager.showNotification('No missing prices to update', 'is-info');
-                    return;
-                }
-                
-                if (confirm(`Update ${missingCount} missing prices?`)) {
-                    this.updating = true;
-                    const loading = portfolioManager.createLoadingOverlay();
-                    loading.show();
-                    
-                    axios.post('/api/update_missing_prices')
-                        .then(response => {
-                            if (response.data.success) {
-                                portfolioManager.showNotification(
-                                    `Updated ${response.data.updated} missing prices successfully. ` +
-                                    `Failed: ${response.data.failed}`, 
-                                    'is-success'
-                                );
-                                this.loadData();
-                            } else {
-                                portfolioManager.showNotification(
-                                    `Price update failed: ${response.data.error}`,
-                                    'is-warning'
-                                );
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Error updating prices:', error);
-                            portfolioManager.showNotification('Error updating prices', 'is-danger');
-                        })
-                        .finally(() => {
-                            this.updating = false;
-                            loading.hide();
-                        });
-                }
+            filterSelect.addEventListener('change', (e) => {
+                this.filterPortfolio = e.target.value;
             });
         }
     }
@@ -924,181 +767,141 @@ const portfolioTableApp = new Vue({
 // Bulk Edit Vue Application
 const bulkEditApp = new Vue({
     el: '#bulk-edit-app',
-    delimiters: ['${', '}'],
-    data: {
-        companies: [],
-        loading: true,
-        filter: '',
-        selectedCompanies: [],
-        portfolioOptions: {{ portfolios|map(attribute='name')|list|tojson }},
-        activeTab: 'portfolio',
-        targetPortfolio: '',
-        portfolioAction: 'add',
-        newCategory: ''
+    data() {
+        return {
+            loading: true,
+            companies: [],
+            searchQuery: '',
+            selectedPortfolios: [],
+            activeTab: 'portfolio',
+            newCategory: '',
+            error: null
+        };
     },
     computed: {
         filteredCompanies() {
-            if (!this.filter) return this.companies;
-            
-            const query = this.filter.toLowerCase();
+            if (!this.searchQuery) return this.companies;
+            const query = this.searchQuery.toLowerCase();
             return this.companies.filter(company => 
-                company.name.toLowerCase().includes(query) || 
-                company.ticker.toLowerCase().includes(query)
+                company.name.toLowerCase().includes(query) ||
+                company.symbol.toLowerCase().includes(query)
             );
         },
         groupedCompanies() {
-            const result = {};
-            
-            this.filteredCompanies.forEach(company => {
-                const portfolio = company.portfolio || 'Unassigned';
-                if (!result[portfolio]) {
-                    result[portfolio] = [];
-                }
-                result[portfolio].push(company);
-            });
-            
-            return result;
+            return this.filteredCompanies.reduce((groups, company) => {
+                const key = company.portfolio || 'Unassigned';
+                (groups[key] = groups[key] || []).push(company);
+                return groups;
+            }, {});
         }
     },
     methods: {
-        loadCompanies() {
-            this.loading = true;
-            axios.get('/api/portfolio_data')
-                .then(response => {
-                    this.companies = response.data.map(item => ({
-                        id: item.id,
-                        name: item.company,
-                        ticker: item.ticker,
-                        portfolio: item.portfolio,
-                        category: item.category
-                    }));
-                })
-                .catch(error => {
-                    console.error('Error loading companies:', error);
-                    portfolioManager.showNotification('Failed to load companies', 'is-danger');
-                })
-                .finally(() => {
-                    this.loading = false;
-                });
+        async loadCompanies() {
+            try {
+                this.loading = true;
+                const response = await fetch('/api/portfolio/companies');
+                if (!response.ok) throw new Error('Failed to load companies');
+                const result = await response.json();
+                this.companies = result.companies;
+            } catch (error) {
+                this.error = error.message;
+                portfolioManager.showNotification(error.message, 'is-danger');
+            } finally {
+                this.loading = false;
+            }
         },
         togglePortfolio(portfolio) {
-            const portfolioCompanies = this.groupedCompanies[portfolio].map(c => c.id);
-            const allSelected = portfolioCompanies.every(id => this.selectedCompanies.includes(id));
-            
-            if (allSelected) {
-                // Deselect all in this portfolio
-                this.selectedCompanies = this.selectedCompanies.filter(
-                    id => !portfolioCompanies.includes(id)
-                );
+            const index = this.selectedPortfolios.indexOf(portfolio);
+            if (index === -1) {
+                this.selectedPortfolios.push(portfolio);
             } else {
-                // Select all in this portfolio
-                const newSelection = [...this.selectedCompanies];
-                portfolioCompanies.forEach(id => {
-                    if (!newSelection.includes(id)) {
-                        newSelection.push(id);
-                    }
-                });
-                this.selectedCompanies = newSelection;
+                this.selectedPortfolios.splice(index, 1);
             }
         },
         isPortfolioSelected(portfolio) {
-            const portfolioCompanies = this.groupedCompanies[portfolio].map(c => c.id);
-            return portfolioCompanies.every(id => this.selectedCompanies.includes(id));
+            return this.selectedPortfolios.includes(portfolio);
         },
-        applyChanges() {
-            if (this.selectedCompanies.length === 0) {
-                portfolioManager.showNotification('No companies selected', 'is-warning');
-                return;
-            }
-            
-            if (this.activeTab === 'portfolio') {
-                if (!this.targetPortfolio) {
-                    portfolioManager.showNotification('Please select a target portfolio', 'is-warning');
-                    return;
+        async applyChanges() {
+            try {
+                if (this.activeTab === 'portfolio' && !this.selectedPortfolios.length) {
+                    throw new Error('Please select at least one portfolio');
                 }
-                
-                const loading = portfolioManager.createLoadingOverlay();
-                loading.show();
-                
-                axios.post('/api/bulk_update_portfolio', {
-                    company_ids: this.selectedCompanies,
-                    target_portfolio: this.targetPortfolio,
-                    action: this.portfolioAction
-                })
-                .then(response => {
-                    if (response.data.success) {
-                        portfolioManager.showNotification(response.data.message, 'is-success');
-                        // Close modal and reload data
-                        this.closeModal();
-                        portfolioTableApp.loadData();
-                    } else {
-                        portfolioManager.showNotification(`Failed: ${response.data.error}`, 'is-warning');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error applying bulk changes:', error);
-                    portfolioManager.showNotification('Error applying changes', 'is-danger');
-                })
-                .finally(() => {
-                    loading.hide();
-                });
-            }
-            else if (this.activeTab === 'category') {
-                if (!this.newCategory) {
-                    portfolioManager.showNotification('Please enter a category name', 'is-warning');
-                    return;
+                if (this.activeTab === 'category' && !this.newCategory.trim()) {
+                    throw new Error('Please enter a category name');
                 }
-                
-                const loading = portfolioManager.createLoadingOverlay();
-                loading.show();
-                
-                axios.post('/api/bulk_update_category', {
-                    company_ids: this.selectedCompanies,
-                    new_category: this.newCategory
-                })
-                .then(response => {
-                    if (response.data.success) {
-                        portfolioManager.showNotification(response.data.message, 'is-success');
-                        // Close modal and reload data
-                        this.closeModal();
-                        portfolioTableApp.loadData();
-                    } else {
-                        portfolioManager.showNotification(`Failed: ${response.data.error}`, 'is-warning');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error applying bulk changes:', error);
-                    portfolioManager.showNotification('Error applying changes', 'is-danger');
-                })
-                .finally(() => {
-                    loading.hide();
+
+                const payload = {
+                    type: this.activeTab,
+                    portfolios: this.selectedPortfolios,
+                    category: this.newCategory.trim(),
+                    companies: this.filteredCompanies.map(c => c.id)
+                };
+
+                const response = await fetch('/api/portfolio/bulk-edit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
                 });
+
+                if (!response.ok) throw new Error('Failed to apply changes');
+                
+                portfolioManager.showNotification('Changes applied successfully', 'is-success');
+                this.closeModal();
+                portfolioTableApp.loadData();
+            } catch (error) {
+                portfolioManager.showNotification(error.message, 'is-danger');
             }
         },
         closeModal() {
             const modal = document.getElementById('bulk-edit-modal');
             if (modal) {
                 modal.classList.remove('is-active');
+                this.selectedPortfolios = [];
+                this.activeTab = 'portfolio';
+                this.newCategory = '';
             }
         }
     },
     mounted() {
         this.loadCompanies();
         
-        // Set up save button
+        // Set up modal triggers
+        const modalTriggers = document.querySelectorAll('.js-modal-trigger');
+        modalTriggers.forEach(trigger => {
+            trigger.addEventListener('click', () => {
+                const modal = document.getElementById(trigger.dataset.target);
+                if (modal) {
+                    modal.classList.add('is-active');
+                }
+            });
+        });
+
+        // Set up modal close handlers
+        const modal = document.getElementById('bulk-edit-modal');
+        if (modal) {
+            const closeButtons = modal.querySelectorAll('.delete, .modal-cancel');
+            closeButtons.forEach(button => {
+                button.addEventListener('click', () => this.closeModal());
+            });
+        }
+
+        // Save button handler
         const saveButton = document.getElementById('bulk-edit-save');
         if (saveButton) {
             saveButton.addEventListener('click', () => this.applyChanges());
         }
-        
-        // Reset selection when modal opens
-        document.querySelector('[data-target="bulk-edit-modal"]').addEventListener('click', () => {
-            this.selectedCompanies = [];
-            this.activeTab = 'portfolio';
-            this.targetPortfolio = '';
-            this.newCategory = '';
-            this.filter = '';
-            this.loadCompanies();
+
+        // Tab handlers
+        const tabs = document.querySelectorAll('.tabs li');
+        tabs.forEach(tab => {
+            const link = tab.querySelector('a');
+            if (link) {
+                link.addEventListener('click', () => {
+                    tabs.forEach(t => t.classList.remove('is-active'));
+                    tab.classList.add('is-active');
+                    this.activeTab = link.dataset.tab;
+                });
+            }
         });
     }
 });

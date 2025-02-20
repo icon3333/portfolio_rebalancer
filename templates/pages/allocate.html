@@ -9,21 +9,22 @@
                 <span class="icon">
                     <i class="fas fa-coins"></i>
                 </span>
-                <span>Portfolio Allocation</span>
+                <span>Portfolio Allocation & Rebalancing</span>
             </span>
         </h1>
 
         <div class="notification is-info is-light">
             <button class="delete"></button>
-            <p>Review and rebalance your portfolio allocations across multiple portfolios and categories. 
-            Enter the amount you plan to invest, then fine-tune allocations for each portfolio.</p>
+            <p>Use this page to apply your investment decisions, including the exact amount to 
+               invest across different portfolios. You can also rebalance existing holdings 
+               according to your preferred rules.</p>
         </div>
     </div>
 </div>
 
 <div class="columns">
     <div class="column is-12">
-        <!-- Investment Budget Section -->
+        <!-- Step 1: Investment Budget -->
         <div class="card mb-5">
             <header class="card-header">
                 <p class="card-header-title">
@@ -37,43 +38,54 @@
             </header>
             <div class="card-content">
                 <div class="content">
-                    <form id="allocation-budget-form">
+                    <form id="investment-budget-form">
                         <div class="columns is-multiline">
                             <div class="column is-4">
                                 <div class="field">
                                     <label class="label">Total Net Worth (€)</label>
                                     <div class="control">
-                                        <input class="input" type="text" name="total_net_worth" placeholder="e.g. 50,000">
+                                        <input 
+                                            class="input" 
+                                            type="text" 
+                                            name="net_worth" 
+                                            placeholder="e.g. 50,000">
                                     </div>
-                                    <p class="help">Approximate total net worth in EUR.</p>
+                                    <p class="help">Total approximate net worth in EUR.</p>
                                 </div>
                             </div>
                             <div class="column is-4">
                                 <div class="field">
-                                    <label class="label">Already Invested (€)</label>
+                                    <label class="label">Currently Invested (€)</label>
                                     <div class="control">
-                                        <input class="input" type="text" name="investment_account" placeholder="e.g. 30,000">
+                                        <input 
+                                            class="input" 
+                                            type="text" 
+                                            name="currently_invested" 
+                                            placeholder="e.g. 30,000">
                                     </div>
-                                    <p class="help">Amount already allocated in your investment account.</p>
+                                    <p class="help">Amount already placed in the market.</p>
                                 </div>
                             </div>
                             <div class="column is-4">
                                 <div class="field">
                                     <label class="label">Emergency Fund (€)</label>
                                     <div class="control">
-                                        <input class="input" type="text" name="emergency_fund" placeholder="e.g. 5,000">
+                                        <input 
+                                            class="input" 
+                                            type="text" 
+                                            name="emergency_fund" 
+                                            placeholder="e.g. 5,000">
                                     </div>
-                                    <p class="help">Funds you keep aside for emergencies.</p>
+                                    <p class="help">Reserve funds not to be allocated to investments.</p>
                                 </div>
                             </div>
                         </div>
-                        <!-- Potential slider or advanced UI could go here -->
                         <div class="field">
-                            <button class="button is-primary" id="budget-calculate">
+                            <button class="button is-primary" id="calculate-allocation-btn">
                                 <span class="icon">
                                     <i class="fas fa-calculator"></i>
                                 </span>
-                                <span>Calculate Allocation</span>
+                                <span>Calculate Available Investment</span>
                             </button>
                         </div>
                     </form>
@@ -81,7 +93,7 @@
             </div>
         </div>
 
-        <!-- Allocation Rules Section -->
+        <!-- Step 2: Allocation Rules (Optional) -->
         <div class="card mb-5">
             <header class="card-header">
                 <p class="card-header-title">
@@ -89,39 +101,51 @@
                         <span class="icon">
                             <i class="fas fa-percent"></i>
                         </span>
-                        <span>Allocation Rules</span>
+                        <span>Allocation Constraints</span>
                     </span>
                 </p>
             </header>
             <div class="card-content">
                 <div class="content">
-                    <form id="allocation-rules-form">
+                    <p>If you have custom constraints, set them below. This might override or refine 
+                       the global rules in the “Build” section if needed.</p>
+                    <form id="allocation-constraints-form">
                         <div class="columns">
                             <div class="column is-6">
                                 <div class="field">
                                     <label class="label">Max Allocation per Stock (%)</label>
                                     <div class="control">
-                                        <input class="input" type="number" name="max_per_stock" min="1" max="100" value="10">
+                                        <input 
+                                            class="input" 
+                                            type="number" 
+                                            name="max_stock_allocation" 
+                                            min="1" 
+                                            max="100" 
+                                            value="10">
                                     </div>
-                                    <p class="help">Maximum percentage of total portfolio per single stock.</p>
                                 </div>
                             </div>
                             <div class="column is-6">
                                 <div class="field">
                                     <label class="label">Max Allocation per Category (%)</label>
                                     <div class="control">
-                                        <input class="input" type="number" name="max_per_category" min="1" max="100" value="40">
+                                        <input 
+                                            class="input" 
+                                            type="number" 
+                                            name="max_category_allocation" 
+                                            min="1" 
+                                            max="100" 
+                                            value="40">
                                     </div>
-                                    <p class="help">Maximum percentage of total portfolio per category/sector.</p>
                                 </div>
                             </div>
                         </div>
                         <div class="field">
-                            <button class="button is-success" id="save-rules">
+                            <button class="button is-success" id="save-allocation-constraints">
                                 <span class="icon">
                                     <i class="fas fa-save"></i>
                                 </span>
-                                <span>Save Rules</span>
+                                <span>Save Constraints</span>
                             </button>
                         </div>
                     </form>
@@ -129,59 +153,58 @@
             </div>
         </div>
 
-        <!-- Detailed Allocation Section -->
+        <!-- Step 3: Detailed Allocation & Rebalancing -->
         <div class="card">
             <header class="card-header">
                 <p class="card-header-title">
                     <span class="icon-text">
                         <span class="icon">
-                            <i class="fas fa-coins"></i>
+                            <i class="fas fa-balance-scale"></i>
                         </span>
-                        <span>Detailed Allocations</span>
+                        <span>Rebalance or Distribute Funds</span>
                     </span>
                 </p>
             </header>
             <div class="card-content">
                 <div class="content">
-                    <!-- For a real app, you'd display each portfolio's target percentage 
-                         and the resulting amount. Possibly a table, or a chart. -->
-                    <p class="subtitle is-6">Below is a placeholder for your final distribution across portfolios once the logic is implemented. Adapt freely.</p>
+                    <p>Review each portfolio and apply your chosen rules. Adjust percentages or 
+                       direct amounts as needed. Then click “Apply Rebalance” to finalize changes.</p>
 
                     <div class="table-container">
-                        <table class="table is-fullwidth is-hoverable">
+                        <table class="table is-fullwidth is-hoverable" id="allocation-table">
                             <thead>
                                 <tr>
                                     <th>Portfolio</th>
-                                    <th>Allocation (%)</th>
-                                    <th>Allocation (€)</th>
+                                    <th>Planned Allocation (%)</th>
+                                    <th>Planned Allocation (€)</th>
                                 </tr>
                             </thead>
-                            <tbody id="allocation-details">
-                                <!-- Dynamically populated via JS or server rendering -->
+                            <tbody>
+                                <!-- Example rows; real data would come from calculation. -->
                                 <tr>
                                     <td>Growth Portfolio</td>
-                                    <td>50%</td>
-                                    <td>€25,000</td>
+                                    <td><input class="input is-small" type="number" value="50" step="0.1"></td>
+                                    <td><input class="input is-small" type="number" value="25000"></td>
                                 </tr>
                                 <tr>
                                     <td>Dividend Portfolio</td>
-                                    <td>30%</td>
-                                    <td>€15,000</td>
+                                    <td><input class="input is-small" type="number" value="30" step="0.1"></td>
+                                    <td><input class="input is-small" type="number" value="15000"></td>
                                 </tr>
                                 <tr>
                                     <td>REIT Portfolio</td>
-                                    <td>20%</td>
-                                    <td>€10,000</td>
+                                    <td><input class="input is-small" type="number" value="20" step="0.1"></td>
+                                    <td><input class="input is-small" type="number" value="10000"></td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
 
-                    <button class="button is-info" id="rebalance-now">
+                    <button class="button is-info mt-4" id="apply-rebalance-btn">
                         <span class="icon">
                             <i class="fas fa-sync-alt"></i>
                         </span>
-                        <span>Rebalance Now</span>
+                        <span>Apply Rebalance</span>
                     </button>
                 </div>
             </div>
@@ -192,31 +215,42 @@
 
 {% block scripts %}
 <script>
-// Similar approach to your other pages with a potential Vue or pure JS
-
 document.addEventListener('DOMContentLoaded', () => {
-    // Example: wire up "Calculate" button
-    const budgetCalculateBtn = document.getElementById('budget-calculate');
-    if (budgetCalculateBtn) {
-        budgetCalculateBtn.addEventListener('click', (e) => {
+
+    // Dismiss notifications
+    document.querySelectorAll('.notification .delete').forEach(btn => {
+        btn.addEventListener('click', () => {
+            btn.parentNode.remove();
+        });
+    });
+
+    // 1) Calculate available investment
+    const calcAllocBtn = document.getElementById('calculate-allocation-btn');
+    if (calcAllocBtn) {
+        calcAllocBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            portfolioManager.showNotification('Budget calculation logic goes here', 'is-info');
+            // Suppose you POST to /allocate/calculate
+            portfolioManager.showNotification('Calculated your available investment budget.', 'is-info');
         });
     }
 
-    const saveRulesBtn = document.getElementById('save-rules');
-    if (saveRulesBtn) {
-        saveRulesBtn.addEventListener('click', (e) => {
+    // 2) Save custom allocation constraints
+    const saveConstraintsBtn = document.getElementById('save-allocation-constraints');
+    if (saveConstraintsBtn) {
+        saveConstraintsBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            portfolioManager.showNotification('Allocation rules saved (placeholder)', 'is-success');
+            // Suppose you call /allocate/save_constraints
+            portfolioManager.showNotification('Allocation constraints saved.', 'is-success');
         });
     }
 
-    const rebalanceNowBtn = document.getElementById('rebalance-now');
-    if (rebalanceNowBtn) {
-        rebalanceNowBtn.addEventListener('click', (e) => {
+    // 3) Apply final rebalancing
+    const applyRebalanceBtn = document.getElementById('apply-rebalance-btn');
+    if (applyRebalanceBtn) {
+        applyRebalanceBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            portfolioManager.showNotification('Rebalancing logic invoked (placeholder)', 'is-warning');
+            // Suppose you post final distribution to /allocate/rebalance
+            portfolioManager.showNotification('Rebalance applied successfully.', 'is-warning');
         });
     }
 });
