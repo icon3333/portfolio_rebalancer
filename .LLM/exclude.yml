@@ -1,0 +1,12 @@
+# Default exclusions
+_*/
+.git/
+.LLM/
+venv/
+
+
+# Add your custom exclude patterns below in gitignore format
+# Examples:
+# *.pyc
+# __pycache__/
+# .env

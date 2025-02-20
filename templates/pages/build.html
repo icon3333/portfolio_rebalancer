@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}Build - Portfolio Manager{% endblock %}
+
+{% block content %}
+<div class="columns">
+    <div class="column is-12">
+        <h1 class="title">
+            <span class="icon-text">
+                <span class="icon">
+                    <i class="fas fa-hammer"></i>
+                </span>
+                <span>Allocation Builder</span>
+            </span>
+        </h1>
+
+        <div class="notification is-info is-light">
+            <button class="delete"></button>
+            <p>Use the allocation builder to define custom rules, target percentages, 
+               and weighted positions for each portfolio. Then see how your ideal portfolio 
+               would look with these settings.</p>
+        </div>
+    </div>
+</div>
+
+<div class="columns is-multiline">
+    <div class="column is-12">
+        <!-- Global Settings Card -->
+        <div class="card mb-5">
+            <header class="card-header">
+                <p class="card-header-title">
+                    <span class="icon-text">
+                        <span class="icon">
+                            <i class="fas fa-tools"></i>
+                        </span>
+                        <span>Global Allocation Settings</span>
+                    </span>
+                </p>
+            </header>
+            <div class="card-content">
+                <div class="content">
+                    <form id="global-settings-form">
+                        <div class="columns">
+                            <div class="column is-6">
+                                <div class="field">
+                                    <label class="label">Max Per Stock (%)</label>
+                                    <div class="control">
+                                        <input class="input" type="number" name="max_stock" min="1" max="100" value="10">
+                                    </div>
+                                    <p class="help">Limit for a single stock's weight in any portfolio.</p>
+                                </div>
+                            </div>
+                            <div class="column is-6">
+                                <div class="field">
+                                    <label class="label">Max Per Category (%)</label>
+                                    <div class="control">
+                                        <input class="input" type="number" name="max_category" min="1" max="100" value="40">
+                                    </div>
+                                    <p class="help">Limit for any single category across all portfolios.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <button class="button is-primary" id="save-global-settings">
+                                <span class="icon">
+                                    <i class="fas fa-save"></i>
+                                </span>
+                                <span>Save Global Settings</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Portfolio Builder Card -->
+        <div class="card">
+            <header class="card-header">
+                <p class="card-header-title">
+                    <span class="icon-text">
+                        <span class="icon">
+                            <i class="fas fa-clipboard-list"></i>
+                        </span>
+                        <span>Portfolio Builder</span>
+                    </span>
+                </p>
+            </header>
+            <div class="card-content">
+                <div class="content">
+                    <!-- If you want to implement weighting logic (like in Streamlit “Build”), 
+                         you can place forms for each portfolio. For now, a placeholder below. -->
+                    <p class="subtitle is-6 mb-4">
+                        Define your target positions, weights, or categories for each portfolio. 
+                        Use these to auto-generate an ideal allocation plan.
+                    </p>
+                    
+                    <!-- Example: Weighted Positions for "Growth Portfolio" -->
+                    <article class="message is-warning mb-5">
+                        <div class="message-header">
+                            <p>Growth Portfolio - Weighted Positions</p>
+                        </div>
+                        <div class="message-body">
+                            <p class="mb-2">e.g. Apple (AAPL) - 25%, Microsoft (MSFT) - 15%, etc.</p>
+                            <div class="field has-addons">
+                                <div class="control is-expanded">
+                                    <input class="input" type="text" placeholder="Company / Ticker">
+                                </div>
+                                <div class="control is-expanded">
+                                    <input class="input" type="number" placeholder="Target %" step="0.1">
+                                </div>
+                                <div class="control">
+                                    <button class="button is-info">
+                                        <span class="icon">
+                                            <i class="fas fa-plus"></i>
+                                        </span>
+                                        <span>Add</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <!-- Weighted positions list / table would go here -->
+                        </div>
+                    </article>
+
+                    <button class="button is-success" id="build-portfolio">
+                        <span class="icon">
+                            <i class="fas fa-play"></i>
+                        </span>
+                        <span>Generate Allocation Plan</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // Example: wiring up Save Global Settings
+    const saveSettingsBtn = document.getElementById('save-global-settings');
+    if (saveSettingsBtn) {
+        saveSettingsBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            portfolioManager.showNotification('Global settings saved (placeholder)', 'is-success');
+        });
+    }
+
+    const buildPortfolioBtn = document.getElementById('build-portfolio');
+    if (buildPortfolioBtn) {
+        buildPortfolioBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            portfolioManager.showNotification('Allocations built successfully (placeholder)', 'is-success');
+        });
+    }
+});
+</script>
+{% endblock %}

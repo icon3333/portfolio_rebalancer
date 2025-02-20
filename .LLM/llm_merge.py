@@ -29,113 +29,164 @@ Repository Structure
 ================================================================
 """
 
-# Load gitignore patterns
 def load_gitignore(directory):
+    """
+    Load .gitignore from the specified directory, if it exists,
+    and return a PathSpec. Otherwise return None.
+    """
     gitignore_path = os.path.join(directory, '.gitignore')
     if os.path.exists(gitignore_path):
-        with open(gitignore_path, 'r') as f:
+        with open(gitignore_path, 'r', encoding='utf-8') as f:
             return PathSpec.from_lines(GitWildMatchPattern, f.readlines())
     return None
 
-# Function to exclude certain paths
-def should_exclude(path, base_dir, gitignore_spec):
-    base_name = os.path.basename(path)
-    # Basic exclusions
-    if base_name.startswith('_') or base_name == 'LLM' or base_name == '.git':
+def load_exclude_patterns(directory):
+    """
+    Load exclude.yml from the specified directory, if it exists,
+    and return a PathSpec. Otherwise return None.
+    """
+    exclude_path = os.path.join(directory, 'exclude.yml')
+    if os.path.exists(exclude_path):
+        with open(exclude_path, 'r', encoding='utf-8') as f:
+            # Filter out comments and empty lines
+            patterns = [
+                line.strip()
+                for line in f.readlines()
+                if line.strip() and not line.strip().startswith('#')
+            ]
+            return PathSpec.from_lines(GitWildMatchPattern, patterns)
+    return None
+
+def should_exclude(path, base_dir, exclude_spec, gitignore_spec):
+    """
+    Check if a path should be excluded either by exclude.yml patterns or .gitignore patterns.
+    """
+    rel_path = os.path.relpath(path, base_dir)
+
+    # Check exclude.yml patterns first
+    if exclude_spec and exclude_spec.match_file(rel_path):
         return True
-    
-    # Check gitignore patterns if available
-    if gitignore_spec:
-        rel_path = os.path.relpath(path, base_dir)
-        return gitignore_spec.match_file(rel_path)
-    
+
+    # Then check .gitignore patterns if available
+    if gitignore_spec and gitignore_spec.match_file(rel_path):
+        return True
+
     return False
 
-# Function to generate the repository structure as a formatted string
-def generate_repository_structure(directory, gitignore_spec):
-    structure = []
+def generate_repository_structure(directory, gitignore_spec, exclude_spec):
+    """
+    Generate a textual "tree" of the repository structure, respecting exclude rules.
+    """
+    structure_lines = []
     for root, dirs, files in os.walk(directory):
-        # Filter out excluded directories in place
-        dirs[:] = [d for d in dirs if not should_exclude(os.path.join(root, d), directory, gitignore_spec)]
-        
-        # Add directory path to structure
-        indent_level = root.replace(directory, "").count(os.sep)
-        structure.append("    " * indent_level + os.path.basename(root) + "/")
-        
+        # Filter out excluded directories
+        dirs[:] = [
+            d for d in dirs
+            if not should_exclude(os.path.join(root, d), directory, exclude_spec, gitignore_spec)
+        ]
+
+        indent_level = os.path.relpath(root, directory).count(os.sep)
+        # If we're at the top-level, relpath might be '.', so handle that cleanly
+        dirname = '.' if root == directory else os.path.basename(root)
+        structure_lines.append("    " * indent_level + dirname + "/")
+
         for file in files:
             file_path = os.path.join(root, file)
-            if not should_exclude(file_path, directory, gitignore_spec) and file.endswith('.py'):
-                structure.append("    " * (indent_level + 1) + file)
-                
-    return "\n".join(structure)
+            if not should_exclude(file_path, directory, exclude_spec, gitignore_spec):
+                structure_lines.append("    " * (indent_level + 1) + file)
 
-# Function to merge files and split output if necessary
-def merge_and_split_files(directory, output_prefix, max_size_mb=10):
-    max_size_bytes = max_size_mb * 1024 * 1024
-    current_size = 0
-    current_file_number = 1
-    gitignore_spec = load_gitignore(directory)
-    repository_structure = generate_repository_structure(directory, gitignore_spec)
-    current_output = [header, repository_structure, ""]
+    return "\n".join(structure_lines)
 
-    def write_output():
-        nonlocal current_file_number
-        output_filename = os.path.join(script_dir, f"{output_prefix}_{current_file_number}.txt")
-        with open(output_filename, 'w', encoding='utf-8') as f:
-            f.write('\n'.join(current_output))
-        print(f"Created {output_filename}")
-        current_file_number += 1
+def merge_files(src_directory, output_directory, output_prefix):
+    """
+    Merges all non-excluded files into a single text file. Respects exclude patterns.
+    Writes the output to `output_directory`, ensuring we don't re-include that output.
+    """
+    gitignore_spec = load_gitignore(src_directory)
+    exclude_spec = load_exclude_patterns(os.path.join(src_directory, '.LLM'))
 
-    for root, dirs, files in os.walk(directory):
-        # Exclude certain directories
-        dirs[:] = [d for d in dirs if not should_exclude(os.path.join(root, d), directory, gitignore_spec)]
+    # Build the final set of patterns in memory so the new output file doesn't get re-included
+    additional_excludes = []
+    # We'll exclude the final output file name explicitly, just in case:
+    merged_name = f"{output_prefix}.txt"
+    additional_excludes.append(merged_name)
+    # Convert them into PathSpec lines and combine with existing exclude patterns:
+    # (We only do this if exclude_spec isn't None; otherwise we create a new one.)
+    extra_spec = PathSpec.from_lines(GitWildMatchPattern, additional_excludes)
+
+    # Combine patterns if we already had some
+    if exclude_spec:
+        patterns_combined = exclude_spec.patterns + extra_spec.patterns
+        exclude_spec = PathSpec(patterns=patterns_combined)
+    else:
+        exclude_spec = extra_spec
+
+    # Generate a repository structure overview
+    repository_structure = generate_repository_structure(src_directory, gitignore_spec, exclude_spec)
+
+    # Prepare the full output text in memory
+    output_lines = [
+        header,
+        repository_structure,
+        ""
+    ]
+
+    valid_files = []
+    for root, dirs, files in os.walk(src_directory):
+        # Exclude directories inline
+        dirs[:] = [
+            d for d in dirs
+            if not should_exclude(os.path.join(root, d), src_directory, exclude_spec, gitignore_spec)
+        ]
 
         for file in files:
-            if file.endswith('.py') and not should_exclude(os.path.join(root, file), directory, gitignore_spec):
-                file_path = os.path.join(root, file)
-                
-                # Skip files in excluded paths
-                if any(should_exclude(os.path.join(directory, part), directory, gitignore_spec) for part in file_path.split(os.sep)):
-                    continue
+            file_path = os.path.join(root, file)
+            rel_path = os.path.relpath(file_path, src_directory)
+            # Skip excluded files or files in excluded dirs
+            if should_exclude(file_path, src_directory, exclude_spec, gitignore_spec):
+                continue
 
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
+            # Also skip if any of this file's parent directories are excluded
+            parents = rel_path.split(os.sep)[:-1]
+            if any(
+                should_exclude(os.path.join(src_directory, p), src_directory, exclude_spec, gitignore_spec)
+                for p in parents
+            ):
+                continue
 
-                file_size = len(content.encode('utf-8'))
+            valid_files.append(file_path)
 
-                if current_size + file_size > max_size_bytes:
-                    if current_output:
-                        write_output()
-                    current_output = [header, repository_structure, ""]
-                    current_size = 0
-                
-                relative_path = os.path.relpath(file_path, directory)
-                current_output.append("================================================================")
-                current_output.append(f"###START_FILE_PATH: {relative_path}###")
-                current_output.append(content)
-                current_output.append("###END_FILE###")
-                current_output.append("")  # Add an empty line between files
-                current_size += file_size
+    for file_path in valid_files:
+        relative_path = os.path.relpath(file_path, src_directory)
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            output_lines.append("================================================================")
+            output_lines.append(f"###START_FILE_PATH: {relative_path}###")
+            output_lines.append(content)
+            output_lines.append("###END_FILE###\n")
+        except Exception as e:
+            print(f"Error reading {file_path}: {e}")
 
-    if current_output:
-        write_output()
+    # Finally write out the merged file
+    final_output_path = os.path.join(output_directory, merged_name)
+    with open(final_output_path, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(output_lines))
+
+    print(f"Created {final_output_path}")
 
 if __name__ == "__main__":
     script_dir = os.path.dirname(os.path.abspath(__file__))
     parent_dir = os.path.dirname(script_dir)
 
+    # Default output prefix
     output_prefix = "merged_output"
-    max_size_mb = 10
-
     if len(sys.argv) > 1:
         output_prefix = sys.argv[1]
-    if len(sys.argv) > 2:
-        max_size_mb = int(sys.argv[2])
 
     print(f"Scanning directory: {parent_dir}")
     print(f"Output will be saved in: {script_dir}")
     print(f"Output prefix: {output_prefix}")
-    print(f"Maximum file size: {max_size_mb} MB")
-    print("Excluding folders: /LLM, and all folders starting with '.' or '_'")
+    print(f"Using exclude patterns from: {os.path.join(parent_dir, '.LLM', 'exclude.yml')}")
 
-    merge_and_split_files(parent_dir, output_prefix, max_size_mb)
+    merge_files(parent_dir, script_dir, output_prefix)

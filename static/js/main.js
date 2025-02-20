@@ -151,3 +151,173 @@ function initializeTabs() {
                 if (target) {
                     const targetContent = document.getElementById(target);
                     if (targetContent) {
+                        targetContent.classList.remove('is-hidden');
+                    }
+                }
+            });
+        });
+    });
+}
+
+/**
+ * Setup AJAX error handling
+ */
+function setupAjaxErrorHandling() {
+    // Add global error handling for Axios
+    if (window.axios) {
+        axios.interceptors.response.use(
+            response => response,
+            error => {
+                console.error('AJAX Error:', error);
+                
+                let errorMessage = 'An unexpected error occurred';
+                
+                if (error.response) {
+                    // The server responded with an error status
+                    if (error.response.data && error.response.data.error) {
+                        errorMessage = error.response.data.error;
+                    } else {
+                        errorMessage = `Server error: ${error.response.status}`;
+                    }
+                } else if (error.request) {
+                    // The request was made but no response was received
+                    errorMessage = 'No response from server. Please check your connection.';
+                }
+                
+                // Create and show error notification
+                showNotification(errorMessage, 'is-danger');
+                
+                return Promise.reject(error);
+            }
+        );
+    }
+}
+
+/**
+ * Show notification
+ * @param {string} message - Message to display
+ * @param {string} type - Notification type (is-info, is-success, is-warning, is-danger)
+ * @param {number} duration - Duration in milliseconds (0 for permanent)
+ */
+function showNotification(message, type = 'is-info', duration = 5000) {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    
+    // Add delete button
+    const deleteButton = document.createElement('button');
+    deleteButton.className = 'delete';
+    notification.appendChild(deleteButton);
+    
+    // Add message text
+    const messageText = document.createTextNode(message);
+    notification.appendChild(messageText);
+    
+    // Add notification to container
+    const container = document.querySelector('.container') || document.body;
+    container.insertBefore(notification, container.firstChild);
+    
+    // Setup delete button
+    deleteButton.addEventListener('click', () => {
+        notification.remove();
+    });
+    
+    // Auto-dismiss if duration > 0
+    if (duration > 0) {
+        setTimeout(() => {
+            notification.classList.add('is-fading-out');
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 500);
+        }, duration);
+    }
+}
+
+/**
+ * Format currency with symbol
+ * @param {number} amount - Amount to format
+ * @param {string} currency - Currency symbol
+ * @returns {string} Formatted currency string
+ */
+function formatCurrency(amount, currency = '€') {
+    if (typeof amount !== 'number') {
+        return `${currency}0`;
+    }
+    
+    return amount >= 100
+        ? `${currency}${amount.toLocaleString('en-US', {maximumFractionDigits: 0})}`
+        : `${currency}${amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+}
+
+/**
+ * Format percentage
+ * @param {number} value - Value to format as percentage
+ * @param {number} decimals - Number of decimal places
+ * @param {boolean} includeSymbol - Whether to include % symbol
+ * @returns {string} Formatted percentage
+ */
+function formatPercentage(value, decimals = 1, includeSymbol = true) {
+    if (typeof value !== 'number') {
+        return includeSymbol ? '0%' : '0';
+    }
+    
+    const formatted = value.toLocaleString('en-US', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+    });
+    
+    return includeSymbol ? `${formatted}%` : formatted;
+}
+
+/**
+ * Create loading overlay
+ * @returns {Object} Loading overlay control object
+ */
+function createLoadingOverlay() {
+    // Create elements
+    const overlay = document.createElement('div');
+    overlay.className = 'loading-overlay';
+    
+    const spinner = document.createElement('div');
+    spinner.className = 'spinner';
+    overlay.appendChild(spinner);
+    
+    // Return control object
+    return {
+        show: function() {
+            document.body.appendChild(overlay);
+            document.body.style.overflow = 'hidden';
+        },
+        hide: function() {
+            if (overlay.parentNode) {
+                overlay.parentNode.removeChild(overlay);
+                document.body.style.overflow = '';
+            }
+        }
+    };
+}
+
+/**
+ * Debounce function to limit function call frequency
+ * @param {Function} func - Function to debounce
+ * @param {number} wait - Wait time in milliseconds
+ * @returns {Function} Debounced function
+ */
+function debounce(func, wait = 300) {
+    let timeout;
+    return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+}
+
+// Export global utilities
+window.portfolioManager = {
+    formatCurrency,
+    formatPercentage,
+    showNotification,
+    createLoadingOverlay,
+    debounce
+};

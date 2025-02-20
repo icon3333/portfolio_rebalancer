@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+{% block title %}Allocate - Portfolio Manager{% endblock %}
+
+{% block content %}
+<div class="columns">
+    <div class="column is-12">
+        <h1 class="title">
+            <span class="icon-text">
+                <span class="icon">
+                    <i class="fas fa-coins"></i>
+                </span>
+                <span>Portfolio Allocation</span>
+            </span>
+        </h1>
+
+        <div class="notification is-info is-light">
+            <button class="delete"></button>
+            <p>Review and rebalance your portfolio allocations across multiple portfolios and categories. 
+            Enter the amount you plan to invest, then fine-tune allocations for each portfolio.</p>
+        </div>
+    </div>
+</div>
+
+<div class="columns">
+    <div class="column is-12">
+        <!-- Investment Budget Section -->
+        <div class="card mb-5">
+            <header class="card-header">
+                <p class="card-header-title">
+                    <span class="icon-text">
+                        <span class="icon">
+                            <i class="fas fa-piggy-bank"></i>
+                        </span>
+                        <span>Investment Budget</span>
+                    </span>
+                </p>
+            </header>
+            <div class="card-content">
+                <div class="content">
+                    <form id="allocation-budget-form">
+                        <div class="columns is-multiline">
+                            <div class="column is-4">
+                                <div class="field">
+                                    <label class="label">Total Net Worth (€)</label>
+                                    <div class="control">
+                                        <input class="input" type="text" name="total_net_worth" placeholder="e.g. 50,000">
+                                    </div>
+                                    <p class="help">Approximate total net worth in EUR.</p>
+                                </div>
+                            </div>
+                            <div class="column is-4">
+                                <div class="field">
+                                    <label class="label">Already Invested (€)</label>
+                                    <div class="control">
+                                        <input class="input" type="text" name="investment_account" placeholder="e.g. 30,000">
+                                    </div>
+                                    <p class="help">Amount already allocated in your investment account.</p>
+                                </div>
+                            </div>
+                            <div class="column is-4">
+                                <div class="field">
+                                    <label class="label">Emergency Fund (€)</label>
+                                    <div class="control">
+                                        <input class="input" type="text" name="emergency_fund" placeholder="e.g. 5,000">
+                                    </div>
+                                    <p class="help">Funds you keep aside for emergencies.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Potential slider or advanced UI could go here -->
+                        <div class="field">
+                            <button class="button is-primary" id="budget-calculate">
+                                <span class="icon">
+                                    <i class="fas fa-calculator"></i>
+                                </span>
+                                <span>Calculate Allocation</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Allocation Rules Section -->
+        <div class="card mb-5">
+            <header class="card-header">
+                <p class="card-header-title">
+                    <span class="icon-text">
+                        <span class="icon">
+                            <i class="fas fa-percent"></i>
+                        </span>
+                        <span>Allocation Rules</span>
+                    </span>
+                </p>
+            </header>
+            <div class="card-content">
+                <div class="content">
+                    <form id="allocation-rules-form">
+                        <div class="columns">
+                            <div class="column is-6">
+                                <div class="field">
+                                    <label class="label">Max Allocation per Stock (%)</label>
+                                    <div class="control">
+                                        <input class="input" type="number" name="max_per_stock" min="1" max="100" value="10">
+                                    </div>
+                                    <p class="help">Maximum percentage of total portfolio per single stock.</p>
+                                </div>
+                            </div>
+                            <div class="column is-6">
+                                <div class="field">
+                                    <label class="label">Max Allocation per Category (%)</label>
+                                    <div class="control">
+                                        <input class="input" type="number" name="max_per_category" min="1" max="100" value="40">
+                                    </div>
+                                    <p class="help">Maximum percentage of total portfolio per category/sector.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <button class="button is-success" id="save-rules">
+                                <span class="icon">
+                                    <i class="fas fa-save"></i>
+                                </span>
+                                <span>Save Rules</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detailed Allocation Section -->
+        <div class="card">
+            <header class="card-header">
+                <p class="card-header-title">
+                    <span class="icon-text">
+                        <span class="icon">
+                            <i class="fas fa-coins"></i>
+                        </span>
+                        <span>Detailed Allocations</span>
+                    </span>
+                </p>
+            </header>
+            <div class="card-content">
+                <div class="content">
+                    <!-- For a real app, you'd display each portfolio's target percentage 
+                         and the resulting amount. Possibly a table, or a chart. -->
+                    <p class="subtitle is-6">Below is a placeholder for your final distribution across portfolios once the logic is implemented. Adapt freely.</p>
+
+                    <div class="table-container">
+                        <table class="table is-fullwidth is-hoverable">
+                            <thead>
+                                <tr>
+                                    <th>Portfolio</th>
+                                    <th>Allocation (%)</th>
+                                    <th>Allocation (€)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="allocation-details">
+                                <!-- Dynamically populated via JS or server rendering -->
+                                <tr>
+                                    <td>Growth Portfolio</td>
+                                    <td>50%</td>
+                                    <td>€25,000</td>
+                                </tr>
+                                <tr>
+                                    <td>Dividend Portfolio</td>
+                                    <td>30%</td>
+                                    <td>€15,000</td>
+                                </tr>
+                                <tr>
+                                    <td>REIT Portfolio</td>
+                                    <td>20%</td>
+                                    <td>€10,000</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <button class="button is-info" id="rebalance-now">
+                        <span class="icon">
+                            <i class="fas fa-sync-alt"></i>
+                        </span>
+                        <span>Rebalance Now</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Similar approach to your other pages with a potential Vue or pure JS
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Example: wire up "Calculate" button
+    const budgetCalculateBtn = document.getElementById('budget-calculate');
+    if (budgetCalculateBtn) {
+        budgetCalculateBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            portfolioManager.showNotification('Budget calculation logic goes here', 'is-info');
+        });
+    }
+
+    const saveRulesBtn = document.getElementById('save-rules');
+    if (saveRulesBtn) {
+        saveRulesBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            portfolioManager.showNotification('Allocation rules saved (placeholder)', 'is-success');
+        });
+    }
+
+    const rebalanceNowBtn = document.getElementById('rebalance-now');
+    if (rebalanceNowBtn) {
+        rebalanceNowBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            portfolioManager.showNotification('Rebalancing logic invoked (placeholder)', 'is-warning');
+        });
+    }
+});
+</script>
+{% endblock %}
