@@ -186,31 +186,31 @@
                                 <div class="level-item has-text-centered">
                                     <div>
                                         <p class="heading">Total Companies</p>
-                                        <p class="title">{{ metrics.total }}</p>
+                                        {% raw %}{{ metrics.total }}{% endraw %}
                                     </div>
                                 </div>
                                 <div class="level-item has-text-centered">
                                     <div>
                                         <p class="heading">Portfolio Health</p>
-                                        <p class="title">{{ metrics.health }}%</p>
+                                        {% raw %}{{ metrics.health }}%{% endraw %}
                                     </div>
                                 </div>
                                 <div class="level-item has-text-centered">
                                     <div>
                                         <p class="heading">Missing Prices</p>
-                                        <p class="title">{{ metrics.missing }}</p>
+                                        {% raw %}{{ metrics.missing }}{% endraw %}
                                     </div>
                                 </div>
                                 <div class="level-item has-text-centered">
                                     <div>
                                         <p class="heading">Total Value</p>
-                                        <p class="title">{{ formatCurrency(metrics.totalValue) }}</p>
+                                        {% raw %}{{ formatCurrency(metrics.totalValue) }}{% endraw %}
                                     </div>
                                 </div>
                                 <div class="level-item has-text-centered">
                                     <div>
                                         <p class="heading">Last Update</p>
-                                        <p class="title is-6">{{ metrics.lastUpdate }}</p>
+                                        {% raw %}{{ metrics.lastUpdate }}{% endraw %}
                                     </div>
                                 </div>
                             </div>
@@ -243,44 +243,41 @@
                                             <input type="checkbox" v-model="selectedItems" :value="index">
                                         </label>
                                     </td>
-                                    <td>{{ item.ticker }}</td>
-                                    <td>{{ item.company }}</td>
+                                    <td>{% raw %}{{ item.ticker }}{% endraw %}</td>
+                                    <td>{% raw %}{{ item.company }}{% endraw %}</td>
                                     <td>
                                         <div class="select is-small">
                                             <select v-model="item.portfolio">
                                                 <option value="">-</option>
-                                                <option v-for="p in portfolioOptions" :key="p" :value="p">{{ p }}</option>
+                                                <option v-for="p in portfolioOptions" :key="p" :value="p">{% raw %}{{ p }}{% endraw %}</option>
                                             </select>
                                         </div>
                                     </td>
                                     <td>
                                         <input class="input is-small" type="text" v-model="item.category">
                                     </td>
-                                    <td>{{ formatNumber(item.shares) }}</td>
+                                    <td>{% raw %}{{ formatNumber(item.shares) }}{% endraw %}</td>
                                     <td :class="{'has-text-danger': !item.price_eur}">
-                                        {{ item.price_eur ? formatCurrency(item.price_eur) : 'No price' }}
+                                        {% raw %}{{ item.price_eur ? formatCurrency(item.price_eur) : 'No price' }}{% endraw %}
                                         <button class="button is-small" 
                                                 @click="updatePrice(item)"
                                                 :class="{'is-loading': updating}"
                                                 :disabled="updating">
-                                            <span class="icon is-small">
+                                            <span class="icon">
                                                 <i class="fas fa-sync-alt"></i>
                                             </span>
                                         </button>
                                     </td>
-                                    <td>{{ formatCurrency(item.price_eur * item.shares) }}</td>
+                                    <td>{% raw %}{{ formatCurrency(item.price_eur * item.shares) }}{% endraw %}</td>
                                     <td>
-                                        <span v-if="item.last_updated" :title="formatDateTime(item.last_updated)">
-                                            {{ formatDateAgo(item.last_updated) }}
-                                        </span>
-                                        <span v-else>-</span>
+                                        {% raw %}{{ formatDateAgo(item.last_updated) }}{% endraw %}
                                     </td>
                                     <td>
                                         <div class="buttons are-small">
                                             <button class="button is-danger" 
                                                     @click="confirmDelete(item)"
                                                     :disabled="updating">
-                                                <span class="icon is-small">
+                                                <span class="icon">
                                                     <i class="fas fa-trash-alt"></i>
                                                 </span>
                                             </button>
@@ -461,7 +458,7 @@
                             <div v-for="company in companies" :key="company.id" class="column is-6">
                                 <label class="checkbox">
                                     <input type="checkbox" v-model="selectedCompanies" :value="company.id">
-                                    {{ company.name }} ({{ company.ticker }})
+                                    {% raw %}{{ company.name }} ({{ company.ticker }}){% endraw %}
                                 </label>
                             </div>
                         </div>
@@ -475,7 +472,7 @@
                     
                     <!-- Selection Summary -->
                     <div class="notification is-info is-light" v-if="selectedCompanies.length > 0">
-                        <p><strong>{{ selectedCompanies.length }}</strong> companies selected</p>
+                        <p><strong>{% raw %}{{ selectedCompanies.length }}{% endraw %}</strong> companies selected</p>
                     </div>
                     
                     <div class="tabs">
@@ -497,7 +494,7 @@
                                 <div class="select is-fullwidth">
                                     <select v-model="targetPortfolio">
                                         <option value="">Select portfolio</option>
-                                        <option v-for="p in portfolioOptions" :value="p">{{ p }}</option>
+                                        <option v-for="p in portfolioOptions" :key="p" :value="p">{% raw %}{{ p }}{% endraw %}</option>
                                     </select>
                                 </div>
                             </div>
