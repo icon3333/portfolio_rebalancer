@@ -768,6 +768,58 @@ def update_single_portfolio_api(company_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@portfolio_bp.route('/api/update_price/<int:company_id>', methods=['GET', 'POST'])
+def update_single_price_api(company_id):
+    """API endpoint to update price for a specific company"""
+    if 'account_id' not in session:
+        return jsonify({'error': 'Not authenticated. Please select an account from the home page.'}), 401
+        
+    try:
+        account_id = session['account_id']
+        
+        # Verify company belongs to account and get ticker
+        company = query_db(
+            'SELECT id, name, ticker FROM companies WHERE id = ? AND account_id = ?',
+            [company_id, account_id],
+            one=True
+        )
+        
+        if not company:
+            return jsonify({'error': 'Company not found or access denied'}), 404
+            
+        ticker = company['ticker']
+        if not ticker:
+            return jsonify({'error': f'No ticker available for company {company["name"]}'}), 400
+            
+        # Get latest price for the company using price_fetcher
+        try:
+            price_data = price_fetcher.get_current_prices([ticker])
+            if not price_data or ticker not in price_data:
+                return jsonify({'error': f'Could not fetch price for {ticker}'}), 400
+                
+            price = price_data[ticker]
+            
+            # Update price in database
+            execute_db(
+                'UPDATE market_prices SET price = ?, last_updated = CURRENT_TIMESTAMP WHERE ticker = ?',
+                [price, ticker]
+            )
+            
+            return jsonify({
+                'message': 'Price updated successfully',
+                'company_id': company_id,
+                'ticker': ticker,
+                'price': price
+            })
+            
+        except Exception as e:
+            logger.error(f"Error fetching price for {ticker}: {str(e)}")
+            return jsonify({'error': f'Error fetching price for {ticker}: {str(e)}'}), 500
+        
+    except Exception as e:
+        logger.error(f"Error in update_single_price_api: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 def get_portfolio_data(account_id):
     """Get portfolio data from the database"""
     try:
