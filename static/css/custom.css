@@ -197,7 +197,6 @@
 
 .is-fading-out {
     opacity: 0 !important;
-}
     box-shadow: 0 0 0 0.125em rgba(50, 115, 220, 0.25);
 }
 

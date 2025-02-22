@@ -77,6 +77,12 @@ CREATE INDEX idx_state_lookup ON expanded_state(account_id, page_name, variable_
 CREATE INDEX idx_state_type ON expanded_state(variable_type);
 CREATE INDEX idx_state_updated ON expanded_state(last_updated);
 
+-- Indexes for portfolio data query performance
+CREATE INDEX IF NOT EXISTS idx_companies_account_id ON companies(account_id);
+CREATE INDEX IF NOT EXISTS idx_company_shares_company_id ON company_shares(company_id);
+CREATE INDEX IF NOT EXISTS idx_market_prices_ticker ON market_prices(ticker);
+CREATE INDEX IF NOT EXISTS idx_companies_portfolio_id ON companies(portfolio_id);
+
 -- Create trigger for expanded_state
 CREATE TRIGGER update_state_timestamp 
 AFTER UPDATE ON expanded_state

@@ -1,6 +1,6 @@
 import os
 from datetime import datetime
-from flask import Flask, render_template
+from flask import Flask, render_template, session
 from config import config
 
 def create_app(config_name='default'):
@@ -14,12 +14,30 @@ def create_app(config_name='default'):
         Configured Flask application
     """
     # Create Flask app instance
-    template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'templates'))
-    static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'static'))
-    
     app = Flask(__name__, 
-                template_folder=template_dir,
-                static_folder=static_dir)
+                template_folder='../templates',
+                static_folder='../static')
+    
+    # Configure app
+    secret_key_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'secret_key')
+    if os.path.exists(secret_key_file):
+        with open(secret_key_file, 'rb') as f:
+            secret_key = f.read()
+    else:
+        # Generate a new secret key
+        secret_key = os.urandom(24)
+        with open(secret_key_file, 'wb') as f:
+            f.write(secret_key)
+    
+    app.config.update(
+        SECRET_KEY=secret_key,
+        SQLALCHEMY_DATABASE_URI='sqlite:///portfolio.db',
+        TEMPLATES_AUTO_RELOAD=True,
+        JSON_SORT_KEYS=False,
+        SESSION_COOKIE_SECURE=False,  # Set to True in production with HTTPS
+        SESSION_COOKIE_HTTPONLY=True,
+        PERMANENT_SESSION_LIFETIME=3600 * 24 * 7  # 7 days
+    )
     
     # Load configuration
     app.config.from_object(config[config_name])

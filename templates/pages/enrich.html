@@ -3,19 +3,22 @@
 {% block title %}Enrich Portfolio Data - Portfolio Manager{% endblock %}
 
 {% block head_extras %}
-<style>
-    .file-label {
-        width: 100%;
-    }
-    .file-name {
-        max-width: none;
-        width: 100%;
-    }
-    .portfolio-editor {
-        height: 600px;
-        overflow: auto;
-    }
-</style>
+    {{ super() }}
+    <!-- Add Lodash -->
+    <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
+    <style>
+        .file-label {
+            width: 100%;
+        }
+        .file-name {
+            max-width: none;
+            width: 100%;
+        }
+        .portfolio-editor {
+            height: 600px;
+            overflow: auto;
+        }
+    </style>
 {% endblock %}
 
 {% block content %}
@@ -122,14 +125,6 @@
                     </button>
                 </div>
                 <div class="control">
-                    <button class="button is-success" id="save-changes">
-                        <span class="icon">
-                            <i class="fas fa-save"></i>
-                        </span>
-                        <span>Save Changes</span>
-                    </button>
-                </div>
-                <div class="control">
                     <button class="button is-warning" id="update-prices">
                         <span class="icon">
                             <i class="fas fa-dollar-sign"></i>
@@ -150,7 +145,7 @@
                         <select id="filter-portfolio">
                             <option value="">All Portfolios</option>
                             {% for portfolio in portfolios %}
-                                <option value="{{ portfolio.name }}">{{ portfolio.name }}</option>
+                                <option value="{{ portfolio }}">{{ portfolio }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -210,7 +205,7 @@
                                 <div class="level-item has-text-centered">
                                     <div>
                                         <p class="heading">Last Update</p>
-                                        {% raw %}{{ metrics.lastUpdate }}{% endraw %}
+                                        {% raw %}{{ formatDateAgo(metrics.lastUpdate) }}{% endraw %}
                                     </div>
                                 </div>
                             </div>
@@ -232,43 +227,56 @@
                                     <th>Shares</th>
                                     <th>Price (EUR)</th>
                                     <th>Total Value</th>
+                                    <th>Total Invested</th>
                                     <th>Last Updated</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr v-for="(item, index) in filteredData" :key="item.id">
+                                <tr v-for="(item, index) in filteredData" :key="item.id || item.isin || index">
                                     <td v-if="showSelector">
                                         <label class="checkbox">
                                             <input type="checkbox" v-model="selectedItems" :value="index">
                                         </label>
                                     </td>
-                                    <td>{% raw %}{{ item.ticker }}{% endraw %}</td>
+                                    <td>
+                                        <input class="input is-small" 
+                                               type="text" 
+                                               v-model="item.ticker"
+                                               @input="debouncedSaveTickerChange(item)"
+                                               @change="saveTickerChange(item)">
+                                    </td>
                                     <td>{% raw %}{{ item.company }}{% endraw %}</td>
                                     <td>
                                         <div class="select is-small">
-                                            <select v-model="item.portfolio">
+                                            <select v-model="item.portfolio" 
+                                                    @input="debouncedSavePortfolioChange(item)">
                                                 <option value="">-</option>
                                                 <option v-for="p in portfolioOptions" :key="p" :value="p">{% raw %}{{ p }}{% endraw %}</option>
                                             </select>
                                         </div>
                                     </td>
                                     <td>
-                                        <input class="input is-small" type="text" v-model="item.category">
+                                        <input class="input is-small" 
+                                               type="text" 
+                                               v-model="item.category"
+                                               @input="debouncedSavePortfolioChange(item)">
                                     </td>
                                     <td>{% raw %}{{ formatNumber(item.shares) }}{% endraw %}</td>
                                     <td :class="{'has-text-danger': !item.price_eur}">
                                         {% raw %}{{ item.price_eur ? formatCurrency(item.price_eur) : 'No price' }}{% endraw %}
-                                        <button class="button is-small" 
-                                                @click="updatePrice(item)"
-                                                :class="{'is-loading': updating}"
-                                                :disabled="updating">
+                                        <button 
+                                            class="button is-small" 
+                                            @click="updatePrice(item)"
+                                            :class="{'is-loading': updatingItems.has(item.id)}"
+                                            :disabled="updatingItems.has(item.id)">
                                             <span class="icon">
                                                 <i class="fas fa-sync-alt"></i>
                                             </span>
                                         </button>
                                     </td>
                                     <td>{% raw %}{{ formatCurrency(item.price_eur * item.shares) }}{% endraw %}</td>
+                                    <td>{% raw %}{{ formatCurrency(item.total_invested) }}{% endraw %}</td>
                                     <td>
                                         {% raw %}{{ formatDateAgo(item.last_updated) }}{% endraw %}
                                     </td>
@@ -276,7 +284,7 @@
                                         <div class="buttons are-small">
                                             <button class="button is-danger" 
                                                     @click="confirmDelete(item)"
-                                                    :disabled="updating">
+                                                    :disabled="updatingItems.has(item.id)">
                                                 <span class="icon">
                                                     <i class="fas fa-trash-alt"></i>
                                                 </span>
@@ -349,8 +357,8 @@
                                 <select name="old_name" required>
                                     <option value="">Select portfolio to rename</option>
                                     {% for portfolio in portfolios %}
-                                        {% if portfolio.name != '-' %}
-                                            <option value="{{ portfolio.name }}">{{ portfolio.name }}</option>
+                                        {% if portfolio != '-' %}
+                                            <option value="{{ portfolio }}">{{ portfolio }}</option>
                                         {% endif %}
                                     {% endfor %}
                                 </select>
@@ -386,8 +394,8 @@
                                 <select name="portfolio_name" required>
                                     <option value="">Select portfolio to delete</option>
                                     {% for portfolio in portfolios %}
-                                        {% if portfolio.name != '-' %}
-                                            <option value="{{ portfolio.name }}">{{ portfolio.name }}</option>
+                                        {% if portfolio != '-' %}
+                                            <option value="{{ portfolio }}">{{ portfolio }}</option>
                                         {% endif %}
                                     {% endfor %}
                                 </select>
@@ -443,7 +451,7 @@
                     </div>
                     
                     <!-- Companies selector grouped by portfolio -->
-                    <div v-for="(companies, portfolio) in groupedCompanies" :key="portfolio" class="mb-5">
+                    <div v-for="(companies, portfolio) in computedGroupedCompanies" :key="portfolio" class="mb-5">
                         <div class="is-flex is-justify-content-space-between is-align-items-center mb-2">
                             <h5 class="title is-5">{{ portfolio }}</h5>
                             <label class="checkbox">
@@ -466,7 +474,7 @@
                     </div>
                     
                     <!-- No companies found message -->
-                    <div v-if="Object.keys(groupedCompanies).length === 0" class="notification is-warning">
+                    <div v-if="Object.keys(computedGroupedCompanies).length === 0" class="notification is-warning">
                         <p>No companies found matching your filter criteria.</p>
                     </div>
                     
@@ -537,13 +545,22 @@
 
 {% block scripts %}
 <script>
-// Initialize portfolio manager utility
-const portfolioManager = {
-    showNotification(message, type = 'is-info') {
-        // Implementation for showing notifications
-        console.log(`${type}: ${message}`);
-    }
-};
+// File input handling
+document.addEventListener('DOMContentLoaded', function() {
+    const fileInput = document.querySelector('.file-input');
+    const fileLabel = document.querySelector('.file-name');
+    const uploadButton = document.getElementById('upload-button');
+
+    fileInput.addEventListener('change', function() {
+        if (fileInput.files.length > 0) {
+            fileLabel.textContent = fileInput.files[0].name;
+            uploadButton.disabled = false;
+        } else {
+            fileLabel.textContent = 'No file selected';
+            uploadButton.disabled = true;
+        }
+    });
+});
 
 // Portfolio Table Vue Application
 const portfolioTableApp = new Vue({
@@ -552,26 +569,55 @@ const portfolioTableApp = new Vue({
         return {
             data: [],
             loading: true,
-            updating: false,
-            showSelector: false,
-            selectAll: false,
+            error: null,
             selectedItems: [],
-            portfolioOptions: JSON.parse('{{ portfolios|map(attribute="name")|list|tojson|safe }}'),
-            filterPortfolio: '',
+            showSelector: false,
+            searchQuery: '',
+            portfolioOptions: [],
             metrics: {
                 total: 0,
-                health: 0,
                 missing: 0,
-                lastUpdate: 'Never',
-                totalValue: 0
+                health: 0,
+                totalValue: 0,
+                lastUpdate: null
             },
-            error: null
+            updatingItems: new Set(),
+            updatingAll: false,
+            debouncedSaveTickerChange: null,
+            debouncedSaveCategory: null,
+            groupedCompanies: {}
         };
     },
     computed: {
         filteredData() {
-            if (!this.filterPortfolio) return this.data;
-            return this.data.filter(item => item.portfolio === this.filterPortfolio);
+            if (!this.data || !Array.isArray(this.data)) return [];
+            let filtered = this.data;
+            
+            if (this.searchQuery) {
+                const query = this.searchQuery.toLowerCase();
+                filtered = filtered.filter(item => {
+                    return (
+                        (item.company && item.company.toLowerCase().includes(query)) ||
+                        (item.ticker && item.ticker.toLowerCase().includes(query)) ||
+                        (item.isin && item.isin.toLowerCase().includes(query)) ||
+                        (item.category && item.category.toLowerCase().includes(query)) ||
+                        (item.portfolio && item.portfolio.toLowerCase().includes(query))
+                    );
+                });
+            }
+            
+            return filtered;
+        },
+        computedGroupedCompanies() {
+            if (!this.data || !Array.isArray(this.data)) return {};
+            return this.data.reduce((acc, item) => {
+                const portfolio = item.portfolio || 'Unassigned';
+                if (!acc[portfolio]) {
+                    acc[portfolio] = [];
+                }
+                acc[portfolio].push(item);
+                return acc;
+            }, {});
         },
         healthColorClass() {
             if (!this.data.length) return 'is-info';
@@ -588,13 +634,40 @@ const portfolioTableApp = new Vue({
         async loadData() {
             try {
                 this.loading = true;
-                const response = await fetch('/api/portfolio/data');
-                if (!response.ok) throw new Error('Failed to load portfolio data');
-                this.data = await response.json();
+                this.error = null;
+                
+                // Load portfolio options first
+                const portfoliosResponse = await fetch('/portfolio/api/portfolios');
+                if (portfoliosResponse.ok) {
+                    const portfoliosData = await portfoliosResponse.json();
+                    if (Array.isArray(portfoliosData)) {
+                        this.portfolioOptions = portfoliosData;
+                    } else if (portfoliosData.error) {
+                        throw new Error(portfoliosData.error);
+                    }
+                }
+                
+                // Load portfolio data
+                const response = await fetch('/portfolio/api/portfolio_data');
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        window.location.href = '/';
+                        return;
+                    }
+                    throw new Error('Failed to load portfolio data');
+                }
+                
+                const data = await response.json();
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                this.data = Array.isArray(data) ? data : [];
                 this.calculateMetrics();
+                
             } catch (err) {
+                console.error('Error loading data:', err);
                 this.error = err.message;
-                portfolioManager.showNotification(err.message, 'is-danger');
             } finally {
                 this.loading = false;
             }
@@ -603,10 +676,10 @@ const portfolioTableApp = new Vue({
             if (!this.data.length) {
                 this.metrics = {
                     total: 0,
-                    health: 0,
                     missing: 0,
-                    lastUpdate: 'Never',
-                    totalValue: 0
+                    health: 0,
+                    totalValue: 0,
+                    lastUpdate: null
                 };
                 return;
             }
@@ -620,10 +693,10 @@ const portfolioTableApp = new Vue({
             
             this.metrics = {
                 total,
-                health,
                 missing,
+                health,
                 totalValue,
-                lastUpdate: this.data[0]?.last_updated || 'Never'
+                lastUpdate: this.data[0]?.last_updated || null
             };
         },
         formatNumber(value) {
@@ -638,126 +711,177 @@ const portfolioTableApp = new Vue({
             }).format(value);
         },
         formatDateTime(dateStr) {
-            if (!dateStr) return '-';
-            return new Date(dateStr).toLocaleString('de-DE');
+            if (!dateStr) return 'Never';
+            return new Date(dateStr).toLocaleString();
         },
         formatDateAgo(dateStr) {
-            if (!dateStr) return '-';
+            if (!dateStr) return 'Never';
+            
             const date = new Date(dateStr);
             const now = new Date();
             const diffMs = now - date;
-            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMins / 60);
+            const diffDays = Math.floor(diffHours / 24);
             
-            if (diffDays === 0) {
-                const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-                if (diffHours === 0) {
-                    const diffMinutes = Math.floor(diffMs / (1000 * 60));
-                    return `${diffMinutes} min ago`;
-                }
-                return `${diffHours} hours ago`;
-            }
+            if (diffMins < 1) return 'Just now';
+            if (diffMins < 60) return `${diffMins} minutes ago`;
+            if (diffHours < 24) return `${diffHours} hours ago`;
             if (diffDays === 1) return 'Yesterday';
             if (diffDays < 7) return `${diffDays} days ago`;
-            return this.formatDateTime(dateStr);
+            return date.toLocaleDateString();
         },
         async updatePrice(item) {
-            if (this.updating) return;
+            if (!item.id || this.updatingItems.has(item.id)) return;
+            
             try {
-                this.updating = true;
-                const response = await fetch('/api/portfolio/update-price', {
+                this.updatingItems.add(item.id);
+                const response = await fetch(`/portfolio/api/update_price/${item.id}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const updatedItem = await response.json();
+                if (updatedItem.error) {
+                    throw new Error(updatedItem.error);
+                }
+                
+                // Update the item in the data array
+                const index = this.data.findIndex(i => i.id === item.id);
+                if (index !== -1) {
+                    this.data[index] = { ...this.data[index], ...updatedItem };
+                }
+                
+                this.calculateMetrics();
+            } catch (err) {
+                console.error('Error updating price:', err);
+                // Show error notification
+                const notification = document.createElement('div');
+                notification.className = 'notification is-danger';
+                notification.textContent = `Failed to update price: ${err.message}`;
+                document.body.appendChild(notification);
+                setTimeout(() => notification.remove(), 5000);
+            } finally {
+                this.updatingItems.delete(item.id);
+            }
+        },
+        async saveTickerChange(item) {
+            if (!item.id) return;
+            
+            try {
+                const response = await fetch(`/portfolio/api/update_ticker/${item.id}`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
                     body: JSON.stringify({ ticker: item.ticker })
                 });
                 
-                if (!response.ok) throw new Error('Failed to update price');
-                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
                 
-                Object.assign(item, data);
+                const result = await response.json();
+                if (result.error) {
+                    throw new Error(result.error);
+                }
+                
+                // Update the item in the data array
+                const index = this.data.findIndex(i => i.id === item.id);
+                if (index !== -1) {
+                    this.data[index] = { ...this.data[index], ...result };
+                }
+            } catch (err) {
+                console.error('Error saving ticker:', err);
+                // Show error notification
+                const notification = document.createElement('div');
+                notification.className = 'notification is-danger';
+                notification.textContent = `Failed to save ticker: ${err.message}`;
+                document.body.appendChild(notification);
+                setTimeout(() => notification.remove(), 5000);
+            }
+        },
+        async savePortfolioChange(item) {
+            if (!item.id) return;
+            
+            try {
+                const response = await fetch(`/portfolio/api/update_portfolio/${item.id}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        portfolio: item.portfolio || '-',
+                        category: item.category || ''
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                if (!result.success) {
+                    throw new Error(result.error || 'Unknown error');
+                }
+                
+                // Update the item in the data array with the returned data
+                const index = this.data.findIndex(i => i.id === item.id);
+                if (index !== -1) {
+                    this.data[index] = { ...this.data[index], ...result.data };
+                }
+                
                 this.calculateMetrics();
-                portfolioManager.showNotification('Price updated successfully', 'is-success');
             } catch (err) {
-                portfolioManager.showNotification(err.message, 'is-danger');
-            } finally {
-                this.updating = false;
-            }
-        },
-        async updateAllPrices() {
-            if (this.updating) return;
-            try {
-                this.updating = true;
-                const response = await fetch('/api/portfolio/update-all-prices', {
-                    method: 'POST'
-                });
-                
-                if (!response.ok) throw new Error('Failed to update prices');
-                await this.loadData();
-                portfolioManager.showNotification('All prices updated successfully', 'is-success');
-            } catch (err) {
-                portfolioManager.showNotification(err.message, 'is-danger');
-            } finally {
-                this.updating = false;
-            }
-        },
-        async updateMissingPrices() {
-            if (this.updating || !this.metrics.missing) return;
-            try {
-                this.updating = true;
-                const response = await fetch('/api/portfolio/update-missing-prices', {
-                    method: 'POST'
-                });
-                
-                if (!response.ok) throw new Error('Failed to update missing prices');
-                await this.loadData();
-                portfolioManager.showNotification('Missing prices updated successfully', 'is-success');
-            } catch (err) {
-                portfolioManager.showNotification(err.message, 'is-danger');
-            } finally {
-                this.updating = false;
+                console.error('Error saving portfolio:', err);
+                showNotification(`Failed to save portfolio: ${err.message}`, 'is-danger');
             }
         },
         async confirmDelete(item) {
-            if (!confirm(`Are you sure you want to delete ${item.company}?`)) return;
+            if (!confirm(`Are you sure you want to delete ${item.company || item.ticker}?`)) {
+                return;
+            }
+            
             try {
-                this.updating = true;
-                const response = await fetch('/api/portfolio/delete-company', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id: item.id })
+                const response = await fetch(`/portfolio/api/delete_company/${item.id}`, {
+                    method: 'DELETE'
                 });
                 
-                if (!response.ok) throw new Error('Failed to delete company');
-                this.data = this.data.filter(i => i.id !== item.id);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                // Remove the item from the data array
+                const index = this.data.findIndex(i => i.id === item.id);
+                if (index !== -1) {
+                    this.data.splice(index, 1);
+                }
+                
                 this.calculateMetrics();
-                portfolioManager.showNotification('Company deleted successfully', 'is-success');
             } catch (err) {
-                portfolioManager.showNotification(err.message, 'is-danger');
-            } finally {
-                this.updating = false;
+                console.error('Error deleting company:', err);
+                // Show error notification
+                const notification = document.createElement('div');
+                notification.className = 'notification is-danger';
+                notification.textContent = `Failed to delete company: ${err.message}`;
+                document.body.appendChild(notification);
+                setTimeout(() => notification.remove(), 5000);
             }
         },
         toggleSelectAll() {
-            if (this.selectAll) {
-                this.selectedItems = this.filteredData.map((_, index) => index);
-            } else {
+            if (this.selectedItems.length === this.filteredData.length) {
                 this.selectedItems = [];
+            } else {
+                this.selectedItems = this.filteredData.map((_, index) => index);
             }
         }
     },
+    created() {
+        // Create debounced save functions
+        this.debouncedSaveTickerChange = _.debounce(this.saveTickerChange, 1000);
+        this.debouncedSavePortfolioChange = _.debounce(this.savePortfolioChange, 1000);
+    },
     mounted() {
         this.loadData();
-        
-        // Event listeners
-        document.getElementById('refresh-data').addEventListener('click', () => this.loadData());
-        document.getElementById('update-prices').addEventListener('click', () => this.updateAllPrices());
-        document.getElementById('update-missing-prices').addEventListener('click', () => this.updateMissingPrices());
-        
-        const filterSelect = document.getElementById('filter-portfolio');
-        if (filterSelect) {
-            filterSelect.addEventListener('change', (e) => {
-                this.filterPortfolio = e.target.value;
-            });
-        }
     }
 });
 
@@ -766,140 +890,39 @@ const bulkEditApp = new Vue({
     el: '#bulk-edit-app',
     data() {
         return {
-            loading: true,
+            loading: false,
             companies: [],
-            searchQuery: '',
-            selectedPortfolios: [],
+            filter: '',
             activeTab: 'portfolio',
+            selectedPortfolios: [],
+            newPortfolio: '',
+            portfolioOptions: [],
+            targetPortfolio: '',
+            portfolioAction: 'add',
             newCategory: '',
-            error: null
+            searchQuery: ''
         };
     },
-    computed: {
-        filteredCompanies() {
-            if (!this.searchQuery) return this.companies;
-            const query = this.searchQuery.toLowerCase();
-            return this.companies.filter(company => 
-                company.name.toLowerCase().includes(query) ||
-                company.symbol.toLowerCase().includes(query)
-            );
-        },
-        groupedCompanies() {
-            return this.filteredCompanies.reduce((groups, company) => {
-                const key = company.portfolio || 'Unassigned';
-                (groups[key] = groups[key] || []).push(company);
-                return groups;
-            }, {});
-        }
-    },
     methods: {
-        async loadCompanies() {
+        async loadPortfolioOptions() {
             try {
-                this.loading = true;
-                const response = await fetch('/api/portfolio/companies');
-                if (!response.ok) throw new Error('Failed to load companies');
-                const result = await response.json();
-                this.companies = result.companies;
-            } catch (error) {
-                this.error = error.message;
-                portfolioManager.showNotification(error.message, 'is-danger');
-            } finally {
-                this.loading = false;
-            }
-        },
-        togglePortfolio(portfolio) {
-            const index = this.selectedPortfolios.indexOf(portfolio);
-            if (index === -1) {
-                this.selectedPortfolios.push(portfolio);
-            } else {
-                this.selectedPortfolios.splice(index, 1);
-            }
-        },
-        isPortfolioSelected(portfolio) {
-            return this.selectedPortfolios.includes(portfolio);
-        },
-        async applyChanges() {
-            try {
-                if (this.activeTab === 'portfolio' && !this.selectedPortfolios.length) {
-                    throw new Error('Please select at least one portfolio');
+                const response = await fetch('/portfolio/api/portfolios');
+                if (!response.ok) {
+                    throw new Error('Failed to load portfolios');
                 }
-                if (this.activeTab === 'category' && !this.newCategory.trim()) {
-                    throw new Error('Please enter a category name');
+                const data = await response.json();
+                if (Array.isArray(data)) {
+                    this.portfolioOptions = data;
+                } else if (data.error) {
+                    throw new Error(data.error);
                 }
-
-                const payload = {
-                    type: this.activeTab,
-                    portfolios: this.selectedPortfolios,
-                    category: this.newCategory.trim(),
-                    companies: this.filteredCompanies.map(c => c.id)
-                };
-
-                const response = await fetch('/api/portfolio/bulk-edit', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                if (!response.ok) throw new Error('Failed to apply changes');
-                
-                portfolioManager.showNotification('Changes applied successfully', 'is-success');
-                this.closeModal();
-                portfolioTableApp.loadData();
-            } catch (error) {
-                portfolioManager.showNotification(error.message, 'is-danger');
-            }
-        },
-        closeModal() {
-            const modal = document.getElementById('bulk-edit-modal');
-            if (modal) {
-                modal.classList.remove('is-active');
-                this.selectedPortfolios = [];
-                this.activeTab = 'portfolio';
-                this.newCategory = '';
+            } catch (err) {
+                console.error('Error loading portfolio options:', err);
             }
         }
     },
     mounted() {
-        this.loadCompanies();
-        
-        // Set up modal triggers
-        const modalTriggers = document.querySelectorAll('.js-modal-trigger');
-        modalTriggers.forEach(trigger => {
-            trigger.addEventListener('click', () => {
-                const modal = document.getElementById(trigger.dataset.target);
-                if (modal) {
-                    modal.classList.add('is-active');
-                }
-            });
-        });
-
-        // Set up modal close handlers
-        const modal = document.getElementById('bulk-edit-modal');
-        if (modal) {
-            const closeButtons = modal.querySelectorAll('.delete, .modal-cancel');
-            closeButtons.forEach(button => {
-                button.addEventListener('click', () => this.closeModal());
-            });
-        }
-
-        // Save button handler
-        const saveButton = document.getElementById('bulk-edit-save');
-        if (saveButton) {
-            saveButton.addEventListener('click', () => this.applyChanges());
-        }
-
-        // Tab handlers
-        const tabs = document.querySelectorAll('.tabs li');
-        tabs.forEach(tab => {
-            const link = tab.querySelector('a');
-            if (link) {
-                link.addEventListener('click', () => {
-                    tabs.forEach(t => t.classList.remove('is-active'));
-                    tab.classList.add('is-active');
-                    this.activeTab = link.dataset.tab;
-                });
-            }
-        });
+        this.loadPortfolioOptions();
     }
 });
 </script>

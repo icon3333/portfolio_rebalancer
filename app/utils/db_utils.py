@@ -8,10 +8,240 @@ import pandas as pd
 import numpy as np
 from typing import Tuple, Dict, List, Any, Optional
 from app.database.db_manager import query_db, execute_db, backup_database
-from app.utils.price_fetcher import price_fetcher
+from app.utils.isin_utils import isin_to_ticker
+import time  # Add missing import
 
 # Set up logger
 logger = logging.getLogger(__name__)
+
+class AdaptiveRateLimit:
+    """Rate limiter that adapts to API response patterns"""
+    def __init__(self, initial_rate=0.1):
+        self.rate = initial_rate
+        self.failures = 0
+        self.last_call = 0
+        
+    def __enter__(self):
+        now = time.time()
+        time_since_last = now - self.last_call
+        if time_since_last < self.rate:
+            time.sleep(self.rate - time_since_last)
+        self.last_call = time.time()
+        return self
+        
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is not None and "429" in str(exc_val):
+            self.failures += 1
+            self.rate = min(2.0, self.rate * 2)  # Double the rate up to 2 seconds
+        elif exc_type is None:
+            self.failures = max(0, self.failures - 1)
+            if self.failures == 0:
+                self.rate = max(0.1, self.rate * 0.75)  # Reduce rate when successful
+
+class PriceFetchManager:
+    """Handles all external API interactions for price fetching"""
+    def __init__(self):
+        self.rate_limiter = AdaptiveRateLimit()
+        self.cache = {}
+        self.cache_expiry = {}
+        self.failed_tickers = set()  # Cache for failed lookups
+        self.cache_duration = 300  # 5 minutes in seconds
+        
+    def get_cached_price(self, ticker: str) -> Optional[Tuple[float, str, float]]:
+        """Get price from cache or fetch if expired"""
+        # Skip invalid tickers
+        if not isinstance(ticker, str) or not ticker.strip():
+            logger.warning("Invalid ticker format")
+            return None, None, None
+            
+        # Clean and validate ticker
+        try:
+            ticker = str(ticker).strip().upper()
+        except:
+            logger.warning(f"Could not process ticker: {ticker}")
+            return None, None, None
+            
+        if not ticker:
+            logger.warning("Empty ticker")
+            return None, None, None
+            
+        # Check if ticker is in failed cache
+        if ticker in self.failed_tickers:
+            logger.debug(f"Skipping previously failed ticker: {ticker}")
+            return None, None, None
+            
+        now = time.time()
+        if ticker in self.cache and now < self.cache_expiry.get(ticker, 0):
+            return self.cache[ticker]
+            
+        result = self.fetch_price_and_currency(ticker)
+        if result[0] is not None:
+            self.cache[ticker] = result
+            self.cache_expiry[ticker] = now + self.cache_duration
+        return result
+
+    def fetch_price_and_currency(self, ticker: str) -> Tuple[Optional[float], Optional[str], Optional[float]]:
+        """Fetch single ticker price data"""
+        logger.debug(f"Fetching price for ticker: {ticker}")
+        
+        max_retries = 3
+        retry_delay = 1  # seconds
+        
+        for attempt in range(max_retries):
+            try:
+                with self.rate_limiter:
+                    yf_data = yf.Ticker(ticker)
+                    logger.info(f"Getting history for {ticker} (attempt {attempt + 1}/{max_retries})")
+                    history = yf_data.history(period='5d')  
+                    logger.info(f"History data for {ticker}: {history if not history.empty else 'Empty'}")
+                    
+                    if history.empty:
+                        logger.info(f"No price data available for {ticker}")
+                        if attempt < max_retries - 1:
+                            time.sleep(retry_delay)
+                            continue
+                        return None, None, None
+                    
+                    try:
+                        # Try to get the most recent price
+                        price = history['Close'].iloc[-1]
+                        if pd.isna(price) and len(history) > 1:
+                            # If latest is NaN, try previous day
+                            price = history['Close'].iloc[-2]
+                            
+                        if pd.isna(price):
+                            logger.warning(f"No valid price found for {ticker}")
+                            if attempt < max_retries - 1:
+                                time.sleep(retry_delay)
+                                continue
+                            return None, None, None
+                            
+                        logger.info(f"Got price for {ticker}: {price}")
+                        
+                        # Try to get currency from yfinance info first
+                        try:
+                            info = yf_data.info
+                            currency = info.get('currency', None)
+                            logger.info(f"Got currency from yfinance for {ticker}: {currency}")
+                        except Exception as e:
+                            logger.warning(f"Failed to get currency from yfinance for {ticker}: {e}")
+                            currency = None
+                        
+                        # Fall back to USD if no currency info available
+                        if not currency:
+                            currency = 'USD'  # Default to USD if no currency info available
+                            logger.info(f"Using default USD currency for {ticker}")
+                        
+                        # Handle GBp (British pence) to GBP conversion
+                        if currency == 'GBp':
+                            price = price / 100  # Convert pence to pounds
+                            currency = 'GBP'
+                            logger.info(f"Converted GBp to GBP for {ticker}: {price} GBP")
+                        
+                        # Calculate EUR price if needed
+                        price_eur = price
+                        if currency != 'EUR':
+                            eur_rate = self._get_eur_rate(currency)
+                            if eur_rate is not None:
+                                price_eur = price * eur_rate
+                                logger.info(f"Converted {ticker} price to EUR: {price_eur} (rate: {eur_rate})")
+                            else:
+                                logger.warning(f"Failed to get EUR rate for {currency}")
+                                if attempt < max_retries - 1:
+                                    time.sleep(retry_delay)
+                                    continue
+                                return price, currency, None
+                                
+                        return price, currency, price_eur
+                        
+                    except Exception as e:
+                        logger.warning(f"Error processing data for {ticker}: {str(e)}")
+                        if attempt < max_retries - 1:
+                            time.sleep(retry_delay)
+                            continue
+                        return None, None, None
+                        
+            except Exception as e:
+                logger.warning(f"Failed to fetch data for {ticker} (attempt {attempt + 1}/{max_retries}): {str(e)}")
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay)
+                    continue
+                self.failed_tickers.add(ticker)
+                return None, None, None
+
+    def _get_eur_rate(self, currency: str) -> Optional[float]:
+        """Get EUR conversion rate"""
+        max_retries = 3
+        retry_delay = 1  # seconds
+        
+        for attempt in range(max_retries):
+            try:
+                with self.rate_limiter:
+                    eur_ticker = f"{currency}EUR=X"
+                    eur_data = yf.Ticker(eur_ticker)
+                    eur_history = eur_data.history(period='5d')  
+                    if not eur_history.empty:
+                        rate = eur_history['Close'].iloc[-1]
+                        if pd.isna(rate) and len(eur_history) > 1:
+                            # If latest is NaN, try previous day
+                            rate = eur_history['Close'].iloc[-2]
+                        
+                        if not pd.isna(rate):
+                            return rate
+                            
+                    if attempt < max_retries - 1:
+                        time.sleep(retry_delay)
+                        continue
+                        
+                    return None
+                        
+            except Exception as e:
+                if '404' in str(e):
+                    logger.info(f"EUR rate not available for {currency}")
+                    return None
+                else:
+                    logger.error(f"Failed to get EUR rate for {currency} (attempt {attempt + 1}/{max_retries}): {e}")
+                    if attempt < max_retries - 1:
+                        time.sleep(retry_delay)
+                        continue
+                    return None
+
+    def fetch_batch(self, tickers: list, timeout: int = 10) -> Dict[str, Tuple[float, str, float]]:
+        """Batch process multiple tickers with timeout"""
+        results = {}
+        logger.info(f"Starting batch fetch for {len(tickers)} tickers: {tickers}")
+        
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            future_to_ticker = {
+                executor.submit(self.get_cached_price, ticker): ticker 
+                for ticker in tickers
+                if ticker not in self.failed_tickers  # Skip known failed tickers
+            }
+            
+            if len(future_to_ticker) != len(tickers):
+                skipped = set(tickers) - {ticker for ticker in future_to_ticker.values()}
+                logger.info(f"Skipping {len(skipped)} previously failed tickers: {skipped}")
+            
+            for future in as_completed(future_to_ticker):
+                ticker = future_to_ticker[future]
+                try:
+                    result = future.result(timeout=timeout)
+                    results[ticker] = result
+                    if result[0] is not None:
+                        logger.info(f"Successfully fetched {ticker}: Price={result[0]} {result[1]} (EUR: {result[2]})")
+                    else:
+                        logger.warning(f"Failed to fetch {ticker}: No price data")
+                except TimeoutError:
+                    logger.warning(f"Timeout fetching {ticker}")
+                    results[ticker] = (None, None, None)
+                except Exception as e:
+                    logger.error(f"Error fetching {ticker}: {str(e)}")
+                    results[ticker] = (None, None, None)
+                    
+        return results
+
+# Create a global instance
+price_fetcher = PriceFetchManager()
 
 def load_portfolio_data(account_id: int) -> pd.DataFrame:
     """
@@ -24,101 +254,113 @@ def load_portfolio_data(account_id: int) -> pd.DataFrame:
         DataFrame with portfolio data
     """
     try:
-        # Query portfolio data
+        logger.info(f"Loading portfolio data for account_id: {account_id}")
+        
+        # Enhanced query with explicit company fields
         data = query_db('''
-            SELECT 
+            SELECT
+                c.id,
                 c.name AS company,
                 c.ticker,
                 c.isin,
-                p.name AS portfolio,
                 c.category,
-                cs.shares,
-                cs.override_share,
+                COALESCE(p.name, '-') AS portfolio,
+                COALESCE(cs.shares, 0) AS shares,
+                COALESCE(cs.override_share, 0) AS override_share,
                 mp.price_eur,
                 mp.currency,
                 mp.last_updated,
-                c.total_invested
+                COALESCE(c.total_invested, 0) AS total_invested
             FROM companies c
             LEFT JOIN company_shares cs ON c.id = cs.company_id
             LEFT JOIN portfolios p ON c.portfolio_id = p.id
             LEFT JOIN market_prices mp ON c.ticker = mp.ticker
             WHERE c.account_id = ?
+            ORDER BY c.name
         ''', [account_id])
         
         if not data:
-            logger.info(f"No portfolio data found for account {account_id}")
+            logger.warning(f"No portfolio data found for account {account_id}")
+            logger.info("Checking if account exists...")
+            account = query_db('SELECT * FROM accounts WHERE id = ?', [account_id], one=True)
+            if account:
+                logger.info(f"Account exists: {account['username']}")
+            else:
+                logger.warning("Account not found in database")
             return pd.DataFrame()
         
-        # Convert to DataFrame
-        df = pd.DataFrame(data)
+        # Convert to DataFrame efficiently
+        logger.debug(f"Converting {len(data)} rows to DataFrame")
+        df = pd.DataFrame([dict(row) for row in data])
         
-        # Process data
-        df = process_portfolio_dataframe(df)
+        # Process numeric columns efficiently
+        numeric_cols = ['shares', 'override_share', 'price_eur', 'total_invested']
+        for col in numeric_cols:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
         
+        # Convert last_updated to datetime
+        if 'last_updated' in df.columns:
+            df['last_updated'] = pd.to_datetime(df['last_updated'], errors='coerce')
+        
+        logger.info(f"Loaded {len(df)} portfolio items")
         return df
         
     except Exception as e:
-        logger.error(f"Error loading portfolio data: {str(e)}")
+        logger.error(f"Error loading portfolio data: {str(e)}", exc_info=True)
         return pd.DataFrame()
 
 def process_portfolio_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Process portfolio DataFrame to ensure consistent data.
-    
-    Args:
-        df: Raw portfolio DataFrame
+    """Process portfolio data DataFrame"""
+    try:
+        # Fill missing values
+        df['portfolio'] = df['portfolio'].fillna('-')
+        df['category'] = df['category'].fillna('-')
+        df['shares'] = pd.to_numeric(df['shares'], errors='coerce').fillna(0)
+        df['override_share'] = pd.to_numeric(df['override_share'], errors='coerce')
+        df['price_eur'] = pd.to_numeric(df['price_eur'], errors='coerce')
+        df['total_invested'] = pd.to_numeric(df['total_invested'], errors='coerce').fillna(0)
         
-    Returns:
-        Processed DataFrame
-    """
-    if df.empty:
+        # Convert last_updated to datetime
+        df['last_updated'] = pd.to_datetime(df['last_updated'], errors='coerce')
+        
+        # Ensure required columns exist
+        required_columns = [
+            'company', 'isin', 'ticker', 'portfolio', 'category',
+            'shares', 'override_share', 'price_eur', 'currency',
+            'total_invested', 'last_updated'
+        ]
+        for col in required_columns:
+            if col not in df.columns:
+                df[col] = None
+                
+        # Add validation for company-specific fields
+        required_company_columns = ['company', 'isin', 'ticker']
+        for col in required_company_columns:
+            if col not in df.columns:
+                df[col] = 'N/A'
+                logger.warning(f"Added missing company column: {col}")
+        
         return df
-    
-    # Ensure columns exist
-    required_columns = [
-        'company', 'ticker', 'portfolio', 'category', 
-        'shares', 'override_share', 'price_eur', 'currency',
-        'last_updated', 'total_invested'
-    ]
-    
-    for col in required_columns:
-        if col not in df.columns:
-            df[col] = None
-    
-    # Replace missing values with defaults
-    df['portfolio'] = df['portfolio'].fillna('-')
-    df['category'] = df['category'].fillna('-')
-    
-    # Calculate effective shares
-    df['effective_shares'] = df.apply(
-        lambda row: row['override_share'] if pd.notna(row['override_share']) and row['override_share'] > 0 
-                    else row['shares'] if pd.notna(row['shares']) else 0,
-        axis=1
-    )
-    
-    # Calculate total value
-    df['total_value_eur'] = df.apply(
-        lambda row: row['effective_shares'] * row['price_eur'] if pd.notna(row['price_eur']) else 0,
-        axis=1
-    )
-    
-    return df
+    except Exception as e:
+        logger.error(f"Error processing DataFrame: {str(e)}", exc_info=True)
+        return df
 
 def update_prices(
-    tickers: List[str], 
+    identifiers: List[str], 
     account_id: Optional[int] = None, 
     force_update: bool = False
 ) -> Tuple[Dict[str, int], List[str]]:
     """
-    Update prices for the given tickers.
+    Update prices for the given identifiers (ISINs or tickers).
     
     Args:
-        tickers: List of tickers to update prices for
+        identifiers: List of ISINs or tickers to update prices for
         account_id: Account ID to update last_price_update field
         force_update: Whether to force update regardless of time since last update
         
     Returns:
-        Tuple of (results_dict, failed_tickers_list)
+        Tuple of (results_dict, failed_identifiers_list)
     """
     try:
         # Initialize counters
@@ -127,7 +369,7 @@ def update_prices(
             'failed': 0,
             'skipped': 0
         }
-        failed_tickers = []
+        failed_identifiers = []
         
         # Skip update if not forced and last update was recent
         if not force_update and account_id:
@@ -142,38 +384,56 @@ def update_prices(
                 last_update_time = datetime.strptime(last_update['last_price_update'], '%Y-%m-%d %H:%M:%S')
                 if datetime.now() - last_update_time < timedelta(hours=24):
                     logger.info("Skipping price update - less than 24 hours since last update")
-                    results['skipped'] = len(tickers)
-                    return results, failed_tickers
+                    results['skipped'] = len(identifiers)
+                    return results, failed_identifiers
+        
+        # Convert ISINs to tickers
+        ticker_map = isin_to_ticker(identifiers)
+        logger.info(f"Mapped {len(ticker_map)} identifiers to tickers")
         
         # Process in batches to avoid rate limiting
         BATCH_SIZE = 5
-        total_batches = (len(tickers) + BATCH_SIZE - 1) // BATCH_SIZE
+        valid_identifiers = [id for id in identifiers if ticker_map.get(id) is not None]
+        total_batches = (len(valid_identifiers) + BATCH_SIZE - 1) // BATCH_SIZE
         
         for batch_num in range(total_batches):
             start_idx = batch_num * BATCH_SIZE
-            end_idx = min(start_idx + BATCH_SIZE, len(tickers))
-            batch_tickers = tickers[start_idx:end_idx]
+            end_idx = min(start_idx + BATCH_SIZE, len(valid_identifiers))
+            batch_identifiers = valid_identifiers[start_idx:end_idx]
             
-            logger.info(f"Processing batch {batch_num + 1}/{total_batches}: {batch_tickers}")
+            logger.info(f"Processing batch {batch_num + 1}/{total_batches}: {batch_identifiers}")
+            
+            # Get tickers for this batch
+            batch_tickers = [ticker_map[id] for id in batch_identifiers]
             
             # Fetch batch prices
             batch_results = price_fetcher.fetch_batch(batch_tickers)
             
-            for ticker, (price, currency, price_eur) in batch_results.items():
-                if price is not None:
-                    # Update price in database
-                    success = update_price_in_db(ticker, price, currency, price_eur)
+            # Map results back to original identifiers
+            for identifier, ticker in zip(batch_identifiers, batch_tickers):
+                price_result = batch_results.get(ticker)
+                if price_result and price_result[0] is not None:
+                    price, currency, price_eur = price_result
+                    # Update price in database using original identifier
+                    success = update_price_in_db(identifier, price, currency, price_eur)
                     if success:
                         results['success'] += 1
-                        logger.info(f"Updated price for {ticker}: {price} {currency} (EUR: {price_eur})")
+                        logger.info(f"Updated price for {identifier} (ticker: {ticker}): {price} {currency} (EUR: {price_eur})")
                     else:
                         results['failed'] += 1
-                        failed_tickers.append(ticker)
-                        logger.warning(f"Failed to update price in database for {ticker}")
+                        failed_identifiers.append(identifier)
+                        logger.warning(f"Failed to update price in database for {identifier}")
                 else:
                     results['failed'] += 1
-                    failed_tickers.append(ticker)
-                    logger.warning(f"Failed to fetch price for {ticker}")
+                    failed_identifiers.append(identifier)
+                    logger.warning(f"Failed to fetch price for {identifier} (ticker: {ticker})")
+        
+        # Add unmapped identifiers to failed list
+        unmapped = [id for id in identifiers if ticker_map.get(id) is None]
+        if unmapped:
+            results['failed'] += len(unmapped)
+            failed_identifiers.extend(unmapped)
+            logger.warning(f"Could not map identifiers to tickers: {unmapped}")
         
         # Update last price update timestamp for account
         if account_id:
@@ -183,11 +443,11 @@ def update_prices(
                 [datetime.now().strftime('%Y-%m-%d %H:%M:%S'), account_id]
             )
             
-        return results, failed_tickers
+        return results, failed_identifiers
             
     except Exception as e:
-        logger.error(f"Error updating prices: {str(e)}")
-        return {'success': 0, 'failed': len(tickers), 'skipped': 0}, tickers
+        logger.error(f"Error updating prices: {str(e)}", exc_info=True)
+        return {'success': 0, 'failed': len(identifiers), 'skipped': 0}, identifiers
 
 def update_price_in_db(ticker: str, price: float, currency: str, price_eur: float) -> bool:
     """
@@ -326,6 +586,17 @@ def calculate_portfolio_composition(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.
 
     return portfolio_composition, category_composition, total_value, df_clean, warning_message
 
+def get_portfolios(account_id):
+    """Get list of portfolios for an account"""
+    portfolios = query_db('''
+        SELECT id, name
+        FROM portfolios
+        WHERE account_id = ?
+        ORDER BY name
+    ''', [account_id])
+    
+    return [{'id': p['id'], 'name': p['name']} for p in portfolios]
+
 def save_state(account_id: int, page_name: str, variable_name: str, variable_value: Any, variable_type: str) -> bool:
     """
     Save state to the expanded_state table.
@@ -453,17 +724,71 @@ def process_csv_data(account_id: int, file_content: str) -> Tuple[bool, str, Dic
         # Parse CSV
         df = pd.read_csv(io.StringIO(file_content), delimiter=';')
         
-        # Validate required columns
-        required_columns = [
-            "datetime", "date", "time", "price", "shares", "amount", "tax", 
-            "fee", "realizedgains", "type", "broker", "assettype", "identifier",
-            "wkn", "originalcurrency", "currency", "fxrate", "holding",
-            "holdingname", "holdingnickname", "exchange", "avgholdingperiod"
-        ]
+        # Make column names lowercase and remove spaces/underscores for comparison
+        df.columns = df.columns.str.lower()
+        df.columns = df.columns.str.replace(' ', '').str.replace('_', '')
         
-        missing_columns = [col for col in required_columns if col not in df.columns]
+        # Define essential columns that must be present
+        essential_columns = {
+            "identifier": ["identifier", "isin", "symbol"],
+            "holdingname": ["holdingname", "name", "securityname"],
+            "shares": ["shares", "quantity", "units"],
+            "price": ["price", "unitprice", "priceperunit"]
+        }
+        
+        # Optional columns with defaults
+        optional_columns = {
+            "type": ["type", "transactiontype"],
+            "broker": ["broker", "brokername"],
+            "assettype": ["assettype", "type", "securitytype"],
+            "wkn": ["wkn"],
+            "currency": ["currency"],
+            "exchange": ["exchange", "market"]
+        }
+        
+        # Try to map essential columns first
+        column_mapping = {}
+        missing_columns = []
+        
+        # Try to find matching columns for essential fields
+        for required_col, alternatives in essential_columns.items():
+            found = False
+            for alt in alternatives:
+                for col in df.columns:
+                    if alt in col:
+                        column_mapping[required_col] = col
+                        found = True
+                        break
+                if found:
+                    break
+            
+            if not found:
+                missing_columns.append(required_col)
+        
+        # Check for essential columns
         if missing_columns:
+            logger.warning(f"Missing essential columns: {missing_columns}")
             return False, f"Missing required columns: {', '.join(missing_columns)}", {}
+        
+        # Try to map optional columns
+        for opt_col, alternatives in optional_columns.items():
+            for alt in alternatives:
+                for col in df.columns:
+                    if alt in col and opt_col not in column_mapping:
+                        column_mapping[opt_col] = col
+                        break
+        
+        # Log found columns
+        logger.info(f"Found columns: {column_mapping}")
+        
+        # Rename columns to match our format
+        df = df.rename(columns=column_mapping)
+        
+        # Set default values for missing optional columns
+        if 'type' not in df.columns:
+            df['type'] = 'Buy'  # Default to Buy type
+        if 'currency' not in df.columns:
+            df['currency'] = 'EUR'  # Default to EUR
         
         # Filter to valid transaction types
         valid_types = ['Buy', 'Sell', 'TransferOut', 'TransferIn']
@@ -497,27 +822,48 @@ def process_csv_data(account_id: int, file_content: str) -> Tuple[bool, str, Dic
         
         # Process numeric values
         def process_value(value):
-            if isinstance(value, (int, float)):
-                return float(value)
-            
-            value_str = str(value).strip()
-            # Remove currency symbols first
-            currency_symbols = ['€', '£', '¥', '$']
-            for symbol in currency_symbols:
-                value_str = value_str.replace(symbol, '')
-            
-            # Clean and standardize the number format
-            value_str = value_str.replace(',', '.')
-            
-            # Keep only valid number characters (digits, decimal point, minus sign)
-            value_str = ''.join(c for c in value_str if c.isdigit() or c in '.-')
-            
-            # Handle case of multiple decimal points
-            parts = value_str.split('.')
-            if len(parts) > 2:  # Multiple decimal points
-                value_str = parts[0] + '.' + parts[1]  # Keep only first decimal point
-            
-            return float(value_str) if value_str else 0
+            try:
+                if pd.isna(value):
+                    return 0.0
+                
+                if isinstance(value, (int, float)):
+                    return float(value)
+                
+                value_str = str(value).strip()
+                
+                # Remove any currency symbols and thousand separators
+                currency_symbols = ['€', '£', '¥', '$']
+                for symbol in currency_symbols:
+                    value_str = value_str.replace(symbol, '')
+                value_str = value_str.replace(',', '')  # Remove thousand separators
+                
+                # Try to convert directly first
+                try:
+                    return float(value_str)
+                except ValueError:
+                    pass
+                
+                # If that fails, try more aggressive cleaning
+                # Keep only valid number characters (digits, decimal point, minus sign)
+                value_str = ''.join(c for c in value_str if c.isdigit() or c in '.-')
+                
+                # Handle case of multiple decimal points
+                parts = value_str.split('.')
+                if len(parts) > 2:  # Multiple decimal points
+                    value_str = parts[0] + '.' + parts[1]  # Keep only first decimal point
+                
+                # Log the value transformation
+                logger.debug(f"Converting value: original='{value}', cleaned='{value_str}'")
+                
+                return float(value_str) if value_str else 0.0
+            except Exception as e:
+                logger.warning(f"Failed to convert value '{value}' to float: {str(e)}")
+                return 0.0
+        
+        # Add debug logging for raw values
+        logger.info("Raw transaction data before processing:")
+        for _, row in df.iterrows():
+            logger.info(f"Type: {row['type']}, Shares: {row['shares']}, Price: {row['price']}, Holding: {row['holdingname']}")
         
         df['shares'] = df['shares'].apply(process_value)
         df['price'] = df['price'].apply(process_value)

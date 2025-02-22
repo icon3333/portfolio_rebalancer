@@ -135,9 +135,14 @@ function initializeTabs() {
         const tabContents = document.querySelectorAll('.tab-content');
         
         tabs.forEach(tab => {
-            const target = tab.dataset.target;
+            const link = tab.querySelector('a');
+            if (!link) return;
             
-            tab.addEventListener('click', () => {
+            const target = link.dataset.target;
+            
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                
                 // Deactivate all tabs
                 tabs.forEach(t => t.classList.remove('is-active'));
                 
@@ -313,11 +318,68 @@ function debounce(func, wait = 300) {
     };
 }
 
-// Export global utilities
-window.portfolioManager = {
+// Cache for portfolio data
+let portfolioDataCache = null;
+let lastCacheTime = 0;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+// Portfolio manager utility
+const portfolioManager = {
     formatCurrency,
     formatPercentage,
     showNotification,
     createLoadingOverlay,
-    debounce
+    debounce,
+
+    async loadData() {
+        try {
+            // Check cache first
+            const now = Date.now();
+            if (portfolioDataCache && (now - lastCacheTime) < CACHE_DURATION) {
+                return {
+                    data: portfolioDataCache,
+                    fromCache: true
+                };
+            }
+            
+            // Load fresh data
+            const response = await fetch('/portfolio/api/portfolio_data');
+            if (!response.ok) throw new Error('Failed to load portfolio data');
+            
+            const data = await response.json();
+            
+            // Update cache
+            portfolioDataCache = data;
+            lastCacheTime = now;
+            
+            return {
+                data,
+                fromCache: false
+            };
+        } catch (err) {
+            console.error('Failed to load data:', err);
+            throw err;
+        }
+    },
+
+    async refreshDataInBackground() {
+        try {
+            const response = await fetch('/portfolio/api/portfolio_data');
+            if (!response.ok) return null;
+            
+            const data = await response.json();
+            
+            // Update cache
+            portfolioDataCache = data;
+            lastCacheTime = Date.now();
+            
+            return data;
+        } catch (err) {
+            console.error('Background refresh failed:', err);
+            return null;
+        }
+    }
 };
+
+// Export global utilities
+window.portfolioManager = portfolioManager;

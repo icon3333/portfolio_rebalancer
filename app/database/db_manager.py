@@ -197,17 +197,43 @@ def query_db(query, args=(), one=False):
     """
     Query the database and return results as dictionary objects.
     """
-    cur = get_db().execute(query, args)
-    rv = cur.fetchall()
-    cur.close()
-    result = [dict(row) for row in rv]
-    return (result[0] if result else None) if one else result
+    try:
+        logger.debug(f"Executing query: {query}")
+        logger.debug(f"Query args: {args}")
+        
+        cursor = get_db().execute(query, args)
+        rv = cursor.fetchall()
+        cursor.close()
+        
+        # Convert rows to dictionaries
+        result = [dict(row) for row in rv]
+        logger.debug(f"Query returned {len(result)} rows")
+        
+        return (result[0] if result else None) if one else result
+    except Exception as e:
+        logger.error(f"Database query failed: {str(e)}")
+        logger.error(f"Query was: {query}")
+        logger.error(f"Args were: {args}")
+        raise
 
 def execute_db(query, args=()):
     """
     Execute a statement and commit changes, returning the rowcount.
     """
-    db = get_db()
-    cursor = db.execute(query, args)
-    db.commit()
-    return cursor.rowcount
+    try:
+        logger.debug(f"Executing statement: {query}")
+        logger.debug(f"Statement args: {args}")
+        
+        db = get_db()
+        cursor = db.execute(query, args)
+        rowcount = cursor.rowcount
+        db.commit()
+        cursor.close()
+        
+        logger.debug(f"Statement affected {rowcount} rows")
+        return rowcount
+    except Exception as e:
+        logger.error(f"Database execute failed: {str(e)}")
+        logger.error(f"Statement was: {query}")
+        logger.error(f"Args were: {args}")
+        raise
