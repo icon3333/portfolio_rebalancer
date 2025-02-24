@@ -272,30 +272,24 @@ def get_portfolio_allocations(account_id):
 def generate_sunburst_data(portfolio_data):
     """Generate data structure for sunburst visualization"""
     if not portfolio_data:
-        return {}
+        return []
         
-    # Convert to DataFrame
+    # Convert to dataframe for easier grouping
     df = pd.DataFrame(portfolio_data)
     
     # Calculate total portfolio value
     total_value = df['total_value_eur'].sum()
     
-    if total_value == 0:
-        return {}
-    
-    # Create nodes for sunburst chart
-    nodes = []
-    
-    # Add root node
-    nodes.append({
+    # Initialize nodes list with root node
+    nodes = [{
         'id': 'total',
         'parent': '',
-        'name': 'Total Portfolio',
+        'name': 'Total',
         'value': total_value,
         'percentage': 100
-    })
+    }]
     
-    # Add portfolio nodes
+    # Group by portfolio
     for portfolio, group in df.groupby('portfolio'):
         portfolio_value = group['total_value_eur'].sum()
         portfolio_percent = (portfolio_value / total_value * 100)
@@ -322,7 +316,7 @@ def generate_sunburst_data(portfolio_data):
                         'name': row['company'],
                         'value': stock_value,
                         'percentage': stock_percent,
-                        'ticker': row['ticker']
+                        'identifier': row['identifier']
                     })
             else:
                 # Add category node
@@ -348,7 +342,7 @@ def generate_sunburst_data(portfolio_data):
                         'name': row['company'],
                         'value': stock_value,
                         'percentage': stock_percent,
-                        'ticker': row['ticker']
+                        'identifier': row['identifier']
                     })
     
     return nodes
@@ -359,8 +353,7 @@ def get_portfolio_data(account_id):
     data = query_db('''
         SELECT 
             c.name AS company,
-            c.ticker,
-            c.isin,
+            c.identifier,
             p.name AS portfolio,
             c.category,
             cs.shares,
@@ -372,7 +365,7 @@ def get_portfolio_data(account_id):
         FROM companies c
         LEFT JOIN company_shares cs ON c.id = cs.company_id
         LEFT JOIN portfolios p ON c.portfolio_id = p.id
-        LEFT JOIN market_prices mp ON c.ticker = mp.ticker
+        LEFT JOIN market_prices mp ON c.identifier = mp.identifier
         WHERE c.account_id = ?
     ''', [account_id])
     

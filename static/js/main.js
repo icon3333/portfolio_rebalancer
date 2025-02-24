@@ -381,5 +381,28 @@ const portfolioManager = {
     }
 };
 
+// Add to portfolioManager object
+portfolioManager.updatePrice = async function(companyId) {
+    try {
+        const response = await fetch(`/portfolio/api/update_price/${companyId}`);
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to update price');
+        }
+        
+        // Refresh the portfolio data
+        await this.refreshDataInBackground();
+        
+        this.showNotification('Price updated successfully', 'is-success');
+        return data;
+        
+    } catch (error) {
+        console.error('Error updating price:', error);
+        this.showNotification(error.message, 'is-danger');
+        throw error;
+    }
+};
+
 // Export global utilities
 window.portfolioManager = portfolioManager;

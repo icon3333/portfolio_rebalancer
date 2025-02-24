@@ -29,7 +29,7 @@ def index():
                 FROM portfolios p
                 LEFT JOIN companies c ON p.id = c.portfolio_id
                 LEFT JOIN company_shares cs ON c.id = cs.company_id
-                LEFT JOIN market_prices mp ON c.ticker = mp.ticker
+                LEFT JOIN market_prices mp ON c.identifier = mp.identifier
                 WHERE p.account_id = ?
                 GROUP BY p.name
             ''', [account_id])

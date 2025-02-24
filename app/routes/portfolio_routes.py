@@ -9,9 +9,7 @@ from app.utils.db_utils import (
     get_portfolios
 )
 from app.utils.data_processing import clear_data_caches
-from app.utils.price_fetcher import price_fetcher
-from app.utils.isin_utils import isin_to_ticker
-
+from app.utils.yfinance_utils import get_stock_info
 import pandas as pd
 import io
 import logging
@@ -67,45 +65,40 @@ def enrich():
     logger.debug(f"- portfolio_data: {portfolio_data}")
     logger.debug(f"- portfolios: {[p['name'] for p in portfolios]}")
     
+    # Calculate metrics safely handling None values
+    last_updates = [item['last_updated'] for item in portfolio_data if item['last_updated'] is not None]
+    total_value = sum(
+        (item['price_eur'] or 0) * (item['shares'] or 0) 
+        for item in portfolio_data
+    )
+    missing_prices = sum(1 for item in portfolio_data if not item['price_eur'])
+    total_items = len(portfolio_data)
+    health = int(((total_items - missing_prices) / total_items * 100) if total_items > 0 else 100)
+    
     return render_template('pages/enrich.html',
                          portfolio_data=portfolio_data,
-                         portfolios=[p['name'] for p in portfolios])
+                         portfolios=[p['name'] for p in portfolios],
+                         metrics={
+                             'total': total_items,
+                             'health': health,
+                             'missing': missing_prices,
+                             'totalValue': total_value,
+                             'lastUpdate': max(last_updates) if last_updates else None
+                         })
 
-@portfolio_bp.route('/api/portfolio_data')
+@portfolio_bp.route('/api/portfolio_data', methods=['GET'])
 def get_portfolio_data_api():
-    """API endpoint to get portfolio data"""
-    logger.info("Accessing portfolio data API")
-    logger.info(f"Current session: {dict(session)}")
-    logger.info(f"Request headers: {dict(request.headers)}")
-    
-    if 'account_id' not in session:
-        logger.warning("No account_id in session")
-        return jsonify({'error': 'Not authenticated. Please select an account from the home page.'}), 401
-    
+    """Get portfolio data from the database"""
     try:
         account_id = session['account_id']
-        logger.info(f"Getting portfolio data for account_id: {account_id}")
-        
-        # Get account info
-        account = query_db('SELECT * FROM accounts WHERE id = ?', [account_id], one=True)
-        if not account:
-            logger.error(f"Account {account_id} not found")
-            return jsonify({'error': 'Account not found'}), 404
-            
-        logger.info(f"Found account: {account['username']}")
-        
-        # Get portfolio data
+        if not account_id:
+            return jsonify({'error': 'Not authenticated'}), 401
+
+        # Get data from database without triggering any yfinance updates
         portfolio_data = get_portfolio_data(account_id)
-        
-        # Log response details
-        logger.info(f"Retrieved {len(portfolio_data)} portfolio items")
-        if portfolio_data:
-            logger.info("Sample portfolio item:")
-            logger.info(f"Keys: {list(portfolio_data[0].keys())}")
-            logger.info(f"First item: {portfolio_data[0]}")
-        else:
-            logger.warning("No portfolio data returned")
-            
+        if not portfolio_data:
+            return jsonify([])
+
         return jsonify(portfolio_data)
     except Exception as e:
         logger.error(f"Error getting portfolio data: {str(e)}", exc_info=True)
@@ -284,10 +277,10 @@ def update_portfolio_api():
                 # Update company
                 cursor.execute('''
                     UPDATE companies 
-                    SET ticker = ?, category = ?, portfolio_id = ?
+                    SET identifier = ?, category = ?, portfolio_id = ?
                     WHERE id = ?
                 ''', [
-                    item.get('ticker', ''),
+                    item.get('identifier', ''),
                     item.get('category', ''),
                     portfolio_id,
                     company_id
@@ -439,249 +432,48 @@ def manage_portfolios():
     
     return redirect(url_for('portfolio.enrich'))
 
-@portfolio_bp.route('/api/portfolio_update_price', methods=['POST'])
+@portfolio_bp.route('/api/update_price', methods=['POST'])
 def update_price_api():
     """API endpoint to update a company's price"""
-    if 'account_id' not in session:
-        return jsonify({'error': 'Not authenticated. Please select an account from the home page.'}), 401
-    
     try:
-        account_id = session['account_id']
-        data = request.json
-        identifier = data.get('ticker')  # Can be either ISIN or ticker
+        data = request.get_json() if request.is_json else request.form
+        identifier = data.get('identifier', '').strip().upper()
         
         if not identifier:
-            return jsonify({'error': 'Identifier (ISIN/ticker) is required'}), 400
+            return jsonify({'error': 'No identifier provided'}), 400
             
-        # Create backup before price update
+        # Backup database before making changes
         backup_database()
         
-        # Convert ISIN to ticker if needed
-        ticker_map = isin_to_ticker([identifier])
-        ticker = ticker_map.get(identifier)
-        
-        if not ticker:
-            return jsonify({'error': f'Failed to map {identifier} to a valid ticker'}), 400
-        
-        # Get current price from yfinance
-        price, currency, price_eur = price_fetcher.get_cached_price(ticker)
+        # Get current price
+        result = get_stock_info(identifier)
+        if not result['success']:
+            return jsonify({'error': f'Failed to fetch price for {identifier}: {result.get("error")}'}), 400
+            
+        data = result['data']
+        price = data.get('currentPrice')
+        currency = data.get('currency')
+        price_eur = data.get('priceEUR')  # Get EUR price from the result
         
         if price is None:
-            return jsonify({'error': f'Failed to fetch price for {ticker}'}), 400
+            return jsonify({'error': f'Failed to fetch price for {identifier}'}), 400
             
-        now = datetime.now().isoformat()
-        
-        # Update price in database using the original identifier
-        db = get_db()
-        cursor = db.cursor()
-        cursor.execute('BEGIN TRANSACTION')
-        
-        try:
-            cursor.execute('''
-                INSERT OR REPLACE INTO market_prices 
-                (ticker, price, currency, price_eur, last_updated)
-                VALUES (?, ?, ?, ?, ?)
-            ''', [identifier, price, currency, price_eur, now])  # Use original identifier as ticker
-            
-            # Update account's last price update timestamp
-            cursor.execute('''
-                UPDATE accounts 
-                SET last_price_update = ? 
-                WHERE id = ?
-            ''', [now, account_id])
-            
-            db.commit()
-            
+        # Update price in database
+        if update_price_in_db(identifier, price, currency, price_eur):
             return jsonify({
-                'price': price,
-                'currency': currency,
-                'price_eur': price_eur,
-                'last_updated': now
+                'success': True,
+                'data': {
+                    'identifier': identifier,
+                    'price': price,
+                    'currency': currency,
+                    'price_eur': price_eur
+                }
             })
-            
-        except Exception as e:
-            db.rollback()
-            raise e
+        else:
+            return jsonify({'error': f'Failed to update price in database for {identifier}'}), 500
             
     except Exception as e:
-        logger.error(f"Error updating price: {str(e)}", exc_info=True)
-        return jsonify({'error': str(e)}), 500
-
-@portfolio_bp.route('/api/portfolio_update_all_prices', methods=['POST'])
-def update_all_prices_api():
-    """API endpoint to update all company prices"""
-    if 'account_id' not in session:
-        return jsonify({'error': 'Not authenticated. Please select an account from the home page.'}), 401
-    
-    try:
-        account_id = session['account_id']
-        
-        # Create backup before price update
-        backup_database()
-        
-        # Get all unique identifiers (ISINs/tickers) from portfolio
-        db = get_db()
-        cursor = db.cursor()
-        cursor.execute('''
-            SELECT DISTINCT c.isin 
-            FROM companies c
-            JOIN portfolio_companies pc ON c.id = pc.company_id
-            JOIN portfolios p ON pc.portfolio_id = p.id
-            WHERE p.account_id = ?
-        ''', [account_id])
-        identifiers = [row[0] for row in cursor.fetchall()]
-        
-        if not identifiers:
-            return jsonify({'message': 'No companies found to update'}), 200
-            
-        # Convert ISINs to tickers
-        ticker_map = isin_to_ticker(identifiers)
-        
-        # Update prices for each identifier
-        now = datetime.now().isoformat()
-        updated = 0
-        failed = 0
-        
-        for identifier in identifiers:
-            ticker = ticker_map.get(identifier)
-            if not ticker:
-                logger.warning(f"No ticker found for identifier: {identifier}")
-                failed += 1
-                continue
-                
-            try:
-                price, currency, price_eur = price_fetcher.get_cached_price(ticker)
-                
-                if price is None:
-                    logger.warning(f"Failed to fetch price for {ticker}")
-                    failed += 1
-                    continue
-                    
-                cursor.execute('''
-                    INSERT OR REPLACE INTO market_prices 
-                    (ticker, price, currency, price_eur, last_updated)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', [identifier, price, currency, price_eur, now])  # Use original identifier
-                updated += 1
-                
-            except Exception as e:
-                logger.error(f"Error updating price for {identifier}: {str(e)}")
-                failed += 1
-        
-        # Update account's last price update timestamp
-        cursor.execute('''
-            UPDATE accounts 
-            SET last_price_update = ? 
-            WHERE id = ?
-        ''', [now, account_id])
-        
-        db.commit()
-        
-        message = f"Updated {updated} prices"
-        if failed > 0:
-            message += f", {failed} failed"
-            
-        return jsonify({'message': message}), 200
-        
-    except Exception as e:
-        logger.error(f"Error in update_all_prices_api: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-@portfolio_bp.route('/api/portfolio_update_missing_prices', methods=['POST'])
-def update_missing_prices_api():
-    """API endpoint to update prices for companies with missing prices"""
-    if 'account_id' not in session:
-        return jsonify({'error': 'Not authenticated. Please select an account from the home page.'}), 401
-    
-    try:
-        account_id = session['account_id']
-        
-        # Get ISINs for companies with missing or old prices
-        isins = query_db('''
-            SELECT DISTINCT c.isin
-            FROM companies c
-            LEFT JOIN market_prices mp ON c.isin = mp.ticker
-            WHERE c.account_id = ? 
-            AND c.isin IS NOT NULL
-            AND (
-                mp.price_eur IS NULL 
-                OR mp.last_updated < datetime('now', '-24 hours')
-            )
-        ''', [account_id])
-        
-        if not isins:
-            return jsonify({'message': 'No companies found with missing prices'}), 200
-            
-        # Extract ISINs from query result
-        isin_list = [row['isin'] for row in isins]
-        logger.info(f"Updating prices for {len(isin_list)} ISINs with missing prices")
-        
-        # Create backup before price update
-        backup_database()
-        
-        # Update prices
-        results, failed = update_prices(isin_list, account_id, force_update=True)
-        
-        if failed:
-            logger.warning(f"Failed to update prices for {len(failed)} ISINs: {failed}")
-            
-        return jsonify({
-            'success': results['success'],
-            'failed': results['failed'],
-            'skipped': results['skipped'],
-            'failed_isins': failed
-        })
-        
-    except Exception as e:
-        logger.error(f"Error updating missing prices: {str(e)}", exc_info=True)
-        return jsonify({'error': str(e)}), 500
-
-@portfolio_bp.route('/api/portfolio_delete_company', methods=['POST'])
-def delete_company_api():
-    """API endpoint to delete a company"""
-    if 'account_id' not in session:
-        return jsonify({'error': 'Not authenticated. Please select an account from the home page.'}), 401
-    
-    try:
-        account_id = session['account_id']
-        data = request.json
-        company_id = data.get('id')
-        
-        if not company_id:
-            return jsonify({'error': 'Company ID is required'}), 400
-            
-        # Check if company exists and belongs to account
-        company = query_db(
-            'SELECT 1 FROM companies WHERE id = ? AND account_id = ?',
-            [company_id, account_id],
-            one=True
-        )
-        
-        if not company:
-            return jsonify({'error': 'Company not found'}), 404
-            
-        # Create backup before deletion
-        backup_database()
-        
-        # Delete company and related data
-        db = get_db()
-        cursor = db.cursor()
-        cursor.execute('BEGIN TRANSACTION')
-        
-        try:
-            # Delete shares
-            cursor.execute('DELETE FROM company_shares WHERE company_id = ?', [company_id])
-            # Then delete company
-            cursor.execute('DELETE FROM companies WHERE id = ?', [company_id])
-            db.commit()
-            
-        except Exception as e:
-            db.rollback()
-            raise e
-            
-        return jsonify({'message': 'Company deleted successfully'})
-        
-    except Exception as e:
+        logger.error(f"Error updating price: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @portfolio_bp.route('/api/update_portfolio/<int:company_id>', methods=['POST'])
@@ -768,56 +560,200 @@ def update_single_portfolio_api(company_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@portfolio_bp.route('/api/update_price/<int:company_id>', methods=['GET', 'POST'])
+@portfolio_bp.route('/api/companies/<int:company_id>/price', methods=['PUT'])
 def update_single_price_api(company_id):
     """API endpoint to update price for a specific company"""
-    if 'account_id' not in session:
-        return jsonify({'error': 'Not authenticated. Please select an account from the home page.'}), 401
-        
     try:
-        account_id = session['account_id']
-        
-        # Verify company belongs to account and get ticker
+        # Get company info from database
         company = query_db(
-            'SELECT id, name, ticker FROM companies WHERE id = ? AND account_id = ?',
-            [company_id, account_id],
+            'SELECT * FROM portfolio WHERE id = ?', 
+            [company_id],
             one=True
         )
         
         if not company:
-            return jsonify({'error': 'Company not found or access denied'}), 404
+            return jsonify({'error': f'Company with id {company_id} not found'}), 404
             
-        ticker = company['ticker']
-        if not ticker:
-            return jsonify({'error': f'No ticker available for company {company["name"]}'}), 400
+        identifier = company.get('identifier')
+        if not identifier:
+            return jsonify({'error': f'No identifier available for company {company["name"]}'}), 400
             
-        # Get latest price for the company using price_fetcher
-        try:
-            price_data = price_fetcher.get_current_prices([ticker])
-            if not price_data or ticker not in price_data:
-                return jsonify({'error': f'Could not fetch price for {ticker}'}), 400
-                
-            price = price_data[ticker]
+        # Get latest price for the company
+        result = get_stock_info(identifier)
+        if not result['success']:
+            return jsonify({'error': f'Could not fetch price for {identifier}: {result.get("error")}'}), 400
             
-            # Update price in database
-            execute_db(
-                'UPDATE market_prices SET price = ?, last_updated = CURRENT_TIMESTAMP WHERE ticker = ?',
-                [price, ticker]
-            )
+        data = result['data']
+        price = data.get('currentPrice')
+        currency = data.get('currency')
+        price_eur = data.get('priceEUR')  # Get EUR price from the result
+        
+        if price is None:
+            return jsonify({'error': f'No price data available for {identifier}'}), 400
             
-            return jsonify({
-                'message': 'Price updated successfully',
-                'company_id': company_id,
-                'ticker': ticker,
-                'price': price
-            })
+        # Update price in database
+        success = update_price_in_db(identifier, price, currency, price_eur)
+        
+        if not success:
+            return jsonify({'error': f'Failed to update price in database'}), 500
             
-        except Exception as e:
-            logger.error(f"Error fetching price for {ticker}: {str(e)}")
-            return jsonify({'error': f'Error fetching price for {ticker}: {str(e)}'}), 500
+        return jsonify({
+            'success': True,
+            'price': price,
+            'currency': currency,
+            'price_eur': price_eur
+        })
         
     except Exception as e:
-        logger.error(f"Error in update_single_price_api: {str(e)}")
+        logger.error(f"Error in update_single_price_api: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+@portfolio_bp.route('/api/update_identifier/<int:company_id>', methods=['POST'])
+def update_identifier_api(company_id):
+    """API endpoint to update a company's identifier"""
+    if 'account_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+        
+    try:
+        data = request.json
+        if not data or 'identifier' not in data:
+            return jsonify({'error': 'No identifier provided'}), 400
+            
+        identifier = data['identifier'].strip()
+        
+        # Get company
+        company = query_db(
+            'SELECT id FROM companies WHERE id = ? AND account_id = ?',
+            [company_id, session['account_id']],
+            one=True
+        )
+        
+        if not company:
+            return jsonify({'error': 'Company not found'}), 404
+            
+        # Update company
+        execute_db(
+            'UPDATE companies SET identifier = ? WHERE id = ?',
+            [identifier, company_id]
+        )
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.error(f"Error updating identifier: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@portfolio_bp.route('/api/update_all_prices', methods=['POST'])
+def update_all_prices_api():
+    """API endpoint to update all company prices"""
+    try:
+        # Get all company identifiers from database
+        companies = query_db('SELECT identifier FROM companies WHERE identifier IS NOT NULL')
+        if not companies:
+            return jsonify({'message': 'No companies with identifiers found'}), 200
+            
+        identifiers = [company['identifier'] for company in companies]
+        logger.info(f"Updating prices for {len(identifiers)} companies")
+        
+        # Backup database before making changes
+        backup_database()
+        
+        # Update prices one by one
+        results = {}
+        failed = []
+        
+        for identifier in identifiers:
+            try:
+                result = get_stock_info(identifier)
+                if result['success']:
+                    data = result['data']
+                    price = data.get('currentPrice')
+                    currency = data.get('currency')
+                    price_eur = data.get('priceEUR')  # Get EUR price from the result
+                    
+                    if price is not None:
+                        if update_price_in_db(identifier, price, currency, price_eur):
+                            results[identifier] = {
+                                'price': price,
+                                'currency': currency
+                            }
+                        else:
+                            failed.append(identifier)
+                    else:
+                        failed.append(identifier)
+                else:
+                    failed.append(identifier)
+            except Exception as e:
+                logger.error(f"Error updating price for {identifier}: {str(e)}")
+                failed.append(identifier)
+                
+        return jsonify({
+            'message': 'Prices updated',
+            'updated': results,
+            'failed': failed
+        }), 200
+            
+    except Exception as e:
+        logger.error(f"Error updating prices: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@portfolio_bp.route('/api/update_price/<int:company_id>', methods=['GET', 'POST'])
+def update_price_by_id_api(company_id):
+    """API endpoint to update price for a specific company by ID"""
+    try:
+        logger.info(f"Starting price update for company ID: {company_id}")
+        
+        # Get company identifier from database
+        company = query_db('SELECT identifier, name FROM companies WHERE id = ?', [company_id], one=True)
+        if not company:
+            error_msg = f'Company with ID {company_id} not found'
+            logger.error(error_msg)
+            return jsonify({'error': error_msg}), 404
+            
+        identifier = company['identifier']
+        company_name = company['name']
+        
+        if not identifier:
+            error_msg = f'Company {company_id} ({company_name}) has no identifier'
+            logger.error(error_msg)
+            return jsonify({'error': error_msg}), 400
+            
+        logger.info(f"Fetching price for company: {company_name} (ID: {company_id}, Identifier: {identifier})")
+        
+        # Get current price using yfinance directly
+        result = get_stock_info(identifier)
+        if not result['success']:
+            error_msg = f'Failed to fetch price for {company_name} ({identifier}): {result.get("error")}'
+            logger.error(error_msg)
+            return jsonify({'error': error_msg}), 400
+            
+        data = result['data']
+        price = data.get('currentPrice')
+        currency = data.get('currency')
+        price_eur = data.get('priceEUR')  # Get EUR price from the result
+        
+        if price is None:
+            error_msg = f'Failed to fetch price for {company_name} ({identifier})'
+            logger.error(error_msg)
+            return jsonify({'error': error_msg}), 400
+            
+        # Update price in database
+        if update_price_in_db(identifier, price, currency, price_eur):
+            return jsonify({
+                'success': True,
+                'data': {
+                    'identifier': identifier,
+                    'price': price,
+                    'currency': currency,
+                    'price_eur': price_eur
+                }
+            })
+        else:
+            error_msg = f'Failed to update price in database for {company_name} ({identifier})'
+            logger.error(error_msg)
+            return jsonify({'error': error_msg}), 500
+            
+    except Exception as e:
+        logger.error(f"Error updating price: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 def get_portfolio_data(account_id):
@@ -846,8 +782,7 @@ def get_portfolio_data(account_id):
             SELECT
                 c.id,
                 c.name,
-                c.ticker,
-                c.isin,
+                c.identifier,
                 c.category,
                 COALESCE(cs.shares, 0) as shares,
                 COALESCE(cs.override_share, 0) as override_share,
@@ -865,8 +800,7 @@ def get_portfolio_data(account_id):
                 item = {
                     'id': row['id'],  # Add the id field
                     'company': row['company'],
-                    'isin': row['isin'],
-                    'ticker': row['ticker'],
+                    'identifier': row['identifier'],
                     'portfolio': row['portfolio'],
                     'category': row['category'],
                     'shares': float(row['shares']) if pd.notna(row['shares']) else 0,
@@ -1059,7 +993,7 @@ def process_csv_data(account_id, file_content):
                 # Update existing company
                 cursor.execute('''
                     UPDATE companies 
-                    SET ticker = ?, total_invested = ?
+                    SET identifier = ?, total_invested = ?
                     WHERE id = ?
                 ''', [identifier, total_invested, company['id']])
                 
@@ -1087,13 +1021,12 @@ def process_csv_data(account_id, file_content):
                 # Insert new company
                 cursor.execute('''
                     INSERT INTO companies (
-                        name, ticker, isin, category, portfolio_id, 
+                        name, identifier, category, portfolio_id, 
                         account_id, total_invested
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?)
                 ''', [
                     company_name,
                     identifier,
-                    identifier if len(identifier) == 12 else '',  # Assume ISIN if 12 chars
                     '',  # Empty category
                     default_portfolio_id,
                     account_id,

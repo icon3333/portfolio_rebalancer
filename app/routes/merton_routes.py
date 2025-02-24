@@ -11,6 +11,9 @@ import requests
 from bs4 import BeautifulSoup
 from typing import List, Tuple, Dict, Optional
 from datetime import datetime, timedelta
+import logging
+
+logger = logging.getLogger(__name__)
 
 merton_bp = Blueprint('merton', __name__)
 
@@ -344,21 +347,21 @@ def perform_merton_calculations(account_id, params):
     """
     start_time = datetime.now()
     
-    # Get parameters
-    risk_free_rate = float(params['risk_free_rate'])
-    risk_aversion = float(params['risk_aversion'])
+    # Extract parameters
     years = int(params['years'])
+    risk_free_rate = float(params['risk_free_rate']) / 100
+    risk_aversion = float(params['risk_aversion'])
     projected_years = int(params['projected_years'])
     target_growth_rates = params['target_growth_rates']
     
     # Tracking variables
-    excluded_tickers = []
+    excluded_identifiers = []
     warning_message = None
     warnings = []
     stats = {
         'portfolios_processed': 0,
-        'valid_tickers': 0,
-        'invalid_tickers': 0,
+        'valid_identifiers': 0,
+        'invalid_identifiers': 0,
         'total_returns_calculated': 0
     }
     
@@ -370,7 +373,7 @@ def perform_merton_calculations(account_id, params):
             'allocations': {},
             'portfolios': [],
             'warning_message': "No data available for this account.",
-            'excluded_tickers': [],
+            'excluded_identifiers': [],
             'calculation_time': 0,
             'stats': stats
         }
@@ -386,7 +389,7 @@ def perform_merton_calculations(account_id, params):
             'allocations': {},
             'portfolios': [],
             'warning_message': "No valid portfolios found.",
-            'excluded_tickers': [],
+            'excluded_identifiers': [],
             'calculation_time': (datetime.now() - start_time).total_seconds(),
             'stats': stats
         }
@@ -399,40 +402,40 @@ def perform_merton_calculations(account_id, params):
     
     for portfolio in valid_portfolios:
         try:
-            # Filter valid tickers
+            # Filter valid identifiers
             portfolio_df = df[df['portfolio'] == portfolio]
-            valid_tickers, invalid_tickers = filter_valid_tickers(portfolio_df)
+            valid_identifiers, invalid_identifiers = filter_valid_identifiers(portfolio_df)
             
-            stats['valid_tickers'] += len(valid_tickers)
-            stats['invalid_tickers'] += len(invalid_tickers)
+            stats['valid_identifiers'] += len(valid_identifiers)
+            stats['invalid_identifiers'] += len(invalid_identifiers)
             
-            # Log excluded tickers
-            if invalid_tickers:
-                invalid_companies = portfolio_df[portfolio_df['ticker'].isin(invalid_tickers)]['company'].tolist()
-                excluded_tickers.extend(invalid_companies)
+            # Log excluded identifiers
+            if invalid_identifiers:
+                invalid_companies = portfolio_df[portfolio_df['identifier'].isin(invalid_identifiers)]['company'].tolist()
+                excluded_identifiers.extend(invalid_companies)
                 warnings.append(f"Excluded companies from {portfolio}: {', '.join(invalid_companies)}")
             
-            if not valid_tickers:
-                warnings.append(f"No valid tickers found for portfolio {portfolio}")
+            if not valid_identifiers:
+                warnings.append(f"No valid identifiers found for portfolio {portfolio}")
                 continue
             
             # Get historical data
-            historical_data = get_historical_data(valid_tickers, years)
+            historical_data = get_historical_data(valid_identifiers, years)
             
             if historical_data.empty:
                 warnings.append(f"No historical prices available for portfolio {portfolio}")
                 continue
             
-            # Check which tickers we got data for
-            received_tickers = historical_data.columns.tolist()
-            missing_tickers = list(set(valid_tickers) - set(received_tickers))
+            # Check which identifiers we got data for
+            received_identifiers = historical_data.columns.tolist()
+            missing_identifiers = list(set(valid_identifiers) - set(received_identifiers))
             
-            if missing_tickers:
-                missing_companies = portfolio_df[portfolio_df['ticker'].isin(missing_tickers)]['company'].tolist()
+            if missing_identifiers:
+                missing_companies = portfolio_df[portfolio_df['identifier'].isin(missing_identifiers)]['company'].tolist()
                 warnings.append(f"Missing price data for companies in {portfolio}: {', '.join(missing_companies)}")
-                excluded_tickers.extend(missing_companies)
+                excluded_identifiers.extend(missing_companies)
             
-            if not received_tickers:
+            if not received_identifiers:
                 warnings.append(f"No valid price data for portfolio {portfolio}")
                 continue
             
@@ -451,113 +454,112 @@ def perform_merton_calculations(account_id, params):
             stats['total_returns_calculated'] += 1
             
         except Exception as e:
-            warnings.append(f"Error processing {portfolio}: {str(e)}")
+            logger.error(f"Error processing portfolio {portfolio}: {str(e)}")
+            warnings.append(f"Error processing portfolio {portfolio}: {str(e)}")
             continue
     
     if not portfolio_returns:
+        warning_message = "No valid portfolios to process"
         return {
             'allocations': {},
-            'portfolios': list(valid_portfolios),
-            'warning_message': "No valid portfolio returns calculated.",
-            'excluded_tickers': excluded_tickers,
+            'portfolios': [],
+            'warning_message': warning_message,
+            'excluded_identifiers': excluded_identifiers,
             'calculation_time': (datetime.now() - start_time).total_seconds(),
             'stats': stats
         }
     
-    # Calculate optimal allocations
     try:
-        # Combine portfolio returns
-        returns_df = pd.DataFrame(portfolio_returns)
+        # Calculate metrics for each portfolio
+        allocations = {}
+        for portfolio, returns in portfolio_returns.items():
+            metrics = calculate_portfolio_metrics(returns, risk_free_rate, processed_target_returns)
+            allocations[portfolio] = metrics
         
-        # Calculate metrics
-        expected_returns, covariance = calculate_portfolio_metrics(
-            returns_df,
-            risk_free_rate,
-            processed_target_returns
-        )
-        
-        # Calculate Merton shares
-        merton_shares = calculate_merton_shares(
-            expected_returns,
-            covariance,
-            risk_free_rate,
-            risk_aversion
-        )
-        
-        # Create result structure
-        allocations = {
-            portfolio: float(share)
-            for portfolio, share in zip(returns_df.columns, merton_shares)
-        }
-        
-        warning_message = ". ".join(warnings) if warnings else None
-        
-        return {
-            'allocations': allocations,
-            'portfolios': list(returns_df.columns),
-            'warning_message': warning_message,
-            'excluded_tickers': excluded_tickers,
-            'calculation_time': (datetime.now() - start_time).total_seconds(),
-            'stats': stats
-        }
-        
-    except Exception as e:
-        # Fall back to equal weights on error
-        equal_weight = 1.0 / len(portfolio_returns)
-        allocations = {p: equal_weight for p in portfolio_returns.keys()}
-        
-        warnings.append(f"Error in optimization: {str(e)}. Using equal weights.")
-        warning_message = ". ".join(warnings)
+        # Format warnings
+        if warnings:
+            warning_message = "\n".join(warnings)
         
         return {
             'allocations': allocations,
             'portfolios': list(portfolio_returns.keys()),
             'warning_message': warning_message,
-            'excluded_tickers': excluded_tickers,
+            'excluded_identifiers': excluded_identifiers,
+            'calculation_time': (datetime.now() - start_time).total_seconds(),
+            'stats': stats
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in Merton calculations: {str(e)}")
+        return {
+            'allocations': {},
+            'portfolios': [],
+            'warning_message': f"Error in calculations: {str(e)}",
+            'excluded_identifiers': excluded_identifiers,
             'calculation_time': (datetime.now() - start_time).total_seconds(),
             'stats': stats
         }
 
-def filter_valid_tickers(df):
-    """Filter out invalid tickers and return both valid and invalid lists."""
-    all_tickers = df['ticker'].unique().tolist()
+def filter_valid_identifiers(df):
+    """Filter out invalid identifiers and return both valid and invalid lists."""
+    # Get all identifiers
+    identifiers = df['identifier'].unique().tolist()
     
-    valid_tickers = []
-    invalid_tickers = []
+    # Remove None and empty strings
+    valid_identifiers = [i for i in identifiers if i and isinstance(i, str)]
+    invalid_identifiers = [i for i in identifiers if not i or not isinstance(i, str)]
     
-    for ticker in all_tickers:
-        if pd.isna(ticker) or ticker in ['', '-', 'None', 'NO TICKER FOUND', None]:
-            invalid_tickers.append(str(ticker))
-        else:
-            valid_tickers.append(str(ticker).strip())
-            
-    return valid_tickers, invalid_tickers
+    return valid_identifiers, invalid_identifiers
 
-def get_historical_data(tickers, years=5):
-    """Get historical data for multiple tickers"""
+def get_historical_data(identifiers, years=5):
+    """Get historical data for multiple identifiers"""
     end_date = datetime.now()
-    start_date = end_date - timedelta(days=years * 365)
+    start_date = end_date - timedelta(days=years*365)
     
-    all_data = pd.DataFrame()
+    # Initialize empty DataFrame for results
+    historical_data = pd.DataFrame()
     
-    for ticker in tickers:
+    for identifier in identifiers:
         try:
-            ticker_obj = yf.Ticker(ticker)
-            hist = ticker_obj.history(start=start_date, end=end_date)
+            # Get historical data from yfinance
+            data = yf.download(
+                identifier,
+                start=start_date,
+                end=end_date,
+                progress=False,
+                show_errors=False
+            )
             
-            if hist.empty:
-                continue
+            if not data.empty:
+                # Use adjusted close price
+                historical_data[identifier] = data['Adj Close']
                 
-            prices = hist['Close'].rename(ticker)
-            if all_data.empty:
-                all_data = pd.DataFrame(prices)
-            else:
-                all_data = pd.concat([all_data, prices], axis=1)
-                
-        except Exception:
+        except Exception as e:
+            logger.error(f"Error fetching data for {identifier}: {str(e)}")
             continue
     
-    return all_data
+    return historical_data
+
+def get_portfolio_data(account_id):
+    """Get portfolio data from the database"""
+    return query_db('''
+        SELECT 
+            c.name AS company,
+            c.identifier,
+            p.name AS portfolio,
+            c.category,
+            cs.shares,
+            cs.override_share,
+            mp.price_eur,
+            mp.currency,
+            mp.last_updated,
+            c.total_invested
+        FROM companies c
+        LEFT JOIN company_shares cs ON c.id = cs.company_id
+        LEFT JOIN portfolios p ON c.portfolio_id = p.id
+        LEFT JOIN market_prices mp ON c.identifier = mp.identifier
+        WHERE c.account_id = ?
+    ''', [account_id])
 
 def calculate_portfolio_metrics(returns, risk_free_rate, target_returns, ann_factor=52):
     """Calculate portfolio metrics with proper annualization"""
@@ -630,48 +632,3 @@ def process_target_returns(target_rates, projected_years):
             processed_returns[portfolio] = rate
             
     return processed_returns
-
-def get_portfolio_data(account_id):
-    """Get portfolio data from the database"""
-    # Query to get portfolio data with prices
-    data = query_db('''
-        SELECT 
-            c.name AS company,
-            c.ticker,
-            c.isin,
-            p.name AS portfolio,
-            c.category,
-            cs.shares,
-            cs.override_share,
-            mp.price_eur,
-            mp.currency,
-            mp.last_updated,
-            c.total_invested
-        FROM companies c
-        LEFT JOIN company_shares cs ON c.id = cs.company_id
-        LEFT JOIN portfolios p ON c.portfolio_id = p.id
-        LEFT JOIN market_prices mp ON c.ticker = mp.ticker
-        WHERE c.account_id = ?
-    ''', [account_id])
-    
-    # Process data for frontend
-    for item in data:
-        # Handle empty values
-        if item['portfolio'] is None or item['portfolio'] == '':
-            item['portfolio'] = '-'
-        if item['category'] is None or item['category'] == '':
-            item['category'] = '-'
-        
-        # Calculate effective shares
-        if item['override_share'] is not None and item['override_share'] > 0:
-            item['effective_shares'] = item['override_share']
-        else:
-            item['effective_shares'] = item['shares'] if item['shares'] is not None else 0
-            
-        # Calculate total value
-        if item['price_eur'] is not None and item['effective_shares'] is not None:
-            item['total_value_eur'] = item['price_eur'] * item['effective_shares']
-        else:
-            item['total_value_eur'] = 0
-    
-    return data

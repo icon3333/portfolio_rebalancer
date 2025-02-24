@@ -1,4 +1,3 @@
-import os
 from app.main import create_app
 
 # Create the Flask application

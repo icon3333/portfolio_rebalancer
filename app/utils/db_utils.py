@@ -8,81 +8,55 @@ import pandas as pd
 import numpy as np
 from typing import Tuple, Dict, List, Any, Optional
 from app.database.db_manager import query_db, execute_db, backup_database
-from app.utils.isin_utils import isin_to_ticker
-import time  # Add missing import
+from datetime import datetime, timedelta
 
 # Set up logger
 logger = logging.getLogger(__name__)
 
-class AdaptiveRateLimit:
-    """Rate limiter that adapts to API response patterns"""
-    def __init__(self, initial_rate=0.1):
-        self.rate = initial_rate
-        self.failures = 0
-        self.last_call = 0
-        
-    def __enter__(self):
-        now = time.time()
-        time_since_last = now - self.last_call
-        if time_since_last < self.rate:
-            time.sleep(self.rate - time_since_last)
-        self.last_call = time.time()
-        return self
-        
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if exc_type is not None and "429" in str(exc_val):
-            self.failures += 1
-            self.rate = min(2.0, self.rate * 2)  # Double the rate up to 2 seconds
-        elif exc_type is None:
-            self.failures = max(0, self.failures - 1)
-            if self.failures == 0:
-                self.rate = max(0.1, self.rate * 0.75)  # Reduce rate when successful
-
 class PriceFetchManager:
     """Handles all external API interactions for price fetching"""
     def __init__(self):
-        self.rate_limiter = AdaptiveRateLimit()
         self.cache = {}
         self.cache_expiry = {}
-        self.failed_tickers = set()  # Cache for failed lookups
+        self.failed_isins = set()  # Cache for failed lookups
         self.cache_duration = 300  # 5 minutes in seconds
         
-    def get_cached_price(self, ticker: str) -> Optional[Tuple[float, str, float]]:
+    def get_cached_price(self, isin: str) -> Optional[Tuple[float, str, float]]:
         """Get price from cache or fetch if expired"""
-        # Skip invalid tickers
-        if not isinstance(ticker, str) or not ticker.strip():
-            logger.warning("Invalid ticker format")
+        # Skip invalid ISINs
+        if not isinstance(isin, str) or not isin.strip():
+            logger.warning("Invalid ISIN format")
             return None, None, None
             
-        # Clean and validate ticker
+        # Clean and validate ISIN
         try:
-            ticker = str(ticker).strip().upper()
+            isin = str(isin).strip().upper()
         except:
-            logger.warning(f"Could not process ticker: {ticker}")
+            logger.warning(f"Could not process ISIN: {isin}")
             return None, None, None
             
-        if not ticker:
-            logger.warning("Empty ticker")
+        if not isin:
+            logger.warning("Empty ISIN")
             return None, None, None
             
-        # Check if ticker is in failed cache
-        if ticker in self.failed_tickers:
-            logger.debug(f"Skipping previously failed ticker: {ticker}")
+        # Check if ISIN is in failed cache
+        if isin in self.failed_isins:
+            logger.debug(f"Skipping previously failed ISIN: {isin}")
             return None, None, None
             
         now = time.time()
-        if ticker in self.cache and now < self.cache_expiry.get(ticker, 0):
-            return self.cache[ticker]
+        if isin in self.cache and now < self.cache_expiry.get(isin, 0):
+            return self.cache[isin]
             
-        result = self.fetch_price_and_currency(ticker)
+        result = self.fetch_price_and_currency(isin)
         if result[0] is not None:
-            self.cache[ticker] = result
-            self.cache_expiry[ticker] = now + self.cache_duration
+            self.cache[isin] = result
+            self.cache_expiry[isin] = now + self.cache_duration
         return result
 
-    def fetch_price_and_currency(self, ticker: str) -> Tuple[Optional[float], Optional[str], Optional[float]]:
-        """Fetch single ticker price data"""
-        logger.debug(f"Fetching price for ticker: {ticker}")
+    def fetch_price_and_currency(self, isin: str) -> Tuple[Optional[float], Optional[str], Optional[float]]:
+        """Fetch single ISIN price data"""
+        logger.debug(f"Fetching price for ISIN: {isin}")
         
         max_retries = 3
         retry_delay = 1  # seconds
@@ -90,13 +64,13 @@ class PriceFetchManager:
         for attempt in range(max_retries):
             try:
                 with self.rate_limiter:
-                    yf_data = yf.Ticker(ticker)
-                    logger.info(f"Getting history for {ticker} (attempt {attempt + 1}/{max_retries})")
+                    yf_data = yf.Ticker(isin)
+                    logger.info(f"Getting history for {isin} (attempt {attempt + 1}/{max_retries})")
                     history = yf_data.history(period='5d')  
-                    logger.info(f"History data for {ticker}: {history if not history.empty else 'Empty'}")
+                    logger.info(f"History data for {isin}: {history if not history.empty else 'Empty'}")
                     
                     if history.empty:
-                        logger.info(f"No price data available for {ticker}")
+                        logger.info(f"No price data available for {isin}")
                         if attempt < max_retries - 1:
                             time.sleep(retry_delay)
                             continue
@@ -110,33 +84,33 @@ class PriceFetchManager:
                             price = history['Close'].iloc[-2]
                             
                         if pd.isna(price):
-                            logger.warning(f"No valid price found for {ticker}")
+                            logger.warning(f"No valid price found for {isin}")
                             if attempt < max_retries - 1:
                                 time.sleep(retry_delay)
                                 continue
                             return None, None, None
                             
-                        logger.info(f"Got price for {ticker}: {price}")
+                        logger.info(f"Got price for {isin}: {price}")
                         
                         # Try to get currency from yfinance info first
                         try:
                             info = yf_data.info
                             currency = info.get('currency', None)
-                            logger.info(f"Got currency from yfinance for {ticker}: {currency}")
+                            logger.info(f"Got currency from yfinance for {isin}: {currency}")
                         except Exception as e:
-                            logger.warning(f"Failed to get currency from yfinance for {ticker}: {e}")
+                            logger.warning(f"Failed to get currency from yfinance for {isin}: {e}")
                             currency = None
                         
                         # Fall back to USD if no currency info available
                         if not currency:
                             currency = 'USD'  # Default to USD if no currency info available
-                            logger.info(f"Using default USD currency for {ticker}")
+                            logger.info(f"Using default USD currency for {isin}")
                         
                         # Handle GBp (British pence) to GBP conversion
                         if currency == 'GBp':
                             price = price / 100  # Convert pence to pounds
                             currency = 'GBP'
-                            logger.info(f"Converted GBp to GBP for {ticker}: {price} GBP")
+                            logger.info(f"Converted GBp to GBP for {isin}: {price} GBP")
                         
                         # Calculate EUR price if needed
                         price_eur = price
@@ -144,7 +118,7 @@ class PriceFetchManager:
                             eur_rate = self._get_eur_rate(currency)
                             if eur_rate is not None:
                                 price_eur = price * eur_rate
-                                logger.info(f"Converted {ticker} price to EUR: {price_eur} (rate: {eur_rate})")
+                                logger.info(f"Converted {isin} price to EUR: {price_eur} (rate: {eur_rate})")
                             else:
                                 logger.warning(f"Failed to get EUR rate for {currency}")
                                 if attempt < max_retries - 1:
@@ -155,18 +129,18 @@ class PriceFetchManager:
                         return price, currency, price_eur
                         
                     except Exception as e:
-                        logger.warning(f"Error processing data for {ticker}: {str(e)}")
+                        logger.warning(f"Error processing data for {isin}: {str(e)}")
                         if attempt < max_retries - 1:
                             time.sleep(retry_delay)
                             continue
                         return None, None, None
                         
             except Exception as e:
-                logger.warning(f"Failed to fetch data for {ticker} (attempt {attempt + 1}/{max_retries}): {str(e)}")
+                logger.warning(f"Failed to fetch data for {isin} (attempt {attempt + 1}/{max_retries}): {str(e)}")
                 if attempt < max_retries - 1:
                     time.sleep(retry_delay)
                     continue
-                self.failed_tickers.add(ticker)
+                self.failed_isins.add(isin)
                 return None, None, None
 
     def _get_eur_rate(self, currency: str) -> Optional[float]:
@@ -206,37 +180,37 @@ class PriceFetchManager:
                         continue
                     return None
 
-    def fetch_batch(self, tickers: list, timeout: int = 10) -> Dict[str, Tuple[float, str, float]]:
-        """Batch process multiple tickers with timeout"""
+    def fetch_batch(self, isins: list, timeout: int = 10) -> Dict[str, Tuple[float, str, float]]:
+        """Batch process multiple ISINs with timeout"""
         results = {}
-        logger.info(f"Starting batch fetch for {len(tickers)} tickers: {tickers}")
+        logger.info(f"Starting batch fetch for {len(isins)} ISINs: {isins}")
         
         with ThreadPoolExecutor(max_workers=10) as executor:
-            future_to_ticker = {
-                executor.submit(self.get_cached_price, ticker): ticker 
-                for ticker in tickers
-                if ticker not in self.failed_tickers  # Skip known failed tickers
+            future_to_isin = {
+                executor.submit(self.get_cached_price, isin): isin 
+                for isin in isins
+                if isin not in self.failed_isins  # Skip known failed ISINs
             }
             
-            if len(future_to_ticker) != len(tickers):
-                skipped = set(tickers) - {ticker for ticker in future_to_ticker.values()}
-                logger.info(f"Skipping {len(skipped)} previously failed tickers: {skipped}")
+            if len(future_to_isin) != len(isins):
+                skipped = set(isins) - {isin for isin in future_to_isin.values()}
+                logger.info(f"Skipping {len(skipped)} previously failed ISINs: {skipped}")
             
-            for future in as_completed(future_to_ticker):
-                ticker = future_to_ticker[future]
+            for future in as_completed(future_to_isin):
+                isin = future_to_isin[future]
                 try:
                     result = future.result(timeout=timeout)
-                    results[ticker] = result
+                    results[isin] = result
                     if result[0] is not None:
-                        logger.info(f"Successfully fetched {ticker}: Price={result[0]} {result[1]} (EUR: {result[2]})")
+                        logger.info(f"Successfully fetched {isin}: Price={result[0]} {result[1]} (EUR: {result[2]})")
                     else:
-                        logger.warning(f"Failed to fetch {ticker}: No price data")
+                        logger.warning(f"Failed to fetch {isin}: No price data")
                 except TimeoutError:
-                    logger.warning(f"Timeout fetching {ticker}")
-                    results[ticker] = (None, None, None)
+                    logger.warning(f"Timeout fetching {isin}")
+                    results[isin] = (None, None, None)
                 except Exception as e:
-                    logger.error(f"Error fetching {ticker}: {str(e)}")
-                    results[ticker] = (None, None, None)
+                    logger.error(f"Error fetching {isin}: {str(e)}")
+                    results[isin] = (None, None, None)
                     
         return results
 
@@ -261,8 +235,7 @@ def load_portfolio_data(account_id: int) -> pd.DataFrame:
             SELECT
                 c.id,
                 c.name AS company,
-                c.ticker,
-                c.isin,
+                c.identifier,
                 c.category,
                 COALESCE(p.name, '-') AS portfolio,
                 COALESCE(cs.shares, 0) AS shares,
@@ -274,7 +247,7 @@ def load_portfolio_data(account_id: int) -> pd.DataFrame:
             FROM companies c
             LEFT JOIN company_shares cs ON c.id = cs.company_id
             LEFT JOIN portfolios p ON c.portfolio_id = p.id
-            LEFT JOIN market_prices mp ON c.ticker = mp.ticker
+            LEFT JOIN market_prices mp ON c.identifier = mp.identifier
             WHERE c.account_id = ?
             ORDER BY c.name
         ''', [account_id])
@@ -326,7 +299,7 @@ def process_portfolio_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         
         # Ensure required columns exist
         required_columns = [
-            'company', 'isin', 'ticker', 'portfolio', 'category',
+            'company', 'identifier', 'portfolio', 'category',
             'shares', 'override_share', 'price_eur', 'currency',
             'total_invested', 'last_updated'
         ]
@@ -335,7 +308,7 @@ def process_portfolio_dataframe(df: pd.DataFrame) -> pd.DataFrame:
                 df[col] = None
                 
         # Add validation for company-specific fields
-        required_company_columns = ['company', 'isin', 'ticker']
+        required_company_columns = ['company', 'identifier']
         for col in required_company_columns:
             if col not in df.columns:
                 df[col] = 'N/A'
@@ -346,115 +319,51 @@ def process_portfolio_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         logger.error(f"Error processing DataFrame: {str(e)}", exc_info=True)
         return df
 
-def update_prices(
-    identifiers: List[str], 
-    account_id: Optional[int] = None, 
-    force_update: bool = False
-) -> Tuple[Dict[str, int], List[str]]:
+def update_prices(identifiers: List[str], account_id: Optional[int] = None, force_update: bool = False) -> Tuple[Dict[str, Any], List[str]]:
     """
-    Update prices for the given identifiers (ISINs or tickers).
+    Get last update time for identifiers from database.
     
     Args:
-        identifiers: List of ISINs or tickers to update prices for
+        identifiers: List of identifiers to check
         account_id: Account ID to update last_price_update field
         force_update: Whether to force update regardless of time since last update
         
     Returns:
         Tuple of (results_dict, failed_identifiers_list)
     """
-    try:
-        # Initialize counters
-        results = {
-            'success': 0,
-            'failed': 0,
-            'skipped': 0
-        }
-        failed_identifiers = []
+    if not force_update:
+        # Check last update time
+        last_updates = query_db('''
+            SELECT identifier, last_price_update 
+            FROM portfolio 
+            WHERE identifier IN ({})
+        '''.format(','.join('?' * len(identifiers))), identifiers)
         
-        # Skip update if not forced and last update was recent
-        if not force_update and account_id:
-            last_update = query_db(
-                'SELECT last_price_update FROM accounts WHERE id = ?', 
-                [account_id],
-                one=True
-            )
-            
-            if last_update and last_update['last_price_update']:
-                from datetime import datetime, timedelta
-                last_update_time = datetime.strptime(last_update['last_price_update'], '%Y-%m-%d %H:%M:%S')
-                if datetime.now() - last_update_time < timedelta(hours=24):
-                    logger.info("Skipping price update - less than 24 hours since last update")
-                    results['skipped'] = len(identifiers)
-                    return results, failed_identifiers
-        
-        # Convert ISINs to tickers
-        ticker_map = isin_to_ticker(identifiers)
-        logger.info(f"Mapped {len(ticker_map)} identifiers to tickers")
-        
-        # Process in batches to avoid rate limiting
-        BATCH_SIZE = 5
-        valid_identifiers = [id for id in identifiers if ticker_map.get(id) is not None]
-        total_batches = (len(valid_identifiers) + BATCH_SIZE - 1) // BATCH_SIZE
-        
-        for batch_num in range(total_batches):
-            start_idx = batch_num * BATCH_SIZE
-            end_idx = min(start_idx + BATCH_SIZE, len(valid_identifiers))
-            batch_identifiers = valid_identifiers[start_idx:end_idx]
-            
-            logger.info(f"Processing batch {batch_num + 1}/{total_batches}: {batch_identifiers}")
-            
-            # Get tickers for this batch
-            batch_tickers = [ticker_map[id] for id in batch_identifiers]
-            
-            # Fetch batch prices
-            batch_results = price_fetcher.fetch_batch(batch_tickers)
-            
-            # Map results back to original identifiers
-            for identifier, ticker in zip(batch_identifiers, batch_tickers):
-                price_result = batch_results.get(ticker)
-                if price_result and price_result[0] is not None:
-                    price, currency, price_eur = price_result
-                    # Update price in database using original identifier
-                    success = update_price_in_db(identifier, price, currency, price_eur)
-                    if success:
-                        results['success'] += 1
-                        logger.info(f"Updated price for {identifier} (ticker: {ticker}): {price} {currency} (EUR: {price_eur})")
-                    else:
-                        results['failed'] += 1
-                        failed_identifiers.append(identifier)
-                        logger.warning(f"Failed to update price in database for {identifier}")
+        if last_updates:
+            now = datetime.now()
+            all_recent = True
+            for update in last_updates:
+                if update['last_price_update']:
+                    last_update = datetime.strptime(update['last_price_update'], '%Y-%m-%d %H:%M:%S')
+                    if (now - last_update).total_seconds() > 24 * 3600:  # 24 hours
+                        all_recent = False
+                        break
                 else:
-                    results['failed'] += 1
-                    failed_identifiers.append(identifier)
-                    logger.warning(f"Failed to fetch price for {identifier} (ticker: {ticker})")
-        
-        # Add unmapped identifiers to failed list
-        unmapped = [id for id in identifiers if ticker_map.get(id) is None]
-        if unmapped:
-            results['failed'] += len(unmapped)
-            failed_identifiers.extend(unmapped)
-            logger.warning(f"Could not map identifiers to tickers: {unmapped}")
-        
-        # Update last price update timestamp for account
-        if account_id:
-            from datetime import datetime
-            execute_db(
-                'UPDATE accounts SET last_price_update = ? WHERE id = ?',
-                [datetime.now().strftime('%Y-%m-%d %H:%M:%S'), account_id]
-            )
-            
-        return results, failed_identifiers
-            
-    except Exception as e:
-        logger.error(f"Error updating prices: {str(e)}", exc_info=True)
-        return {'success': 0, 'failed': len(identifiers), 'skipped': 0}, identifiers
+                    all_recent = False
+                    break
+                    
+            if all_recent:
+                logger.info("Skipping price update - less than 24 hours since last update")
+                return {'skipped': len(identifiers)}, []
+    
+    return {'checked': len(identifiers)}, []
 
-def update_price_in_db(ticker: str, price: float, currency: str, price_eur: float) -> bool:
+def update_price_in_db(identifier: str, price: float, currency: str, price_eur: float) -> bool:
     """
-    Update price in database for a single ticker.
+    Update price in database for a single identifier.
     
     Args:
-        ticker: Ticker symbol
+        identifier: Stock identifier
         price: Price in original currency
         currency: Currency code
         price_eur: Price in EUR
@@ -463,25 +372,20 @@ def update_price_in_db(ticker: str, price: float, currency: str, price_eur: floa
         Success status
     """
     try:
-        from datetime import datetime
-        
-        # Update or insert price
+        # First try to update existing record
         execute_db('''
-            INSERT OR REPLACE INTO market_prices 
-            (ticker, price, currency, price_eur, last_updated)
-            VALUES (?, ?, ?, ?, ?)
-        ''', [
-            ticker,
-            price,
-            currency,
-            price_eur,
-            datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        ])
-        
+            INSERT INTO market_prices (identifier, price, currency, price_eur, last_updated)
+            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(identifier) DO UPDATE SET
+                price = excluded.price,
+                currency = excluded.currency,
+                price_eur = excluded.price_eur,
+                last_updated = CURRENT_TIMESTAMP
+        ''', [identifier, price, currency, price_eur])
+        logger.info(f"Updated price for {identifier}: {price} {currency}")
         return True
-        
     except Exception as e:
-        logger.error(f"Error updating price in database for {ticker}: {str(e)}")
+        logger.error(f"Error updating price for {identifier}: {str(e)}")
         return False
 
 def calculate_portfolio_composition(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame, float, pd.DataFrame, str]:
@@ -716,7 +620,6 @@ def process_csv_data(account_id: int, file_content: str) -> Tuple[bool, str, Dic
     try:
         import io
         import pandas as pd
-        from app.utils.price_fetcher import isin_to_ticker
         
         # Create backup before making changes
         backup_database()
@@ -807,19 +710,6 @@ def process_csv_data(account_id: int, file_content: str) -> Tuple[bool, str, Dic
         if df.empty:
             return False, "No valid entries found in CSV file after cleaning", {}
         
-        # Convert identifiers to tickers
-        unique_identifiers = df['identifier'].unique().tolist()
-        ticker_results = isin_to_ticker(unique_identifiers)
-        
-        # Add ticker column
-        df['ticker'] = df['identifier'].map(ticker_results)
-        
-        # Remove rows with failed ticker resolution
-        df = df[~df['ticker'].str.contains('Error|No data found|Invalid', na=False)]
-        
-        if df.empty:
-            return False, "No valid entries remained after identifier resolution", {}
-        
         # Process numeric values
         def process_value(value):
             try:
@@ -876,7 +766,7 @@ def process_csv_data(account_id: int, file_content: str) -> Tuple[bool, str, Dic
         df['total_invested_effect'] = df['shares_effect'] * df['price']
         
         # Aggregate data
-        aggregated_data = df.groupby(['holdingname', 'identifier', 'ticker']).agg({
+        aggregated_data = df.groupby(['holdingname', 'identifier']).agg({
             'shares_effect': 'sum',
             'total_invested_effect': 'sum'
         }).reset_index()
@@ -913,7 +803,6 @@ def process_csv_data(account_id: int, file_content: str) -> Tuple[bool, str, Dic
                 for _, row in aggregated_data.iterrows():
                     try:
                         company_name = row['holdingname']
-                        ticker = row['ticker']
                         share_count = float(row['shares_effect'])
                         total_invested = float(row['total_invested_effect'])
                         
@@ -949,9 +838,9 @@ def process_csv_data(account_id: int, file_content: str) -> Tuple[bool, str, Dic
                             # Update existing company
                             cursor.execute(
                                 """UPDATE companies 
-                                   SET ticker = ?, total_invested = ?
+                                   SET total_invested = ?
                                    WHERE id = ?""",
-                                [ticker, total_invested, company['id']]
+                                [total_invested, company['id']]
                             )
                             
                             # Check if shares record exists
@@ -978,11 +867,10 @@ def process_csv_data(account_id: int, file_content: str) -> Tuple[bool, str, Dic
                             # Insert new company
                             cursor.execute(
                                 """INSERT INTO companies 
-                                   (name, ticker, isin, category, portfolio_id, account_id, total_invested)
-                                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                                   (name, identifier, category, portfolio_id, account_id, total_invested)
+                                   VALUES (?, ?, ?, ?, ?, ?)""",
                                 [
                                     company_name,
-                                    ticker,
                                     row['identifier'],
                                     '',  # Empty category
                                     default_portfolio_id,
@@ -1010,19 +898,19 @@ def process_csv_data(account_id: int, file_content: str) -> Tuple[bool, str, Dic
                 db.commit()
                 
                 # Update prices for new/updated companies
-                tickers_to_update = []
+                isins_to_update = []
                 if positions_added:
-                    tickers_to_update.extend([
-                        row['ticker'] for _, row in aggregated_data.iterrows()
+                    isins_to_update.extend([
+                        row['identifier'] for _, row in aggregated_data.iterrows()
                         if row['holdingname'] in positions_added
                     ])
                 
                 price_update_results = {'success': 0, 'failed': 0, 'skipped': 0}
-                failed_price_tickers = []
+                failed_price_isins = []
                 
-                if tickers_to_update:
-                    price_update_results, failed_price_tickers = update_prices(
-                        tickers_to_update, account_id, force_update=True
+                if isins_to_update:
+                    price_update_results, failed_price_isins = update_prices(
+                        isins_to_update, account_id, force_update=True
                     )
                 
                 # Prepare result
@@ -1032,7 +920,7 @@ def process_csv_data(account_id: int, file_content: str) -> Tuple[bool, str, Dic
                     'removed': positions_removed,
                     'failed': failed_companies,
                     'price_update': price_update_results,
-                    'failed_prices': failed_price_tickers
+                    'failed_prices': failed_price_isins
                 }
                 
                 # Create success message
@@ -1052,8 +940,8 @@ def process_csv_data(account_id: int, file_content: str) -> Tuple[bool, str, Dic
                 warnings = []
                 if failed_companies:
                     warnings.append(f"Failed to process {len(failed_companies)} companies")
-                if failed_price_tickers:
-                    warnings.append(f"Failed to fetch prices for {len(failed_price_tickers)} tickers")
+                if failed_price_isins:
+                    warnings.append(f"Failed to fetch prices for {len(failed_price_isins)} ISINs")
                 if ignored_types:
                     warnings.append(f"Ignored transaction types: {', '.join(ignored_types)}")
                 

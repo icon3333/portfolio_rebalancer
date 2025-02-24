@@ -49,9 +49,6 @@ def init_db(app):
             # Verify that required columns exist, etc.
             verify_schema(db)
 
-            # Run custom migration to fix old ISIN-based records
-            migrate_market_prices_to_tickers(db)
-
             # Check if database is empty and insert sample data if you want
             if is_database_empty(db):
                 logger.info("Database appears empty. Optionally adding sample data.")
@@ -78,52 +75,23 @@ def verify_schema(db):
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", [table])
         result = cursor.fetchone()
         if not result:
-            logger.warning(f"Missing table: {table}. You might need to re-run schema.sql or migrations.")
+            logger.warning(f"Missing table: {table}. You might need to re-run schema.sql.")
 
-    # Example check for a column in 'companies'
+    # Check companies table structure
     columns_check = cursor.execute("PRAGMA table_info(companies)").fetchall()
     col_names = [col[1] for col in columns_check]
-    if 'total_invested' not in col_names:
-        logger.warning("Column 'total_invested' missing in 'companies' table? Migration needed.")
+    required_columns = ['id', 'name', 'identifier', 'category', 'portfolio_id', 'account_id', 'total_invested']
+    missing_columns = [col for col in required_columns if col not in col_names]
+    if missing_columns:
+        logger.warning(f"Missing columns in 'companies' table: {missing_columns}")
 
-def migrate_market_prices_to_tickers(db):
-    """
-    Perform a migration that converts old ISIN fields in market_prices
-    to real ticker symbols if needed. 
-    This is just an example - adapt to your actual needs.
-    """
-    logger.info("Running migrate_market_prices_to_tickers ...")
-    cursor = db.cursor()
-
-    # Example: Suppose old code stored `ticker` as ISIN if no real ticker was found.
-    # We'll detect those (12 chars) and attempt to transform them.
-    # In real usage, you might map them properly or remove them if invalid.
-
-    # 1. Identify potential ISIN-based records
-    cursor.execute("""
-        SELECT ticker FROM market_prices
-        WHERE LENGTH(ticker) = 12
-    """)
-    isin_rows = cursor.fetchall()
-    if not isin_rows:
-        logger.info("No ISIN-based ticker rows found. Migration not needed.")
-        return
-
-    # 2. For each row, do a fake transform or an actual transform:
-    for row in isin_rows:
-        old_ticker = row['ticker']
-        # Example logic: just append '.DE' or do real mapping
-        new_ticker = old_ticker + '.DE'
-        logger.info(f"Migrating old ticker {old_ticker} -> {new_ticker}")
-
-        cursor.execute("""
-            UPDATE market_prices
-            SET ticker = ?
-            WHERE ticker = ?
-        """, [new_ticker, old_ticker])
-
-    db.commit()
-    logger.info("migrate_market_prices_to_tickers complete.")
+    # Check market_prices table structure
+    market_prices_check = cursor.execute("PRAGMA table_info(market_prices)").fetchall()
+    col_names = [col[1] for col in market_prices_check]
+    required_columns = ['identifier', 'price', 'currency', 'price_eur', 'last_updated']
+    missing_columns = [col for col in required_columns if col not in col_names]
+    if missing_columns:
+        logger.warning(f"Missing columns in 'market_prices' table: {missing_columns}")
 
 def is_database_empty(db):
     """

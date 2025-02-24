@@ -1,19 +1,13 @@
+from flask import Flask, render_template, request, jsonify
+import logging
 import os
 from datetime import datetime
-from flask import Flask, render_template, session
-from config import config
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def create_app(config_name='default'):
-    """
-    Application factory function to create and configure the Flask app.
-    
-    Args:
-        config_name: Configuration to use (default, development, testing, production)
-        
-    Returns:
-        Configured Flask application
-    """
-    # Create Flask app instance
     app = Flask(__name__, 
                 template_folder='../templates',
                 static_folder='../static')
@@ -33,22 +27,13 @@ def create_app(config_name='default'):
         SECRET_KEY=secret_key,
         SQLALCHEMY_DATABASE_URI='sqlite:///portfolio.db',
         TEMPLATES_AUTO_RELOAD=True,
-        JSON_SORT_KEYS=False,
-        SESSION_COOKIE_SECURE=False,  # Set to True in production with HTTPS
-        SESSION_COOKIE_HTTPONLY=True,
-        PERMANENT_SESSION_LIFETIME=3600 * 24 * 7  # 7 days
+        JSON_SORT_KEYS=False
     )
     
-    # Load configuration
-    app.config.from_object(config[config_name])
-    
-    # Ensure upload directory exists
-    if not os.path.exists(app.config['UPLOAD_FOLDER']):
-        os.makedirs(app.config['UPLOAD_FOLDER'])
-        
-    # Ensure database backup directory exists
-    if not os.path.exists(app.config['DB_BACKUP_DIR']):
-        os.makedirs(app.config['DB_BACKUP_DIR'])
+    # Add context processor for datetime
+    @app.context_processor
+    def inject_now():
+        return {'now': datetime.now()}
     
     # Register blueprints
     from app.routes.main_routes import main_bp
@@ -58,51 +43,29 @@ def create_app(config_name='default'):
     app.register_blueprint(account_bp, url_prefix='/account')
     
     from app.routes.portfolio_routes import portfolio_bp
-    app.register_blueprint(portfolio_bp, url_prefix='/portfolio')
-    
-    from app.routes.analysis_routes import analysis_bp
-    app.register_blueprint(analysis_bp, url_prefix='/analysis')
+    app.register_blueprint(portfolio_bp)
     
     from app.routes.merton_routes import merton_bp
     app.register_blueprint(merton_bp, url_prefix='/merton')
     
-    # Initialize database
-    from app.database.db_manager import init_db
-    init_db(app)
+    from app.routes.analysis_routes import analysis_bp
+    app.register_blueprint(analysis_bp, url_prefix='/analysis')
     
-    # Register error handlers
-    register_error_handlers(app)
-    
-    # Register context processors
-    register_context_processors(app)
+    @app.route('/profile', methods=['POST'])
+    def get_profile():
+        data = request.get_json() if request.is_json else request.form
+        symbol = data.get('identifier', '').strip().upper()
+        
+        if not symbol:
+            return jsonify({'error': 'No symbol provided'})
+        
+        try:
+            from app.utils.yfinance_utils import get_yfinance_info
+            result = get_yfinance_info(symbol)
+            return jsonify(result)
+                
+        except Exception as e:
+            logger.error(f"Error processing request: {str(e)}")
+            return jsonify({'error': str(e)})
     
     return app
-
-def register_error_handlers(app):
-    """Register custom error handlers."""
-    
-    @app.errorhandler(404)
-    def page_not_found(e):
-        return render_template('errors/404.html'), 404
-    
-    @app.errorhandler(500)
-    def internal_server_error(e):
-        return render_template('errors/500.html'), 500
-
-def register_context_processors(app):
-    """Register template context processors."""
-    
-    @app.context_processor
-    def utility_processor():
-        from app.utils.formatting import (
-            format_number, 
-            format_currency, 
-            format_percentage
-        )
-        
-        return dict(
-            format_number=format_number,
-            format_currency=format_currency,
-            format_percentage=format_percentage,
-            now=datetime.now()
-        )

@@ -6,7 +6,7 @@ DROP TABLE IF EXISTS companies;
 DROP TABLE IF EXISTS portfolios;
 DROP TABLE IF EXISTS accounts;
 
--- Create accounts table with last_price_update
+-- Create accounts table
 CREATE TABLE accounts (
     id INTEGER PRIMARY KEY,
     username TEXT UNIQUE NOT NULL,
@@ -23,12 +23,11 @@ CREATE TABLE portfolios (
     UNIQUE (account_id, name)
 );
 
--- Create companies table with total_invested
+-- Create companies table
 CREATE TABLE companies (
     id INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
-    ticker TEXT,
-    isin TEXT,
+    identifier TEXT NOT NULL,
     category TEXT NOT NULL,
     portfolio_id INTEGER NOT NULL,
     account_id INTEGER NOT NULL,
@@ -48,7 +47,7 @@ CREATE TABLE company_shares (
 
 -- Create market_prices table
 CREATE TABLE market_prices (
-    ticker TEXT PRIMARY KEY,
+    identifier TEXT PRIMARY KEY,
     price REAL,
     currency TEXT,
     price_eur REAL,
@@ -70,7 +69,7 @@ CREATE TABLE expanded_state (
 
 -- Create indexes for market_prices
 CREATE INDEX idx_market_prices_last_updated ON market_prices(last_updated);
-CREATE INDEX idx_market_prices_ticker ON market_prices(ticker);
+CREATE INDEX idx_market_prices_identifier ON market_prices(identifier);
 
 -- Create indexes for expanded_state
 CREATE INDEX idx_state_lookup ON expanded_state(account_id, page_name, variable_name);
@@ -78,10 +77,9 @@ CREATE INDEX idx_state_type ON expanded_state(variable_type);
 CREATE INDEX idx_state_updated ON expanded_state(last_updated);
 
 -- Indexes for portfolio data query performance
-CREATE INDEX IF NOT EXISTS idx_companies_account_id ON companies(account_id);
-CREATE INDEX IF NOT EXISTS idx_company_shares_company_id ON company_shares(company_id);
-CREATE INDEX IF NOT EXISTS idx_market_prices_ticker ON market_prices(ticker);
-CREATE INDEX IF NOT EXISTS idx_companies_portfolio_id ON companies(portfolio_id);
+CREATE INDEX idx_companies_account_id ON companies(account_id);
+CREATE INDEX idx_company_shares_company_id ON company_shares(company_id);
+CREATE INDEX idx_companies_portfolio_id ON companies(portfolio_id);
 
 -- Create trigger for expanded_state
 CREATE TRIGGER update_state_timestamp 
