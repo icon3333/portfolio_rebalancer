@@ -658,30 +658,63 @@ def update_all_prices_api():
         # Backup database before making changes
         backup_database()
         
-        # Use batch processing to get all prices
-        batch_results = batch_get_stock_prices(identifiers)
+        # Start a batch processing job
+        from app.utils.batch_processing import start_batch_process, get_job_status
+        job_id = start_batch_process()
         
-        # Update database with results
+        # Wait for job to complete (with timeout)
+        timeout = 300  # 5 minutes
+        start_time = time.time()
+        while True:
+            status = get_job_status(job_id)
+            if status['status'] == 'completed':
+                break
+            elif status['status'] == 'not_found':
+                return jsonify({'error': 'Batch job not found'}), 500
+            elif time.time() - start_time > timeout:
+                return jsonify({'error': 'Batch job timed out'}), 500
+            time.sleep(2)
+        
+        # Process results and update database
         results = {}
         failed = []
         
-        for identifier, (price, currency, price_eur) in batch_results.items():
-            try:
-                if price is not None:
-                    if update_price_in_db(identifier, price, currency, price_eur):
-                        results[identifier] = {
-                            'price': price,
-                            'currency': currency,
-                            'price_eur': price_eur
-                        }
+        if status.get('results'):
+            for isin, result in status['results'].items():
+                try:
+                    if result.get('success') and result.get('price') is not None and result.get('ticker'):
+                        # Get currency info from yfinance
+                        ticker_obj = yf.Ticker(result['ticker'])
+                        currency = ticker_obj.info.get('currency', None)
+                        
+                        # Get EUR conversion rate
+                        from app.utils.yfinance_utils import _get_eur_rate
+                        eur_rate = _get_eur_rate(currency) if currency else None
+                        price_eur = result['price'] * eur_rate if eur_rate is not None else None
+                        
+                        logger.info(f"Updating price for {isin}: {result['price']} {currency} ({price_eur} EUR)")
+                        
+                        if update_price_in_db(isin, result['price'], currency, price_eur):
+                            results[isin] = {
+                                'price': result['price'],
+                                'currency': currency,
+                                'price_eur': price_eur,
+                                'ticker': result['ticker']
+                            }
+                        else:
+                            failed.append(isin)
                     else:
-                        failed.append(identifier)
-                else:
-                    failed.append(identifier)
-            except Exception as e:
-                logger.error(f"Error updating price for {identifier}: {str(e)}")
-                failed.append(identifier)
-                
+                        logger.warning(f"Invalid result for {isin}: {result}")
+                        failed.append(isin)
+                except Exception as e:
+                    logger.error(f"Error updating price for {isin}: {str(e)}")
+                    failed.append(isin)
+        
+        # Log summary
+        logger.info(f"Price update complete. Updated: {len(results)}, Failed: {len(failed)}")
+        if failed:
+            logger.warning(f"Failed ISINs: {failed}")
+                    
         return jsonify({
             'message': 'Prices updated',
             'updated': results,

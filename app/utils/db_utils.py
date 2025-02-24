@@ -372,20 +372,39 @@ def update_price_in_db(identifier: str, price: float, currency: str, price_eur: 
         Success status
     """
     try:
-        # First try to update existing record
+        if not identifier or price is None:
+            logger.warning("Missing identifier or price")
+            return False
+            
+        now = datetime.now().isoformat()
+        
+        # Update or insert into market_prices table
         execute_db('''
             INSERT INTO market_prices (identifier, price, currency, price_eur, last_updated)
-            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+            VALUES (?, ?, ?, ?, ?)
             ON CONFLICT(identifier) DO UPDATE SET
                 price = excluded.price,
                 currency = excluded.currency,
                 price_eur = excluded.price_eur,
-                last_updated = CURRENT_TIMESTAMP
-        ''', [identifier, price, currency, price_eur])
-        logger.info(f"Updated price for {identifier}: {price} {currency}")
+                last_updated = excluded.last_updated
+        ''', [identifier, price, currency, price_eur, now])
+        
+        # Update last_price_update in accounts table for all accounts that have this identifier
+        execute_db('''
+            UPDATE accounts 
+            SET last_price_update = ? 
+            WHERE id IN (
+                SELECT DISTINCT account_id 
+                FROM companies 
+                WHERE identifier = ?
+            )
+        ''', [now, identifier])
+        
+        logger.info(f"Successfully updated price for {identifier}: {price} {currency} ({price_eur} EUR)")
         return True
+        
     except Exception as e:
-        logger.error(f"Error updating price for {identifier}: {str(e)}")
+        logger.error(f"Failed to update price in database for {identifier}: {str(e)}")
         return False
 
 def calculate_portfolio_composition(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame, float, pd.DataFrame, str]:
