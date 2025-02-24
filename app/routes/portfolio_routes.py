@@ -9,12 +9,14 @@ from app.utils.db_utils import (
     get_portfolios
 )
 from app.utils.data_processing import clear_data_caches
-from app.utils.yfinance_utils import get_stock_info
+from app.utils.yfinance_utils import get_stock_info, batch_get_stock_prices
 import pandas as pd
 import io
 import logging
 from datetime import datetime
 import os
+import time
+from flask import g, Response
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -644,7 +646,6 @@ def update_identifier_api(company_id):
 
 @portfolio_bp.route('/api/update_all_prices', methods=['POST'])
 def update_all_prices_api():
-    """API endpoint to update all company prices"""
     try:
         # Get all company identifiers from database
         companies = query_db('SELECT identifier FROM companies WHERE identifier IS NOT NULL')
@@ -652,32 +653,27 @@ def update_all_prices_api():
             return jsonify({'message': 'No companies with identifiers found'}), 200
             
         identifiers = [company['identifier'] for company in companies]
-        logger.info(f"Updating prices for {len(identifiers)} companies")
+        logger.info(f"Batch updating prices for {len(identifiers)} companies")
         
         # Backup database before making changes
         backup_database()
         
-        # Update prices one by one
+        # Use batch processing to get all prices
+        batch_results = batch_get_stock_prices(identifiers)
+        
+        # Update database with results
         results = {}
         failed = []
         
-        for identifier in identifiers:
+        for identifier, (price, currency, price_eur) in batch_results.items():
             try:
-                result = get_stock_info(identifier)
-                if result['success']:
-                    data = result['data']
-                    price = data.get('currentPrice')
-                    currency = data.get('currency')
-                    price_eur = data.get('priceEUR')  # Get EUR price from the result
-                    
-                    if price is not None:
-                        if update_price_in_db(identifier, price, currency, price_eur):
-                            results[identifier] = {
-                                'price': price,
-                                'currency': currency
-                            }
-                        else:
-                            failed.append(identifier)
+                if price is not None:
+                    if update_price_in_db(identifier, price, currency, price_eur):
+                        results[identifier] = {
+                            'price': price,
+                            'currency': currency,
+                            'price_eur': price_eur
+                        }
                     else:
                         failed.append(identifier)
                 else:
@@ -755,6 +751,18 @@ def update_price_by_id_api(company_id):
     except Exception as e:
         logger.error(f"Error updating price: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+@portfolio_bp.route('/api/update_progress')
+def update_progress():
+    def generate():
+        while True:
+            progress = g.get('update_progress', 0)
+            yield f"data: {progress}\n\n"
+            if progress >= 100:
+                break
+            time.sleep(0.5)
+    
+    return Response(generate(), mimetype='text/event-stream')
 
 def get_portfolio_data(account_id):
     """Get portfolio data from the database"""

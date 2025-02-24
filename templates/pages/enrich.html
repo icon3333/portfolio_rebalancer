@@ -115,54 +115,54 @@
     </header>
     <div class="card-content">
         <div class="content">
-            <div class="field is-grouped mb-4">
-                <div class="control">
-                    <button class="button is-info" id="refresh-data" @click="loadData">
-                        <span class="icon">
-                            <i class="fas fa-sync"></i>
-                        </span>
-                        <span>Refresh Data</span>
-                    </button>
-                </div>
-                <div class="control">
-                    <button class="button is-warning" id="update-prices">
-                        <span class="icon">
-                            <i class="fas fa-dollar-sign"></i>
-                        </span>
-                        <span>Update All Prices</span>
-                    </button>
-                </div>
-                <div class="control">
-                    <button class="button is-danger is-light" id="update-missing-prices">
-                        <span class="icon">
-                            <i class="fas fa-exclamation-circle"></i>
-                        </span>
-                        <span>Update Missing Prices</span>
-                    </button>
-                </div>
-                <div class="control ml-auto">
-                    <div class="select">
-                        <select id="filter-portfolio">
-                            <option value="">All Portfolios</option>
-                            {% for portfolio in portfolios %}
-                                <option value="{{ portfolio }}">{{ portfolio }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
-                <div class="control">
-                    <button class="button is-info is-light js-modal-trigger" data-target="bulk-edit-modal">
-                        <span class="icon">
-                            <i class="fas fa-edit"></i>
-                        </span>
-                        <span>Bulk Edit</span>
-                    </button>
-                </div>
-            </div>
-            
             <div id="portfolio-editor" class="portfolio-editor">
                 <!-- Vue.js component will be mounted here -->
                 <div id="portfolio-table-app" v-cloak>
+                    <div class="field is-grouped mb-4">
+                        <div class="control">
+                            <button class="button is-info" id="refresh-data" @click="loadData">
+                                <span class="icon">
+                                    <i class="fas fa-sync"></i>
+                                </span>
+                                <span>Refresh Data</span>
+                            </button>
+                        </div>
+                        <div class="control">
+                            <button class="button is-warning" id="update-prices" @click="updateAllPrices" :class="{'is-loading': isUpdatingAll}">
+                                <span class="icon">
+                                    <i class="fas fa-dollar-sign"></i>
+                                </span>
+                                <span>Update All Prices</span>
+                            </button>
+                        </div>
+                        <div class="control">
+                            <button class="button is-danger is-light" id="update-missing-prices" @click="updateMissingPrices" :class="{'is-loading': isUpdatingMissing}">
+                                <span class="icon">
+                                    <i class="fas fa-exclamation-circle"></i>
+                                </span>
+                                <span>Update Missing Prices</span>
+                            </button>
+                        </div>
+                        <div class="control ml-auto">
+                            <div class="select">
+                                <select id="filter-portfolio">
+                                    <option value="">All Portfolios</option>
+                                    {% for portfolio in portfolios %}
+                                        <option value="{{ portfolio }}">{{ portfolio }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="control">
+                            <button class="button is-info is-light js-modal-trigger" data-target="bulk-edit-modal">
+                                <span class="icon">
+                                    <i class="fas fa-edit"></i>
+                                </span>
+                                <span>Bulk Edit</span>
+                            </button>
+                        </div>
+                    </div>
+                    
                     <div v-if="loading" class="has-text-centered my-6">
                         <span class="icon is-large">
                             <i class="fas fa-spinner fa-pulse fa-3x"></i>
@@ -637,6 +637,8 @@ const app = new Vue({
             showUpdatePriceModal: false,
             showDeleteModal: false,
             isUpdating: false,
+            isUpdatingAll: false,
+            isUpdatingMissing: false,
             isDeleting: false,
             loading: false,
             metrics: {
@@ -735,6 +737,138 @@ const app = new Vue({
             } finally {
                 this.isDeleting = false;
                 this.closeModal();
+            }
+        },
+
+        async updateAllPrices() {
+            this.isUpdatingAll = true;
+            try {
+                const response = await fetch('/portfolio/api/update_all_prices', {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                
+                if (response.ok) {
+                    const updatedCount = Object.keys(result.updated).length;
+                    const failedCount = result.failed.length;
+                    
+                    let message = `Updated ${updatedCount} prices successfully.`;
+                    if (failedCount > 0) {
+                        message += ` Failed to update ${failedCount} prices.`;
+                    }
+                    
+                    // Show success notification
+                    const notification = document.createElement('div');
+                    notification.className = `notification is-${failedCount === 0 ? 'success' : 'warning'} is-light`;
+                    notification.innerHTML = `
+                        <button class="delete"></button>
+                        ${message}
+                    `;
+                    
+                    // Add notification to page
+                    const container = document.querySelector('.columns');
+                    container.insertBefore(notification, container.firstChild);
+                    
+                    // Add click handler to delete button
+                    notification.querySelector('.delete').addEventListener('click', () => {
+                        notification.remove();
+                    });
+                    
+                    // Auto-remove after 5 seconds
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.remove();
+                        }
+                    }, 5000);
+                    
+                    // Refresh data
+                    await this.loadData();
+                }
+            } catch (error) {
+                console.error('Error updating all prices:', error);
+            } finally {
+                this.isUpdatingAll = false;
+            }
+        },
+        
+        async updateMissingPrices() {
+            this.isUpdatingMissing = true;
+            try {
+                // Get items with missing prices
+                const missingItems = this.portfolioItems.filter(item => !item.price_eur);
+                if (missingItems.length === 0) {
+                    // Show info notification
+                    const notification = document.createElement('div');
+                    notification.className = 'notification is-info is-light';
+                    notification.innerHTML = `
+                        <button class="delete"></button>
+                        No missing prices to update.
+                    `;
+                    
+                    // Add notification to page
+                    const container = document.querySelector('.columns');
+                    container.insertBefore(notification, container.firstChild);
+                    
+                    // Add click handler to delete button
+                    notification.querySelector('.delete').addEventListener('click', () => {
+                        notification.remove();
+                    });
+                    
+                    // Auto-remove after 5 seconds
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.remove();
+                        }
+                    }, 5000);
+                    return;
+                }
+                
+                // Update missing prices
+                const response = await fetch('/portfolio/api/update_all_prices', {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                
+                if (response.ok) {
+                    const updatedCount = Object.keys(result.updated).length;
+                    const failedCount = result.failed.length;
+                    
+                    let message = `Updated ${updatedCount} missing prices successfully.`;
+                    if (failedCount > 0) {
+                        message += ` Failed to update ${failedCount} prices.`;
+                    }
+                    
+                    // Show success notification
+                    const notification = document.createElement('div');
+                    notification.className = `notification is-${failedCount === 0 ? 'success' : 'warning'} is-light`;
+                    notification.innerHTML = `
+                        <button class="delete"></button>
+                        ${message}
+                    `;
+                    
+                    // Add notification to page
+                    const container = document.querySelector('.columns');
+                    container.insertBefore(notification, container.firstChild);
+                    
+                    // Add click handler to delete button
+                    notification.querySelector('.delete').addEventListener('click', () => {
+                        notification.remove();
+                    });
+                    
+                    // Auto-remove after 5 seconds
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.remove();
+                        }
+                    }, 5000);
+                    
+                    // Refresh data
+                    await this.loadData();
+                }
+            } catch (error) {
+                console.error('Error updating missing prices:', error);
+            } finally {
+                this.isUpdatingMissing = false;
             }
         },
 

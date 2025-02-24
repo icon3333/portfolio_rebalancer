@@ -128,7 +128,12 @@ def backup_database():
     """
     try:
         db_path = current_app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
-        backup_dir = current_app.config['DB_BACKUP_DIR']
+        # Use backups folder in app/database
+        backup_dir = os.path.join(os.path.dirname(__file__), 'backups')
+        
+        # Create backup directory if it doesn't exist
+        os.makedirs(backup_dir, exist_ok=True)
+        
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         backup_filename = os.path.join(backup_dir, f"backup_{timestamp}.db")
 
@@ -136,7 +141,7 @@ def backup_database():
         logger.info(f"Database backed up successfully to {backup_filename}")
 
         # Clean up old backups
-        cleanup_old_backups(backup_dir, current_app.config['MAX_BACKUP_FILES'])
+        cleanup_old_backups(backup_dir, current_app.config.get('MAX_BACKUP_FILES', 10))
         return backup_filename
     except Exception as e:
         logger.error(f"Database backup failed: {e}")

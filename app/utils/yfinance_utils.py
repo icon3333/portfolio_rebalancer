@@ -1,5 +1,5 @@
 import yfinance as yf
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
 import logging
 import requests
 import pandas as pd
@@ -137,16 +137,7 @@ def get_stock_price_and_currency(symbol: str) -> Tuple[Optional[float], Optional
                 logger.warning(f"Failed to get currency from yfinance for {symbol}: {e}")
                 currency = None
             
-            # Fall back to suffix-based detection if needed
-            if not currency:
-                if any(symbol.upper().endswith(suffix) for suffix in ['.DE', '.F', '.MU']):
-                    currency = 'EUR'
-                elif any(symbol.upper().endswith(suffix) for suffix in ['.L']):
-                    currency = 'GBP'
-                else:
-                    currency = 'USD'  # Default to USD for NYSE/NASDAQ stocks
-                logger.info(f"Using suffix-based currency for {symbol}: {currency}")
-            
+           
             # Handle GBp (British pence) to GBP conversion
             if currency == 'GBp':
                 price = price / 100
@@ -172,6 +163,50 @@ def get_stock_price_and_currency(symbol: str) -> Tuple[Optional[float], Optional
                 time.sleep(retry_delay)
                 continue
             return None, None, None
+
+def batch_get_stock_prices(symbols: List[str]) -> Dict[str, Tuple[Optional[float], Optional[str], Optional[float]]]:
+    """
+    Get stock prices, currencies, and EUR prices for multiple symbols in batch
+    
+    Args:
+        symbols (List[str]): List of stock symbols
+        
+    Returns:
+        Dict[str, Tuple[Optional[float], Optional[str], Optional[float]]]: 
+            Dictionary mapping symbols to tuples of (price, currency, price_eur)
+    """
+    logger.info(f"Batch getting stock prices for {len(symbols)} symbols")
+    results = {}
+    
+    # Process in smaller batches to avoid rate limits
+    batch_size = 5
+    max_retries = 3
+    retry_delay = 2  # seconds
+    
+    for i in range(0, len(symbols), batch_size):
+        batch = symbols[i:i + batch_size]
+        
+        # Process each symbol in the batch with retries
+        for symbol in batch:
+            for attempt in range(max_retries):
+                try:
+                    _rate_limited_call()  # Ensure we respect rate limits
+                    price, currency, price_eur = get_stock_price_and_currency(symbol)
+                    if price is not None or attempt == max_retries - 1:
+                        results[symbol] = (price, currency, price_eur)
+                        break
+                except Exception as e:
+                    logger.error(f"Error getting price for {symbol} (attempt {attempt + 1}/{max_retries}): {str(e)}")
+                    if attempt == max_retries - 1:
+                        results[symbol] = (None, None, None)
+                    else:
+                        time.sleep(retry_delay)
+            
+        # Add delay between batches to avoid overwhelming the API
+        if i + batch_size < len(symbols):
+            time.sleep(2)
+            
+    return results
 
 def get_stock_info(identifier: str) -> Dict[str, Any]:
     """
