@@ -1,13 +1,13 @@
 flask==3.1.0
 Flask-WTF==1.2.2
 WTForms==3.2.1
-yfinance==0.2.31
+yfinance==0.2.54
 pandas==2.2.3
 numpy==2.2.3
 plotly==6.0.0
 python-dateutil==2.9.0.post0
 pytz==2025.1
-requests==2.32.3
+requests==2.31
 beautifulsoup4==4.13.3
 matplotlib==3.10.0
 sqlalchemy==2.0.38

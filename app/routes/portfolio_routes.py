@@ -6,10 +6,11 @@ from app.database.db_manager import query_db, execute_db, backup_database, get_d
 from app.utils.db_utils import (
     load_portfolio_data, process_portfolio_dataframe,
     update_prices, update_price_in_db, calculate_portfolio_composition,
-    get_portfolios
+    get_portfolios, update_batch_prices_in_db
 )
 from app.utils.data_processing import clear_data_caches
-from app.utils.yfinance_utils import get_stock_info, batch_get_stock_prices
+from app.utils.yfinance_utils import get_isin_data, get_price_for_ticker, find_ticker_for_isin
+from app.utils.batch_processing import start_batch_process, get_job_status
 import pandas as pd
 import io
 import logging
@@ -17,6 +18,7 @@ from datetime import datetime
 import os
 import time
 from flask import g, Response
+import traceback
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -610,122 +612,7 @@ def update_single_price_api(company_id):
         logger.error(f"Error in update_single_price_api: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
-@portfolio_bp.route('/api/update_identifier/<int:company_id>', methods=['POST'])
-def update_identifier_api(company_id):
-    """API endpoint to update a company's identifier"""
-    if 'account_id' not in session:
-        return jsonify({'error': 'Not authenticated'}), 401
-        
-    try:
-        data = request.json
-        if not data or 'identifier' not in data:
-            return jsonify({'error': 'No identifier provided'}), 400
-            
-        identifier = data['identifier'].strip()
-        
-        # Get company
-        company = query_db(
-            'SELECT id FROM companies WHERE id = ? AND account_id = ?',
-            [company_id, session['account_id']],
-            one=True
-        )
-        
-        if not company:
-            return jsonify({'error': 'Company not found'}), 404
-            
-        # Update company
-        execute_db(
-            'UPDATE companies SET identifier = ? WHERE id = ?',
-            [identifier, company_id]
-        )
-        
-        return jsonify({'success': True})
-    except Exception as e:
-        logger.error(f"Error updating identifier: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-@portfolio_bp.route('/api/update_all_prices', methods=['POST'])
-def update_all_prices_api():
-    try:
-        # Get all company identifiers from database
-        companies = query_db('SELECT identifier FROM companies WHERE identifier IS NOT NULL')
-        if not companies:
-            return jsonify({'message': 'No companies with identifiers found'}), 200
-            
-        identifiers = [company['identifier'] for company in companies]
-        logger.info(f"Batch updating prices for {len(identifiers)} companies")
-        
-        # Backup database before making changes
-        backup_database()
-        
-        # Start a batch processing job
-        from app.utils.batch_processing import start_batch_process, get_job_status
-        job_id = start_batch_process()
-        
-        # Wait for job to complete (with timeout)
-        timeout = 300  # 5 minutes
-        start_time = time.time()
-        while True:
-            status = get_job_status(job_id)
-            if status['status'] == 'completed':
-                break
-            elif status['status'] == 'not_found':
-                return jsonify({'error': 'Batch job not found'}), 500
-            elif time.time() - start_time > timeout:
-                return jsonify({'error': 'Batch job timed out'}), 500
-            time.sleep(2)
-        
-        # Process results and update database
-        results = {}
-        failed = []
-        
-        if status.get('results'):
-            for isin, result in status['results'].items():
-                try:
-                    if result.get('success') and result.get('price') is not None and result.get('ticker'):
-                        # Get currency info from yfinance
-                        ticker_obj = yf.Ticker(result['ticker'])
-                        currency = ticker_obj.info.get('currency', None)
-                        
-                        # Get EUR conversion rate
-                        from app.utils.yfinance_utils import _get_eur_rate
-                        eur_rate = _get_eur_rate(currency) if currency else None
-                        price_eur = result['price'] * eur_rate if eur_rate is not None else None
-                        
-                        logger.info(f"Updating price for {isin}: {result['price']} {currency} ({price_eur} EUR)")
-                        
-                        if update_price_in_db(isin, result['price'], currency, price_eur):
-                            results[isin] = {
-                                'price': result['price'],
-                                'currency': currency,
-                                'price_eur': price_eur,
-                                'ticker': result['ticker']
-                            }
-                        else:
-                            failed.append(isin)
-                    else:
-                        logger.warning(f"Invalid result for {isin}: {result}")
-                        failed.append(isin)
-                except Exception as e:
-                    logger.error(f"Error updating price for {isin}: {str(e)}")
-                    failed.append(isin)
-        
-        # Log summary
-        logger.info(f"Price update complete. Updated: {len(results)}, Failed: {len(failed)}")
-        if failed:
-            logger.warning(f"Failed ISINs: {failed}")
-                    
-        return jsonify({
-            'message': 'Prices updated',
-            'updated': results,
-            'failed': failed
-        }), 200
-            
-    except Exception as e:
-        logger.error(f"Error updating prices: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-@portfolio_bp.route('/api/update_price/<int:company_id>', methods=['GET', 'POST'])
+@portfolio_bp.route('/api/update_price/<int:company_id>', methods=['POST'])
 def update_price_by_id_api(company_id):
     """API endpoint to update price for a specific company by ID"""
     try:
@@ -746,40 +633,189 @@ def update_price_by_id_api(company_id):
             logger.error(error_msg)
             return jsonify({'error': error_msg}), 400
             
-        logger.info(f"Fetching price for company: {company_name} (ID: {company_id}, Identifier: {identifier})")
+        logger.info(f"Processing company: {company_name} (ID: {company_id}, Identifier: {identifier})")
         
-        # Get current price using yfinance directly
-        result = get_stock_info(identifier)
+        # Instead of using batch processing for a single item, call get_isin_data directly
+        result = get_isin_data(identifier)
+        
         if not result['success']:
-            error_msg = f'Failed to fetch price for {company_name} ({identifier}): {result.get("error")}'
-            logger.error(error_msg)
-            return jsonify({'error': error_msg}), 400
-            
-        data = result['data']
-        price = data.get('currentPrice')
-        currency = data.get('currency')
-        price_eur = data.get('priceEUR')  # Get EUR price from the result
-        
-        if price is None:
-            error_msg = f'Failed to fetch price for {company_name} ({identifier})'
-            logger.error(error_msg)
-            return jsonify({'error': error_msg}), 400
+            return jsonify({
+                'error': f"Failed to get price for {company_name}: {result.get('error', 'Unknown error')}"
+            }), 400
             
         # Update price in database
-        if update_price_in_db(identifier, price, currency, price_eur):
+        price = result.get('price')
+        currency = result.get('currency', 'USD')
+        price_eur = result.get('price_eur', price)
+        
+        if price and update_price_in_db(identifier, price, currency, price_eur):
             return jsonify({
                 'success': True,
+                'message': f'Updated price for {company_name}',
                 'data': {
-                    'identifier': identifier,
                     'price': price,
                     'currency': currency,
-                    'price_eur': price_eur
+                    'price_eur': price_eur,
+                    'updated_at': datetime.now().isoformat()
                 }
             })
         else:
-            error_msg = f'Failed to update price in database for {company_name} ({identifier})'
+            return jsonify({
+                'error': f'Failed to update price for {company_name}'
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Error updating price: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@portfolio_bp.route('/api/update_all_prices', methods=['POST'])
+def update_all_prices_api():
+    try:
+        # Get current account_id from session
+        account_id = session.get('account_id')
+        if not account_id:
+            return jsonify({'error': 'No account selected'}), 400
+
+        # Load portfolio data
+        portfolio_items = load_portfolio_data(account_id)
+        
+        if not portfolio_items:  # Check if list is empty
+            return jsonify({'message': 'No portfolio items found'}), 200
+            
+        # Convert list of dicts to pandas DataFrame
+        import pandas as pd
+        df = pd.DataFrame(portfolio_items)
+        
+        if df.empty:
+            return jsonify({'message': 'No portfolio items found'}), 200
+
+        # Get list of ISINs
+        isins = df['identifier'].dropna().unique().tolist()
+        
+        # Filter out empty strings and non-strings
+        isins = [isin for isin in isins if isinstance(isin, str) and isin.strip()]
+        
+        if not isins:
+            return jsonify({'message': 'No valid identifiers found'}), 200
+        
+        # Start batch processing
+        job_id = start_batch_process(isins)
+        
+        if not job_id:
+            return jsonify({'error': 'Failed to start batch process'}), 500
+        
+        # Return job ID for status checking
+        return jsonify({
+            'status': 'processing',
+            'job_id': job_id,
+            'message': f'Processing {len(isins)} portfolio items'
+        })
+
+    except Exception as e:
+        logger.error(f"Error in update_all_prices: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@portfolio_bp.route('/api/price_update_status/<job_id>', methods=['GET'])
+def get_price_update_status(job_id):
+    """Get status of price update job."""
+    try:
+        # Get job status
+        status = get_job_status(job_id)
+        
+        if status['status'] == 'not_found':
+            return jsonify({'error': 'Job not found'}), 404
+            
+        if status['status'] == 'completed' and status.get('results'):
+            # Process results if completed
+            results = status.get('results')
+            if isinstance(results, dict):
+                # Handle both old and new format
+                if 'items' in results and 'summary' in results:
+                    # New format with summary
+                    items = results.get('items', {})
+                    summary = results.get('summary', {})
+                    success = update_batch_prices_in_db(items)
+                    logger.info(f"Price update processed with status: {success}")
+                    
+                    # Add information about the update to the status
+                    status['price_update'] = {
+                        'success': success,
+                        'total': summary.get('total', 0),
+                        'success_count': summary.get('success_count', 0),
+                        'failure_count': summary.get('failure_count', 0)
+                    }
+                else:
+                    # Old format (just items)
+                    success = update_batch_prices_in_db(results)
+                    logger.info(f"Price update processed with status: {success}")
+                    # Add information about the update to the status
+                    status['price_update'] = {
+                        'success': success
+                    }
+            else:
+                logger.warning(f"Invalid results format or empty results: {type(results)}")
+                status['price_update'] = {
+                    'success': False,
+                    'error': 'Invalid results format'
+                }
+        
+        return jsonify(status)
+    
+    except Exception as e:
+        logger.error(f"Error checking price update status: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+def update_prices_in_db(results):
+    """Update portfolio items with new prices."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        for isin, result in results.items():
+            if result['success'] and result['price'] is not None:
+                cursor.execute('''
+                    UPDATE portfolio_items 
+                    SET price_eur = ?, last_updated = ? 
+                    WHERE identifier = ?
+                ''', (result['price'], datetime.now(), isin))
+        
+        conn.commit()
+        
+    except Exception as e:
+        logger.error(f"Error updating prices in database: {str(e)}")
+        raise
+
+@portfolio_bp.route('/api/batch_update_price/<int:company_id>', methods=['GET', 'POST'])
+def batch_update_price_by_id_api(company_id):
+    """API endpoint to update price for a specific company by ID using batch processing"""
+    try:
+        logger.info(f"Starting batch price update for company ID: {company_id}")
+        
+        # Get company identifier from database
+        company = query_db('SELECT identifier, name FROM companies WHERE id = ?', [company_id], one=True)
+        if not company:
+            error_msg = f'Company with ID {company_id} not found'
             logger.error(error_msg)
-            return jsonify({'error': error_msg}), 500
+            return jsonify({'error': error_msg}), 404
+            
+        identifier = company['identifier']
+        company_name = company['name']
+        
+        if not identifier:
+            error_msg = f'Company {company_id} ({company_name}) has no identifier'
+            logger.error(error_msg)
+            return jsonify({'error': error_msg}), 400
+            
+        logger.info(f"Starting batch process for company: {company_name} (ID: {company_id}, Identifier: {identifier})")
+        
+        # Start batch process for single ISIN
+        job_id = start_batch_process([identifier])
+        
+        return jsonify({
+            'status': 'processing',
+            'job_id': job_id,
+            'message': f'Processing price update for {company_name}'
+        })
             
     except Exception as e:
         logger.error(f"Error updating price: {str(e)}")
@@ -806,8 +842,16 @@ def get_portfolio_data(account_id):
         if df is None:
             logger.warning("load_portfolio_data returned None")
             return []
-        if df.empty:
+        if not df:  # Check if list is empty
             logger.info("No portfolio data found")
+            return []
+            
+        import pandas as pd
+        # Convert list of dicts to pandas DataFrame
+        df = pd.DataFrame(df)
+        
+        if df.empty:
+            logger.info("DataFrame is empty after conversion")
             return []
             
         logger.info(f"Raw DataFrame columns: {df.columns.tolist()}")
@@ -840,9 +884,9 @@ def get_portfolio_data(account_id):
             try:
                 item = {
                     'id': row['id'],  # Add the id field
-                    'company': row['company'],
+                    'company': row['name'],  # Changed from 'company' to 'name'
                     'identifier': row['identifier'],
-                    'portfolio': row['portfolio'],
+                    'portfolio': row.get('portfolio_name', ''),  # Try to get portfolio_name or fall back to empty string
                     'category': row['category'],
                     'shares': float(row['shares']) if pd.notna(row['shares']) else 0,
                     'override_share': float(row['override_share']) if pd.notna(row['override_share']) else None,

@@ -1,5 +1,5 @@
 This file is a merged representation of the entire codebase, combining all repository files into a single document.
-Generated on: 2025-02-24T00:15:02.737185
+Generated on: 2025-02-25T21:56:54.788345
 
 ================================================================
 Purpose:
@@ -25,7 +25,6 @@ Repository Structure
     secret_key
     requirements.txt
     run.py
-    doc.txt
     .gitignore
     config.py
 templates/
@@ -71,15 +70,14 @@ app/
         account_routes.py
         __pycache__/
     __pycache__/
-    uploads/
     utils/
         yfinance_utils.py
         db_utils.py
         formatting.py
         __init__.py
+        batch_processing.py
         data_processing.py
         __pycache__/
-migrations/
 .LLM/
 venv/
 __pycache__/
@@ -96,25 +94,25 @@ static/
             charts.js
     css/
         custom.css
-    img/
 
 ================================================================
 ###START_FILE_PATH: requirements.txt###
-flask==3.0.0
-Flask-WTF==1.1.1
-WTForms==3.0.1
-yfinance==0.2.36
-pandas==2.0.2
-numpy==1.24.3
-plotly==5.15.0
-python-dateutil==2.8.2
-pytz==2023.3
-requests==2.31.0
-beautifulsoup4==4.12.2
-matplotlib==3.7.1
-sqlalchemy==2.0.16
-gunicorn==20.1.0
-python-dotenv==1.0.0
+flask==3.1.0
+Flask-WTF==1.2.2
+WTForms==3.2.1
+yfinance==0.2.54
+pandas==2.2.3
+numpy==2.2.3
+plotly==6.0.0
+python-dateutil==2.9.0.post0
+pytz==2025.1
+requests==2.28.1
+beautifulsoup4==4.13.3
+matplotlib==3.10.0
+sqlalchemy==2.0.38
+gunicorn==23.0.0
+python-dotenv==1.0.1
+ratelimit==2.2.1
 ###END_FILE###
 
 ================================================================
@@ -126,242 +124,6 @@ app = create_app()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
-###END_FILE###
-
-================================================================
-###START_FILE_PATH: doc.txt###
-# ISIN to Comprehensive Stock Information
-
-This project demonstrates how to use yfinance to fetch comprehensive stock information directly using ISIN numbers, without needing to convert them to ticker symbols first.
-
-## The Discovery
-
-While yfinance is traditionally used with ticker symbols (e.g., "AAPL", "MSFT"), we've discovered that it can also handle International Securities Identification Numbers (ISINs) directly. This is an undocumented feature that works surprisingly well.
-
-### Examples of Working ISINs:
-- US88579Y1010 (3M Co)
-- NL0000235190 (Airbus)
-- DE000BASF111 (BASF)
-
-## Technical Implementation
-
-### 1. Project Setup
-
-1. Create a new Python virtual environment:
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-2. Install required packages:
-```bash
-pip install flask python-dotenv yfinance
-```
-
-3. Create the following project structure:
-```
-isin_ticker/
-├── app.py
-├── isin_logic.py
-├── requirements.txt
-└── templates/
-    └── index.html
-```
-
-### 2. Core Implementation (isin_logic.py)
-
-```python
-from typing import Dict, Any
-import logging
-import yfinance as yf
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-def get_yfinance_info(isin: str) -> Dict[str, Any]:
-    """
-    Get detailed information about a stock using yfinance with ISIN
-    
-    Args:
-        isin (str): ISIN of the stock
-        
-    Returns:
-        Dict[str, Any]: Dictionary containing stock information
-    """
-    try:
-        # Create a Ticker object using the ISIN
-        ticker = yf.Ticker(isin)
-        
-        # Get basic info
-        info = ticker.info
-        
-        return {
-            'success': True,
-            'data': {
-                'ticker': info.get('symbol'),
-                'currentPrice': info.get('currentPrice'),
-                'marketCap': info.get('marketCap'),
-                'dividendYield': info.get('dividendYield'),
-                'peRatio': info.get('trailingPE'),
-                '52WeekHigh': info.get('fiftyTwoWeekHigh'),
-                '52WeekLow': info.get('fiftyTwoWeekLow'),
-                'volume': info.get('volume'),
-                'sector': info.get('sector'),
-                'industry': info.get('industry'),
-                'country': info.get('country'),
-                'exchange': info.get('exchange'),
-                'currency': info.get('currency'),
-                'description': info.get('longBusinessSummary'),
-                'website': info.get('website'),
-                'previousClose': info.get('regularMarketPreviousClose'),
-                'beta': info.get('beta'),
-            }
-        }
-    except Exception as e:
-        return {
-            'success': False,
-            'error': str(e)
-        }
-```
-
-### 3. Flask Backend (app.py)
-
-```python
-from flask import Flask, render_template, request, jsonify
-from isin_logic import get_yfinance_info
-from dotenv import load_dotenv
-import logging
-
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-app = Flask(__name__)
-
-@app.route('/')
-def index():
-    return render_template('index.html')
-
-@app.route('/profile', methods=['POST'])
-def get_profile():
-    data = request.get_json() if request.is_json else request.form
-    identifier = data.get('identifier', '').strip().upper()
-    
-    if not identifier:
-        return jsonify({'error': 'No identifier provided'})
-    
-    try:
-        result = get_yfinance_info(identifier)
-        return jsonify(result)
-    except Exception as e:
-        logger.error(f"Error processing request: {str(e)}")
-        return jsonify({'error': str(e)})
-
-if __name__ == '__main__':
-    app.run(debug=True)
-```
-
-### 4. Frontend Implementation (templates/index.html)
-
-The frontend displays the stock information in an organized layout with the following sections:
-- Basic Information (ticker, price, volume)
-- Performance Metrics (52-week high/low, PE ratio, beta)
-- Company Information (sector, industry, country)
-- Company Description
-
-Key HTML/JavaScript features:
-- Uses Bulma CSS framework for styling
-- Async/await for API calls
-- Error handling and loading states
-- Formatted number display (currency, percentages)
-
-For the complete frontend code, please refer to the `templates/index.html` file in the repository.
-
-### 5. Running the Application
-
-1. Activate the virtual environment:
-```bash
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-2. Start the Flask application:
-```bash
-python app.py
-```
-
-3. Open a web browser and navigate to:
-```
-http://127.0.0.1:5000
-```
-
-## Retrieved Information
-
-Using this implementation, you can retrieve the following stock information using just an ISIN:
-
-1. **Basic Information**
-   - Ticker Symbol
-   - Current Price
-   - Previous Close
-   - Market Cap
-   - Volume
-
-2. **Performance Metrics**
-   - 52 Week High/Low
-   - PE Ratio
-   - Beta
-   - Dividend Yield
-
-3. **Company Information**
-   - Sector
-   - Industry
-   - Country
-   - Exchange
-   - Currency
-   - Website
-
-4. **Additional Information**
-   - Company Description
-
-## Important Notes
-
-1. **Rate Limiting**: Be mindful of yfinance's rate limits. Implement caching for production use.
-
-2. **Data Accuracy**: Always validate information against official sources for critical applications.
-
-3. **Market Hours**: Some information may be delayed or unavailable outside market hours.
-
-4. **Future Compatibility**: Since using ISINs with yfinance is an undocumented feature, it may change in future versions.
-
-5. **Error Handling**: The implementation includes robust error handling to manage cases where:
-   - The ISIN is invalid
-   - The stock information is unavailable
-   - The yfinance API is unreachable
-
-## Troubleshooting
-
-1. **Missing Data**: Some fields might return 'N/A' if the information is not available for that particular stock.
-
-2. **API Errors**: If you encounter frequent errors, consider:
-   - Implementing exponential backoff
-   - Adding request retries
-   - Using a caching system
-
-3. **Performance**: For better performance:
-   - Cache responses
-   - Implement rate limiting
-   - Only request needed fields
-
-## Contributing
-
-Feel free to contribute to this project by:
-1. Reporting issues
-2. Suggesting enhancements
-3. Creating pull requests
-
-## License
-
-This project is open-source and available under the MIT License.
-
 ###END_FILE###
 
 ================================================================
@@ -2197,54 +1959,54 @@ document.addEventListener('DOMContentLoaded', () => {
     </header>
     <div class="card-content">
         <div class="content">
-            <div class="field is-grouped mb-4">
-                <div class="control">
-                    <button class="button is-info" id="refresh-data" @click="loadData">
-                        <span class="icon">
-                            <i class="fas fa-sync"></i>
-                        </span>
-                        <span>Refresh Data</span>
-                    </button>
-                </div>
-                <div class="control">
-                    <button class="button is-warning" id="update-prices">
-                        <span class="icon">
-                            <i class="fas fa-dollar-sign"></i>
-                        </span>
-                        <span>Update All Prices</span>
-                    </button>
-                </div>
-                <div class="control">
-                    <button class="button is-danger is-light" id="update-missing-prices">
-                        <span class="icon">
-                            <i class="fas fa-exclamation-circle"></i>
-                        </span>
-                        <span>Update Missing Prices</span>
-                    </button>
-                </div>
-                <div class="control ml-auto">
-                    <div class="select">
-                        <select id="filter-portfolio">
-                            <option value="">All Portfolios</option>
-                            {% for portfolio in portfolios %}
-                                <option value="{{ portfolio }}">{{ portfolio }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
-                <div class="control">
-                    <button class="button is-info is-light js-modal-trigger" data-target="bulk-edit-modal">
-                        <span class="icon">
-                            <i class="fas fa-edit"></i>
-                        </span>
-                        <span>Bulk Edit</span>
-                    </button>
-                </div>
-            </div>
-            
             <div id="portfolio-editor" class="portfolio-editor">
                 <!-- Vue.js component will be mounted here -->
                 <div id="portfolio-table-app" v-cloak>
+                    <div class="field is-grouped mb-4">
+                        <div class="control">
+                            <button class="button is-info" id="refresh-data" @click="loadData">
+                                <span class="icon">
+                                    <i class="fas fa-sync"></i>
+                                </span>
+                                <span>Refresh Data</span>
+                            </button>
+                        </div>
+                        <div class="control">
+                            <button class="button is-warning" id="update-prices" @click="updateAllPrices" :class="{'is-loading': isUpdatingAll}">
+                                <span class="icon">
+                                    <i class="fas fa-dollar-sign"></i>
+                                </span>
+                                <span>Update All Prices</span>
+                            </button>
+                        </div>
+                        <div class="control">
+                            <button class="button is-danger is-light" id="update-missing-prices" @click="updateMissingPrices" :class="{'is-loading': isUpdatingMissing}">
+                                <span class="icon">
+                                    <i class="fas fa-exclamation-circle"></i>
+                                </span>
+                                <span>Update Missing Prices</span>
+                            </button>
+                        </div>
+                        <div class="control ml-auto">
+                            <div class="select">
+                                <select id="filter-portfolio">
+                                    <option value="">All Portfolios</option>
+                                    {% for portfolio in portfolios %}
+                                        <option value="{{ portfolio }}">{{ portfolio }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="control">
+                            <button class="button is-info is-light js-modal-trigger" data-target="bulk-edit-modal">
+                                <span class="icon">
+                                    <i class="fas fa-edit"></i>
+                                </span>
+                                <span>Bulk Edit</span>
+                            </button>
+                        </div>
+                    </div>
+                    
                     <div v-if="loading" class="has-text-centered my-6">
                         <span class="icon is-large">
                             <i class="fas fa-spinner fa-pulse fa-3x"></i>
@@ -2315,7 +2077,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                         <th>Portfolio</th>
                                         <th>Category</th>
                                         <th>Shares</th>
-                                        <th>Price</th>
+                                        <th>Price (EUR)</th>
                                         <th>Total Value</th>
                                         <th>Total Invested</th>
                                         <th>Last Update</th>
@@ -2719,6 +2481,8 @@ const app = new Vue({
             showUpdatePriceModal: false,
             showDeleteModal: false,
             isUpdating: false,
+            isUpdatingAll: false,
+            isUpdatingMissing: false,
             isDeleting: false,
             loading: false,
             metrics: {
@@ -2820,6 +2584,195 @@ const app = new Vue({
             }
         },
 
+        async updateAllPrices() {
+            this.isUpdatingAll = true;
+            try {
+                // Start batch process
+                const response = await fetch('/portfolio/api/update_all_prices', {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                
+                if (response.ok) {
+                    // Show processing notification
+                    const notification = document.createElement('div');
+                    notification.className = 'notification is-info is-light';
+                    notification.innerHTML = `
+                        <button class="delete"></button>
+                        <div>
+                            <p>Price update started. Processing ${result.message}</p>
+                            <progress class="progress is-info" value="0" max="100">0%</progress>
+                        </div>
+                    `;
+                    
+                    // Add notification to page
+                    const container = document.querySelector('.columns');
+                    container.insertBefore(notification, container.firstChild);
+                    
+                    // Add click handler to delete button
+                    notification.querySelector('.delete').addEventListener('click', () => {
+                        notification.remove();
+                    });
+                    
+                    // Start polling for status
+                    const progressBar = notification.querySelector('progress');
+                    const statusText = notification.querySelector('p');
+                    
+                    const pollStatus = async () => {
+                        try {
+                            const statusResponse = await fetch(`/portfolio/api/price_update_status/${result.job_id}`);
+                            const status = await statusResponse.json();
+                            
+                            if (status.status === 'completed') {
+                                // Update progress bar
+                                progressBar.value = 100;
+                                statusText.textContent = 'Price update completed!';
+                                
+                                // Refresh data
+                                await this.loadData();
+                                
+                                // Remove notification after 3 seconds
+                                setTimeout(() => {
+                                    if (notification.parentNode) {
+                                        notification.remove();
+                                    }
+                                }, 3000);
+                                
+                                return;
+                            } else if (status.status === 'processing') {
+                                // Update progress bar
+                                const progress = (status.progress / status.total) * 100;
+                                progressBar.value = progress;
+                                statusText.textContent = `Processing: ${status.progress}/${status.total} items`;
+                                
+                                // Continue polling
+                                setTimeout(pollStatus, 1000);
+                            }
+                        } catch (error) {
+                            console.error('Error polling status:', error);
+                            statusText.textContent = 'Error checking update status';
+                        }
+                    };
+                    
+                    // Start polling
+                    pollStatus();
+                }
+            } catch (error) {
+                console.error('Error updating all prices:', error);
+            } finally {
+                this.isUpdatingAll = false;
+            }
+        },
+        
+        async updateMissingPrices() {
+            this.isUpdatingMissing = true;
+            try {
+                // Get items with missing prices
+                const missingItems = this.portfolioItems.filter(item => !item.price_eur);
+                if (missingItems.length === 0) {
+                    // Show info notification
+                    const notification = document.createElement('div');
+                    notification.className = 'notification is-info is-light';
+                    notification.innerHTML = `
+                        <button class="delete"></button>
+                        No missing prices to update.
+                    `;
+                    
+                    // Add notification to page
+                    const container = document.querySelector('.columns');
+                    container.insertBefore(notification, container.firstChild);
+                    
+                    // Add click handler to delete button
+                    notification.querySelector('.delete').addEventListener('click', () => {
+                        notification.remove();
+                    });
+                    
+                    // Auto-remove after 5 seconds
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.remove();
+                        }
+                    }, 5000);
+                    return;
+                }
+                
+                // Start batch process for missing prices
+                const response = await fetch('/portfolio/api/update_all_prices', {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                
+                if (response.ok) {
+                    // Show processing notification
+                    const notification = document.createElement('div');
+                    notification.className = 'notification is-info is-light';
+                    notification.innerHTML = `
+                        <button class="delete"></button>
+                        <div>
+                            <p>Updating missing prices. ${result.message}</p>
+                            <progress class="progress is-info" value="0" max="100">0%</progress>
+                        </div>
+                    `;
+                    
+                    // Add notification to page
+                    const container = document.querySelector('.columns');
+                    container.insertBefore(notification, container.firstChild);
+                    
+                    // Add click handler to delete button
+                    notification.querySelector('.delete').addEventListener('click', () => {
+                        notification.remove();
+                    });
+                    
+                    // Start polling for status
+                    const progressBar = notification.querySelector('progress');
+                    const statusText = notification.querySelector('p');
+                    
+                    const pollStatus = async () => {
+                        try {
+                            const statusResponse = await fetch(`/portfolio/api/price_update_status/${result.job_id}`);
+                            const status = await statusResponse.json();
+                            
+                            if (status.status === 'completed') {
+                                // Update progress bar
+                                progressBar.value = 100;
+                                statusText.textContent = 'Missing prices update completed!';
+                                
+                                // Refresh data
+                                await this.loadData();
+                                
+                                // Remove notification after 3 seconds
+                                setTimeout(() => {
+                                    if (notification.parentNode) {
+                                        notification.remove();
+                                    }
+                                }, 3000);
+                                
+                                return;
+                            } else if (status.status === 'processing') {
+                                // Update progress bar
+                                const progress = (status.progress / status.total) * 100;
+                                progressBar.value = progress;
+                                statusText.textContent = `Processing: ${status.progress}/${status.total} items`;
+                                
+                                // Continue polling
+                                setTimeout(pollStatus, 1000);
+                            }
+                        } catch (error) {
+                            console.error('Error polling status:', error);
+                            statusText.textContent = 'Error checking update status';
+                        }
+                    };
+                    
+                    // Start polling
+                    pollStatus();
+                }
+            } catch (error) {
+                console.error('Error updating missing prices:', error);
+            } finally {
+                this.isUpdatingMissing = false;
+            }
+        },
+
         formatCurrency(value) {
             if (!value) return '€0.00';
             return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(value);
@@ -2877,6 +2830,34 @@ const bulkEditApp = new Vue({
             selectedCompanies: []
         };
     },
+    computed: {
+        computedGroupedCompanies() {
+            // Group companies by portfolio
+            const grouped = {};
+            
+            if (!this.companies.length) {
+                return {};
+            }
+            
+            // Filter companies by search query if provided
+            const filteredCompanies = this.searchQuery 
+                ? this.companies.filter(c => 
+                    c.name.toLowerCase().includes(this.searchQuery.toLowerCase()) || 
+                    c.identifier.toLowerCase().includes(this.searchQuery.toLowerCase()))
+                : this.companies;
+            
+            // Group by portfolio
+            filteredCompanies.forEach(company => {
+                const portfolio = company.portfolio || 'Unassigned';
+                if (!grouped[portfolio]) {
+                    grouped[portfolio] = [];
+                }
+                grouped[portfolio].push(company);
+            });
+            
+            return grouped;
+        }
+    },
     methods: {
         async loadPortfolioOptions() {
             try {
@@ -2893,10 +2874,51 @@ const bulkEditApp = new Vue({
             } catch (err) {
                 console.error('Error loading portfolio options:', err);
             }
+        },
+        
+        async loadCompanies() {
+            this.loading = true;
+            try {
+                const response = await fetch('/portfolio/api/portfolio_data');
+                if (!response.ok) {
+                    throw new Error('Failed to load companies');
+                }
+                const data = await response.json();
+                this.companies = data;
+            } catch (err) {
+                console.error('Error loading companies:', err);
+            } finally {
+                this.loading = false;
+            }
+        },
+        
+        isPortfolioSelected(portfolio) {
+            // Check if all companies in this portfolio are selected
+            const companiesInPortfolio = this.computedGroupedCompanies[portfolio] || [];
+            if (!companiesInPortfolio.length) return false;
+            
+            return companiesInPortfolio.every(company => 
+                this.selectedCompanies.includes(company.id));
+        },
+        
+        togglePortfolio(portfolio) {
+            const companiesInPortfolio = this.computedGroupedCompanies[portfolio] || [];
+            const allSelected = this.isPortfolioSelected(portfolio);
+            
+            if (allSelected) {
+                // Deselect all companies in this portfolio
+                this.selectedCompanies = this.selectedCompanies.filter(id => 
+                    !companiesInPortfolio.some(company => company.id === id));
+            } else {
+                // Select all companies in this portfolio
+                const companyIds = companiesInPortfolio.map(company => company.id);
+                this.selectedCompanies = [...new Set([...this.selectedCompanies, ...companyIds])];
+            }
         }
     },
     mounted() {
         this.loadPortfolioOptions();
+        this.loadCompanies();
     }
 });
 </script>
@@ -3379,6 +3401,10 @@ def create_app(config_name='default'):
     from app.routes.analysis_routes import analysis_bp
     app.register_blueprint(analysis_bp, url_prefix='/analysis')
     
+    # Initialize the database
+    from app.database.db_manager import init_db
+    init_db(app)
+    
     @app.route('/profile', methods=['POST'])
     def get_profile():
         data = request.get_json() if request.is_json else request.form
@@ -3538,9 +3564,11 @@ END;
 
 ================================================================
 ###START_FILE_PATH: app/database/__init__.py###
+# app/database/__init__.py
 # Database module initialization
 from app.database.db_manager import (
     get_db,
+    get_background_db,  # Add this new function
     close_db,
     init_db,
     backup_database,
@@ -3550,6 +3578,7 @@ from app.database.db_manager import (
 
 __all__ = [
     'get_db',
+    'get_background_db',  # Add this to exports
     'close_db',
     'init_db',
     'backup_database',
@@ -3580,6 +3609,18 @@ def get_db():
         g.db = sqlite3.connect(db_path, detect_types=sqlite3.PARSE_DECLTYPES)
         g.db.row_factory = sqlite3.Row
     return g.db
+
+def get_background_db():
+    """
+    Get a new database connection for background tasks.
+    This should be used instead of get_db() when working in background threads
+    where Flask's request context is not available.
+    """
+    from flask import current_app
+    db_path = current_app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
+    db = sqlite3.connect(db_path, detect_types=sqlite3.PARSE_DECLTYPES)
+    db.row_factory = sqlite3.Row
+    return db
 
 def close_db(e=None):
     """Close the database connection at the end of the request."""
@@ -3690,7 +3731,12 @@ def backup_database():
     """
     try:
         db_path = current_app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
-        backup_dir = current_app.config['DB_BACKUP_DIR']
+        # Use backups folder in app/database
+        backup_dir = os.path.join(os.path.dirname(__file__), 'backups')
+        
+        # Create backup directory if it doesn't exist
+        os.makedirs(backup_dir, exist_ok=True)
+        
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         backup_filename = os.path.join(backup_dir, f"backup_{timestamp}.db")
 
@@ -3698,7 +3744,7 @@ def backup_database():
         logger.info(f"Database backed up successfully to {backup_filename}")
 
         # Clean up old backups
-        cleanup_old_backups(backup_dir, current_app.config['MAX_BACKUP_FILES'])
+        cleanup_old_backups(backup_dir, current_app.config.get('MAX_BACKUP_FILES', 10))
         return backup_filename
     except Exception as e:
         logger.error(f"Database backup failed: {e}")
@@ -3768,6 +3814,18 @@ def execute_db(query, args=()):
         logger.error(f"Args were: {args}")
         raise
 
+def get_background_db():
+    """
+    Get a new database connection for background tasks.
+    This should be used instead of get_db() when working in background threads
+    where Flask's request context is not available.
+    """
+    from flask import current_app
+    import sqlite3
+    db_path = current_app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
+    db = sqlite3.connect(db_path, detect_types=sqlite3.PARSE_DECLTYPES)
+    db.row_factory = sqlite3.Row
+    return db
 ###END_FILE###
 
 ================================================================
@@ -4324,15 +4382,19 @@ from app.database.db_manager import query_db, execute_db, backup_database, get_d
 from app.utils.db_utils import (
     load_portfolio_data, process_portfolio_dataframe,
     update_prices, update_price_in_db, calculate_portfolio_composition,
-    get_portfolios
+    get_portfolios, update_batch_prices_in_db
 )
 from app.utils.data_processing import clear_data_caches
-from app.utils.yfinance_utils import get_stock_info, get_stock_price
+from app.utils.yfinance_utils import get_isin_data, get_price_for_ticker, find_ticker_for_isin
+from app.utils.batch_processing import start_batch_process, get_job_status
 import pandas as pd
 import io
 import logging
 from datetime import datetime
 import os
+import time
+from flask import g, Response
+import traceback
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -4771,7 +4833,7 @@ def update_price_api():
         data = result['data']
         price = data.get('currentPrice')
         currency = data.get('currency')
-        price_eur = price if currency == 'EUR' else None  # Simple EUR handling for now
+        price_eur = data.get('priceEUR')  # Get EUR price from the result
         
         if price is None:
             return jsonify({'error': f'Failed to fetch price for {identifier}'}), 400
@@ -4904,7 +4966,7 @@ def update_single_price_api(company_id):
         data = result['data']
         price = data.get('currentPrice')
         currency = data.get('currency')
-        price_eur = price if currency == 'EUR' else None
+        price_eur = data.get('priceEUR')  # Get EUR price from the result
         
         if price is None:
             return jsonify({'error': f'No price data available for {identifier}'}), 400
@@ -4926,95 +4988,7 @@ def update_single_price_api(company_id):
         logger.error(f"Error in update_single_price_api: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
-@portfolio_bp.route('/api/update_identifier/<int:company_id>', methods=['POST'])
-def update_identifier_api(company_id):
-    """API endpoint to update a company's identifier"""
-    if 'account_id' not in session:
-        return jsonify({'error': 'Not authenticated'}), 401
-        
-    try:
-        data = request.json
-        if not data or 'identifier' not in data:
-            return jsonify({'error': 'No identifier provided'}), 400
-            
-        identifier = data['identifier'].strip()
-        
-        # Get company
-        company = query_db(
-            'SELECT id FROM companies WHERE id = ? AND account_id = ?',
-            [company_id, session['account_id']],
-            one=True
-        )
-        
-        if not company:
-            return jsonify({'error': 'Company not found'}), 404
-            
-        # Update company
-        execute_db(
-            'UPDATE companies SET identifier = ? WHERE id = ?',
-            [identifier, company_id]
-        )
-        
-        return jsonify({'success': True})
-    except Exception as e:
-        logger.error(f"Error updating identifier: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-@portfolio_bp.route('/api/update_all_prices', methods=['POST'])
-def update_all_prices_api():
-    """API endpoint to update all company prices"""
-    try:
-        # Get all company identifiers from database
-        companies = query_db('SELECT identifier FROM companies WHERE identifier IS NOT NULL')
-        if not companies:
-            return jsonify({'message': 'No companies with identifiers found'}), 200
-            
-        identifiers = [company['identifier'] for company in companies]
-        logger.info(f"Updating prices for {len(identifiers)} companies")
-        
-        # Backup database before making changes
-        backup_database()
-        
-        # Update prices one by one
-        results = {}
-        failed = []
-        
-        for identifier in identifiers:
-            try:
-                result = get_stock_info(identifier)
-                if result['success']:
-                    data = result['data']
-                    price = data.get('currentPrice')
-                    currency = data.get('currency')
-                    price_eur = price if currency == 'EUR' else None
-                    
-                    if price is not None:
-                        if update_price_in_db(identifier, price, currency, price_eur):
-                            results[identifier] = {
-                                'price': price,
-                                'currency': currency
-                            }
-                        else:
-                            failed.append(identifier)
-                    else:
-                        failed.append(identifier)
-                else:
-                    failed.append(identifier)
-            except Exception as e:
-                logger.error(f"Error updating price for {identifier}: {str(e)}")
-                failed.append(identifier)
-                
-        return jsonify({
-            'message': 'Prices updated',
-            'updated': results,
-            'failed': failed
-        }), 200
-            
-    except Exception as e:
-        logger.error(f"Error updating prices: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-@portfolio_bp.route('/api/update_price/<int:company_id>', methods=['GET', 'POST'])
+@portfolio_bp.route('/api/update_price/<int:company_id>', methods=['POST'])
 def update_price_by_id_api(company_id):
     """API endpoint to update price for a specific company by ID"""
     try:
@@ -5035,44 +5009,205 @@ def update_price_by_id_api(company_id):
             logger.error(error_msg)
             return jsonify({'error': error_msg}), 400
             
-        logger.info(f"Fetching price for company: {company_name} (ID: {company_id}, Identifier: {identifier})")
+        logger.info(f"Processing company: {company_name} (ID: {company_id}, Identifier: {identifier})")
         
-        # Get current price using yfinance directly
-        result = get_stock_info(identifier)
+        # Instead of using batch processing for a single item, call get_isin_data directly
+        result = get_isin_data(identifier)
+        
         if not result['success']:
-            error_msg = f'Failed to fetch price for {company_name} ({identifier}): {result.get("error")}'
-            logger.error(error_msg)
-            return jsonify({'error': error_msg}), 400
-            
-        data = result['data']
-        price = data.get('currentPrice')
-        currency = data.get('currency')
-        price_eur = price if currency == 'EUR' else None  # Simple EUR handling for now
-        
-        if price is None:
-            error_msg = f'Failed to fetch price for {company_name} ({identifier})'
-            logger.error(error_msg)
-            return jsonify({'error': error_msg}), 400
+            return jsonify({
+                'error': f"Failed to get price for {company_name}: {result.get('error', 'Unknown error')}"
+            }), 400
             
         # Update price in database
-        if update_price_in_db(identifier, price, currency, price_eur):
+        price = result.get('price')
+        currency = result.get('currency', 'USD')
+        price_eur = result.get('price_eur', price)
+        
+        if price and update_price_in_db(identifier, price, currency, price_eur):
             return jsonify({
                 'success': True,
+                'message': f'Updated price for {company_name}',
                 'data': {
-                    'identifier': identifier,
                     'price': price,
                     'currency': currency,
-                    'price_eur': price_eur
+                    'price_eur': price_eur,
+                    'updated_at': datetime.now().isoformat()
                 }
             })
         else:
-            error_msg = f'Failed to update price in database for {company_name} ({identifier})'
-            logger.error(error_msg)
-            return jsonify({'error': error_msg}), 500
+            return jsonify({
+                'error': f'Failed to update price for {company_name}'
+            }), 500
             
     except Exception as e:
         logger.error(f"Error updating price: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+@portfolio_bp.route('/api/update_all_prices', methods=['POST'])
+def update_all_prices_api():
+    try:
+        # Get current account_id from session
+        account_id = session.get('account_id')
+        if not account_id:
+            return jsonify({'error': 'No account selected'}), 400
+
+        # Load portfolio data
+        portfolio_items = load_portfolio_data(account_id)
+        
+        if not portfolio_items:  # Check if list is empty
+            return jsonify({'message': 'No portfolio items found'}), 200
+            
+        # Convert list of dicts to pandas DataFrame
+        import pandas as pd
+        df = pd.DataFrame(portfolio_items)
+        
+        if df.empty:
+            return jsonify({'message': 'No portfolio items found'}), 200
+
+        # Get list of ISINs
+        isins = df['identifier'].dropna().unique().tolist()
+        
+        # Filter out empty strings and non-strings
+        isins = [isin for isin in isins if isinstance(isin, str) and isin.strip()]
+        
+        if not isins:
+            return jsonify({'message': 'No valid identifiers found'}), 200
+        
+        # Start batch processing
+        job_id = start_batch_process(isins)
+        
+        if not job_id:
+            return jsonify({'error': 'Failed to start batch process'}), 500
+        
+        # Return job ID for status checking
+        return jsonify({
+            'status': 'processing',
+            'job_id': job_id,
+            'message': f'Processing {len(isins)} portfolio items'
+        })
+
+    except Exception as e:
+        logger.error(f"Error in update_all_prices: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@portfolio_bp.route('/api/price_update_status/<job_id>', methods=['GET'])
+def get_price_update_status(job_id):
+    """Get status of price update job."""
+    try:
+        # Get job status
+        status = get_job_status(job_id)
+        
+        if status['status'] == 'not_found':
+            return jsonify({'error': 'Job not found'}), 404
+            
+        if status['status'] == 'completed' and status.get('results'):
+            # Process results if completed
+            results = status.get('results')
+            if isinstance(results, dict):
+                # Handle both old and new format
+                if 'items' in results and 'summary' in results:
+                    # New format with summary
+                    items = results.get('items', {})
+                    summary = results.get('summary', {})
+                    success = update_batch_prices_in_db(items)
+                    logger.info(f"Price update processed with status: {success}")
+                    
+                    # Add information about the update to the status
+                    status['price_update'] = {
+                        'success': success,
+                        'total': summary.get('total', 0),
+                        'success_count': summary.get('success_count', 0),
+                        'failure_count': summary.get('failure_count', 0)
+                    }
+                else:
+                    # Old format (just items)
+                    success = update_batch_prices_in_db(results)
+                    logger.info(f"Price update processed with status: {success}")
+                    # Add information about the update to the status
+                    status['price_update'] = {
+                        'success': success
+                    }
+            else:
+                logger.warning(f"Invalid results format or empty results: {type(results)}")
+                status['price_update'] = {
+                    'success': False,
+                    'error': 'Invalid results format'
+                }
+        
+        return jsonify(status)
+    
+    except Exception as e:
+        logger.error(f"Error checking price update status: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+def update_prices_in_db(results):
+    """Update portfolio items with new prices."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        for isin, result in results.items():
+            if result['success'] and result['price'] is not None:
+                cursor.execute('''
+                    UPDATE portfolio_items 
+                    SET price_eur = ?, last_updated = ? 
+                    WHERE identifier = ?
+                ''', (result['price'], datetime.now(), isin))
+        
+        conn.commit()
+        
+    except Exception as e:
+        logger.error(f"Error updating prices in database: {str(e)}")
+        raise
+
+@portfolio_bp.route('/api/batch_update_price/<int:company_id>', methods=['GET', 'POST'])
+def batch_update_price_by_id_api(company_id):
+    """API endpoint to update price for a specific company by ID using batch processing"""
+    try:
+        logger.info(f"Starting batch price update for company ID: {company_id}")
+        
+        # Get company identifier from database
+        company = query_db('SELECT identifier, name FROM companies WHERE id = ?', [company_id], one=True)
+        if not company:
+            error_msg = f'Company with ID {company_id} not found'
+            logger.error(error_msg)
+            return jsonify({'error': error_msg}), 404
+            
+        identifier = company['identifier']
+        company_name = company['name']
+        
+        if not identifier:
+            error_msg = f'Company {company_id} ({company_name}) has no identifier'
+            logger.error(error_msg)
+            return jsonify({'error': error_msg}), 400
+            
+        logger.info(f"Starting batch process for company: {company_name} (ID: {company_id}, Identifier: {identifier})")
+        
+        # Start batch process for single ISIN
+        job_id = start_batch_process([identifier])
+        
+        return jsonify({
+            'status': 'processing',
+            'job_id': job_id,
+            'message': f'Processing price update for {company_name}'
+        })
+            
+    except Exception as e:
+        logger.error(f"Error updating price: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@portfolio_bp.route('/api/update_progress')
+def update_progress():
+    def generate():
+        while True:
+            progress = g.get('update_progress', 0)
+            yield f"data: {progress}\n\n"
+            if progress >= 100:
+                break
+            time.sleep(0.5)
+    
+    return Response(generate(), mimetype='text/event-stream')
 
 def get_portfolio_data(account_id):
     """Get portfolio data from the database"""
@@ -5083,8 +5218,16 @@ def get_portfolio_data(account_id):
         if df is None:
             logger.warning("load_portfolio_data returned None")
             return []
-        if df.empty:
+        if not df:  # Check if list is empty
             logger.info("No portfolio data found")
+            return []
+            
+        import pandas as pd
+        # Convert list of dicts to pandas DataFrame
+        df = pd.DataFrame(df)
+        
+        if df.empty:
+            logger.info("DataFrame is empty after conversion")
             return []
             
         logger.info(f"Raw DataFrame columns: {df.columns.tolist()}")
@@ -5117,9 +5260,9 @@ def get_portfolio_data(account_id):
             try:
                 item = {
                     'id': row['id'],  # Add the id field
-                    'company': row['company'],
+                    'company': row['name'],  # Changed from 'company' to 'name'
                     'identifier': row['identifier'],
-                    'portfolio': row['portfolio'],
+                    'portfolio': row.get('portfolio_name', ''),  # Try to get portfolio_name or fall back to empty string
                     'category': row['category'],
                     'shares': float(row['shares']) if pd.notna(row['shares']) else 0,
                     'override_share': float(row['override_share']) if pd.notna(row['override_share']) else None,
@@ -6203,520 +6346,200 @@ def delete_account():
 
 ================================================================
 ###START_FILE_PATH: app/utils/yfinance_utils.py###
-import yfinance as yf
-from typing import Dict, Any, Optional
 import logging
+import yfinance as yf
+from datetime import datetime
+from typing import Dict, Any
 
-# Configure logger
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def isin_to_symbol(isin: str) -> Optional[str]:
+def find_ticker_for_isin(isin: str) -> str:
     """
-    Convert ISIN to stock symbol. This is a simple mapping for now.
-    In a real implementation, you would need to use a proper ISIN to symbol mapping service.
+    Find ticker symbol for an ISIN using direct yfinance approach.
     
     Args:
-        isin (str): ISIN code
+        isin (str): ISIN code (e.g., 'US0378331005')
         
     Returns:
-        Optional[str]: Stock symbol if found, None otherwise
+        str: Ticker symbol or None if not found
     """
-    # Simple mapping for common stocks
-    isin_to_symbol_map = {
-        'US88579Y1010': 'MMM',  # 3M Company
-    }
-    return isin_to_symbol_map.get(isin)
+    logger.info(f"Finding ticker for ISIN: {isin}")
+    
+    # For non-ISIN identifiers, return as is (cryptocurrencies, etc.)
+    if len(isin) != 12 or not isin.isalnum():
+        return isin
+    
+    try:
+        # For US stocks, extract ticker from ISIN
+        if isin.startswith('US') and len(isin) == 12:
+            potential_ticker = isin[2:].lstrip('0')
+            if len(potential_ticker) > 6:  # Extract likely ticker part
+                potential_ticker = potential_ticker[:6]
+            logger.info(f"Extracted potential ticker {potential_ticker} from ISIN {isin}")
+            return potential_ticker
+            
+        # For other ISINs, try direct approach
+        ticker_obj = yf.Ticker(isin)
+        
+        # Check if the ticker obj has useful info
+        # Some versions of yfinance have different attributes
+        if hasattr(ticker_obj, 'ticker') and ticker_obj.ticker:
+            ticker = ticker_obj.ticker
+            logger.info(f"Successfully mapped ISIN {isin} to ticker {ticker}")
+            return ticker
+        else:
+            logger.warning(f"No ticker found for ISIN: {isin}")
+            return None
+            
+    except Exception as e:
+        logger.error(f"Error finding ticker for ISIN {isin}: {str(e)}")
+        return None
 
-def get_stock_price(symbol: str) -> float:
+def get_price_for_ticker(ticker: str) -> float:
     """
-    Get the latest stock price for a given symbol using yfinance with multiple fallback methods
+    Get the current price for a ticker symbol.
     
     Args:
-        symbol (str): Stock symbol (e.g., 'MMM')
+        ticker (str): Ticker symbol (e.g., 'AAPL')
         
     Returns:
-        float: Latest stock price
+        float: Current price or None if not available
     """
-    logger.info(f"Getting stock price for symbol: {symbol}")
+    if not ticker:
+        return None
     
-    def try_fetch_methods(ticker):
-        # Method 1: Try fast_info
+    logger.info(f"Getting price for ticker: {ticker}")
+    try:
+        ticker_obj = yf.Ticker(ticker)
+        
+        # Try different approaches to get the price
+        # Method 1: Try info.currentPrice - most reliable but slower
         try:
-            price = ticker.fast_info.get('last_price') or ticker.fast_info.get('regular_market_price')
-            if price is not None:
-                return float(price)
+            info = ticker_obj.info
+            if 'currentPrice' in info and info['currentPrice'] is not None:
+                return float(info['currentPrice'])
+            if 'regularMarketPrice' in info and info['regularMarketPrice'] is not None:
+                return float(info['regularMarketPrice'])
         except Exception as e:
-            logger.warning(f"Failed fast_info method: {str(e)}")
-            
-        # Method 2: Try regular info
+            logger.warning(f"Error getting info price for {ticker}: {str(e)}")
+        
+        # Method 2: Try fast_info (newer versions of yfinance)
         try:
-            price = ticker.info.get('regularMarketPrice') or ticker.info.get('currentPrice')
-            if price is not None:
-                return float(price)
-        except Exception as e:
-            logger.warning(f"Failed info method: {str(e)}")
-            
-        # Method 3: Try history
-        try:
-            data = ticker.history(period="1d", interval="1d")
-            if not data.empty:
-                return float(data['Close'].iloc[-1])
-        except Exception as e:
-            logger.warning(f"Failed history method: {str(e)}")
-            
-        # Method 4: Try quotes
-        try:
-            quotes = ticker.quotes
-            if quotes and len(quotes) > 0:
-                price = quotes[0].get('regularMarketPrice')
+            if hasattr(ticker_obj, 'fast_info'):
+                price = ticker_obj.fast_info.get('last_price') or ticker_obj.fast_info.get('regularMarketPrice')
                 if price is not None:
                     return float(price)
         except Exception as e:
-            logger.warning(f"Failed quotes method: {str(e)}")
+            logger.warning(f"Error getting fast_info price for {ticker}: {str(e)}")
         
+        # Method 3: Fallback to historical data
+        try:
+            data = ticker_obj.history(period="1d")
+            if not data.empty and 'Close' in data.columns:
+                return float(data['Close'].iloc[-1])
+        except Exception as e:
+            logger.warning(f"Error getting historical price for {ticker}: {str(e)}")
+        
+        logger.warning(f"All methods failed to get price for {ticker}")
+        return None
+    except Exception as e:
+        logger.error(f"Error getting price data for {ticker}: {str(e)}")
         return None
 
-    # Try with default session
-    try:
-        ticker = yf.Ticker(symbol)
-        price = try_fetch_methods(ticker)
-        if price is not None:
-            return price
-    except Exception as e:
-        logger.warning(f"Failed with default session: {str(e)}")
-
-    # Try with a fresh session
-    try:
-        session = yf.Ticker(symbol).session
-        session.close()
-        ticker = yf.Ticker(symbol)
-        price = try_fetch_methods(ticker)
-        if price is not None:
-            return price
-    except Exception as e:
-        logger.warning(f"Failed with fresh session: {str(e)}")
-
-    # If all methods failed, raise the error
-    raise ValueError(f"Could not fetch price for {symbol} using any available method")
-
-def get_stock_info(identifier: str) -> Dict[str, Any]:
+def get_isin_data(isin: str) -> Dict[str, Any]:
     """
-    Get detailed information about a stock using yfinance
+    Get stock data for a given ISIN
     
     Args:
-        identifier (str): ISIN or stock symbol (e.g., 'US88579Y1010' or 'MMM')
+        isin (str): ISIN code (e.g., 'US0378331005')
+        
+    Returns:
+        Dict[str, Any]: Dictionary containing ISIN information
+    """
+    logger.info(f"Processing ISIN: {isin}")
+    try:
+        # Step 1: Find the ticker for this ISIN
+        ticker = find_ticker_for_isin(isin)
+        
+        # Step 2: Get the price for this ticker
+        price = None
+        if ticker:
+            price = get_price_for_ticker(ticker)
+            
+        # Step 3: Prepare result
+        result = {
+            'success': ticker is not None and price is not None,
+            'isin': isin,
+            'ticker': ticker,
+            'price': price,
+            'currency': 'USD',  # Default currency
+            'price_eur': price,  # Assuming 1:1 for simplicity
+            'status': 'processed' if (ticker and price is not None) else 'ticker_not_found' if not ticker else 'price_not_found',
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        # Log appropriate message based on result
+        if result['success']:
+            logger.info(f"Successfully retrieved price {price} for {isin} (ticker: {ticker})")
+        else:
+            logger.warning(f"Failed to retrieve valid data for {isin}: ticker={ticker}, price={price}")
+            
+        return result
+            
+    except Exception as e:
+        logger.error(f"Error processing ISIN {isin}: {str(e)}")
+        return {
+            'success': False,
+            'isin': isin,
+            'error': str(e),
+            'status': 'error',
+            'timestamp': datetime.now().isoformat()
+        }
+
+def get_yfinance_info(identifier: str) -> Dict[str, Any]:
+    """
+    Get stock information for a given identifier (ticker or ISIN).
+    
+    Args:
+        identifier (str): Stock identifier (ticker or ISIN)
         
     Returns:
         Dict[str, Any]: Dictionary containing stock information
     """
-    try:
-        # Convert ISIN to symbol if needed
-        symbol = isin_to_symbol(identifier)
-        if not symbol:
-            symbol = identifier  # Use identifier as is if no mapping found
-            
-        ticker = yf.Ticker(symbol)
-        info = ticker.info
-        
-        result = {
-            'success': True,
-            'data': {
-                'ticker': info.get('symbol'),
-                'currentPrice': get_stock_price(symbol),
-                'marketCap': info.get('marketCap'),
-                'dividendYield': info.get('dividendYield'),
-                'peRatio': info.get('trailingPE'),
-                '52WeekHigh': info.get('fiftyTwoWeekHigh'),
-                '52WeekLow': info.get('fiftyTwoWeekLow'),
-                'volume': info.get('volume'),
-                'sector': info.get('sector'),
-                'industry': info.get('industry'),
-                'country': info.get('country'),
-                'exchange': info.get('exchange'),
-                'currency': info.get('currency'),
-                'description': info.get('longBusinessSummary'),
-                'website': info.get('website'),
-                'previousClose': info.get('regularMarketPreviousClose'),
-                'beta': info.get('beta'),
-            }
-        }
-        return result
-    except Exception as e:
-        logger.error(f"Error getting stock info for {identifier}: {str(e)}")
-        return {
-            'success': False,
-            'error': str(e)
-        }
+    logger.info(f"Fetching data for identifier={identifier!r}")
+    
+    # Just use get_isin_data for consistency - it handles both ISINs and tickers
+    result = get_isin_data(identifier)
+    
+    # Format return value for compatibility with expected structure
+    return {
+        "success": result['success'],
+        "identifier": identifier,
+        "ticker": result.get('ticker'),
+        "price": result.get('price'),
+        "currency": result.get('currency', 'USD'),
+        "price_eur": result.get('price_eur'),
+        "error": result.get('error'),
+        "timestamp": result.get('timestamp')
+    }
 ###END_FILE###
 
 ================================================================
 ###START_FILE_PATH: app/utils/db_utils.py###
-"""
-Database utility functions for data loading and processing.
-"""
-
+# app/utils/db_utils.py
 import logging
-import json
-import pandas as pd
-import numpy as np
-from typing import Tuple, Dict, List, Any, Optional
-from app.database.db_manager import query_db, execute_db, backup_database
-from datetime import datetime, timedelta
+from datetime import datetime
+from app.database.db_manager import query_db, execute_db
 
-# Set up logger
 logger = logging.getLogger(__name__)
-
-class PriceFetchManager:
-    """Handles all external API interactions for price fetching"""
-    def __init__(self):
-        self.cache = {}
-        self.cache_expiry = {}
-        self.failed_isins = set()  # Cache for failed lookups
-        self.cache_duration = 300  # 5 minutes in seconds
-        
-    def get_cached_price(self, isin: str) -> Optional[Tuple[float, str, float]]:
-        """Get price from cache or fetch if expired"""
-        # Skip invalid ISINs
-        if not isinstance(isin, str) or not isin.strip():
-            logger.warning("Invalid ISIN format")
-            return None, None, None
-            
-        # Clean and validate ISIN
-        try:
-            isin = str(isin).strip().upper()
-        except:
-            logger.warning(f"Could not process ISIN: {isin}")
-            return None, None, None
-            
-        if not isin:
-            logger.warning("Empty ISIN")
-            return None, None, None
-            
-        # Check if ISIN is in failed cache
-        if isin in self.failed_isins:
-            logger.debug(f"Skipping previously failed ISIN: {isin}")
-            return None, None, None
-            
-        now = time.time()
-        if isin in self.cache and now < self.cache_expiry.get(isin, 0):
-            return self.cache[isin]
-            
-        result = self.fetch_price_and_currency(isin)
-        if result[0] is not None:
-            self.cache[isin] = result
-            self.cache_expiry[isin] = now + self.cache_duration
-        return result
-
-    def fetch_price_and_currency(self, isin: str) -> Tuple[Optional[float], Optional[str], Optional[float]]:
-        """Fetch single ISIN price data"""
-        logger.debug(f"Fetching price for ISIN: {isin}")
-        
-        max_retries = 3
-        retry_delay = 1  # seconds
-        
-        for attempt in range(max_retries):
-            try:
-                with self.rate_limiter:
-                    yf_data = yf.Ticker(isin)
-                    logger.info(f"Getting history for {isin} (attempt {attempt + 1}/{max_retries})")
-                    history = yf_data.history(period='5d')  
-                    logger.info(f"History data for {isin}: {history if not history.empty else 'Empty'}")
-                    
-                    if history.empty:
-                        logger.info(f"No price data available for {isin}")
-                        if attempt < max_retries - 1:
-                            time.sleep(retry_delay)
-                            continue
-                        return None, None, None
-                    
-                    try:
-                        # Try to get the most recent price
-                        price = history['Close'].iloc[-1]
-                        if pd.isna(price) and len(history) > 1:
-                            # If latest is NaN, try previous day
-                            price = history['Close'].iloc[-2]
-                            
-                        if pd.isna(price):
-                            logger.warning(f"No valid price found for {isin}")
-                            if attempt < max_retries - 1:
-                                time.sleep(retry_delay)
-                                continue
-                            return None, None, None
-                            
-                        logger.info(f"Got price for {isin}: {price}")
-                        
-                        # Try to get currency from yfinance info first
-                        try:
-                            info = yf_data.info
-                            currency = info.get('currency', None)
-                            logger.info(f"Got currency from yfinance for {isin}: {currency}")
-                        except Exception as e:
-                            logger.warning(f"Failed to get currency from yfinance for {isin}: {e}")
-                            currency = None
-                        
-                        # Fall back to USD if no currency info available
-                        if not currency:
-                            currency = 'USD'  # Default to USD if no currency info available
-                            logger.info(f"Using default USD currency for {isin}")
-                        
-                        # Handle GBp (British pence) to GBP conversion
-                        if currency == 'GBp':
-                            price = price / 100  # Convert pence to pounds
-                            currency = 'GBP'
-                            logger.info(f"Converted GBp to GBP for {isin}: {price} GBP")
-                        
-                        # Calculate EUR price if needed
-                        price_eur = price
-                        if currency != 'EUR':
-                            eur_rate = self._get_eur_rate(currency)
-                            if eur_rate is not None:
-                                price_eur = price * eur_rate
-                                logger.info(f"Converted {isin} price to EUR: {price_eur} (rate: {eur_rate})")
-                            else:
-                                logger.warning(f"Failed to get EUR rate for {currency}")
-                                if attempt < max_retries - 1:
-                                    time.sleep(retry_delay)
-                                    continue
-                                return price, currency, None
-                                
-                        return price, currency, price_eur
-                        
-                    except Exception as e:
-                        logger.warning(f"Error processing data for {isin}: {str(e)}")
-                        if attempt < max_retries - 1:
-                            time.sleep(retry_delay)
-                            continue
-                        return None, None, None
-                        
-            except Exception as e:
-                logger.warning(f"Failed to fetch data for {isin} (attempt {attempt + 1}/{max_retries}): {str(e)}")
-                if attempt < max_retries - 1:
-                    time.sleep(retry_delay)
-                    continue
-                self.failed_isins.add(isin)
-                return None, None, None
-
-    def _get_eur_rate(self, currency: str) -> Optional[float]:
-        """Get EUR conversion rate"""
-        max_retries = 3
-        retry_delay = 1  # seconds
-        
-        for attempt in range(max_retries):
-            try:
-                with self.rate_limiter:
-                    eur_ticker = f"{currency}EUR=X"
-                    eur_data = yf.Ticker(eur_ticker)
-                    eur_history = eur_data.history(period='5d')  
-                    if not eur_history.empty:
-                        rate = eur_history['Close'].iloc[-1]
-                        if pd.isna(rate) and len(eur_history) > 1:
-                            # If latest is NaN, try previous day
-                            rate = eur_history['Close'].iloc[-2]
-                        
-                        if not pd.isna(rate):
-                            return rate
-                            
-                    if attempt < max_retries - 1:
-                        time.sleep(retry_delay)
-                        continue
-                        
-                    return None
-                        
-            except Exception as e:
-                if '404' in str(e):
-                    logger.info(f"EUR rate not available for {currency}")
-                    return None
-                else:
-                    logger.error(f"Failed to get EUR rate for {currency} (attempt {attempt + 1}/{max_retries}): {e}")
-                    if attempt < max_retries - 1:
-                        time.sleep(retry_delay)
-                        continue
-                    return None
-
-    def fetch_batch(self, isins: list, timeout: int = 10) -> Dict[str, Tuple[float, str, float]]:
-        """Batch process multiple ISINs with timeout"""
-        results = {}
-        logger.info(f"Starting batch fetch for {len(isins)} ISINs: {isins}")
-        
-        with ThreadPoolExecutor(max_workers=10) as executor:
-            future_to_isin = {
-                executor.submit(self.get_cached_price, isin): isin 
-                for isin in isins
-                if isin not in self.failed_isins  # Skip known failed ISINs
-            }
-            
-            if len(future_to_isin) != len(isins):
-                skipped = set(isins) - {isin for isin in future_to_isin.values()}
-                logger.info(f"Skipping {len(skipped)} previously failed ISINs: {skipped}")
-            
-            for future in as_completed(future_to_isin):
-                isin = future_to_isin[future]
-                try:
-                    result = future.result(timeout=timeout)
-                    results[isin] = result
-                    if result[0] is not None:
-                        logger.info(f"Successfully fetched {isin}: Price={result[0]} {result[1]} (EUR: {result[2]})")
-                    else:
-                        logger.warning(f"Failed to fetch {isin}: No price data")
-                except TimeoutError:
-                    logger.warning(f"Timeout fetching {isin}")
-                    results[isin] = (None, None, None)
-                except Exception as e:
-                    logger.error(f"Error fetching {isin}: {str(e)}")
-                    results[isin] = (None, None, None)
-                    
-        return results
-
-# Create a global instance
-price_fetcher = PriceFetchManager()
-
-def load_portfolio_data(account_id: int) -> pd.DataFrame:
-    """
-    Load portfolio data from the database.
-    
-    Args:
-        account_id: Account ID to load data for
-        
-    Returns:
-        DataFrame with portfolio data
-    """
-    try:
-        logger.info(f"Loading portfolio data for account_id: {account_id}")
-        
-        # Enhanced query with explicit company fields
-        data = query_db('''
-            SELECT
-                c.id,
-                c.name AS company,
-                c.identifier,
-                c.category,
-                COALESCE(p.name, '-') AS portfolio,
-                COALESCE(cs.shares, 0) AS shares,
-                COALESCE(cs.override_share, 0) AS override_share,
-                mp.price_eur,
-                mp.currency,
-                mp.last_updated,
-                COALESCE(c.total_invested, 0) AS total_invested
-            FROM companies c
-            LEFT JOIN company_shares cs ON c.id = cs.company_id
-            LEFT JOIN portfolios p ON c.portfolio_id = p.id
-            LEFT JOIN market_prices mp ON c.identifier = mp.identifier
-            WHERE c.account_id = ?
-            ORDER BY c.name
-        ''', [account_id])
-        
-        if not data:
-            logger.warning(f"No portfolio data found for account {account_id}")
-            logger.info("Checking if account exists...")
-            account = query_db('SELECT * FROM accounts WHERE id = ?', [account_id], one=True)
-            if account:
-                logger.info(f"Account exists: {account['username']}")
-            else:
-                logger.warning("Account not found in database")
-            return pd.DataFrame()
-        
-        # Convert to DataFrame efficiently
-        logger.debug(f"Converting {len(data)} rows to DataFrame")
-        df = pd.DataFrame([dict(row) for row in data])
-        
-        # Process numeric columns efficiently
-        numeric_cols = ['shares', 'override_share', 'price_eur', 'total_invested']
-        for col in numeric_cols:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce')
-        
-        # Convert last_updated to datetime
-        if 'last_updated' in df.columns:
-            df['last_updated'] = pd.to_datetime(df['last_updated'], errors='coerce')
-        
-        logger.info(f"Loaded {len(df)} portfolio items")
-        return df
-        
-    except Exception as e:
-        logger.error(f"Error loading portfolio data: {str(e)}", exc_info=True)
-        return pd.DataFrame()
-
-def process_portfolio_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-    """Process portfolio data DataFrame"""
-    try:
-        # Fill missing values
-        df['portfolio'] = df['portfolio'].fillna('-')
-        df['category'] = df['category'].fillna('-')
-        df['shares'] = pd.to_numeric(df['shares'], errors='coerce').fillna(0)
-        df['override_share'] = pd.to_numeric(df['override_share'], errors='coerce')
-        df['price_eur'] = pd.to_numeric(df['price_eur'], errors='coerce')
-        df['total_invested'] = pd.to_numeric(df['total_invested'], errors='coerce').fillna(0)
-        
-        # Convert last_updated to datetime
-        df['last_updated'] = pd.to_datetime(df['last_updated'], errors='coerce')
-        
-        # Ensure required columns exist
-        required_columns = [
-            'company', 'identifier', 'portfolio', 'category',
-            'shares', 'override_share', 'price_eur', 'currency',
-            'total_invested', 'last_updated'
-        ]
-        for col in required_columns:
-            if col not in df.columns:
-                df[col] = None
-                
-        # Add validation for company-specific fields
-        required_company_columns = ['company', 'identifier']
-        for col in required_company_columns:
-            if col not in df.columns:
-                df[col] = 'N/A'
-                logger.warning(f"Added missing company column: {col}")
-        
-        return df
-    except Exception as e:
-        logger.error(f"Error processing DataFrame: {str(e)}", exc_info=True)
-        return df
-
-def update_prices(identifiers: List[str], account_id: Optional[int] = None, force_update: bool = False) -> Tuple[Dict[str, Any], List[str]]:
-    """
-    Get last update time for identifiers from database.
-    
-    Args:
-        identifiers: List of identifiers to check
-        account_id: Account ID to update last_price_update field
-        force_update: Whether to force update regardless of time since last update
-        
-    Returns:
-        Tuple of (results_dict, failed_identifiers_list)
-    """
-    if not force_update:
-        # Check last update time
-        last_updates = query_db('''
-            SELECT identifier, last_price_update 
-            FROM portfolio 
-            WHERE identifier IN ({})
-        '''.format(','.join('?' * len(identifiers))), identifiers)
-        
-        if last_updates:
-            now = datetime.now()
-            all_recent = True
-            for update in last_updates:
-                if update['last_price_update']:
-                    last_update = datetime.strptime(update['last_price_update'], '%Y-%m-%d %H:%M:%S')
-                    if (now - last_update).total_seconds() > 24 * 3600:  # 24 hours
-                        all_recent = False
-                        break
-                else:
-                    all_recent = False
-                    break
-                    
-            if all_recent:
-                logger.info("Skipping price update - less than 24 hours since last update")
-                return {'skipped': len(identifiers)}, []
-    
-    return {'checked': len(identifiers)}, []
 
 def update_price_in_db(identifier: str, price: float, currency: str, price_eur: float) -> bool:
     """
     Update price in database for a single identifier.
     
     Args:
-        identifier: Stock identifier
+        identifier: Stock identifier (ISIN)
         price: Price in original currency
         currency: Currency code
         price_eur: Price in EUR
@@ -6725,586 +6548,325 @@ def update_price_in_db(identifier: str, price: float, currency: str, price_eur: 
         Success status
     """
     try:
-        execute_db('''
-            UPDATE portfolio 
-            SET price = ?, currency = ?, price_eur = ?, last_price_update = CURRENT_TIMESTAMP 
-            WHERE identifier = ?
-        ''', [price, currency, price_eur, identifier])
-        logger.info(f"Updated price for {identifier}: {price} {currency}")
-        return True
-    except Exception as e:
-        logger.error(f"Error updating price for {identifier}: {str(e)}")
-        return False
-
-def calculate_portfolio_composition(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame, float, pd.DataFrame, str]:
-    """
-    Calculate portfolio and category composition from the provided DataFrame.
-    
-    Args:
-        df: DataFrame containing portfolio data with prices
+        if not identifier or price is None:
+            logger.warning(f"Missing identifier or price: {identifier}, {price}")
+            return False
+            
+        now = datetime.now().isoformat()
         
-    Returns:
-        Tuple containing:
-        - portfolio_composition: Portfolio-level aggregations
-        - category_composition: Category-level aggregations
-        - total_value: Total portfolio value in EUR
-        - df_clean: Cleaned DataFrame
-        - warning_message: Any warning messages
-    """
-    logger.info(f"Initial DataFrame shape: {df.shape}")
-    warning_message = ""
-
-    # Basic data validation
-    required_columns = ['portfolio', 'category', 'price_eur', 'shares', 'override_share']
-    missing_columns = [col for col in required_columns if col not in df.columns]
-    if missing_columns:
-        # Add missing columns with default values
-        for col in missing_columns:
-            if col in ['shares', 'override_share', 'price_eur']:
-                df[col] = 0.0
-            else:
-                df[col] = '-'
-        warning_message = f"Added missing columns with default values: {missing_columns}"
-        logger.warning(warning_message)
-
-    # Check for unassigned portfolios
-    companies_without_portfolio = df[df['portfolio'].isin(['-', '', 'nan', None])].shape[0]
-    if companies_without_portfolio > 0:
-        warning_message = f"{companies_without_portfolio} companies without a defined portfolio. Results may be based on incomplete data."
-        logger.warning(warning_message)
-
-    # Filter and clean data
-    df_clean = df[~df['portfolio'].isin(['-', '', 'nan', None])].copy()
-
-    if df_clean.empty:
-        logger.warning("No data available after filtering unassigned portfolios")
-        return None, None, 0, df_clean, warning_message
-
-    # Convert object columns to strings and handle NaN values
-    object_columns = df_clean.select_dtypes(include=['object']).columns
-    for col in object_columns:
-        df_clean[col] = df_clean[col].fillna('-').astype(str)
-        df_clean.loc[df_clean[col].str.lower() == 'nan', col] = '-'
-
-    # Calculate effective shares
-    df_clean['effective_shares'] = pd.to_numeric(df_clean['override_share'], errors='coerce').fillna(
-        pd.to_numeric(df_clean['shares'], errors='coerce').fillna(0)
-    )
-
-    # Convert and validate price data
-    df_clean['price_eur'] = pd.to_numeric(df_clean['price_eur'], errors='coerce').fillna(0)
-    
-    # Calculate total values
-    df_clean['total_value_eur'] = df_clean['effective_shares'] * df_clean['price_eur']
-    
-    # Remove rows with zero or invalid values
-    df_clean = df_clean[df_clean['total_value_eur'] > 0]
-    
-    if df_clean.empty:
-        logger.warning("All rows were dropped due to invalid calculations")
-        return None, None, 0, df_clean, warning_message
-
-    # Calculate total portfolio value
-    total_value = df_clean['total_value_eur'].sum()
-
-    # Calculate portfolio composition
-    portfolio_composition = (df_clean.groupby('portfolio')
-                           .agg({
-                               'total_value_eur': 'sum',
-                               'company': 'count'
-                           })
-                           .rename(columns={'company': 'stock_count'})
-                           .reset_index())
-    
-    portfolio_composition['percentage'] = (portfolio_composition['total_value_eur'] / total_value * 100)
-    portfolio_composition = portfolio_composition.sort_values('percentage', ascending=False)
-
-    # Calculate category composition
-    category_composition = (df_clean.groupby('category')
-                          .agg({
-                              'total_value_eur': 'sum',
-                              'company': 'count'
-                          })
-                          .rename(columns={'company': 'stock_count'})
-                          .reset_index())
-    
-    category_composition['percentage'] = (category_composition['total_value_eur'] / total_value * 100)
-    category_composition = category_composition.sort_values('percentage', ascending=False)
-
-    # Log results
-    logger.info(f"Final portfolio composition calculated: {len(portfolio_composition)} portfolios")
-    logger.info(f"Final category composition calculated: {len(category_composition)} categories")
-    logger.info(f"Total portfolio value: €{total_value:,.2f}")
-
-    return portfolio_composition, category_composition, total_value, df_clean, warning_message
-
-def get_portfolios(account_id):
-    """Get list of portfolios for an account"""
-    portfolios = query_db('''
-        SELECT id, name
-        FROM portfolios
-        WHERE account_id = ?
-        ORDER BY name
-    ''', [account_id])
-    
-    return [{'id': p['id'], 'name': p['name']} for p in portfolios]
-
-def save_state(account_id: int, page_name: str, variable_name: str, variable_value: Any, variable_type: str) -> bool:
-    """
-    Save state to the expanded_state table.
-    
-    Args:
-        account_id: Account ID
-        page_name: Page name
-        variable_name: Variable name
-        variable_value: Variable value (will be JSON serialized)
-        variable_type: Variable type
-        
-    Returns:
-        Success status
-    """
-    try:
-        # Convert value to JSON string if it's not already a string
-        if not isinstance(variable_value, str):
-            variable_value = json.dumps(variable_value)
-        
-        # Check if state exists
+        # Check if the record exists
         existing = query_db(
-            '''SELECT id FROM expanded_state 
-               WHERE account_id = ? AND page_name = ? AND variable_name = ?''',
-            [account_id, page_name, variable_name],
+            'SELECT 1 FROM market_prices WHERE identifier = ?',
+            [identifier],
             one=True
         )
         
         if existing:
-            # Update existing state
-            execute_db(
-                '''UPDATE expanded_state 
-                   SET variable_value = ?, variable_type = ? 
-                   WHERE id = ?''',
-                [variable_value, variable_type, existing['id']]
-            )
+            # Update existing record
+            execute_db('''
+                UPDATE market_prices 
+                SET price = ?, currency = ?, price_eur = ?, last_updated = ?
+                WHERE identifier = ?
+            ''', [price, currency, price_eur, now, identifier])
         else:
-            # Insert new state
-            execute_db(
-                '''INSERT INTO expanded_state 
-                   (account_id, page_name, variable_name, variable_type, variable_value)
-                   VALUES (?, ?, ?, ?, ?)''',
-                [account_id, page_name, variable_name, variable_type, variable_value]
+            # Insert new record
+            execute_db('''
+                INSERT INTO market_prices 
+                (identifier, price, currency, price_eur, last_updated)
+                VALUES (?, ?, ?, ?, ?)
+            ''', [identifier, price, currency, price_eur, now])
+        
+        # Update last_price_update in accounts table for all accounts that have this identifier
+        execute_db('''
+            UPDATE accounts 
+            SET last_price_update = ? 
+            WHERE id IN (
+                SELECT DISTINCT account_id 
+                FROM companies 
+                WHERE identifier = ?
             )
-            
+        ''', [now, identifier])
+        
+        logger.info(f"Successfully updated price for {identifier}: {price} {currency} ({price_eur} EUR)")
         return True
         
     except Exception as e:
-        logger.error(f"Error saving state: {str(e)}")
+        logger.error(f"Failed to update price in database for {identifier}: {str(e)}")
         return False
 
-def load_state(account_id: int, page_name: str, variable_name: str, default_value: Any, variable_type: str) -> Any:
-    """
-    Load state from the expanded_state table.
-    
-    Args:
-        account_id: Account ID
-        page_name: Page name
-        variable_name: Variable name
-        default_value: Default value if state doesn't exist
-        variable_type: Expected variable type
-        
-    Returns:
-        State value or default value
-    """
+def get_portfolios(account_id):
+    """Get list of portfolios for an account"""
     try:
-        result = query_db(
-            '''SELECT variable_value, variable_type 
-               FROM expanded_state 
-               WHERE account_id = ? AND page_name = ? AND variable_name = ?''',
-            [account_id, page_name, variable_name],
-            one=True
-        )
+        portfolios = query_db('''
+            SELECT id, name
+            FROM portfolios
+            WHERE account_id = ?
+            ORDER BY name
+        ''', [account_id])
         
-        if not result:
-            return default_value
-            
-        # Parse JSON value based on type
-        value = result['variable_value']
-        
-        if variable_type in ['dict', 'list', 'object']:
-            try:
-                return json.loads(value)
-            except json.JSONDecodeError:
-                logger.warning(f"Failed to decode JSON for {page_name}.{variable_name}")
-                return default_value
-        elif variable_type == 'int':
-            try:
-                return int(value)
-            except ValueError:
-                return default_value
-        elif variable_type == 'float':
-            try:
-                return float(value)
-            except ValueError:
-                return default_value
-        elif variable_type == 'bool':
-            return value.lower() in ('true', 't', 'yes', 'y', '1')
-        else:
-            # Return as string
-            return value
-            
+        return [{'id': p['id'], 'name': p['name']} for p in portfolios]
     except Exception as e:
-        logger.error(f"Error loading state: {str(e)}")
-        return default_value
+        logger.error(f"Error getting portfolios: {str(e)}")
+        return []
 
-def process_csv_data(account_id: int, file_content: str) -> Tuple[bool, str, Dict]:
+def load_portfolio_data(account_id=None, portfolio_id=None):
     """
-    Process CSV data and import to database.
+    Load portfolio data from the database.
     
     Args:
-        account_id: Account ID
-        file_content: CSV file content
+        account_id: Optional account ID to filter by
+        portfolio_id: Optional portfolio ID to filter by
         
     Returns:
-        Tuple of (success, message, results_dict)
+        List of portfolio items
     """
     try:
-        import io
-        import pandas as pd
+        params = []
+        query = '''
+            SELECT c.*, cs.shares, cs.override_share, mp.price, mp.currency, mp.price_eur, mp.last_updated,
+                   p.name as portfolio_name
+            FROM companies c
+            LEFT JOIN company_shares cs ON c.id = cs.company_id
+            LEFT JOIN market_prices mp ON c.identifier = mp.identifier
+            LEFT JOIN portfolios p ON c.portfolio_id = p.id
+            WHERE 1=1
+        '''
         
-        # Create backup before making changes
-        backup_database()
-        
-        # Parse CSV
-        df = pd.read_csv(io.StringIO(file_content), delimiter=';')
-        
-        # Make column names lowercase and remove spaces/underscores for comparison
-        df.columns = df.columns.str.lower()
-        df.columns = df.columns.str.replace(' ', '').str.replace('_', '')
-        
-        # Define essential columns that must be present
-        essential_columns = {
-            "identifier": ["identifier", "isin", "symbol"],
-            "holdingname": ["holdingname", "name", "securityname"],
-            "shares": ["shares", "quantity", "units"],
-            "price": ["price", "unitprice", "priceperunit"]
-        }
-        
-        # Optional columns with defaults
-        optional_columns = {
-            "type": ["type", "transactiontype"],
-            "broker": ["broker", "brokername"],
-            "assettype": ["assettype", "type", "securitytype"],
-            "wkn": ["wkn"],
-            "currency": ["currency"],
-            "exchange": ["exchange", "market"]
-        }
-        
-        # Try to map essential columns first
-        column_mapping = {}
-        missing_columns = []
-        
-        # Try to find matching columns for essential fields
-        for required_col, alternatives in essential_columns.items():
-            found = False
-            for alt in alternatives:
-                for col in df.columns:
-                    if alt in col:
-                        column_mapping[required_col] = col
-                        found = True
-                        break
-                if found:
-                    break
+        if account_id:
+            query += ' AND c.account_id = ?'
+            params.append(account_id)
             
-            if not found:
-                missing_columns.append(required_col)
+        if portfolio_id:
+            query += ' AND c.portfolio_id = ?'
+            params.append(portfolio_id)
+            
+        return query_db(query, params)
         
-        # Check for essential columns
-        if missing_columns:
-            logger.warning(f"Missing essential columns: {missing_columns}")
-            return False, f"Missing required columns: {', '.join(missing_columns)}", {}
+    except Exception as e:
+        logger.error(f"Error loading portfolio data: {str(e)}")
+        return []
+
+def process_portfolio_dataframe(df, account_id=None, portfolio_id=None):
+    """
+    Process a portfolio dataframe and calculate additional metrics.
+    
+    Args:
+        df: Pandas DataFrame with portfolio data
+        account_id: Optional account ID to filter by
+        portfolio_id: Optional portfolio ID to filter by
         
-        # Try to map optional columns
-        for opt_col, alternatives in optional_columns.items():
-            for alt in alternatives:
-                for col in df.columns:
-                    if alt in col and opt_col not in column_mapping:
-                        column_mapping[opt_col] = col
-                        break
-        
-        # Log found columns
-        logger.info(f"Found columns: {column_mapping}")
-        
-        # Rename columns to match our format
-        df = df.rename(columns=column_mapping)
-        
-        # Set default values for missing optional columns
-        if 'type' not in df.columns:
-            df['type'] = 'Buy'  # Default to Buy type
-        if 'currency' not in df.columns:
-            df['currency'] = 'EUR'  # Default to EUR
-        
-        # Filter to valid transaction types
-        valid_types = ['Buy', 'Sell', 'TransferOut', 'TransferIn']
-        df['type'] = df['type'].str.strip()
-        ignored_types = df[~df['type'].isin(valid_types)]['type'].unique().tolist()
-        df = df[df['type'].isin(valid_types)]
-        
+    Returns:
+        Processed DataFrame with additional columns
+    """
+    try:
         if df.empty:
-            return False, "No valid transactions found in CSV file", {}
+            return df
+            
+        # Make a copy to avoid SettingWithCopyWarning
+        df = df.copy()
         
-        # Clean data
-        df['identifier'] = df['identifier'].apply(lambda x: str(x).strip() if pd.notna(x) else '')
-        df['holdingname'] = df['holdingname'].apply(lambda x: str(x).strip() if pd.notna(x) else '')
-        df = df[df['identifier'].str.len() > 0]
-        
-        if df.empty:
-            return False, "No valid entries found in CSV file after cleaning", {}
-        
-        # Process numeric values
-        def process_value(value):
-            try:
-                if pd.isna(value):
-                    return 0.0
-                
-                if isinstance(value, (int, float)):
-                    return float(value)
-                
-                value_str = str(value).strip()
-                
-                # Remove any currency symbols and thousand separators
-                currency_symbols = ['€', '£', '¥', '$']
-                for symbol in currency_symbols:
-                    value_str = value_str.replace(symbol, '')
-                value_str = value_str.replace(',', '')  # Remove thousand separators
-                
-                # Try to convert directly first
-                try:
-                    return float(value_str)
-                except ValueError:
-                    pass
-                
-                # If that fails, try more aggressive cleaning
-                # Keep only valid number characters (digits, decimal point, minus sign)
-                value_str = ''.join(c for c in value_str if c.isdigit() or c in '.-')
-                
-                # Handle case of multiple decimal points
-                parts = value_str.split('.')
-                if len(parts) > 2:  # Multiple decimal points
-                    value_str = parts[0] + '.' + parts[1]  # Keep only first decimal point
-                
-                # Log the value transformation
-                logger.debug(f"Converting value: original='{value}', cleaned='{value_str}'")
-                
-                return float(value_str) if value_str else 0.0
-            except Exception as e:
-                logger.warning(f"Failed to convert value '{value}' to float: {str(e)}")
-                return 0.0
-        
-        # Add debug logging for raw values
-        logger.info("Raw transaction data before processing:")
-        for _, row in df.iterrows():
-            logger.info(f"Type: {row['type']}, Shares: {row['shares']}, Price: {row['price']}, Holding: {row['holdingname']}")
-        
-        df['shares'] = df['shares'].apply(process_value)
-        df['price'] = df['price'].apply(process_value)
-        
-        # Calculate share effects
-        df['shares_effect'] = df.apply(
-            lambda row: row['shares'] if row['type'] in ['Buy', 'TransferIn'] else -row['shares'],
+        # Calculate value in EUR
+        df['value_eur'] = df.apply(
+            lambda row: row.get('quantity', 0) * row.get('price_eur', 0) 
+            if row.get('price_eur') is not None else 0, 
             axis=1
         )
-        df['total_invested_effect'] = df['shares_effect'] * df['price']
         
-        # Aggregate data
-        aggregated_data = df.groupby(['holdingname', 'identifier']).agg({
-            'shares_effect': 'sum',
-            'total_invested_effect': 'sum'
-        }).reset_index()
+        # Calculate value in original currency
+        df['value'] = df.apply(
+            lambda row: row.get('quantity', 0) * row.get('price', 0) 
+            if row.get('price') is not None else 0, 
+            axis=1
+        )
         
-        # Process aggregated data
-        with get_db_connection() as db:
-            cursor = db.cursor()
-            try:
-                cursor.execute("BEGIN TRANSACTION")
-                
-                # Ensure default portfolio exists
-                cursor.execute(
-                    "SELECT id FROM portfolios WHERE name = '-' AND account_id = ?",
-                    [account_id]
-                )
-                default_portfolio = cursor.fetchone()
-                
-                if not default_portfolio:
-                    cursor.execute(
-                        "INSERT INTO portfolios (name, account_id) VALUES (?, ?)",
-                        ['-', account_id]
-                    )
-                    default_portfolio_id = cursor.lastrowid
-                else:
-                    default_portfolio_id = default_portfolio['id']
-                
-                # Initialize tracking
-                positions_added = []
-                positions_updated = []
-                positions_removed = []
-                failed_companies = []
-                
-                # Process each company
-                for _, row in aggregated_data.iterrows():
-                    try:
-                        company_name = row['holdingname']
-                        share_count = float(row['shares_effect'])
-                        total_invested = float(row['total_invested_effect'])
-                        
-                        # Handle floating point precision
-                        if abs(share_count) < 1e-10:
-                            share_count = 0
-                            total_invested = 0
-                        
-                        # Check if company exists
-                        cursor.execute(
-                            "SELECT id FROM companies WHERE name = ? AND account_id = ?",
-                            [company_name, account_id]
-                        )
-                        company = cursor.fetchone()
-                        
-                        if share_count <= 0:
-                            # Remove company if it exists and shares are zero/negative
-                            if company:
-                                # Delete shares first (foreign key constraint)
-                                cursor.execute(
-                                    "DELETE FROM company_shares WHERE company_id = ?",
-                                    [company['id']]
-                                )
-                                # Then delete company
-                                cursor.execute(
-                                    "DELETE FROM companies WHERE id = ?",
-                                    [company['id']]
-                                )
-                                positions_removed.append(company_name)
-                            continue
-                        
-                        if company:
-                            # Update existing company
-                            cursor.execute(
-                                """UPDATE companies 
-                                   SET total_invested = ?
-                                   WHERE id = ?""",
-                                [total_invested, company['id']]
-                            )
-                            
-                            # Check if shares record exists
-                            cursor.execute(
-                                "SELECT 1 FROM company_shares WHERE company_id = ?",
-                                [company['id']]
-                            )
-                            if cursor.fetchone():
-                                cursor.execute(
-                                    """UPDATE company_shares 
-                                       SET shares = ?
-                                       WHERE company_id = ?""",
-                                    [share_count, company['id']]
-                                )
-                            else:
-                                cursor.execute(
-                                    """INSERT INTO company_shares (company_id, shares)
-                                       VALUES (?, ?)""",
-                                    [company['id'], share_count]
-                                )
-                                
-                            positions_updated.append(company_name)
-                        else:
-                            # Insert new company
-                            cursor.execute(
-                                """INSERT INTO companies 
-                                   (name, identifier, category, portfolio_id, account_id, total_invested)
-                                   VALUES (?, ?, ?, ?, ?, ?)""",
-                                [
-                                    company_name,
-                                    row['identifier'],
-                                    '',  # Empty category
-                                    default_portfolio_id,
-                                    account_id,
-                                    total_invested
-                                ]
-                            )
-                            
-                            company_id = cursor.lastrowid
-                            
-                            # Insert shares
-                            cursor.execute(
-                                """INSERT INTO company_shares (company_id, shares)
-                                   VALUES (?, ?)""",
-                                [company_id, share_count]
-                            )
-                            
-                            positions_added.append(company_name)
-                            
-                    except Exception as e:
-                        logger.error(f"Failed to process company {row['holdingname']}: {str(e)}")
-                        failed_companies.append(row['holdingname'])
-                
-                # Commit transaction
-                db.commit()
-                
-                # Update prices for new/updated companies
-                isins_to_update = []
-                if positions_added:
-                    isins_to_update.extend([
-                        row['identifier'] for _, row in aggregated_data.iterrows()
-                        if row['holdingname'] in positions_added
-                    ])
-                
-                price_update_results = {'success': 0, 'failed': 0, 'skipped': 0}
-                failed_price_isins = []
-                
-                if isins_to_update:
-                    price_update_results, failed_price_isins = update_prices(
-                        isins_to_update, account_id, force_update=True
-                    )
-                
-                # Prepare result
-                results = {
-                    'added': positions_added,
-                    'updated': positions_updated,
-                    'removed': positions_removed,
-                    'failed': failed_companies,
-                    'price_update': price_update_results,
-                    'failed_prices': failed_price_isins
-                }
-                
-                # Create success message
-                messages = []
-                if positions_added:
-                    messages.append(f"Added {len(positions_added)} new positions")
-                if positions_updated:
-                    messages.append(f"Updated {len(positions_updated)} existing positions")
-                if positions_removed:
-                    messages.append(f"Removed {len(positions_removed)} positions with zero/negative shares")
-                if price_update_results['success'] > 0:
-                    messages.append(f"Updated prices for {price_update_results['success']} positions")
-                
-                success_message = ". ".join(messages) if messages else "CSV imported successfully"
-                
-                # Add warnings
-                warnings = []
-                if failed_companies:
-                    warnings.append(f"Failed to process {len(failed_companies)} companies")
-                if failed_price_isins:
-                    warnings.append(f"Failed to fetch prices for {len(failed_price_isins)} ISINs")
-                if ignored_types:
-                    warnings.append(f"Ignored transaction types: {', '.join(ignored_types)}")
-                
-                warning_message = ". ".join(warnings) if warnings else None
-                
-                return True, success_message, results
-                
-            except Exception as e:
-                db.rollback()
-                logger.error(f"Database error while processing CSV: {str(e)}")
-                return False, f"Database error: {str(e)}", {}
-                
+        # Calculate totals
+        total_value_eur = df['value_eur'].sum()
+        
+        # Calculate portfolio weights
+        if total_value_eur > 0:
+            df['weight'] = df['value_eur'] / total_value_eur
+        else:
+            df['weight'] = 0
+            
+        return df
+        
     except Exception as e:
-        logger.error(f"Error processing CSV: {str(e)}")
-        return False, f"Error processing CSV: {str(e)}", {}
+        logger.error(f"Error processing portfolio dataframe: {str(e)}")
+        return df
+
+def update_batch_prices_in_db(results):
+    """Update market prices with results from batch processing."""
+    success_count = 0
+    failed_count = 0
+    
+    try:
+        for isin, result in results.items():
+            if result.get('success') and result.get('price') is not None:
+                success = update_price_in_db(
+                    isin,
+                    result.get('price'),
+                    result.get('currency', 'USD'),
+                    result.get('price_eur', result.get('price'))
+                )
+                
+                if success:
+                    success_count += 1
+                else:
+                    failed_count += 1
+        
+        logger.info(f"Batch update complete. Success: {success_count}, Failed: {failed_count}")
+        return True
+    except Exception as e:
+        logger.error(f"Error updating batch prices in database: {str(e)}")
+        return False
+
+def update_prices(portfolio_items, get_price_function=None):
+    """
+    Update prices for portfolio items.
+    
+    Args:
+        portfolio_items: List of portfolio items
+        get_price_function: Optional function to get price for an identifier
+        
+    Returns:
+        Tuple of (updated items, success count, failure count)
+    """
+    if not portfolio_items:
+        return [], 0, 0
+        
+    success_count = 0
+    failure_count = 0
+    updated_items = []
+    
+    for item in portfolio_items:
+        identifier = item.get('identifier')
+        if not identifier:
+            failure_count += 1
+            updated_items.append(item)
+            continue
+            
+        if get_price_function:
+            # Use provided price function
+            success, price_data = get_price_function(identifier)
+        else:
+            # Use default implementation
+            from app.utils.yfinance_utils import get_isin_data
+            result = get_isin_data(identifier)
+            success = result.get('success', False)
+            price_data = result if success else None
+            
+        if success and price_data:
+            # Extract price details from result
+            price = price_data.get('price')
+            currency = price_data.get('currency', 'USD')
+            price_eur = price_data.get('price_eur', price)
+            
+            # Update database
+            updated = update_price_in_db(
+                identifier, price, currency, price_eur
+            )
+            
+            if updated:
+                # Update item with new price
+                item['price'] = price
+                item['currency'] = currency
+                item['price_eur'] = price_eur
+                item['last_updated'] = datetime.now().isoformat()
+                success_count += 1
+            else:
+                failure_count += 1
+        else:
+            failure_count += 1
+            
+        updated_items.append(item)
+        
+    return updated_items, success_count, failure_count
+
+def calculate_portfolio_composition(portfolio_data):
+    """
+    Calculate portfolio composition metrics.
+    
+    Args:
+        portfolio_data: List of portfolio items or DataFrame
+        
+    Returns:
+        Dictionary with portfolio metrics
+    """
+    import pandas as pd
+    
+    try:
+        # Convert to DataFrame if list
+        if isinstance(portfolio_data, list):
+            df = pd.DataFrame(portfolio_data)
+        else:
+            df = portfolio_data
+            
+        if df.empty:
+            return {
+                'total_value_eur': 0,
+                'holdings_count': 0,
+                'holdings_by_currency': {},
+                'holdings_by_type': {},
+                'sectors': {}
+            }
+            
+        # Calculate total portfolio value in EUR
+        total_value_eur = df['value_eur'].sum() if 'value_eur' in df.columns else 0
+        
+        # Count holdings
+        holdings_count = len(df)
+        
+        # Group by currency
+        holdings_by_currency = {}
+        if 'currency' in df.columns and 'value' in df.columns:
+            currency_groups = df.groupby('currency')['value'].sum()
+            for currency, value in currency_groups.items():
+                holdings_by_currency[currency] = float(value)
+                
+        # Group by asset type
+        holdings_by_type = {}
+        if 'type' in df.columns and 'value_eur' in df.columns:
+            type_groups = df.groupby('type')['value_eur'].sum()
+            for asset_type, value in type_groups.items():
+                if total_value_eur > 0:
+                    holdings_by_type[asset_type] = {
+                        'value': float(value),
+                        'percentage': float(value / total_value_eur * 100)
+                    }
+                else:
+                    holdings_by_type[asset_type] = {
+                        'value': float(value),
+                        'percentage': 0
+                    }
+                    
+        # Group by sector
+        sectors = {}
+        if 'sector' in df.columns and 'value_eur' in df.columns:
+            sector_groups = df.groupby('sector')['value_eur'].sum()
+            for sector, value in sector_groups.items():
+                if sector and total_value_eur > 0:
+                    sectors[sector] = {
+                        'value': float(value),
+                        'percentage': float(value / total_value_eur * 100)
+                    }
+                    
+        return {
+            'total_value_eur': float(total_value_eur),
+            'holdings_count': holdings_count,
+            'holdings_by_currency': holdings_by_currency,
+            'holdings_by_type': holdings_by_type,
+            'sectors': sectors
+        }
+        
+    except Exception as e:
+        logger.error(f"Error calculating portfolio composition: {str(e)}")
+        return {
+            'total_value_eur': 0,
+            'holdings_count': 0,
+            'holdings_by_currency': {},
+            'holdings_by_type': {},
+            'sectors': {}
+        }
 ###END_FILE###
 
 ================================================================
@@ -7525,13 +7087,212 @@ def format_info_text(text: str) -> str:
 ###END_FILE###
 
 ================================================================
+###START_FILE_PATH: app/utils/batch_processing.py###
+import logging
+import threading
+import uuid
+import json
+from datetime import datetime
+from typing import Dict, Any, List
+import sqlite3
+
+# Import yfinance utility functions
+from app.utils.yfinance_utils import get_isin_data
+from app.utils.db_utils import update_price_in_db
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# This list is just a reference. Actual ISINs will come from the database or user input
+ISIN_LIST = [
+    'US88579Y1010',  # MMM
+    'US36467W1099',  # GME
+    'DE000BAY0017',  # Bayer
+    'US0231351067',  # Amazon
+    'US88160R1014',  # Tesla
+    # (ISIN list shortened for clarity)
+]
+
+def init_db():
+    """Initialize SQLite database with required table."""
+    conn = sqlite3.connect('batch_jobs.db')
+    c = conn.cursor()
+    
+    # We won't drop the table as in the working code sample
+    # Instead, we'll create it if it doesn't exist
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS batch_jobs (
+            job_id TEXT PRIMARY KEY,
+            status TEXT,
+            progress INTEGER,
+            total INTEGER,
+            results TEXT,
+            created_at TIMESTAMP,
+            updated_at TIMESTAMP
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+def process_isins(app, job_id, isins):
+    """Process all ISINs in the list and fetch their data."""
+    # We need to use app context for some database operations
+    with app.app_context():
+        conn = sqlite3.connect('batch_jobs.db')
+        c = conn.cursor()
+        
+        results = {}
+        total = len(isins)
+        processed = 0
+        success_count = 0
+        failure_count = 0
+        
+        for isin in isins:
+            try:
+                logger.info(f"Processing ISIN {isin} ({processed+1}/{total})")
+                result = get_isin_data(isin)
+                results[isin] = result
+                
+                # Update price in database if successful
+                if result.get('success') and result.get('price') is not None:
+                    success = update_price_in_db(
+                        isin, 
+                        result.get('price'), 
+                        result.get('currency', 'USD'),
+                        result.get('price_eur', result.get('price'))
+                    )
+                    
+                    if success:
+                        logger.info(f"Successfully updated price for {isin}: {result.get('price')} {result.get('currency', 'USD')}")
+                        success_count += 1
+                    else:
+                        logger.warning(f"Failed to update price for {isin} in database")
+                        failure_count += 1
+                else:
+                    logger.warning(f"No valid price data for {isin}: success={result.get('success')}, price={result.get('price')}")
+                    failure_count += 1
+                    
+            except Exception as e:
+                logger.error(f"Error processing {isin}: {str(e)}")
+                results[isin] = {
+                    'success': False,
+                    'isin': isin,
+                    'error': str(e),
+                    'status': 'error',
+                    'timestamp': datetime.now().isoformat()
+                }
+                failure_count += 1
+            
+            # Update progress
+            processed += 1
+            c.execute('''
+                UPDATE batch_jobs 
+                SET progress = ?, updated_at = ?
+                WHERE job_id = ?
+            ''', (processed, datetime.now().isoformat(), job_id))
+            conn.commit()
+        
+        # Add success/failure counts to results
+        summary = {
+            'total': total,
+            'success_count': success_count,
+            'failure_count': failure_count,
+            'completion_time': datetime.now().isoformat()
+        }
+        
+        # Update final status and results
+        c.execute('''
+            UPDATE batch_jobs 
+            SET status = ?, results = ?, progress = ?, updated_at = ?
+            WHERE job_id = ?
+        ''', ('completed', json.dumps({'items': results, 'summary': summary}), total, datetime.now().isoformat(), job_id))
+        
+        logger.info(f"Batch processing complete. Total: {total}, Success: {success_count}, Failed: {failure_count}")
+        conn.commit()
+        conn.close()
+
+def start_batch_process(isins):
+    """Start a new batch processing job."""
+    # Ensure database is initialized
+    init_db()
+    
+    job_id = str(uuid.uuid4())
+    conn = sqlite3.connect('batch_jobs.db')
+    c = conn.cursor()
+    
+    # Initialize new job
+    total = len(isins)
+    c.execute('''
+        INSERT INTO batch_jobs (job_id, status, progress, total, created_at, updated_at)
+        VALUES (?, 'processing', 0, ?, ?, ?)
+    ''', (job_id, total, datetime.now().isoformat(), datetime.now().isoformat()))
+    conn.commit()
+    conn.close()
+    
+    # Capture current app before starting thread
+    from flask import current_app
+    app = current_app._get_current_object()
+    
+    # Start processing in background
+    thread = threading.Thread(target=process_isins, args=(app, job_id, isins))
+    thread.daemon = True
+    thread.start()
+    
+    return job_id
+
+def get_job_status(job_id: str) -> Dict[str, Any]:
+    """
+    Get the status and results of a batch processing job.
+    
+    Args:
+        job_id (str): The ID of the job to check
+        
+    Returns:
+        Dict[str, Any]: Job status and results
+    """
+    conn = sqlite3.connect('batch_jobs.db')
+    c = conn.cursor()
+    
+    c.execute('SELECT * FROM batch_jobs WHERE job_id = ?', (job_id,))
+    row = c.fetchone()
+    
+    if row is None:
+        return {'status': 'not_found'}
+    
+    # Convert row to dictionary since SQLite Row objects might not be JSON serializable
+    status = {
+        'job_id': row[0],
+        'status': row[1],
+        'progress': row[2],
+        'total': row[3],
+        'results': json.loads(row[4]) if row[4] else None,
+        'created_at': row[5],
+        'updated_at': row[6]
+    }
+    
+    conn.close()
+    return status
+###END_FILE###
+
+================================================================
 ###START_FILE_PATH: app/utils/data_processing.py###
-"""Data processing utilities"""
+"""
+Utility functions for data processing and cache management.
+"""
+from functools import wraps
+from flask import g
 
 def clear_data_caches():
-    """Clear any data caches"""
-    # Add any cache clearing logic here
-    pass
+    """
+    Clear any cached data in the application context.
+    This helps ensure fresh data is fetched when needed.
+    """
+    if hasattr(g, 'portfolio_data'):
+        delattr(g, 'portfolio_data')
+    if hasattr(g, 'cached_prices'):
+        delattr(g, 'cached_prices')
+    if hasattr(g, 'cached_portfolios'):
+        delattr(g, 'cached_portfolios')
 
 ###END_FILE###
 
@@ -7949,7 +7710,286 @@ window.portfolioManager = portfolioManager;
 
 ================================================================
 ###START_FILE_PATH: static/js/pages/enrich.js###
+// Portfolio Table Vue Application
+const app = new Vue({
+    el: '#portfolio-table-app',
+    data() {
+        return {
+            portfolioItems: [],
+            portfolioOptions: [],
+            selectedItem: {},
+            showUpdatePriceModal: false,
+            showDeleteModal: false,
+            isUpdating: false,
+            isUpdatingAll: false,
+            isUpdatingMissing: false,
+            isDeleting: false,
+            loading: false,
+            metrics: {
+                total: 0,
+                health: 0,
+                missing: 0,
+                totalValue: 0,
+                lastUpdate: null
+            }
+        };
+    },
+    computed: {
+        healthColorClass() {
+            if (!this.portfolioItems.length) return 'is-info';
+            const health = this.metrics.health;
+            if (health >= 90) return 'is-success';
+            if (health >= 70) return 'is-warning';
+            return 'is-danger';
+        }
+    },
+    methods: {
+        async loadData() {
+            this.loading = true;
+            try {
+                const response = await fetch('/portfolio/api/portfolio_data');
+                const data = await response.json();
+                this.portfolioItems = data;
+                this.updateMetrics();
+            } catch (error) {
+                console.error('Error loading portfolio data:', error);
+            } finally {
+                this.loading = false;
+            }
+        },
+        
+        updateMetrics() {
+            const items = this.portfolioItems;
+            this.metrics = {
+                total: items.length,
+                health: items.length ? Math.round(((items.length - items.filter(i => !i.price_eur).length) / items.length) * 100) : 100,
+                missing: items.filter(i => !i.price_eur).length,
+                totalValue: items.reduce((sum, item) => sum + ((item.price_eur || 0) * (item.shares || 0)), 0),
+                lastUpdate: items.reduce((latest, item) => !latest || (item.last_updated && item.last_updated > latest) ? item.last_updated : latest, null)
+            };
+        },
 
+        async updateAllPrices() {
+            this.isUpdatingAll = true;
+            try {
+                // Show loading notification
+                const loadingNotification = document.createElement('div');
+                loadingNotification.className = 'notification is-info is-light';
+                loadingNotification.innerHTML = `
+                    <button class="delete"></button>
+                    <div>
+                        <p class="mb-2">Updating all prices...</p>
+                        <progress class="progress is-info" value="0" max="100">0%</progress>
+                    </div>
+                `;
+                
+                // Add notification to page
+                const container = document.querySelector('.columns');
+                container.insertBefore(loadingNotification, container.firstChild);
+                
+                // Start progress updates
+                const progressBar = loadingNotification.querySelector('progress');
+                const eventSource = new EventSource('/portfolio/api/update_progress');
+                eventSource.onmessage = (event) => {
+                    const progress = parseInt(event.data);
+                    progressBar.value = progress;
+                    if (progress >= 100) {
+                        eventSource.close();
+                    }
+                };
+                
+                const response = await fetch('/portfolio/api/update_all_prices', {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                
+                // Remove loading notification
+                eventSource.close();
+                if (loadingNotification.parentNode) {
+                    loadingNotification.remove();
+                }
+                
+                if (response.ok) {
+                    const updatedCount = Object.keys(result.updated).length;
+                    const failedCount = result.failed.length;
+                    
+                    let message = `Updated ${updatedCount} prices successfully.`;
+                    if (failedCount > 0) {
+                        message += ` Failed to update ${failedCount} prices.`;
+                    }
+                    
+                    // Show success notification
+                    const notification = document.createElement('div');
+                    notification.className = `notification is-${failedCount === 0 ? 'success' : 'warning'} is-light`;
+                    notification.innerHTML = `
+                        <button class="delete"></button>
+                        ${message}
+                    `;
+                    
+                    // Add notification to page
+                    container.insertBefore(notification, container.firstChild);
+                    
+                    // Add click handler to delete button
+                    notification.querySelector('.delete').addEventListener('click', () => {
+                        notification.remove();
+                    });
+                    
+                    // Auto-remove after 5 seconds
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.remove();
+                        }
+                    }, 5000);
+                    
+                    // Refresh data
+                    await this.loadData();
+                }
+            } catch (error) {
+                console.error('Error updating all prices:', error);
+            } finally {
+                this.isUpdatingAll = false;
+            }
+        },
+        
+        async updateMissingPrices() {
+            this.isUpdatingMissing = true;
+            try {
+                // Get items with missing prices
+                const missingItems = this.portfolioItems.filter(item => !item.price_eur);
+                if (missingItems.length === 0) {
+                    // Show info notification
+                    const notification = document.createElement('div');
+                    notification.className = 'notification is-info is-light';
+                    notification.innerHTML = `
+                        <button class="delete"></button>
+                        No missing prices to update.
+                    `;
+                    
+                    // Add notification to page
+                    const container = document.querySelector('.columns');
+                    container.insertBefore(notification, container.firstChild);
+                    
+                    // Add click handler to delete button
+                    notification.querySelector('.delete').addEventListener('click', () => {
+                        notification.remove();
+                    });
+                    
+                    // Auto-remove after 5 seconds
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.remove();
+                        }
+                    }, 5000);
+                    return;
+                }
+                
+                // Show loading notification
+                const loadingNotification = document.createElement('div');
+                loadingNotification.className = 'notification is-info is-light';
+                loadingNotification.innerHTML = `
+                    <button class="delete"></button>
+                    <div>
+                        <p class="mb-2">Updating missing prices...</p>
+                        <progress class="progress is-info" value="0" max="100">0%</progress>
+                    </div>
+                `;
+                
+                // Add notification to page
+                const container = document.querySelector('.columns');
+                container.insertBefore(loadingNotification, container.firstChild);
+                
+                // Start progress updates
+                const progressBar = loadingNotification.querySelector('progress');
+                const eventSource = new EventSource('/portfolio/api/update_progress');
+                eventSource.onmessage = (event) => {
+                    const progress = parseInt(event.data);
+                    progressBar.value = progress;
+                    if (progress >= 100) {
+                        eventSource.close();
+                    }
+                };
+                
+                // Update missing prices
+                const response = await fetch('/portfolio/api/update_all_prices', {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                
+                // Remove loading notification
+                eventSource.close();
+                if (loadingNotification.parentNode) {
+                    loadingNotification.remove();
+                }
+                
+                if (response.ok) {
+                    const updatedCount = Object.keys(result.updated).length;
+                    const failedCount = result.failed.length;
+                    
+                    let message = `Updated ${updatedCount} missing prices successfully.`;
+                    if (failedCount > 0) {
+                        message += ` Failed to update ${failedCount} prices.`;
+                    }
+                    
+                    // Show success notification
+                    const notification = document.createElement('div');
+                    notification.className = `notification is-${failedCount === 0 ? 'success' : 'warning'} is-light`;
+                    notification.innerHTML = `
+                        <button class="delete"></button>
+                        ${message}
+                    `;
+                    
+                    // Add notification to page
+                    container.insertBefore(notification, container.firstChild);
+                    
+                    // Add click handler to delete button
+                    notification.querySelector('.delete').addEventListener('click', () => {
+                        notification.remove();
+                    });
+                    
+                    // Auto-remove after 5 seconds
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.remove();
+                        }
+                    }, 5000);
+                    
+                    // Refresh data
+                    await this.loadData();
+                }
+            } catch (error) {
+                console.error('Error updating missing prices:', error);
+            } finally {
+                this.isUpdatingMissing = false;
+            }
+        },
+
+        formatCurrency(value) {
+            if (!value) return '€0.00';
+            return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(value);
+        },
+
+        formatNumber(value) {
+            if (!value) return '0';
+            return new Intl.NumberFormat('de-DE').format(value);
+        },
+
+        formatDateAgo(date) {
+            if (!date) return 'Never';
+            const d = new Date(date);
+            const now = new Date();
+            const diff = Math.floor((now - d) / 1000); // seconds
+
+            if (diff < 60) return 'Just now';
+            if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+            if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+            if (diff < 2592000) return `${Math.floor(diff / 86400)}d ago`;
+            return d.toLocaleDateString();
+        }
+    },
+    mounted() {
+        this.loadData();
+    }
+});
 ###END_FILE###
 
 ================================================================

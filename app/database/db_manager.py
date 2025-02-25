@@ -19,6 +19,18 @@ def get_db():
         g.db.row_factory = sqlite3.Row
     return g.db
 
+def get_background_db():
+    """
+    Get a new database connection for background tasks.
+    This should be used instead of get_db() when working in background threads
+    where Flask's request context is not available.
+    """
+    from flask import current_app
+    db_path = current_app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
+    db = sqlite3.connect(db_path, detect_types=sqlite3.PARSE_DECLTYPES)
+    db.row_factory = sqlite3.Row
+    return db
+
 def close_db(e=None):
     """Close the database connection at the end of the request."""
     db = g.pop('db', None)
@@ -210,3 +222,16 @@ def execute_db(query, args=()):
         logger.error(f"Statement was: {query}")
         logger.error(f"Args were: {args}")
         raise
+
+def get_background_db():
+    """
+    Get a new database connection for background tasks.
+    This should be used instead of get_db() when working in background threads
+    where Flask's request context is not available.
+    """
+    from flask import current_app
+    import sqlite3
+    db_path = current_app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
+    db = sqlite3.connect(db_path, detect_types=sqlite3.PARSE_DECLTYPES)
+    db.row_factory = sqlite3.Row
+    return db

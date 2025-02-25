@@ -743,26 +743,22 @@ const app = new Vue({
         async updateAllPrices() {
             this.isUpdatingAll = true;
             try {
+                // Start batch process
                 const response = await fetch('/portfolio/api/update_all_prices', {
                     method: 'POST'
                 });
                 const result = await response.json();
                 
                 if (response.ok) {
-                    const updatedCount = Object.keys(result.updated).length;
-                    const failedCount = result.failed.length;
-                    
-                    let message = `Updated ${updatedCount} prices successfully.`;
-                    if (failedCount > 0) {
-                        message += ` Failed to update ${failedCount} prices.`;
-                    }
-                    
-                    // Show success notification
+                    // Show processing notification
                     const notification = document.createElement('div');
-                    notification.className = `notification is-${failedCount === 0 ? 'success' : 'warning'} is-light`;
+                    notification.className = 'notification is-info is-light';
                     notification.innerHTML = `
                         <button class="delete"></button>
-                        ${message}
+                        <div>
+                            <p>Price update started. Processing ${result.message}</p>
+                            <progress class="progress is-info" value="0" max="100">0%</progress>
+                        </div>
                     `;
                     
                     // Add notification to page
@@ -774,15 +770,48 @@ const app = new Vue({
                         notification.remove();
                     });
                     
-                    // Auto-remove after 5 seconds
-                    setTimeout(() => {
-                        if (notification.parentNode) {
-                            notification.remove();
-                        }
-                    }, 5000);
+                    // Start polling for status
+                    const progressBar = notification.querySelector('progress');
+                    const statusText = notification.querySelector('p');
                     
-                    // Refresh data
-                    await this.loadData();
+                    const pollStatus = async () => {
+                        try {
+                            const statusResponse = await fetch(`/portfolio/api/price_update_status/${result.job_id}`);
+                            const status = await statusResponse.json();
+                            
+                            if (status.status === 'completed') {
+                                // Update progress bar
+                                progressBar.value = 100;
+                                statusText.textContent = 'Price update completed!';
+                                
+                                // Refresh data
+                                await this.loadData();
+                                
+                                // Remove notification after 3 seconds
+                                setTimeout(() => {
+                                    if (notification.parentNode) {
+                                        notification.remove();
+                                    }
+                                }, 3000);
+                                
+                                return;
+                            } else if (status.status === 'processing') {
+                                // Update progress bar
+                                const progress = (status.progress / status.total) * 100;
+                                progressBar.value = progress;
+                                statusText.textContent = `Processing: ${status.progress}/${status.total} items`;
+                                
+                                // Continue polling
+                                setTimeout(pollStatus, 1000);
+                            }
+                        } catch (error) {
+                            console.error('Error polling status:', error);
+                            statusText.textContent = 'Error checking update status';
+                        }
+                    };
+                    
+                    // Start polling
+                    pollStatus();
                 }
             } catch (error) {
                 console.error('Error updating all prices:', error);
@@ -823,27 +852,22 @@ const app = new Vue({
                     return;
                 }
                 
-                // Update missing prices
+                // Start batch process for missing prices
                 const response = await fetch('/portfolio/api/update_all_prices', {
                     method: 'POST'
                 });
                 const result = await response.json();
                 
                 if (response.ok) {
-                    const updatedCount = Object.keys(result.updated).length;
-                    const failedCount = result.failed.length;
-                    
-                    let message = `Updated ${updatedCount} missing prices successfully.`;
-                    if (failedCount > 0) {
-                        message += ` Failed to update ${failedCount} prices.`;
-                    }
-                    
-                    // Show success notification
+                    // Show processing notification
                     const notification = document.createElement('div');
-                    notification.className = `notification is-${failedCount === 0 ? 'success' : 'warning'} is-light`;
+                    notification.className = 'notification is-info is-light';
                     notification.innerHTML = `
                         <button class="delete"></button>
-                        ${message}
+                        <div>
+                            <p>Updating missing prices. ${result.message}</p>
+                            <progress class="progress is-info" value="0" max="100">0%</progress>
+                        </div>
                     `;
                     
                     // Add notification to page
@@ -855,15 +879,48 @@ const app = new Vue({
                         notification.remove();
                     });
                     
-                    // Auto-remove after 5 seconds
-                    setTimeout(() => {
-                        if (notification.parentNode) {
-                            notification.remove();
-                        }
-                    }, 5000);
+                    // Start polling for status
+                    const progressBar = notification.querySelector('progress');
+                    const statusText = notification.querySelector('p');
                     
-                    // Refresh data
-                    await this.loadData();
+                    const pollStatus = async () => {
+                        try {
+                            const statusResponse = await fetch(`/portfolio/api/price_update_status/${result.job_id}`);
+                            const status = await statusResponse.json();
+                            
+                            if (status.status === 'completed') {
+                                // Update progress bar
+                                progressBar.value = 100;
+                                statusText.textContent = 'Missing prices update completed!';
+                                
+                                // Refresh data
+                                await this.loadData();
+                                
+                                // Remove notification after 3 seconds
+                                setTimeout(() => {
+                                    if (notification.parentNode) {
+                                        notification.remove();
+                                    }
+                                }, 3000);
+                                
+                                return;
+                            } else if (status.status === 'processing') {
+                                // Update progress bar
+                                const progress = (status.progress / status.total) * 100;
+                                progressBar.value = progress;
+                                statusText.textContent = `Processing: ${status.progress}/${status.total} items`;
+                                
+                                // Continue polling
+                                setTimeout(pollStatus, 1000);
+                            }
+                        } catch (error) {
+                            console.error('Error polling status:', error);
+                            statusText.textContent = 'Error checking update status';
+                        }
+                    };
+                    
+                    // Start polling
+                    pollStatus();
                 }
             } catch (error) {
                 console.error('Error updating missing prices:', error);
@@ -929,6 +986,34 @@ const bulkEditApp = new Vue({
             selectedCompanies: []
         };
     },
+    computed: {
+        computedGroupedCompanies() {
+            // Group companies by portfolio
+            const grouped = {};
+            
+            if (!this.companies.length) {
+                return {};
+            }
+            
+            // Filter companies by search query if provided
+            const filteredCompanies = this.searchQuery 
+                ? this.companies.filter(c => 
+                    c.name.toLowerCase().includes(this.searchQuery.toLowerCase()) || 
+                    c.identifier.toLowerCase().includes(this.searchQuery.toLowerCase()))
+                : this.companies;
+            
+            // Group by portfolio
+            filteredCompanies.forEach(company => {
+                const portfolio = company.portfolio || 'Unassigned';
+                if (!grouped[portfolio]) {
+                    grouped[portfolio] = [];
+                }
+                grouped[portfolio].push(company);
+            });
+            
+            return grouped;
+        }
+    },
     methods: {
         async loadPortfolioOptions() {
             try {
@@ -945,10 +1030,51 @@ const bulkEditApp = new Vue({
             } catch (err) {
                 console.error('Error loading portfolio options:', err);
             }
+        },
+        
+        async loadCompanies() {
+            this.loading = true;
+            try {
+                const response = await fetch('/portfolio/api/portfolio_data');
+                if (!response.ok) {
+                    throw new Error('Failed to load companies');
+                }
+                const data = await response.json();
+                this.companies = data;
+            } catch (err) {
+                console.error('Error loading companies:', err);
+            } finally {
+                this.loading = false;
+            }
+        },
+        
+        isPortfolioSelected(portfolio) {
+            // Check if all companies in this portfolio are selected
+            const companiesInPortfolio = this.computedGroupedCompanies[portfolio] || [];
+            if (!companiesInPortfolio.length) return false;
+            
+            return companiesInPortfolio.every(company => 
+                this.selectedCompanies.includes(company.id));
+        },
+        
+        togglePortfolio(portfolio) {
+            const companiesInPortfolio = this.computedGroupedCompanies[portfolio] || [];
+            const allSelected = this.isPortfolioSelected(portfolio);
+            
+            if (allSelected) {
+                // Deselect all companies in this portfolio
+                this.selectedCompanies = this.selectedCompanies.filter(id => 
+                    !companiesInPortfolio.some(company => company.id === id));
+            } else {
+                // Select all companies in this portfolio
+                const companyIds = companiesInPortfolio.map(company => company.id);
+                this.selectedCompanies = [...new Set([...this.selectedCompanies, ...companyIds])];
+            }
         }
     },
     mounted() {
         this.loadPortfolioOptions();
+        this.loadCompanies();
     }
 });
 </script>
