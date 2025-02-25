@@ -251,6 +251,153 @@ const app = new Vue({
             }
         },
 
+        async savePortfolioChange(item) {
+            console.log('savePortfolioChange called with item:', item);
+            if (!item || !item.id) {
+                console.error('Invalid item for portfolio change');
+                return;
+            }
+            
+            try {
+                console.log('Sending portfolio update request for item ID:', item.id, 'Portfolio:', item.portfolio);
+                const response = await fetch(`/portfolio/api/update_portfolio/${item.id}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        portfolio: item.portfolio || ''
+                    })
+                });
+                
+                const result = await response.json();
+                console.log('Portfolio update response:', result);
+                
+                if (result.success) {
+                    // Show success notification using the global function if available
+                    if (typeof showNotification === 'function') {
+                        showNotification('Portfolio updated successfully', 'is-success', 3000);
+                    } else {
+                        console.log('Portfolio updated successfully');
+                    }
+                } else {
+                    // Show error notification
+                    if (typeof showNotification === 'function') {
+                        showNotification(`Error updating portfolio: ${result.error}`, 'is-danger');
+                    } else {
+                        console.error(`Error updating portfolio: ${result.error}`);
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating portfolio:', error);
+                if (typeof showNotification === 'function') {
+                    showNotification('Failed to update portfolio', 'is-danger');
+                }
+            }
+        },
+        
+        debouncedSavePortfolioChange: _.debounce(function(item) {
+            this.savePortfolioChange(item);
+        }, 500),
+        
+        // Save identifier changes to the database
+        async saveIdentifierChange(item) {
+            if (!item || !item.id) {
+                console.error('Invalid item for identifier change');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/portfolio/api/update_portfolio/${item.id}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        identifier: item.identifier || ''
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Show success notification using the global function if available
+                    if (typeof showNotification === 'function') {
+                        showNotification('Identifier updated successfully', 'is-success', 3000);
+                    } else {
+                        console.log('Identifier updated successfully');
+                    }
+                } else {
+                    // Show error notification
+                    if (typeof showNotification === 'function') {
+                        showNotification(`Error updating identifier: ${result.error}`, 'is-danger');
+                    } else {
+                        console.error(`Error updating identifier: ${result.error}`);
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating identifier:', error);
+                if (typeof showNotification === 'function') {
+                    showNotification('Failed to update identifier', 'is-danger');
+                }
+            }
+        },
+        
+        // Debounced version of saveIdentifierChange for input events
+        debouncedSaveIdentifierChange: _.debounce(function(item) {
+            this.saveIdentifierChange(item);
+        }, 500),
+
+        async saveCategoryChange(item) {
+            console.log('saveCategoryChange called with item:', item);
+            if (!item || !item.id) {
+                console.error('Invalid item for category change');
+                return;
+            }
+            
+            try {
+                console.log('Sending category update request for item ID:', item.id, 'Category:', item.category);
+                const response = await fetch(`/portfolio/api/update_portfolio/${item.id}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        category: item.category || ''
+                    })
+                });
+                
+                const result = await response.json();
+                console.log('Category update response:', result);
+                
+                if (result.success) {
+                    // Show success notification using the global function if available
+                    if (typeof showNotification === 'function') {
+                        showNotification('Category updated successfully', 'is-success', 3000);
+                    } else {
+                        console.log('Category updated successfully');
+                    }
+                } else {
+                    // Show error notification
+                    if (typeof showNotification === 'function') {
+                        showNotification(`Error updating category: ${result.error}`, 'is-danger');
+                    } else {
+                        console.error(`Error updating category: ${result.error}`);
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating category:', error);
+                if (typeof showNotification === 'function') {
+                    showNotification('Failed to update category', 'is-danger');
+                }
+            }
+        },
+        
+        // Debounced version of saveCategoryChange for input events
+        debouncedSaveCategoryChange: _.debounce(function(item) {
+            this.saveCategoryChange(item);
+        }, 500),
+
         formatCurrency(value) {
             if (!value) return '€0.00';
             return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(value);
@@ -275,6 +422,7 @@ const app = new Vue({
         }
     },
     mounted() {
+        console.log('Vue component mounted. Methods available:', Object.keys(this.$options.methods).join(', '));
         this.loadData();
     }
 });

@@ -105,18 +105,25 @@ function initializeNotifications() {
     notifications.forEach(deleteButton => {
         const notification = deleteButton.parentNode;
         
+        // Convert to overlay notification if not already
+        if (!notification.classList.contains('notification-overlay')) {
+            notification.classList.add('notification-overlay');
+            // Move to body for proper positioning
+            document.body.appendChild(notification);
+        }
+        
         // Add event listener for deletion
         deleteButton.addEventListener('click', () => {
-            notification.parentNode.removeChild(notification);
+            notification.remove();
         });
         
         // Auto-dismiss after 5 seconds
         setTimeout(() => {
-            if (notification && notification.parentNode) {
+            if (notification) {
                 notification.classList.add('is-fading-out');
                 setTimeout(() => {
                     if (notification && notification.parentNode) {
-                        notification.parentNode.removeChild(notification);
+                        notification.remove();
                     }
                 }, 500);
             }
@@ -207,7 +214,7 @@ function setupAjaxErrorHandling() {
 function showNotification(message, type = 'is-info', duration = 5000) {
     // Create notification element
     const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
+    notification.className = `notification ${type} notification-overlay`;
     
     // Add delete button
     const deleteButton = document.createElement('button');
@@ -218,9 +225,8 @@ function showNotification(message, type = 'is-info', duration = 5000) {
     const messageText = document.createTextNode(message);
     notification.appendChild(messageText);
     
-    // Add notification to container
-    const container = document.querySelector('.container') || document.body;
-    container.insertBefore(notification, container.firstChild);
+    // Add notification to container - append to body for overlay positioning
+    document.body.appendChild(notification);
     
     // Setup delete button
     deleteButton.addEventListener('click', () => {

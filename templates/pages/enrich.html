@@ -265,7 +265,7 @@
                                         <td>
                                             <div class="select is-small">
                                                 <select v-model="item.portfolio" 
-                                                        @change="savePortfolioChange(item)">
+                                                        @change="debouncedSavePortfolioChange(item)">
                                                     <option value="">-</option>
                                                     <option v-for="p in portfolioOptions" :key="p" :value="p" v-text="p"></option>
                                                 </select>
@@ -274,7 +274,8 @@
                                         <td>
                                             <input class="input is-small" type="text"
                                                    v-model="item.category"
-                                                   @input="debouncedSavePortfolioChange(item)">
+                                                   @input="debouncedSaveCategoryChange(item)"
+                                                   @change="saveCategoryChange(item)">
                                         </td>
                                         <td>
                                             <span v-text="formatNumber(item.shares)"></span>
@@ -928,6 +929,123 @@ const app = new Vue({
                 this.isUpdatingMissing = false;
             }
         },
+
+        async savePortfolioChange(item) {
+            console.log('savePortfolioChange called with item:', item);
+            if (!item || !item.id) {
+                console.error('Invalid item for portfolio change');
+                return;
+            }
+            
+            try {
+                console.log('Sending portfolio update request for item ID:', item.id, 'Portfolio:', item.portfolio);
+                const response = await fetch(`/portfolio/api/update_portfolio/${item.id}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        portfolio: item.portfolio
+                    })
+                });
+                
+                const result = await response.json();
+                console.log('Portfolio update response:', result);
+                
+                if (result.success) {
+                    // Show success notification
+                    showNotification('Portfolio updated successfully', 'is-success', 3000);
+                } else {
+                    // Show error notification
+                    showNotification(`Error updating portfolio: ${result.error}`, 'is-danger');
+                }
+            } catch (error) {
+                console.error('Error updating portfolio:', error);
+                showNotification('Failed to update portfolio', 'is-danger');
+            }
+        },
+        
+        async saveCategoryChange(item) {
+            console.log('saveCategoryChange called with item:', item);
+            if (!item || !item.id) {
+                console.error('Invalid item for category change');
+                return;
+            }
+            
+            try {
+                console.log('Sending category update request for item ID:', item.id, 'Category:', item.category);
+                const response = await fetch(`/portfolio/api/update_portfolio/${item.id}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        category: item.category
+                    })
+                });
+                
+                const result = await response.json();
+                console.log('Category update response:', result);
+                
+                if (result.success) {
+                    // Show success notification
+                    showNotification('Category updated successfully', 'is-success', 3000);
+                } else {
+                    // Show error notification
+                    showNotification(`Error updating category: ${result.error}`, 'is-danger');
+                }
+            } catch (error) {
+                console.error('Error updating category:', error);
+                showNotification('Failed to update category', 'is-danger');
+            }
+        },
+        
+        async saveIdentifierChange(item) {
+            console.log('saveIdentifierChange called with item:', item);
+            if (!item || !item.id) {
+                console.error('Invalid item for identifier change');
+                return;
+            }
+            
+            try {
+                console.log('Sending identifier update request for item ID:', item.id, 'Identifier:', item.identifier);
+                const response = await fetch(`/portfolio/api/update_portfolio/${item.id}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        identifier: item.identifier
+                    })
+                });
+                
+                const result = await response.json();
+                console.log('Identifier update response:', result);
+                
+                if (result.success) {
+                    // Show success notification
+                    showNotification('Identifier updated successfully', 'is-success', 3000);
+                } else {
+                    // Show error notification
+                    showNotification(`Error updating identifier: ${result.error}`, 'is-danger');
+                }
+            } catch (error) {
+                console.error('Error updating identifier:', error);
+                showNotification('Failed to update identifier', 'is-danger');
+            }
+        },
+        
+        debouncedSavePortfolioChange: _.debounce(function(item) {
+            this.savePortfolioChange(item);
+        }, 500),
+        
+        debouncedSaveCategoryChange: _.debounce(function(item) {
+            this.saveCategoryChange(item);
+        }, 500),
+
+        debouncedSaveIdentifierChange: _.debounce(function(item) {
+            this.saveIdentifierChange(item);
+        }, 500),
 
         formatCurrency(value) {
             if (!value) return '€0.00';

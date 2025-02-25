@@ -527,17 +527,50 @@ def update_single_portfolio_api(company_id):
             else:
                 portfolio_id = portfolio_result['id']
             
-            # Update company
-            cursor.execute('''
-                UPDATE companies 
-                SET category = ?, portfolio_id = ?
-                WHERE id = ?
-            ''', [
-                data.get('category', ''),
-                portfolio_id,
-                company_id
-            ])
+            # Get current company data
+            current_company = query_db('''
+                SELECT * FROM companies WHERE id = ?
+            ''', [company_id], one=True)
             
+            if not current_company:
+                return jsonify({
+                    'success': False,
+                    'error': 'Company not found'
+                }), 404
+            
+            # Prepare update fields and values
+            update_fields = []
+            update_values = []
+            
+            # Only update fields that are provided in the request
+            if 'category' in data:
+                update_fields.append('category = ?')
+                update_values.append(data['category'])
+            
+            if 'portfolio' in data:
+                update_fields.append('portfolio_id = ?')
+                update_values.append(portfolio_id)
+            
+            if 'identifier' in data:
+                update_fields.append('identifier = ?')
+                update_values.append(data['identifier'])
+            
+            # If no fields to update, return success
+            if not update_fields:
+                return jsonify({
+                    'success': True,
+                    'message': 'No fields to update'
+                })
+            
+            # Build and execute update query
+            update_query = f'''
+                UPDATE companies 
+                SET {', '.join(update_fields)}
+                WHERE id = ?
+            '''
+            update_values.append(company_id)
+            
+            cursor.execute(update_query, update_values)
             db.commit()
             
             # Get updated company data
@@ -553,7 +586,8 @@ def update_single_portfolio_api(company_id):
                 'data': {
                     'id': updated_company['id'],
                     'portfolio': updated_company['portfolio_name'],
-                    'category': updated_company['category']
+                    'category': updated_company['category'],
+                    'identifier': updated_company['identifier']
                 }
             })
             
@@ -893,7 +927,8 @@ def get_portfolio_data(account_id):
                     'price_eur': float(row['price_eur']) if pd.notna(row['price_eur']) else None,
                     'currency': row['currency'],
                     'total_invested': float(row['total_invested']) if pd.notna(row['total_invested']) else 0,
-                    'last_updated': row['last_updated'].isoformat() if pd.notna(row['last_updated']) else None
+                    'last_updated': row['last_updated'] if isinstance(row['last_updated'], str) else 
+                                   (row['last_updated'].isoformat() if pd.notna(row['last_updated']) else None)
                 }
                 portfolio_data.append(item)
             except Exception as e:
