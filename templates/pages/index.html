@@ -6,31 +6,6 @@
     {% if session.account_id %}
         <!-- Logged in state - Dashboard -->
         <div class="columns is-multiline">
-            <!-- Welcome Banner -->
-            <div class="column is-12">
-                <div class="notification is-info is-light">
-                    <button class="delete"></button>
-                    <div class="columns is-vcentered">
-                        <div class="column">
-                            <h1 class="title">
-                                Welcome back, {{ session.username }}!
-                            </h1>
-                            <p class="subtitle">
-                                Here's your portfolio overview.
-                            </p>
-                        </div>
-                        <div class="column is-narrow">
-                            <a href="{{ url_for('portfolio.enrich') }}" class="button is-info">
-                                <span class="icon">
-                                    <i class="fas fa-table"></i>
-                                </span>
-                                <span>View Portfolio</span>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <!-- Portfolio Summary -->
             {% if portfolios %}
                 <div class="column is-12">
