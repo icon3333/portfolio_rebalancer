@@ -354,7 +354,7 @@ def manage_portfolios():
         backup_database()
         
         if action == 'add':
-            portfolio_name = request.form.get('portfolio_name', '').strip()
+            portfolio_name = request.form.get('add_portfolio_name', '').strip()
             if not portfolio_name:
                 flash('Portfolio name cannot be empty', 'error')
                 return redirect(url_for('portfolio.enrich'))
@@ -406,7 +406,7 @@ def manage_portfolios():
             flash(f'Portfolio renamed from "{old_name}" to "{new_name}"', 'success')
             
         elif action == 'delete':
-            portfolio_name = request.form.get('portfolio_name', '').strip()
+            portfolio_name = request.form.get('delete_portfolio_name', '').strip()
             
             if not portfolio_name:
                 flash('Portfolio name is required', 'error')

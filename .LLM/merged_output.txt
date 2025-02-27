@@ -1,5 +1,5 @@
 This file is a merged representation of the entire codebase, combining all repository files into a single document.
-Generated on: 2025-02-27T22:44:31.344981
+Generated on: 2025-02-27T23:44:31.036943
 
 ================================================================
 Purpose:
@@ -1431,7 +1431,7 @@ def manage_portfolios():
         backup_database()
         
         if action == 'add':
-            portfolio_name = request.form.get('portfolio_name', '').strip()
+            portfolio_name = request.form.get('add_portfolio_name', '').strip()
             if not portfolio_name:
                 flash('Portfolio name cannot be empty', 'error')
                 return redirect(url_for('portfolio.enrich'))
@@ -1483,7 +1483,7 @@ def manage_portfolios():
             flash(f'Portfolio renamed from "{old_name}" to "{new_name}"', 'success')
             
         elif action == 'delete':
-            portfolio_name = request.form.get('portfolio_name', '').strip()
+            portfolio_name = request.form.get('delete_portfolio_name', '').strip()
             
             if not portfolio_name:
                 flash('Portfolio name is required', 'error')
@@ -6984,6 +6984,25 @@ document.addEventListener('DOMContentLoaded', () => {
             height: 600px;
             overflow: auto;
         }
+        
+        /* Custom styles for the enrich page */
+        .card-content {
+            padding: 1rem;
+        }
+        
+        /* Make sure form elements are properly spaced */
+        .field:not(:last-child) {
+            margin-bottom: 0.75rem;
+        }
+        
+        /* Responsive adjustments */
+        @media screen and (max-width: 768px) {
+            .columns .column .card {
+                min-height: auto !important;
+                height: auto !important;
+                margin-bottom: 1rem;
+            }
+        }
     </style>
 {% endblock %}
 
@@ -7001,63 +7020,178 @@ document.addEventListener('DOMContentLoaded', () => {
     </div>
 </div>
 
-<!-- Upload Section -->
-<div class="card mb-5">
-    <header class="card-header">
-        <p class="card-header-title">
-            <span class="icon-text">
-                <span class="icon">
-                    <i class="fas fa-upload"></i>
-                </span>
-                <span>Upload Portfolio Data</span>
-            </span>
-        </p>
-        <button class="card-header-icon" aria-label="more options">
-            <span class="icon">
-                <i class="fas fa-angle-down" aria-hidden="true"></i>
-            </span>
-        </button>
-    </header>
-    <div class="card-content">
-        <div class="content">
-            <form action="{{ url_for('portfolio.upload_csv') }}" method="post" enctype="multipart/form-data">
-                <div class="field">
-                    <label class="label">CSV File</label>
-                    <div class="file has-name is-fullwidth">
-                        <label class="file-label">
-                            <input class="file-input" type="file" name="csv_file" id="csv_file" accept=".csv">
-                            <span class="file-cta">
-                                <span class="file-icon">
-                                    <i class="fas fa-upload"></i>
-                                </span>
-                                <span class="file-label">
-                                    Choose a file…
-                                </span>
-                            </span>
-                            <span class="file-name">
-                                No file selected
-                            </span>
-                        </label>
-                    </div>
-                    <p class="help">Upload a CSV file with your portfolio data.</p>
+<!-- Upload and Management Section -->
+<div class="columns">
+    <!-- Upload Section -->
+    <div class="column is-6">
+        <div class="card mb-5" style="height: 100%; min-height: 250px; display: flex; flex-direction: column;">
+            <header class="card-header">
+                <p class="card-header-title">
+                    <span class="icon-text">
+                        <span class="icon">
+                            <i class="fas fa-upload"></i>
+                        </span>
+                        <span>Upload Portfolio Data</span>
+                    </span>
+                </p>
+                <button class="card-header-icon" aria-label="more options">
+                    <span class="icon">
+                        <i class="fas fa-angle-down" aria-hidden="true"></i>
+                    </span>
+                </button>
+            </header>
+            <div class="card-content" style="flex-grow: 1; display: flex; flex-direction: column; justify-content: flex-start; padding: 0.75rem;">
+                <div class="content">
+                    <form action="{{ url_for('portfolio.upload_csv') }}" method="post" enctype="multipart/form-data">
+                        <div class="field">
+                            <label class="label">CSV File</label>
+                            <div class="file has-name is-fullwidth">
+                                <label class="file-label">
+                                    <input class="file-input" type="file" name="csv_file" id="csv_file" accept=".csv">
+                                    <span class="file-cta">
+                                        <span class="file-icon">
+                                            <i class="fas fa-upload"></i>
+                                        </span>
+                                        <span class="file-label">
+                                            Choose a file…
+                                        </span>
+                                    </span>
+                                    <span class="file-name">
+                                        No file selected
+                                    </span>
+                                </label>
+                            </div>
+                            <p class="help">Upload a CSV file with your portfolio data.</p>
+                        </div>
+                        
+                        <div class="field">
+                            <div class="control">
+                                <button type="submit" class="button is-primary" id="upload-button" disabled>
+                                    <span class="icon">
+                                        <i class="fas fa-cloud-upload-alt"></i>
+                                    </span>
+                                    <span>Upload and Process</span>
+                                </button>
+                            </div>
+                        </div>
+                    </form>
                 </div>
-                
-                <div class="field">
-                    <div class="control">
-                        <button type="submit" class="button is-primary" id="upload-button" disabled>
-                            <span class="icon">
-                                <i class="fas fa-cloud-upload-alt"></i>
-                            </span>
-                            <span>Upload and Process</span>
-                        </button>
-                    </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="column is-6">
+        <div class="card mb-5" style="height: 100%; min-height: 250px; display: flex; flex-direction: column;">
+            <header class="card-header">
+                <p class="card-header-title">
+                    <span class="icon-text">
+                        <span class="icon">
+                            <i class="fas fa-folder-open"></i>
+                        </span>
+                        <span>Portfolio Management</span>
+                    </span>
+                </p>
+                <button class="card-header-icon" aria-label="more options">
+                    <span class="icon">
+                        <i class="fas fa-angle-down" aria-hidden="true"></i>
+                    </span>
+                </button>
+            </header>
+            <div class="card-content" style="flex-grow: 1; display: flex; flex-direction: column; justify-content: flex-start; padding: 0.75rem;">
+                <div class="content">
+                    <form action="{{ url_for('portfolio.manage_portfolios') }}" method="post" id="manage-portfolios-form" style="display: flex; flex-direction: column; height: 100%;">
+                        <div style="flex-grow: 1;">
+                            <div class="columns">
+                                <div class="column is-6">
+                                    <div class="field">
+                                        <label class="label">Actions</label>
+                                        <div class="control">
+                                            <div class="select">
+                                                <select name="action" id="portfolio-action">
+                                                    <option value="">Select action</option>
+                                                    <option value="add">Add Portfolio</option>
+                                                    <option value="rename">Rename Portfolio</option>
+                                                    <option value="delete">Delete Portfolio</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="column is-6">
+                                    <div id="rename-portfolio-fields" class="is-hidden">
+                                        <div class="field">
+                                            <label class="label">Select Portfolio</label>
+                                            <div class="control">
+                                                <div class="select">
+                                                    <select name="old_name">
+                                                        <option value="">Select portfolio</option>
+                                                        {% for portfolio in portfolios %}
+                                                            <option value="{{ portfolio }}">{{ portfolio }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="field">
+                                            <label class="label">New Name</label>
+                                            <div class="control">
+                                                <input class="input" type="text" name="new_name" placeholder="Enter new name">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div id="delete-portfolio-fields" class="is-hidden">
+                                        <div class="field">
+                                            <label class="label">Select Portfolio to Delete</label>
+                                            <div class="control">
+                                                <div class="select">
+                                                    <select name="delete_portfolio_name">
+                                                        <option value="">Select portfolio</option>
+                                                        {% for portfolio in portfolios %}
+                                                            <option value="{{ portfolio }}">{{ portfolio }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="notification is-warning is-light">
+                                            <strong>Warning:</strong> Portfolio must be empty to delete.
+                                        </div>
+                                    </div>
+                                    <div id="add-portfolio-fields" class="is-hidden">
+                                        <div class="field">
+                                            <label class="label">Portfolio Name</label>
+                                            <div class="control">
+                                                <input class="input" type="text" name="add_portfolio_name" placeholder="Enter portfolio name">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Hidden spacer div to maintain consistent height -->
+                            <div id="form-spacer" style="min-height: 50px;"></div>
+                        </div>
+                        
+                        <div class="field">
+                            <div class="control">
+                                <button type="submit" class="button is-info" id="portfolio-action-btn" disabled>
+                                    <span class="icon">
+                                        <i class="fas fa-check"></i>
+                                    </span>
+                                    <span>Apply</span>
+                                </button>
+                            </div>
+                        </div>
+                    </form>
                 </div>
-            </form>
+            </div>
         </div>
     </div>
 </div>
 
-<!-- Portfolio Editor -->
+<!-- Portfolio Data Section -->
 <div class="card mb-5">
     <header class="card-header">
         <p class="card-header-title">
@@ -7082,13 +7216,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="field is-grouped mb-4">
                         <div class="control">
                             <div class="select">
-                                <select id="filter-portfolio">
+                                <select id="filter-portfolio" v-model="selectedPortfolio">
                                     <option value="">All Portfolios</option>
                                     {% for portfolio in portfolios %}
                                         <option value="{{ portfolio }}">{{ portfolio }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
+                        </div>
+                        <div class="control">
+                            <label class="checkbox" style="display: flex; align-items: center; height: 2.5em; padding: 0 0.5em;">
+                                <input type="checkbox" v-model="showOnlyMissingPrices">
+                                <span style="margin-left: 0.5em;">No price</span>
+                            </label>
                         </div>
                         <div class="control">
                             <button class="button is-info is-light js-modal-trigger" data-target="bulk-edit-modal">
@@ -7107,7 +7247,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <p class="mt-4">Loading portfolio data...</p>
                     </div>
                     
-                    <div v-else-if="portfolioItems.length === 0" class="notification is-warning">
+                    <div v-else-if="filteredPortfolioItems.length === 0" class="notification is-warning">
                         <p>No portfolio data available. Please upload a CSV file to get started.</p>
                     </div>
                     
@@ -7156,7 +7296,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <p class="mt-4">Loading portfolio data...</p>
                         </div>
                         
-                        <div v-else-if="portfolioItems.length === 0" class="notification is-warning">
+                        <div v-else-if="filteredPortfolioItems.length === 0" class="notification is-warning">
                             <p>No portfolio data available. Please upload a CSV file to get started.</p>
                         </div>
                         
@@ -7178,11 +7318,11 @@ document.addEventListener('DOMContentLoaded', () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="item in portfolioItems" :key="item.id">
+                                    <tr v-for="item in filteredPortfolioItems" :key="item.id">
                                         <td>
                                             <button 
                                                 class="button is-small" 
-                                                @click="updatePrice(item)"
+                                                @click="confirmPriceUpdate(item)"
                                                 :class="{'is-loading': isUpdating && selectedItem.id === item.id}"
                                                 :disabled="isUpdating">
                                                 <span class="icon is-small">
@@ -7247,127 +7387,56 @@ document.addEventListener('DOMContentLoaded', () => {
                             </table>
                         </div>
                     </div>
+                    
+                    <!-- Delete Confirmation Modal -->
+                    <div class="modal" :class="{'is-active': showDeleteModal}">
+                        <div class="modal-background" @click="closeModal"></div>
+                        <div class="modal-card">
+                            <header class="modal-card-head">
+                                <p class="modal-card-title">Delete Confirmation</p>
+                                <button class="delete" aria-label="close" @click="closeModal"></button>
+                            </header>
+                            <section class="modal-card-body">
+                                <p>Are you sure you want to delete <span v-text="selectedItem.company"></span>?</p>
+                                <p>This action cannot be undone.</p>
+                            </section>
+                            <footer class="modal-card-foot">
+                                <button class="button is-danger" 
+                                        @click="deleteItem"
+                                        :class="{'is-loading': isDeleting}"
+                                        :disabled="isDeleting">
+                                    Delete
+                                </button>
+                                <button class="button" @click="closeModal">Cancel</button>
+                            </footer>
+                        </div>
+                    </div>
+                    
+                    <!-- Update Price Modal -->
+                    <div class="modal" :class="{'is-active': showUpdatePriceModal}">
+                        <div class="modal-background" @click="closeModal"></div>
+                        <div class="modal-card">
+                            <header class="modal-card-head">
+                                <p class="modal-card-title">Update Price</p>
+                                <button class="delete" aria-label="close" @click="closeModal"></button>
+                            </header>
+                            <section class="modal-card-body">
+                                <p>Do you want to fetch the latest price for <span v-text="selectedItem.company"></span>?</p>
+                                <p>Current price: <span v-text="selectedItem.price_eur ? formatCurrency(selectedItem.price_eur) : 'No price'"></span></p>
+                                <p>Last updated: <span v-text="formatDateAgo(selectedItem.last_updated)"></span></p>
+                            </section>
+                            <footer class="modal-card-foot">
+                                <button class="button is-success" 
+                                        @click="updatePrice"
+                                        :class="{'is-loading': isUpdating}"
+                                        :disabled="isUpdating">
+                                    Update Price
+                                </button>
+                                <button class="button" @click="closeModal">Cancel</button>
+                            </footer>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Portfolio Management -->
-<div class="card">
-    <header class="card-header">
-        <p class="card-header-title">
-            <span class="icon-text">
-                <span class="icon">
-                    <i class="fas fa-folder-open"></i>
-                </span>
-                <span>Portfolio Management</span>
-            </span>
-        </p>
-        <button class="card-header-icon" aria-label="more options">
-            <span class="icon">
-                <i class="fas fa-angle-down" aria-hidden="true"></i>
-            </span>
-        </button>
-    </header>
-    <div class="card-content">
-        <div class="content">
-            <div class="tabs">
-                <ul>
-                    <li class="is-active"><a data-target="add-portfolio-tab">Add Portfolio</a></li>
-                    <li><a data-target="rename-portfolio-tab">Rename Portfolio</a></li>
-                    <li><a data-target="delete-portfolio-tab">Delete Portfolio</a></li>
-                </ul>
-            </div>
-            
-            <div id="add-portfolio-tab" class="tab-content">
-                <form action="{{ url_for('portfolio.manage_portfolios') }}" method="post">
-                    <input type="hidden" name="action" value="add">
-                    <div class="field has-addons">
-                        <div class="control is-expanded">
-                            <input class="input" type="text" name="portfolio_name" placeholder="New Portfolio Name" required>
-                        </div>
-                        <div class="control">
-                            <button type="submit" class="button is-primary">
-                                <span class="icon">
-                                    <i class="fas fa-plus"></i>
-                                </span>
-                                <span>Add Portfolio</span>
-                            </button>
-                        </div>
-                    </div>
-                </form>
-            </div>
-            
-            <div id="rename-portfolio-tab" class="tab-content is-hidden">
-                <form action="{{ url_for('portfolio.manage_portfolios') }}" method="post">
-                    <input type="hidden" name="action" value="rename">
-                    <div class="field">
-                        <label class="label">Select Portfolio</label>
-                        <div class="control">
-                            <div class="select is-fullwidth">
-                                <select name="old_name" required>
-                                    <option value="">Select portfolio to rename</option>
-                                    {% for portfolio in portfolios %}
-                                        {% if portfolio != '-' %}
-                                            <option value="{{ portfolio }}">{{ portfolio }}</option>
-                                        {% endif %}
-                                    {% endfor %}
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="field">
-                        <label class="label">New Name</label>
-                        <div class="control">
-                            <input class="input" type="text" name="new_name" placeholder="New Portfolio Name" required>
-                        </div>
-                    </div>
-                    <div class="field">
-                        <div class="control">
-                            <button type="submit" class="button is-warning">
-                                <span class="icon">
-                                    <i class="fas fa-edit"></i>
-                                </span>
-                                <span>Rename Portfolio</span>
-                            </button>
-                        </div>
-                    </div>
-                </form>
-            </div>
-            
-            <div id="delete-portfolio-tab" class="tab-content is-hidden">
-                <form action="{{ url_for('portfolio.manage_portfolios') }}" method="post" id="delete-portfolio-form">
-                    <input type="hidden" name="action" value="delete">
-                    <div class="field">
-                        <label class="label">Select Portfolio</label>
-                        <div class="control">
-                            <div class="select is-fullwidth">
-                                <select name="portfolio_name" required>
-                                    <option value="">Select portfolio to delete</option>
-                                    {% for portfolio in portfolios %}
-                                        {% if portfolio != '-' %}
-                                            <option value="{{ portfolio }}">{{ portfolio }}</option>
-                                        {% endif %}
-                                    {% endfor %}
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="notification is-warning is-light">
-                        <p><strong>Warning:</strong> You can only delete empty portfolios. If a portfolio contains companies, you must first move them to another portfolio.</p>
-                    </div>
-                    <div class="field">
-                        <div class="control">
-                            <button type="submit" class="button is-danger">
-                                <span class="icon">
-                                    <i class="fas fa-trash-alt"></i>
-                                </span>
-                                <span>Delete Portfolio</span>
-                            </button>
-                        </div>
-                    </div>
-                </form>
             </div>
         </div>
     </div>
@@ -7494,55 +7563,6 @@ document.addEventListener('DOMContentLoaded', () => {
     </div>
 </div>
 
-<!-- Update Price Modal -->
-<div class="modal" :class="{'is-active': showUpdatePriceModal}">
-    <div class="modal-background" @click="closeModal"></div>
-    <div class="modal-card">
-        <header class="modal-card-head">
-            <p class="modal-card-title">Update Price</p>
-            <button class="delete" aria-label="close" @click="closeModal"></button>
-        </header>
-        <section class="modal-card-body">
-            <p>Do you want to fetch the latest price for <span v-text="selectedItem.company"></span>?</p>
-            <p>Current price: <span v-text="selectedItem.price_eur ? formatCurrency(selectedItem.price_eur) : 'No price'"></span></p>
-            <p>Last updated: <span v-text="formatDateAgo(selectedItem.last_updated)"></span></p>
-        </section>
-        <footer class="modal-card-foot">
-            <button class="button is-success" 
-                    @click="updatePrice"
-                    :class="{'is-loading': isUpdating}"
-                    :disabled="isUpdating">
-                Update Price
-            </button>
-            <button class="button" @click="closeModal">Cancel</button>
-        </footer>
-    </div>
-</div>
-
-<!-- Delete Confirmation Modal -->
-<div class="modal" :class="{'is-active': showDeleteModal}">
-    <div class="modal-background" @click="closeModal"></div>
-    <div class="modal-card">
-        <header class="modal-card-head">
-            <p class="modal-card-title">Delete Confirmation</p>
-            <button class="delete" aria-label="close" @click="closeModal"></button>
-        </header>
-        <section class="modal-card-body">
-            <p>Are you sure you want to delete <span v-text="selectedItem.company"></span>?</p>
-            <p>This action cannot be undone.</p>
-        </section>
-        <footer class="modal-card-foot">
-            <button class="button is-danger" 
-                    @click="deleteItem"
-                    :class="{'is-loading': isDeleting}"
-                    :disabled="isDeleting">
-                Delete
-            </button>
-            <button class="button" @click="closeModal">Cancel</button>
-        </footer>
-    </div>
-</div>
-
 {% endblock %}
 
 {% block scripts %}
@@ -7560,6 +7580,141 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             fileLabel.textContent = 'No file selected';
             uploadButton.disabled = true;
+        }
+    });
+    
+    // Portfolio management form handling
+    const actionSelect = document.getElementById('portfolio-action');
+    const actionButton = document.getElementById('portfolio-action-btn');
+    const addFields = document.getElementById('add-portfolio-fields');
+    const renameFields = document.getElementById('rename-portfolio-fields');
+    const deleteFields = document.getElementById('delete-portfolio-fields');
+    const portfolioForm = document.getElementById('manage-portfolios-form');
+    const formSpacer = document.getElementById('form-spacer');
+    
+    // Function to adjust form spacer height
+    function adjustFormLayout() {
+        // Reset spacer height
+        formSpacer.style.minHeight = '50px';
+        
+        // Get the visible fields container
+        let visibleFields = null;
+        if (!addFields.classList.contains('is-hidden')) {
+            visibleFields = addFields;
+        } else if (!renameFields.classList.contains('is-hidden')) {
+            visibleFields = renameFields;
+        } else if (!deleteFields.classList.contains('is-hidden')) {
+            visibleFields = deleteFields;
+        }
+        
+        // If we have visible fields, adjust the spacer to compensate
+        if (visibleFields) {
+            const maxFieldsHeight = 120; // Maximum height any of the fields should take
+            const currentHeight = visibleFields.offsetHeight;
+            
+            // If current fields are smaller than max, add to spacer
+            if (currentHeight < maxFieldsHeight) {
+                formSpacer.style.minHeight = (50 + (maxFieldsHeight - currentHeight)) + 'px';
+            }
+        }
+    }
+    
+    if (actionSelect) {
+        actionSelect.addEventListener('change', function() {
+            const action = this.value;
+            
+            // Hide all fields first
+            addFields.classList.add('is-hidden');
+            renameFields.classList.add('is-hidden');
+            deleteFields.classList.add('is-hidden');
+            
+            // Enable/disable action button
+            actionButton.disabled = !action;
+            
+            // Show relevant fields based on action
+            if (action === 'add') {
+                addFields.classList.remove('is-hidden');
+            } else if (action === 'rename') {
+                renameFields.classList.remove('is-hidden');
+            } else if (action === 'delete') {
+                deleteFields.classList.remove('is-hidden');
+            }
+            
+            // Adjust form layout to maintain consistent button position
+            setTimeout(adjustFormLayout, 10);
+        });
+    }
+    
+    // Add form validation before submit
+    if (portfolioForm) {
+        portfolioForm.addEventListener('submit', function(e) {
+            const action = actionSelect.value;
+            
+            if (action === 'add') {
+                const addNameField = document.querySelector('input[name="add_portfolio_name"]');
+                if (!addNameField.value.trim()) {
+                    e.preventDefault();
+                    alert('Portfolio name cannot be empty');
+                }
+            } else if (action === 'rename') {
+                const oldName = document.querySelector('select[name="old_name"]').value;
+                const newName = document.querySelector('input[name="new_name"]').value.trim();
+                if (!oldName || !newName) {
+                    e.preventDefault();
+                    alert('Both old and new portfolio names are required');
+                }
+            } else if (action === 'delete') {
+                const deleteNameField = document.querySelector('select[name="delete_portfolio_name"]');
+                if (!deleteNameField.value) {
+                    e.preventDefault();
+                    alert('Please select a portfolio to delete');
+                }
+            }
+        });
+    }
+    
+    // Ensure consistent card heights
+    function adjustCardHeights() {
+        const cards = document.querySelectorAll('.columns > .column > .card');
+        let maxContentHeight = 0;
+        let targetHeight = 200; // Reduced target height for more compactness
+        
+        // Reset heights to auto first to get natural content height
+        cards.forEach(card => {
+            card.style.height = 'auto';
+        });
+        
+        // Find the maximum content height
+        cards.forEach(card => {
+            const height = card.offsetHeight;
+            if (height > maxContentHeight) {
+                maxContentHeight = height;
+            }
+        });
+        
+        // Use the larger of target height or content height
+        const finalHeight = Math.max(targetHeight, maxContentHeight);
+        
+        // Apply the consistent height to all cards
+        cards.forEach(card => {
+            card.style.height = `${finalHeight}px`;
+        });
+        
+        // Also adjust the form layout
+        if (typeof adjustFormLayout === 'function') {
+            adjustFormLayout();
+        }
+    }
+    
+    adjustCardHeights();
+    
+    // Adjust heights on window resize
+    window.addEventListener('resize', adjustCardHeights);
+    
+    // Call the form layout adjustment function after the page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof adjustFormLayout === 'function') {
+            adjustFormLayout();
         }
     });
 });
@@ -7583,7 +7738,9 @@ const app = new Vue({
                 missing: 0,
                 totalValue: 0,
                 lastUpdate: null
-            }
+            },
+            selectedPortfolio: '',
+            showOnlyMissingPrices: false
         };
     },
     computed: {
@@ -7593,6 +7750,29 @@ const app = new Vue({
             if (health >= 90) return 'is-success';
             if (health >= 70) return 'is-warning';
             return 'is-danger';
+        },
+        filteredPortfolioItems() {
+            // First filter by selected portfolio
+            let filtered = this.selectedPortfolio 
+                ? this.portfolioItems.filter(item => item.portfolio === this.selectedPortfolio)
+                : this.portfolioItems;
+            
+            // Then filter by missing prices if checkbox is checked
+            if (this.showOnlyMissingPrices) {
+                filtered = filtered.filter(item => !item.price_eur);
+            }
+            
+            return filtered;
+        }
+    },
+    watch: {
+        showOnlyMissingPrices() {
+            // Update metrics only if we're showing filtered data
+            this.updateFilteredMetrics();
+        },
+        selectedPortfolio() {
+            // Update metrics when portfolio selection changes
+            this.updateFilteredMetrics();
         }
     },
     methods: {
@@ -7603,6 +7783,7 @@ const app = new Vue({
                 const data = await response.json();
                 this.portfolioItems = data;
                 this.updateMetrics();
+                this.updateFilteredMetrics();
             } catch (error) {
                 console.error('Error loading portfolio data:', error);
             } finally {
@@ -7618,6 +7799,17 @@ const app = new Vue({
                 missing: items.filter(i => !i.price_eur).length,
                 totalValue: items.reduce((sum, item) => sum + ((item.price_eur || 0) * (item.shares || 0)), 0),
                 lastUpdate: items.reduce((latest, item) => !latest || (item.last_updated && item.last_updated > latest) ? item.last_updated : latest, null)
+            };
+        },
+
+        updateFilteredMetrics() {
+            const filteredItems = this.filteredPortfolioItems;
+            this.metrics = {
+                total: filteredItems.length,
+                health: filteredItems.length ? Math.round(((filteredItems.length - filteredItems.filter(i => !i.price_eur).length) / filteredItems.length) * 100) : 100,
+                missing: filteredItems.filter(i => !i.price_eur).length,
+                totalValue: filteredItems.reduce((sum, item) => sum + ((item.price_eur || 0) * (item.shares || 0)), 0),
+                lastUpdate: filteredItems.reduce((latest, item) => !latest || (item.last_updated && item.last_updated > latest) ? item.last_updated : latest, null)
             };
         },
 
@@ -7637,23 +7829,42 @@ const app = new Vue({
             this.selectedItem = {};
         },
 
-        async updatePrice(item) {
-            if (!item.id) return;
+        async updatePrice() {
+            if (!this.selectedItem.id) return;
             
-            this.selectedItem = item;
             this.isUpdating = true;
             try {
-                const response = await fetch(`/portfolio/api/update_price/${item.id}`, {
+                const response = await fetch(`/portfolio/api/update_price/${this.selectedItem.id}`, {
                     method: 'POST'
                 });
+                const result = await response.json();
+                
                 if (response.ok) {
+                    // Refresh the data
                     await this.loadData();
+                    
+                    // Show success notification
+                    if (typeof showNotification === 'function') {
+                        showNotification('Price updated successfully', 'is-success');
+                    } else {
+                        console.log('Price updated successfully');
+                    }
+                } else {
+                    // Show error notification
+                    if (typeof showNotification === 'function') {
+                        showNotification(result.error || 'Failed to update price', 'is-danger');
+                    } else {
+                        console.error('Error:', result.error || 'Failed to update price');
+                    }
                 }
             } catch (error) {
                 console.error('Error updating price:', error);
+                if (typeof showNotification === 'function') {
+                    showNotification('Error updating price', 'is-danger');
+                }
             } finally {
                 this.isUpdating = false;
-                this.selectedItem = {};
+                this.closeModal();
             }
         },
 
@@ -7712,7 +7923,7 @@ const app = new Vue({
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        portfolio: item.portfolio
+                        portfolio: item.portfolio || ''
                     })
                 });
                 
@@ -7720,18 +7931,80 @@ const app = new Vue({
                 console.log('Portfolio update response:', result);
                 
                 if (result.success) {
-                    // Show success notification
-                    showNotification('Portfolio updated successfully', 'is-success', 3000);
+                    // Show success notification using the global function if available
+                    if (typeof showNotification === 'function') {
+                        showNotification('Portfolio updated successfully', 'is-success', 3000);
+                    } else {
+                        console.log('Portfolio updated successfully');
+                    }
                 } else {
                     // Show error notification
-                    showNotification(`Error updating portfolio: ${result.error}`, 'is-danger');
+                    if (typeof showNotification === 'function') {
+                        showNotification(`Error updating portfolio: ${result.error}`, 'is-danger');
+                    } else {
+                        console.error(`Error updating portfolio: ${result.error}`);
+                    }
                 }
             } catch (error) {
                 console.error('Error updating portfolio:', error);
-                showNotification('Failed to update portfolio', 'is-danger');
+                if (typeof showNotification === 'function') {
+                    showNotification('Failed to update portfolio', 'is-danger');
+                }
             }
         },
         
+        debouncedSavePortfolioChange: _.debounce(function(item) {
+            this.savePortfolioChange(item);
+        }, 500),
+        
+        // Save identifier changes to the database
+        async saveIdentifierChange(item) {
+            if (!item || !item.id) {
+                console.error('Invalid item for identifier change');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/portfolio/api/update_portfolio/${item.id}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        identifier: item.identifier || ''
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Show success notification using the global function if available
+                    if (typeof showNotification === 'function') {
+                        showNotification('Identifier updated successfully', 'is-success', 3000);
+                    } else {
+                        console.log('Identifier updated successfully');
+                    }
+                } else {
+                    // Show error notification
+                    if (typeof showNotification === 'function') {
+                        showNotification(`Error updating identifier: ${result.error}`, 'is-danger');
+                    } else {
+                        console.error(`Error updating identifier: ${result.error}`);
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating identifier:', error);
+                if (typeof showNotification === 'function') {
+                    showNotification('Failed to update identifier', 'is-danger');
+                }
+            }
+        },
+        
+        // Debounced version of saveIdentifierChange for input events
+        debouncedSaveIdentifierChange: _.debounce(function(item) {
+            this.saveIdentifierChange(item);
+        }, 500),
+
         async saveCategoryChange(item) {
             console.log('saveCategoryChange called with item:', item);
             if (!item || !item.id) {
@@ -7747,7 +8020,7 @@ const app = new Vue({
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        category: item.category
+                        category: item.category || ''
                     })
                 });
                 
@@ -7755,63 +8028,31 @@ const app = new Vue({
                 console.log('Category update response:', result);
                 
                 if (result.success) {
-                    // Show success notification
-                    showNotification('Category updated successfully', 'is-success', 3000);
+                    // Show success notification using the global function if available
+                    if (typeof showNotification === 'function') {
+                        showNotification('Category updated successfully', 'is-success', 3000);
+                    } else {
+                        console.log('Category updated successfully');
+                    }
                 } else {
                     // Show error notification
-                    showNotification(`Error updating category: ${result.error}`, 'is-danger');
+                    if (typeof showNotification === 'function') {
+                        showNotification(`Error updating category: ${result.error}`, 'is-danger');
+                    } else {
+                        console.error(`Error updating category: ${result.error}`);
+                    }
                 }
             } catch (error) {
                 console.error('Error updating category:', error);
-                showNotification('Failed to update category', 'is-danger');
-            }
-        },
-        
-        async saveIdentifierChange(item) {
-            console.log('saveIdentifierChange called with item:', item);
-            if (!item || !item.id) {
-                console.error('Invalid item for identifier change');
-                return;
-            }
-            
-            try {
-                console.log('Sending identifier update request for item ID:', item.id, 'Identifier:', item.identifier);
-                const response = await fetch(`/portfolio/api/update_portfolio/${item.id}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        identifier: item.identifier
-                    })
-                });
-                
-                const result = await response.json();
-                console.log('Identifier update response:', result);
-                
-                if (result.success) {
-                    // Show success notification
-                    showNotification('Identifier updated successfully', 'is-success', 3000);
-                } else {
-                    // Show error notification
-                    showNotification(`Error updating identifier: ${result.error}`, 'is-danger');
+                if (typeof showNotification === 'function') {
+                    showNotification('Failed to update category', 'is-danger');
                 }
-            } catch (error) {
-                console.error('Error updating identifier:', error);
-                showNotification('Failed to update identifier', 'is-danger');
             }
         },
         
-        debouncedSavePortfolioChange: _.debounce(function(item) {
-            this.savePortfolioChange(item);
-        }, 500),
-        
+        // Debounced version of saveCategoryChange for input events
         debouncedSaveCategoryChange: _.debounce(function(item) {
             this.saveCategoryChange(item);
-        }, 500),
-
-        debouncedSaveIdentifierChange: _.debounce(function(item) {
-            this.saveIdentifierChange(item);
         }, 500),
 
         formatCurrency(value) {
@@ -7838,6 +8079,7 @@ const app = new Vue({
         }
     },
     mounted() {
+        console.log('Vue component mounted. Methods available:', Object.keys(this.$options.methods).join(', '));
         this.loadData();
         
         // Load portfolio options
