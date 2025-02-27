@@ -115,30 +115,6 @@
                 <div id="portfolio-table-app" v-cloak>
                     <div class="field is-grouped mb-4">
                         <div class="control">
-                            <button class="button is-info" id="refresh-data" @click="loadData">
-                                <span class="icon">
-                                    <i class="fas fa-sync"></i>
-                                </span>
-                                <span>Refresh Data</span>
-                            </button>
-                        </div>
-                        <div class="control">
-                            <button class="button is-warning" id="update-prices" @click="updateAllPrices" :class="{'is-loading': isUpdatingAll}">
-                                <span class="icon">
-                                    <i class="fas fa-dollar-sign"></i>
-                                </span>
-                                <span>Update All Prices</span>
-                            </button>
-                        </div>
-                        <div class="control">
-                            <button class="button is-danger is-light" id="update-missing-prices" @click="updateMissingPrices" :class="{'is-loading': isUpdatingMissing}">
-                                <span class="icon">
-                                    <i class="fas fa-exclamation-circle"></i>
-                                </span>
-                                <span>Update Missing Prices</span>
-                            </button>
-                        </div>
-                        <div class="control ml-auto">
                             <div class="select">
                                 <select id="filter-portfolio">
                                     <option value="">All Portfolios</option>
@@ -240,7 +216,7 @@
                                         <td>
                                             <button 
                                                 class="button is-small" 
-                                                @click="updatePrice(item)"
+                                                @click="confirmPriceUpdate(item)"
                                                 :class="{'is-loading': isUpdating && selectedItem.id === item.id}"
                                                 :disabled="isUpdating">
                                                 <span class="icon is-small">
@@ -303,6 +279,55 @@
                                     </tr>
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Delete Confirmation Modal -->
+                    <div class="modal" :class="{'is-active': showDeleteModal}">
+                        <div class="modal-background" @click="closeModal"></div>
+                        <div class="modal-card">
+                            <header class="modal-card-head">
+                                <p class="modal-card-title">Delete Confirmation</p>
+                                <button class="delete" aria-label="close" @click="closeModal"></button>
+                            </header>
+                            <section class="modal-card-body">
+                                <p>Are you sure you want to delete <span v-text="selectedItem.company"></span>?</p>
+                                <p>This action cannot be undone.</p>
+                            </section>
+                            <footer class="modal-card-foot">
+                                <button class="button is-danger" 
+                                        @click="deleteItem"
+                                        :class="{'is-loading': isDeleting}"
+                                        :disabled="isDeleting">
+                                    Delete
+                                </button>
+                                <button class="button" @click="closeModal">Cancel</button>
+                            </footer>
+                        </div>
+                    </div>
+                    
+                    <!-- Update Price Modal -->
+                    <div class="modal" :class="{'is-active': showUpdatePriceModal}">
+                        <div class="modal-background" @click="closeModal"></div>
+                        <div class="modal-card">
+                            <header class="modal-card-head">
+                                <p class="modal-card-title">Update Price</p>
+                                <button class="delete" aria-label="close" @click="closeModal"></button>
+                            </header>
+                            <section class="modal-card-body">
+                                <p>Do you want to fetch the latest price for <span v-text="selectedItem.company"></span>?</p>
+                                <p>Current price: <span v-text="selectedItem.price_eur ? formatCurrency(selectedItem.price_eur) : 'No price'"></span></p>
+                                <p>Last updated: <span v-text="formatDateAgo(selectedItem.last_updated)"></span></p>
+                            </section>
+                            <footer class="modal-card-foot">
+                                <button class="button is-success" 
+                                        @click="updatePrice"
+                                        :class="{'is-loading': isUpdating}"
+                                        :disabled="isUpdating">
+                                    Update Price
+                                </button>
+                                <button class="button" @click="closeModal">Cancel</button>
+                            </footer>
                         </div>
                     </div>
                 </div>
@@ -552,55 +577,6 @@
     </div>
 </div>
 
-<!-- Update Price Modal -->
-<div class="modal" :class="{'is-active': showUpdatePriceModal}">
-    <div class="modal-background" @click="closeModal"></div>
-    <div class="modal-card">
-        <header class="modal-card-head">
-            <p class="modal-card-title">Update Price</p>
-            <button class="delete" aria-label="close" @click="closeModal"></button>
-        </header>
-        <section class="modal-card-body">
-            <p>Do you want to fetch the latest price for <span v-text="selectedItem.company"></span>?</p>
-            <p>Current price: <span v-text="selectedItem.price_eur ? formatCurrency(selectedItem.price_eur) : 'No price'"></span></p>
-            <p>Last updated: <span v-text="formatDateAgo(selectedItem.last_updated)"></span></p>
-        </section>
-        <footer class="modal-card-foot">
-            <button class="button is-success" 
-                    @click="updatePrice"
-                    :class="{'is-loading': isUpdating}"
-                    :disabled="isUpdating">
-                Update Price
-            </button>
-            <button class="button" @click="closeModal">Cancel</button>
-        </footer>
-    </div>
-</div>
-
-<!-- Delete Confirmation Modal -->
-<div class="modal" :class="{'is-active': showDeleteModal}">
-    <div class="modal-background" @click="closeModal"></div>
-    <div class="modal-card">
-        <header class="modal-card-head">
-            <p class="modal-card-title">Delete Confirmation</p>
-            <button class="delete" aria-label="close" @click="closeModal"></button>
-        </header>
-        <section class="modal-card-body">
-            <p>Are you sure you want to delete <span v-text="selectedItem.company"></span>?</p>
-            <p>This action cannot be undone.</p>
-        </section>
-        <footer class="modal-card-foot">
-            <button class="button is-danger" 
-                    @click="deleteItem"
-                    :class="{'is-loading': isDeleting}"
-                    :disabled="isDeleting">
-                Delete
-            </button>
-            <button class="button" @click="closeModal">Cancel</button>
-        </footer>
-    </div>
-</div>
-
 {% endblock %}
 
 {% block scripts %}
@@ -633,8 +609,6 @@ const app = new Vue({
             showUpdatePriceModal: false,
             showDeleteModal: false,
             isUpdating: false,
-            isUpdatingAll: false,
-            isUpdatingMissing: false,
             isDeleting: false,
             loading: false,
             metrics: {
@@ -722,206 +696,38 @@ const app = new Vue({
             
             this.isDeleting = true;
             try {
-                const response = await fetch(`/portfolio/api/portfolio/${this.selectedItem.id}`, {
+                const response = await fetch(`/portfolio/api/company/${this.selectedItem.id}`, {
                     method: 'DELETE'
                 });
+                
+                const result = await response.json();
+                
                 if (response.ok) {
+                    // Refresh the data
                     await this.loadData();
+                    
+                    // Show success notification
+                    if (typeof showNotification === 'function') {
+                        showNotification(result.message || 'Company deleted successfully', 'is-success');
+                    } else {
+                        console.log('Success:', result.message || 'Company deleted successfully');
+                    }
+                } else {
+                    // Show error notification
+                    if (typeof showNotification === 'function') {
+                        showNotification(result.error || 'Failed to delete company', 'is-danger');
+                    } else {
+                        console.error('Error:', result.error || 'Failed to delete company');
+                    }
                 }
             } catch (error) {
                 console.error('Error deleting item:', error);
+                if (typeof showNotification === 'function') {
+                    showNotification('An error occurred while deleting the company', 'is-danger');
+                }
             } finally {
                 this.isDeleting = false;
                 this.closeModal();
-            }
-        },
-
-        async updateAllPrices() {
-            this.isUpdatingAll = true;
-            try {
-                // Start batch process
-                const response = await fetch('/portfolio/api/update_all_prices', {
-                    method: 'POST'
-                });
-                const result = await response.json();
-                
-                if (response.ok) {
-                    // Show processing notification
-                    const notification = document.createElement('div');
-                    notification.className = 'notification is-info is-light';
-                    notification.innerHTML = `
-                        <button class="delete"></button>
-                        <div>
-                            <p>Price update started. Processing ${result.message}</p>
-                            <progress class="progress is-info" value="0" max="100">0%</progress>
-                        </div>
-                    `;
-                    
-                    // Add notification to page
-                    const container = document.querySelector('.columns');
-                    container.insertBefore(notification, container.firstChild);
-                    
-                    // Add click handler to delete button
-                    notification.querySelector('.delete').addEventListener('click', () => {
-                        notification.remove();
-                    });
-                    
-                    // Start polling for status
-                    const progressBar = notification.querySelector('progress');
-                    const statusText = notification.querySelector('p');
-                    
-                    const pollStatus = async () => {
-                        try {
-                            const statusResponse = await fetch(`/portfolio/api/price_update_status/${result.job_id}`);
-                            const status = await statusResponse.json();
-                            
-                            if (status.status === 'completed') {
-                                // Update progress bar
-                                progressBar.value = 100;
-                                statusText.textContent = 'Price update completed!';
-                                
-                                // Refresh data
-                                await this.loadData();
-                                
-                                // Remove notification after 3 seconds
-                                setTimeout(() => {
-                                    if (notification.parentNode) {
-                                        notification.remove();
-                                    }
-                                }, 3000);
-                                
-                                return;
-                            } else if (status.status === 'processing') {
-                                // Update progress bar
-                                const progress = (status.progress / status.total) * 100;
-                                progressBar.value = progress;
-                                statusText.textContent = `Processing: ${status.progress}/${status.total} items`;
-                                
-                                // Continue polling
-                                setTimeout(pollStatus, 1000);
-                            }
-                        } catch (error) {
-                            console.error('Error polling status:', error);
-                            statusText.textContent = 'Error checking update status';
-                        }
-                    };
-                    
-                    // Start polling
-                    pollStatus();
-                }
-            } catch (error) {
-                console.error('Error updating all prices:', error);
-            } finally {
-                this.isUpdatingAll = false;
-            }
-        },
-        
-        async updateMissingPrices() {
-            this.isUpdatingMissing = true;
-            try {
-                // Get items with missing prices
-                const missingItems = this.portfolioItems.filter(item => !item.price_eur);
-                if (missingItems.length === 0) {
-                    // Show info notification
-                    const notification = document.createElement('div');
-                    notification.className = 'notification is-info is-light';
-                    notification.innerHTML = `
-                        <button class="delete"></button>
-                        No missing prices to update.
-                    `;
-                    
-                    // Add notification to page
-                    const container = document.querySelector('.columns');
-                    container.insertBefore(notification, container.firstChild);
-                    
-                    // Add click handler to delete button
-                    notification.querySelector('.delete').addEventListener('click', () => {
-                        notification.remove();
-                    });
-                    
-                    // Auto-remove after 5 seconds
-                    setTimeout(() => {
-                        if (notification.parentNode) {
-                            notification.remove();
-                        }
-                    }, 5000);
-                    return;
-                }
-                
-                // Start batch process for missing prices
-                const response = await fetch('/portfolio/api/update_all_prices', {
-                    method: 'POST'
-                });
-                const result = await response.json();
-                
-                if (response.ok) {
-                    // Show processing notification
-                    const notification = document.createElement('div');
-                    notification.className = 'notification is-info is-light';
-                    notification.innerHTML = `
-                        <button class="delete"></button>
-                        <div>
-                            <p>Updating missing prices. ${result.message}</p>
-                            <progress class="progress is-info" value="0" max="100">0%</progress>
-                        </div>
-                    `;
-                    
-                    // Add notification to page
-                    const container = document.querySelector('.columns');
-                    container.insertBefore(notification, container.firstChild);
-                    
-                    // Add click handler to delete button
-                    notification.querySelector('.delete').addEventListener('click', () => {
-                        notification.remove();
-                    });
-                    
-                    // Start polling for status
-                    const progressBar = notification.querySelector('progress');
-                    const statusText = notification.querySelector('p');
-                    
-                    const pollStatus = async () => {
-                        try {
-                            const statusResponse = await fetch(`/portfolio/api/price_update_status/${result.job_id}`);
-                            const status = await statusResponse.json();
-                            
-                            if (status.status === 'completed') {
-                                // Update progress bar
-                                progressBar.value = 100;
-                                statusText.textContent = 'Missing prices update completed!';
-                                
-                                // Refresh data
-                                await this.loadData();
-                                
-                                // Remove notification after 3 seconds
-                                setTimeout(() => {
-                                    if (notification.parentNode) {
-                                        notification.remove();
-                                    }
-                                }, 3000);
-                                
-                                return;
-                            } else if (status.status === 'processing') {
-                                // Update progress bar
-                                const progress = (status.progress / status.total) * 100;
-                                progressBar.value = progress;
-                                statusText.textContent = `Processing: ${status.progress}/${status.total} items`;
-                                
-                                // Continue polling
-                                setTimeout(pollStatus, 1000);
-                            }
-                        } catch (error) {
-                            console.error('Error polling status:', error);
-                            statusText.textContent = 'Error checking update status';
-                        }
-                    };
-                    
-                    // Start polling
-                    pollStatus();
-                }
-            } catch (error) {
-                console.error('Error updating missing prices:', error);
-            } finally {
-                this.isUpdatingMissing = false;
             }
         },
 

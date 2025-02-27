@@ -297,7 +297,7 @@ def update_portfolio_api():
                     
                     # Check if shares record exists
                     share_exists = query_db(
-                        'SELECT 1 FROM company_shares WHERE company_id = ?',
+                        'SELECT company_id, shares FROM company_shares WHERE company_id = ?',
                         [company_id],
                         one=True
                     )
@@ -951,6 +951,18 @@ def process_csv_data(account_id, file_content):
         db = get_db()
         cursor = db.cursor()
         
+        # Get all existing companies for this account
+        existing_companies = query_db(
+            'SELECT id, name, identifier, total_invested FROM companies WHERE account_id = ?',
+            [account_id]
+        )
+        
+        # Create a mapping of company names to their data for quick lookup
+        existing_company_map = {company['name']: company for company in existing_companies}
+        
+        # Create a set to track processed company IDs
+        processed_company_ids = set()
+        
         # Clean data
         df = pd.read_csv(io.StringIO(file_content), 
                         delimiter=';',
@@ -1070,6 +1082,20 @@ def process_csv_data(account_id, file_content):
         else:
             default_portfolio_id = default_portfolio['id']
         
+        # Get existing shares data for comparison
+        existing_shares = query_db(
+            '''SELECT cs.company_id, cs.shares, c.name 
+               FROM company_shares cs 
+               JOIN companies c ON cs.company_id = c.id 
+               WHERE c.account_id = ?''',
+            [account_id]
+        )
+        
+        # Create a mapping of company names to their current shares
+        company_shares_map = {}
+        for share_data in existing_shares:
+            company_shares_map[share_data['name']] = share_data['shares']
+        
         # Process each row
         positions_added = []
         positions_updated = []
@@ -1087,11 +1113,7 @@ def process_csv_data(account_id, file_content):
                 total_invested = 0
             
             # Check if company exists
-            company = query_db(
-                'SELECT id FROM companies WHERE name = ? AND account_id = ?',
-                [company_name, account_id],
-                one=True
-            )
+            company = existing_company_map.get(company_name)
             
             if share_count <= 0:
                 # Remove company if it exists
@@ -1110,6 +1132,18 @@ def process_csv_data(account_id, file_content):
                 continue
             
             if company:
+                # Check if data has actually changed
+                current_shares = company_shares_map.get(company_name, 0)
+                current_identifier = company['identifier']
+                current_total_invested = company['total_invested']
+                
+                # Only mark as updated if something significant changed
+                data_changed = (
+                    abs(current_shares - share_count) > 1e-10 or
+                    current_identifier != identifier or
+                    abs(current_total_invested - total_invested) > 1e-10
+                )
+                
                 # Update existing company
                 cursor.execute('''
                     UPDATE companies 
@@ -1119,7 +1153,7 @@ def process_csv_data(account_id, file_content):
                 
                 # Update shares
                 share_exists = query_db(
-                    'SELECT 1 FROM company_shares WHERE company_id = ?',
+                    'SELECT company_id, shares FROM company_shares WHERE company_id = ?',
                     [company['id']],
                     one=True
                 )
@@ -1136,7 +1170,11 @@ def process_csv_data(account_id, file_content):
                         VALUES (?, ?)
                     ''', [company['id'], share_count])
                 
-                positions_updated.append(company_name)
+                # Only add to positions_updated if data actually changed
+                if data_changed:
+                    positions_updated.append(company_name)
+                
+                processed_company_ids.add(company['id'])  # Track this company as processed
             else:
                 # Insert new company
                 cursor.execute('''
@@ -1162,6 +1200,22 @@ def process_csv_data(account_id, file_content):
                 ''', [company_id, share_count])
                 
                 positions_added.append(company_name)
+                processed_company_ids.add(company_id)  # Track new company as processed
+        
+        # Now delete companies that were not in the CSV
+        for company in existing_companies:
+            if company['id'] not in processed_company_ids:
+                # Delete shares first
+                cursor.execute(
+                    'DELETE FROM company_shares WHERE company_id = ?',
+                    [company['id']]
+                )
+                # Then delete company
+                cursor.execute(
+                    'DELETE FROM companies WHERE id = ?',
+                    [company['id']]
+                )
+                positions_removed.append(company['name'])
         
         # Commit transaction
         db.commit()
@@ -1184,3 +1238,67 @@ def process_csv_data(account_id, file_content):
         # Clean up cursor and connection
         if cursor:
             cursor.close()
+
+@portfolio_bp.route('/api/company/<int:company_id>', methods=['DELETE'])
+def delete_company(company_id):
+    """API endpoint to delete a company"""
+    if 'account_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    account_id = session['account_id']
+    
+    try:
+        # Create backup before making changes
+        backup_database()
+        
+        # Get company info before deletion
+        company = query_db(
+            'SELECT name, identifier FROM companies WHERE id = ? AND account_id = ?',
+            [company_id, account_id],
+            one=True
+        )
+        
+        if not company:
+            return jsonify({'error': 'Company not found or access denied'}), 404
+            
+        identifier = company['identifier']
+        
+        # Start transaction
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute('BEGIN TRANSACTION')
+        
+        try:
+            # Delete from company_shares first (due to foreign key constraints)
+            cursor.execute('DELETE FROM company_shares WHERE company_id = ?', [company_id])
+            
+            # Delete from companies
+            cursor.execute('DELETE FROM companies WHERE id = ? AND account_id = ?', [company_id, account_id])
+            
+            # Check if any other company uses this identifier
+            other_companies = query_db(
+                'SELECT 1 FROM companies WHERE identifier = ? LIMIT 1',
+                [identifier]
+            )
+            
+            # If no other companies use this identifier, delete from market_prices
+            if not other_companies and identifier:
+                cursor.execute('DELETE FROM market_prices WHERE identifier = ?', [identifier])
+            
+            # Commit transaction
+            db.commit()
+            
+            logger.info(f"Company '{company['name']}' (ID: {company_id}) deleted successfully")
+            return jsonify({
+                'success': True,
+                'message': f'Company "{company["name"]}" deleted successfully'
+            })
+            
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error in transaction: {str(e)}")
+            return jsonify({'error': str(e)}), 500
+            
+    except Exception as e:
+        logger.error(f"Error deleting company: {str(e)}")
+        return jsonify({'error': str(e)}), 500
