@@ -1,5 +1,5 @@
 This file is a merged representation of the entire codebase, combining all repository files into a single document.
-Generated on: 2025-02-27T23:44:31.036943
+Generated on: 2025-02-28T20:30:00.446349
 
 ================================================================
 Purpose:
@@ -2139,6 +2139,22 @@ def process_csv_data(account_id, file_content):
         
         # Calculate total invested
         df['total_invested'] = df['shares'] * df['price']
+        
+        # Group by company name to handle duplicates in the CSV
+        logger.info(f"Before grouping: {len(df)} rows")
+        # Check for duplicate company names
+        duplicate_names = df[df.duplicated('holdingname', keep=False)]['holdingname'].unique()
+        if len(duplicate_names) > 0:
+            logger.info(f"Found duplicate company names in CSV: {duplicate_names}")
+            
+            # Group by company name and aggregate
+            df = df.groupby('holdingname', as_index=False).agg({
+                'identifier': 'first',  # Take the first identifier
+                'shares': 'sum',        # Sum the shares
+                'price': 'mean',        # Average the price
+                'total_invested': 'sum' # Sum the total invested
+            })
+            logger.info(f"After grouping: {len(df)} rows")
         
         # Start database transaction
         cursor.execute('BEGIN TRANSACTION')
@@ -7099,8 +7115,9 @@ document.addEventListener('DOMContentLoaded', () => {
             </header>
             <div class="card-content" style="flex-grow: 1; display: flex; flex-direction: column; justify-content: flex-start; padding: 0.75rem;">
                 <div class="content">
-                    <form action="{{ url_for('portfolio.manage_portfolios') }}" method="post" id="manage-portfolios-form" style="display: flex; flex-direction: column; height: 100%;">
-                        <div style="flex-grow: 1;">
+                    <form action="{{ url_for('portfolio.manage_portfolios') }}" method="post" id="manage-portfolios-form">
+                        <!-- Form fields container with fixed height -->
+                        <div style="min-height: 180px; margin-bottom: 15px;">
                             <div class="columns">
                                 <div class="column is-6">
                                     <div class="field">
@@ -7169,12 +7186,10 @@ document.addEventListener('DOMContentLoaded', () => {
                                     </div>
                                 </div>
                             </div>
-                            
-                            <!-- Hidden spacer div to maintain consistent height -->
-                            <div id="form-spacer" style="min-height: 50px;"></div>
                         </div>
                         
-                        <div class="field">
+                        <!-- Button section with fixed position at bottom -->
+                        <div class="field" style="position: absolute; bottom: 20px; width: calc(100% - 30px);">
                             <div class="control">
                                 <button type="submit" class="button is-info" id="portfolio-action-btn" disabled>
                                     <span class="icon">
@@ -7590,34 +7605,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const renameFields = document.getElementById('rename-portfolio-fields');
     const deleteFields = document.getElementById('delete-portfolio-fields');
     const portfolioForm = document.getElementById('manage-portfolios-form');
-    const formSpacer = document.getElementById('form-spacer');
-    
-    // Function to adjust form spacer height
-    function adjustFormLayout() {
-        // Reset spacer height
-        formSpacer.style.minHeight = '50px';
-        
-        // Get the visible fields container
-        let visibleFields = null;
-        if (!addFields.classList.contains('is-hidden')) {
-            visibleFields = addFields;
-        } else if (!renameFields.classList.contains('is-hidden')) {
-            visibleFields = renameFields;
-        } else if (!deleteFields.classList.contains('is-hidden')) {
-            visibleFields = deleteFields;
-        }
-        
-        // If we have visible fields, adjust the spacer to compensate
-        if (visibleFields) {
-            const maxFieldsHeight = 120; // Maximum height any of the fields should take
-            const currentHeight = visibleFields.offsetHeight;
-            
-            // If current fields are smaller than max, add to spacer
-            if (currentHeight < maxFieldsHeight) {
-                formSpacer.style.minHeight = (50 + (maxFieldsHeight - currentHeight)) + 'px';
-            }
-        }
-    }
     
     if (actionSelect) {
         actionSelect.addEventListener('change', function() {
@@ -7639,9 +7626,6 @@ document.addEventListener('DOMContentLoaded', function() {
             } else if (action === 'delete') {
                 deleteFields.classList.remove('is-hidden');
             }
-            
-            // Adjust form layout to maintain consistent button position
-            setTimeout(adjustFormLayout, 10);
         });
     }
     
@@ -7699,24 +7683,12 @@ document.addEventListener('DOMContentLoaded', function() {
         cards.forEach(card => {
             card.style.height = `${finalHeight}px`;
         });
-        
-        // Also adjust the form layout
-        if (typeof adjustFormLayout === 'function') {
-            adjustFormLayout();
-        }
     }
     
     adjustCardHeights();
     
     // Adjust heights on window resize
     window.addEventListener('resize', adjustCardHeights);
-    
-    // Call the form layout adjustment function after the page loads
-    document.addEventListener('DOMContentLoaded', function() {
-        if (typeof adjustFormLayout === 'function') {
-            adjustFormLayout();
-        }
-    });
 });
 
 // Portfolio Table Vue Application

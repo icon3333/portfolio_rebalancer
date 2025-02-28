@@ -187,7 +187,15 @@ def upload_csv():
             if result.get('failed'):
                 warnings.append(f"Failed to process {len(result['failed'])} companies")
             if result.get('failed_prices'):
-                warnings.append(f"Failed to fetch prices for {len(result['failed_prices'])} tickers")
+                warnings.append(f"Failed to fetch prices for {len(result['failed_prices'])} identifiers")
+            
+            # Show price update success message if relevant
+            added_count = len(result.get('added', []))
+            failed_prices_count = len(result.get('failed_prices', []))
+            if added_count > 0:
+                prices_updated_count = added_count - failed_prices_count
+                if prices_updated_count > 0:
+                    flash(f"Successfully updated prices for {prices_updated_count} newly added companies", 'success')
             
             if warnings:
                 flash(' | '.join(warnings), 'warning')
@@ -1239,10 +1247,51 @@ def process_csv_data(account_id, file_content):
         # Clear data caches to force refresh
         clear_data_caches()
         
+        # Fetch prices for newly added companies
+        newly_added_identifiers = []
+        newly_added_company_ids = []
+        
+        for company_name in positions_added:
+            # Find the company ID and identifier for each newly added company
+            company = query_db(
+                'SELECT id, identifier FROM companies WHERE name = ? AND account_id = ?',
+                [company_name, account_id],
+                one=True
+            )
+            if company and company['identifier']:
+                newly_added_identifiers.append(company['identifier'])
+                newly_added_company_ids.append(company['id'])
+        
+        # Update prices for new companies
+        failed_prices = []
+        for i, identifier in enumerate(newly_added_identifiers):
+            company_id = newly_added_company_ids[i]
+            try:
+                # Use the same logic as single price update
+                result = get_isin_data(identifier)
+                
+                if result['success'] and result.get('price') is not None:
+                    price = result.get('price')
+                    currency = result.get('currency', 'USD')
+                    price_eur = result.get('price_eur', price)
+                    
+                    if update_price_in_db(identifier, price, currency, price_eur):
+                        logger.info(f"Updated price for newly added company: {identifier}")
+                    else:
+                        failed_prices.append(identifier)
+                        logger.warning(f"Failed to update price for newly added company: {identifier}")
+                else:
+                    failed_prices.append(identifier)
+                    logger.warning(f"Failed to get price for newly added company: {identifier}")
+            except Exception as e:
+                failed_prices.append(identifier)
+                logger.error(f"Error updating price for {identifier}: {str(e)}")
+        
         return True, "CSV data imported successfully", {
             'added': positions_added,
             'updated': positions_updated,
-            'removed': positions_removed
+            'removed': positions_removed,
+            'failed_prices': failed_prices
         }
         
     except Exception as e:
