@@ -1063,6 +1063,22 @@ def process_csv_data(account_id, file_content):
         # Calculate total invested
         df['total_invested'] = df['shares'] * df['price']
         
+        # Group by company name to handle duplicates in the CSV
+        logger.info(f"Before grouping: {len(df)} rows")
+        # Check for duplicate company names
+        duplicate_names = df[df.duplicated('holdingname', keep=False)]['holdingname'].unique()
+        if len(duplicate_names) > 0:
+            logger.info(f"Found duplicate company names in CSV: {duplicate_names}")
+            
+            # Group by company name and aggregate
+            df = df.groupby('holdingname', as_index=False).agg({
+                'identifier': 'first',  # Take the first identifier
+                'shares': 'sum',        # Sum the shares
+                'price': 'mean',        # Average the price
+                'total_invested': 'sum' # Sum the total invested
+            })
+            logger.info(f"After grouping: {len(df)} rows")
+        
         # Start database transaction
         cursor.execute('BEGIN TRANSACTION')
         
