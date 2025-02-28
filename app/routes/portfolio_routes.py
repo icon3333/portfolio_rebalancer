@@ -72,7 +72,7 @@ def enrich():
     with get_db() as db:
         portfolios = query_db('''
             SELECT name FROM portfolios 
-            WHERE account_id = ? AND name != '-' 
+            WHERE account_id = ? AND name != '-' AND TRIM(name) != ''
             ORDER BY name
         ''', [account_id])
         logger.info(f"Retrieved {len(portfolios)} portfolios")
@@ -92,9 +92,13 @@ def enrich():
     total_items = len(portfolio_data)
     health = int(((total_items - missing_prices) / total_items * 100) if total_items > 0 else 100)
     
+    # Check if we should use the default portfolio
+    use_default_portfolio = session.pop('use_default_portfolio', False)
+    
     return render_template('pages/enrich.html',
                          portfolio_data=portfolio_data,
                          portfolios=[p['name'] for p in portfolios],
+                         use_default_portfolio=use_default_portfolio,
                          metrics={
                              'total': total_items,
                              'health': health,
@@ -137,7 +141,7 @@ def get_portfolios_api():
         # Get portfolios
         portfolios = query_db('''
             SELECT name FROM portfolios 
-            WHERE account_id = ? AND name != '-'
+            WHERE account_id = ? AND name != '-' AND TRIM(name) != ''
             ORDER BY name
         ''', [account_id])
         logger.info(f"Retrieved {len(portfolios)} portfolios")
@@ -218,6 +222,9 @@ def upload_csv():
             
             if warnings:
                 flash(' | '.join(warnings), 'warning')
+                
+            # Set session variable to indicate we should use "-" as the default portfolio
+            session['use_default_portfolio'] = True
         else:
             flash(message, 'error')
             

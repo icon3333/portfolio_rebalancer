@@ -1195,6 +1195,9 @@ const app = new Vue({
             .then(response => response.json())
             .then(data => {
                 this.portfolioOptions = data;
+                {% if use_default_portfolio %}
+                this.selectedPortfolio = "-";
+                {% endif %}
             })
             .catch(error => {
                 console.error('Error loading portfolios:', error);
