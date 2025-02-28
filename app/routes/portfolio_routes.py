@@ -23,9 +23,22 @@ import traceback
 # Set up logger
 logger = logging.getLogger(__name__)
 
+# Global progress tracking variables
+price_fetch_progress = {
+    'current': 0,
+    'total': 0,
+    'start_time': None
+}
+
 portfolio_bp = Blueprint('portfolio', __name__, 
                        url_prefix='/portfolio',
                        template_folder='../../templates')
+
+# Ensure session persistence
+@portfolio_bp.before_request
+def make_session_permanent():
+    session.permanent = True  # This makes the session last longer
+    session.modified = True   # This ensures changes are saved
 
 @portfolio_bp.route('/enrich')
 def enrich():
@@ -159,6 +172,12 @@ def upload_csv():
         flash('No file selected', 'error')
         return redirect(url_for('portfolio.enrich'))
     
+    # Reset global progress tracking
+    global price_fetch_progress
+    price_fetch_progress['current'] = 0
+    price_fetch_progress['total'] = 0
+    price_fetch_progress['start_time'] = datetime.now().isoformat()
+    
     # Process the file
     try:
         # Create backup
@@ -195,7 +214,7 @@ def upload_csv():
             if added_count > 0:
                 prices_updated_count = added_count - failed_prices_count
                 if prices_updated_count > 0:
-                    flash(f"Successfully updated prices for {prices_updated_count} newly added companies", 'success')
+                    flash(f"Successfully updated prices for {prices_updated_count} out of {added_count} newly added companies", 'success')
             
             if warnings:
                 flash(' | '.join(warnings), 'warning')
@@ -712,50 +731,84 @@ def update_price_by_id_api(company_id):
 
 @portfolio_bp.route('/api/update_all_prices', methods=['POST'])
 def update_all_prices_api():
+    """API endpoint to update all prices"""
+    if 'account_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    account_id = session['account_id']
+    
     try:
-        # Get current account_id from session
-        account_id = session.get('account_id')
-        if not account_id:
-            return jsonify({'error': 'No account selected'}), 400
-
-        # Load portfolio data
-        portfolio_items = load_portfolio_data(account_id)
+        # Get all companies for this account
+        companies = query_db('''
+            SELECT id, name, identifier 
+            FROM companies 
+            WHERE account_id = ?
+        ''', [account_id])
         
-        if not portfolio_items:  # Check if list is empty
-            return jsonify({'message': 'No portfolio items found'}), 200
-            
-        # Convert list of dicts to pandas DataFrame
-        import pandas as pd
-        df = pd.DataFrame(portfolio_items)
+        if not companies:
+            return jsonify({'message': 'No companies found to update'}), 200
         
-        if df.empty:
-            return jsonify({'message': 'No portfolio items found'}), 200
-
-        # Get list of ISINs
-        isins = df['identifier'].dropna().unique().tolist()
+        # Initialize progress tracking
+        global price_fetch_progress
+        price_fetch_progress['current'] = 0
+        price_fetch_progress['total'] = len(companies)
+        price_fetch_progress['start_time'] = datetime.now().isoformat()
         
-        # Filter out empty strings and non-strings
-        isins = [isin for isin in isins if isinstance(isin, str) and isin.strip()]
+        # Create a job to update prices
+        job_id = start_batch_process(
+            update_prices, 
+            [companies, account_id],
+            callback=update_prices_in_db
+        )
         
-        if not isins:
-            return jsonify({'message': 'No valid identifiers found'}), 200
-        
-        # Start batch processing
-        job_id = start_batch_process(isins)
-        
-        if not job_id:
-            return jsonify({'error': 'Failed to start batch process'}), 500
-        
-        # Return job ID for status checking
         return jsonify({
-            'status': 'processing',
-            'job_id': job_id,
-            'message': f'Processing {len(isins)} portfolio items'
+            'success': True,
+            'message': f'Started updating prices for {len(companies)} companies',
+            'job_id': job_id
         })
-
+        
     except Exception as e:
-        logger.error(f"Error in update_all_prices: {str(e)}")
+        logger.error(f"Error updating all prices: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+def update_prices(companies, account_id):
+    """Update prices for all companies"""
+    global price_fetch_progress
+    results = []
+    
+    for i, company in enumerate(companies):
+        try:
+            # Update progress
+            price_fetch_progress['current'] = i + 1
+            
+            identifier = company['identifier']
+            if not identifier:
+                continue
+                
+            result = get_isin_data(identifier)
+            
+            if result['success'] and result.get('price') is not None:
+                price = result.get('price')
+                currency = result.get('currency', 'USD')
+                
+                # Convert to EUR if needed
+                price_eur = price
+                if currency != 'EUR':
+                    # Conversion logic would go here
+                    pass
+                
+                results.append({
+                    'company_id': company['id'],
+                    'price': price,
+                    'price_eur': price_eur,
+                    'currency': currency,
+                    'identifier': identifier
+                })
+                
+        except Exception as e:
+            logger.error(f"Error updating price for {company['name']}: {str(e)}")
+    
+    return results
 
 @portfolio_bp.route('/api/price_update_status/<job_id>', methods=['GET'])
 def get_price_update_status(job_id):
@@ -874,6 +927,30 @@ def update_progress():
             time.sleep(0.5)
     
     return Response(generate(), mimetype='text/event-stream')
+
+@portfolio_bp.route('/api/price_fetch_progress', methods=['GET'])
+def get_price_fetch_progress():
+    """Get the current progress of price fetching"""
+    global price_fetch_progress
+    
+    current = price_fetch_progress['current']
+    total = price_fetch_progress['total']
+    start_time = price_fetch_progress['start_time']
+    
+    # Calculate percentage - handle division by zero
+    percentage = 0
+    if total > 0:
+        percentage = round((current / total) * 100)
+    
+    # Log for debugging
+    logger.debug(f"Progress: {current}/{total} ({percentage}%)")
+    
+    return jsonify({
+        'current': current,
+        'total': total,
+        'start_time': start_time,
+        'percentage': percentage
+    })
 
 def get_portfolio_data(account_id):
     """Get portfolio data from the database"""
@@ -1262,11 +1339,21 @@ def process_csv_data(account_id, file_content):
                 newly_added_identifiers.append(company['identifier'])
                 newly_added_company_ids.append(company['id'])
         
+        # Store progress information in the global variable
+        global price_fetch_progress
+        if newly_added_identifiers:
+            price_fetch_progress['total'] = len(newly_added_identifiers)
+            price_fetch_progress['current'] = 0
+            price_fetch_progress['start_time'] = datetime.now().isoformat()
+        
         # Update prices for new companies
         failed_prices = []
         for i, identifier in enumerate(newly_added_identifiers):
             company_id = newly_added_company_ids[i]
             try:
+                # Update the progress counter
+                price_fetch_progress['current'] = i + 1
+                
                 # Use the same logic as single price update
                 result = get_isin_data(identifier)
                 

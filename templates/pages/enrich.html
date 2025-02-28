@@ -106,6 +106,15 @@
                                     </span>
                                     <span>Upload and Process</span>
                                 </button>
+                                <span id="price-fetch-progress" class="ml-2" style="display: none; align-items: center;">
+                                    <span class="icon is-small mr-1">
+                                        <i class="fas fa-sync fa-spin"></i>
+                                    </span>
+                                    <span>Fetching prices: <span id="progress-count">0</span>/<span id="progress-total">0</span> (<span id="progress-percentage">0%</span>)</span>
+                                    <div class="progress-bar-container mt-1" style="width: 100%; height: 8px; background-color: #eee; border-radius: 4px; overflow: hidden;">
+                                        <div id="progress-bar" style="width: 0%; height: 100%; background-color: #00d1b2; transition: width 0.3s;"></div>
+                                    </div>
+                                </span>
                             </div>
                         </div>
                     </form>
@@ -599,13 +608,36 @@
 {% endblock %}
 
 {% block scripts %}
+<style>
+    #price-fetch-progress {
+        display: inline-flex;
+        align-items: center;
+        vertical-align: middle;
+        font-size: 0.9rem;
+    }
+    
+    #price-fetch-progress .icon {
+        margin-right: 0.3rem;
+    }
+</style>
 <script>
 // File input handling
 document.addEventListener('DOMContentLoaded', function() {
     const fileInput = document.querySelector('.file-input');
     const fileLabel = document.querySelector('.file-name');
     const uploadButton = document.getElementById('upload-button');
-
+    const progressElement = document.getElementById('price-fetch-progress');
+    const progressCount = document.getElementById('progress-count');
+    const progressTotal = document.getElementById('progress-total');
+    const progressPercentage = document.getElementById('progress-percentage');
+    const uploadForm = document.querySelector('form[action*="upload"]');
+    
+    // Initialize progress display
+    progressCount.textContent = '0';
+    progressTotal.textContent = '0';
+    progressPercentage.textContent = '0%';
+    progressElement.style.display = 'none';
+    
     fileInput.addEventListener('change', function() {
         if (fileInput.files.length > 0) {
             fileLabel.textContent = fileInput.files[0].name;
@@ -615,6 +647,92 @@ document.addEventListener('DOMContentLoaded', function() {
             uploadButton.disabled = true;
         }
     });
+    
+    // Simple polling function to check price fetch progress
+    let progressInterval = null;
+    
+    function checkPriceFetchProgress() {
+        fetch('/portfolio/api/price_fetch_progress')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log("Progress data:", data); // Debug log
+                
+                // Update the progress display
+                progressCount.textContent = data.current || 0;
+                progressTotal.textContent = data.total || 0;
+                
+                // Use percentage directly from the server
+                const percentage = data.percentage || 0;
+                progressPercentage.textContent = percentage + '%';
+                
+                // Update progress bar
+                const progressBar = document.getElementById('progress-bar');
+                if (progressBar) {
+                    progressBar.style.width = percentage + '%';
+                }
+                
+                // Only show the progress indicator if there's actual progress happening
+                // or if we're in processing mode (set by form submission)
+                if (data.total > 0 || progressElement.dataset.processing === 'true') {
+                    progressElement.style.display = 'inline-flex';
+                    progressElement.style.flexDirection = 'column'; // Stack elements vertically
+                    
+                    // If we're done, hide after a delay
+                    if (data.current >= data.total && data.total > 0) {
+                        console.log("Process complete, hiding indicator soon");
+                        clearInterval(progressInterval);
+                        setTimeout(() => {
+                            progressElement.style.display = 'none';
+                            // Clear processing flag
+                            delete progressElement.dataset.processing;
+                        }, 3000);
+                    }
+                } else {
+                    // Check if we should keep showing while processing
+                    if (!progressElement.dataset.processing) {
+                        progressElement.style.display = 'none';
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error checking price fetch progress:', error);
+            });
+    }
+    
+    // Do NOT start polling automatically when page loads
+    // We'll start it only when the form is submitted
+    
+    // Form submission event
+    if (uploadForm) {
+        uploadForm.addEventListener('submit', function() {
+            console.log("Form submitted, starting progress tracking");
+            
+            // Reset progress indicators
+            progressCount.textContent = '0';
+            progressTotal.textContent = '0';
+            progressPercentage.textContent = '0%';
+            
+            // Show the progress indicator immediately when the form is submitted
+            progressElement.style.display = 'inline-flex';
+            progressElement.dataset.processing = 'true';
+            
+            // Clear any existing interval and start a new one
+            if (progressInterval) {
+                clearInterval(progressInterval);
+            }
+            
+            // Create a new interval with more frequent updates during processing
+            progressInterval = setInterval(checkPriceFetchProgress, 500);
+            
+            // Also run once immediately
+            checkPriceFetchProgress();
+        });
+    }
     
     // Portfolio management form handling
     const actionSelect = document.getElementById('portfolio-action');
