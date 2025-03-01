@@ -1398,6 +1398,127 @@ def process_csv_data(account_id, file_content):
         if cursor:
             cursor.close()
 
+@portfolio_bp.route('/api/bulk_update', methods=['POST'])
+def bulk_update():
+    """API endpoint to update multiple companies at once"""
+    if 'account_id' not in session:
+        return jsonify({'error': 'Not authenticated. Please select an account from the home page.'}), 401
+    
+    try:
+        account_id = session['account_id']
+        data = request.json
+        
+        # Validate data
+        if not data or 'companies' not in data:
+            return jsonify({'error': 'Invalid data format, companies array is required'}), 400
+            
+        company_ids = data.get('companies', [])
+        if not company_ids or not isinstance(company_ids, list):
+            return jsonify({'error': 'No companies selected or invalid companies format'}), 400
+            
+        # Create backup
+        backup_database()
+        
+        # Start transaction
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute('BEGIN TRANSACTION')
+        
+        updated_companies = []
+        errors = []
+        
+        try:
+            # Handle different update types
+            if 'portfolio' in data:
+                # Get or create portfolio
+                portfolio_name = data.get('portfolio', '-')
+                portfolio_result = query_db(
+                    'SELECT id FROM portfolios WHERE name = ? AND account_id = ?',
+                    [portfolio_name, account_id],
+                    one=True
+                )
+                
+                if not portfolio_result:
+                    cursor.execute(
+                        'INSERT INTO portfolios (name, account_id) VALUES (?, ?)',
+                        [portfolio_name, account_id]
+                    )
+                    portfolio_id = cursor.lastrowid
+                else:
+                    portfolio_id = portfolio_result['id']
+                
+                # Update all selected companies
+                for company_id in company_ids:
+                    # Verify company belongs to account
+                    company = query_db(
+                        'SELECT id, name FROM companies WHERE id = ? AND account_id = ?',
+                        [company_id, account_id],
+                        one=True
+                    )
+                    
+                    if not company:
+                        errors.append(f"Company ID {company_id} not found or access denied")
+                        continue
+                    
+                    # Update portfolio
+                    cursor.execute(
+                        'UPDATE companies SET portfolio_id = ? WHERE id = ?',
+                        [portfolio_id, company_id]
+                    )
+                    
+                    updated_companies.append({
+                        'id': company_id,
+                        'name': company.get('name', 'Unknown'),
+                        'portfolio': portfolio_name
+                    })
+            
+            elif 'category' in data:
+                # Update category for all selected companies
+                new_category = data.get('category', '')
+                
+                for company_id in company_ids:
+                    # Verify company belongs to account
+                    company = query_db(
+                        'SELECT id, name FROM companies WHERE id = ? AND account_id = ?',
+                        [company_id, account_id],
+                        one=True
+                    )
+                    
+                    if not company:
+                        errors.append(f"Company ID {company_id} not found or access denied")
+                        continue
+                    
+                    # Update category
+                    cursor.execute(
+                        'UPDATE companies SET category = ? WHERE id = ?',
+                        [new_category, company_id]
+                    )
+                    
+                    updated_companies.append({
+                        'id': company_id,
+                        'name': company.get('name', 'Unknown'),
+                        'category': new_category
+                    })
+            else:
+                return jsonify({'error': 'No update type specified (portfolio or category)'}), 400
+            
+            # Commit transaction
+            db.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': f'Successfully updated {len(updated_companies)} companies',
+                'updated': updated_companies,
+                'errors': errors
+            })
+            
+        except Exception as e:
+            db.rollback()
+            return jsonify({'error': str(e)}), 500
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @portfolio_bp.route('/api/company/<int:company_id>', methods=['DELETE'])
 def delete_company(company_id):
     """API endpoint to delete a company"""

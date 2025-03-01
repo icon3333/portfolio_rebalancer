@@ -1,0 +1,753 @@
+{% macro head_extras() %}
+    <!-- Add Lodash -->
+    <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
+    <style>
+        .file-label {
+            width: 100%;
+        }
+        .file-name {
+            max-width: none;
+            width: 100%;
+        }
+        .portfolio-editor {
+            height: 600px;
+            overflow: auto;
+        }
+        
+        /* Custom styles for the enrich page */
+        .card-content {
+            padding: 1rem;
+        }
+        
+        /* Make sure form elements are properly spaced */
+        .field:not(:last-child) {
+            margin-bottom: 0.75rem;
+        }
+        
+        /* Responsive adjustments */
+        @media screen and (max-width: 768px) {
+            .columns .column .card {
+                min-height: auto !important;
+                height: auto !important;
+                margin-bottom: 1rem;
+            }
+        }
+        
+        /* Styling for Bulk Edit Modal */
+        .company-list-container {
+            border-radius: 4px;
+            background-color: #1e1e1e;
+            border: none;
+        }
+        
+        .company-list-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .company-list-container::-webkit-scrollbar-track {
+            background: #2b2b2b;
+            border-radius: 4px;
+        }
+        
+        .company-list-container::-webkit-scrollbar-thumb {
+            background: #444;
+            border-radius: 4px;
+        }
+        
+        .company-list-container::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        
+        .company-list .checkbox {
+            color: #ddd;
+        }
+        
+        .company-list .checkbox:hover {
+            background-color: rgba(50, 50, 50, 0.5);
+            border-radius: 4px;
+        }
+        
+        .modal-card-body {
+            padding: 20px 25px;
+        }
+        
+        /* Adjustments for Bulk Edit Modal */
+        .company-list-container {
+            max-height: 400px; 
+            overflow-y: auto; 
+            padding-right: 10px;
+        }
+        
+        .company-list {
+            padding-left: 1.5rem;
+        }
+        
+        .is-flex.is-justify-content-space-between.is-align-items-center.mb-2.px-2.py-1.has-background-light {
+            padding-left: 1.5rem;
+        }
+        
+        .level-item.has-text-centered {
+            display: flex;
+            align-items: center;
+        }
+        
+        .level-item.has-text-centered > div {
+            margin: 0 1rem;
+        }
+        
+        /* Fix select dropdown width */
+        .select.is-fullwidth {
+            width: 100%;
+        }
+        
+        /* Fix portfolio name alignment with "Select All" button */
+        .portfolio-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 1rem;
+            background-color: #2b2b2b;
+            margin-bottom: 0.5rem;
+        }
+        
+        .portfolio-title {
+            font-weight: bold;
+            color: #ffffff;
+            font-size: 1rem;
+            margin: 0;
+            flex-grow: 1; /* Ensure title takes up available space */
+        }
+        
+        .select-all {
+            margin-left: auto;
+            color: #ffffff;
+        }
+        
+        .select-all .checkbox {
+            color: #ffffff;
+        }
+        
+        .company-name {
+            color: #ddd;
+        }
+        
+        #price-fetch-progress {
+            display: inline-flex;
+            align-items: center;
+            vertical-align: middle;
+            font-size: 0.9rem;
+        }
+        
+        #price-fetch-progress .icon {
+            margin-right: 0.3rem;
+        }
+    </style>
+{% endmacro %}
+
+{% macro page_header() %}
+<div class="columns">
+    <div class="column is-12">
+        <h1 class="title">
+            <span class="icon-text">
+                <span class="icon">
+                    <i class="fas fa-gem"></i>
+                </span>
+                <span>Enrich Portfolio Data</span>
+            </span>
+        </h1>
+    </div>
+</div>
+{% endmacro %}
+
+{% macro upload_section(url_for) %}
+<div class="column is-6">
+    <div class="card mb-5" style="height: 100%; min-height: 250px; display: flex; flex-direction: column;">
+        <header class="card-header">
+            <p class="card-header-title">
+                <span class="icon-text">
+                    <span class="icon">
+                        <i class="fas fa-upload"></i>
+                    </span>
+                    <span>Upload Portfolio Data</span>
+                </span>
+            </p>
+            <button class="card-header-icon" aria-label="more options">
+                <span class="icon">
+                    <i class="fas fa-angle-down" aria-hidden="true"></i>
+                </span>
+            </button>
+        </header>
+        <div class="card-content" style="flex-grow: 1; display: flex; flex-direction: column; justify-content: flex-start; padding: 0.75rem;">
+            <div class="content">
+                <form action="{{ url_for('portfolio.upload_csv') }}" method="post" enctype="multipart/form-data">
+                    <div class="field">
+                        <label class="label">CSV File</label>
+                        <div class="file has-name is-fullwidth">
+                            <label class="file-label">
+                                <input class="file-input" type="file" name="csv_file" id="csv_file" accept=".csv">
+                                <span class="file-cta">
+                                    <span class="file-icon">
+                                        <i class="fas fa-upload"></i>
+                                    </span>
+                                    <span class="file-label">
+                                        Choose a file…
+                                    </span>
+                                </span>
+                                <span class="file-name">
+                                    No file selected
+                                </span>
+                            </label>
+                        </div>
+                        <p class="help">Upload a CSV file with your portfolio data.</p>
+                    </div>
+                    
+                    <div class="field">
+                        <div class="control">
+                            <button type="submit" class="button is-primary" id="upload-button" disabled>
+                                <span class="icon">
+                                    <i class="fas fa-cloud-upload-alt"></i>
+                                </span>
+                                <span>Upload and Process</span>
+                            </button>
+                            <span id="price-fetch-progress" class="ml-2" style="display: none; align-items: center;">
+                                <span class="icon is-small mr-1">
+                                    <i class="fas fa-sync fa-spin"></i>
+                                </span>
+                                <span>Fetching prices: <span id="progress-count">0</span>/<span id="progress-total">0</span> (<span id="progress-percentage">0%</span>)</span>
+                                <div class="progress-bar-container mt-1" style="width: 100%; height: 8px; background-color: #eee; border-radius: 4px; overflow: hidden;">
+                                    <div id="progress-bar" style="width: 0%; height: 100%; background-color: #00d1b2; transition: width 0.3s;"></div>
+                                </div>
+                            </span>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endmacro %}
+
+{% macro portfolio_management(url_for, portfolios) %}
+<div class="column is-6">
+    <div class="card mb-5" style="height: 100%; min-height: 250px; display: flex; flex-direction: column;">
+        <header class="card-header">
+            <p class="card-header-title">
+                <span class="icon-text">
+                    <span class="icon">
+                        <i class="fas fa-folder-open"></i>
+                    </span>
+                    <span>Portfolio Management</span>
+                </span>
+            </p>
+            <button class="card-header-icon" aria-label="more options">
+                <span class="icon">
+                    <i class="fas fa-angle-down" aria-hidden="true"></i>
+                </span>
+            </button>
+        </header>
+        <div class="card-content" style="flex-grow: 1; display: flex; flex-direction: column; justify-content: flex-start; padding: 0.75rem;">
+            <div class="content">
+                <form action="{{ url_for('portfolio.manage_portfolios') }}" method="post" id="manage-portfolios-form">
+                    <!-- Form fields container with fixed height -->
+                    <div style="min-height: 180px; margin-bottom: 15px;">
+                        <div class="columns">
+                            <div class="column is-6">
+                                <div class="field">
+                                    <label class="label">Actions</label>
+                                    <div class="control">
+                                        <div class="select">
+                                            <select name="action" id="portfolio-action">
+                                                <option value="">Select action</option>
+                                                <option value="add">Add Portfolio</option>
+                                                <option value="rename">Rename Portfolio</option>
+                                                <option value="delete">Delete Portfolio</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="column is-6">
+                                <div id="rename-portfolio-fields" class="is-hidden">
+                                    <div class="field">
+                                        <label class="label">Select Portfolio</label>
+                                        <div class="control">
+                                            <div class="select">
+                                                <select name="old_name">
+                                                    <option value="">Select portfolio</option>
+                                                    {% for portfolio in portfolios %}
+                                                        <option value="{{ portfolio }}">{{ portfolio }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="field">
+                                        <label class="label">New Name</label>
+                                        <div class="control">
+                                            <input class="input" type="text" name="new_name" placeholder="Enter new name">
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div id="delete-portfolio-fields" class="is-hidden">
+                                    <div class="field">
+                                        <label class="label">Select Portfolio to Delete</label>
+                                        <div class="control">
+                                            <div class="select">
+                                                <select name="delete_portfolio_name">
+                                                    <option value="">Select portfolio</option>
+                                                    {% for portfolio in portfolios %}
+                                                        <option value="{{ portfolio }}">{{ portfolio }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="notification is-warning is-light">
+                                        <strong>Warning:</strong> Portfolio must be empty to delete.
+                                    </div>
+                                </div>
+                                <div id="add-portfolio-fields" class="is-hidden">
+                                    <div class="field">
+                                        <label class="label">Portfolio Name</label>
+                                        <div class="control">
+                                            <input class="input" type="text" name="add_portfolio_name" placeholder="Enter portfolio name">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Button section with fixed position at bottom -->
+                    <div class="field" style="position: absolute; bottom: 20px; width: calc(100% - 30px);">
+                        <div class="control">
+                            <button type="submit" class="button is-info" id="portfolio-action-btn" disabled>
+                                <span class="icon">
+                                    <i class="fas fa-check"></i>
+                                </span>
+                                <span>Apply</span>
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endmacro %}
+
+{% macro portfolio_data_section(portfolios) %}
+<div class="card mb-5">
+    <header class="card-header">
+        <p class="card-header-title">
+            <span class="icon-text">
+                <span class="icon">
+                    <i class="fas fa-table"></i>
+                </span>
+                <span>Portfolio Data</span>
+            </span>
+        </p>
+        <button class="card-header-icon" aria-label="more options">
+            <span class="icon">
+                <i class="fas fa-angle-down" aria-hidden="true"></i>
+            </span>
+        </button>
+    </header>
+    <div class="card-content">
+        <div class="content">
+            <div id="portfolio-editor" class="portfolio-editor">
+                <!-- Vue.js component will be mounted here -->
+                <div id="portfolio-table-app" v-cloak>
+                    <div class="field is-grouped mb-4">
+                        <div class="control">
+                            <div class="select">
+                                <select id="filter-portfolio" v-model="selectedPortfolio">
+                                    <option value="">All Portfolios</option>
+                                    {% for portfolio in portfolios %}
+                                        <option value="{{ portfolio }}">{{ portfolio }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="control">
+                            <label class="checkbox" style="display: flex; align-items: center; height: 2.5em; padding: 0 0.5em;">
+                                <input type="checkbox" v-model="showOnlyMissingPrices">
+                                <span style="margin-left: 0.5em;">No price</span>
+                            </label>
+                        </div>
+                        <div class="control">
+                            <button class="button is-info is-light" @click="bulkEditApp.openModal()">
+                                <span class="icon">
+                                    <i class="fas fa-edit"></i>
+                                </span>
+                                <span>Bulk Edit</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div v-if="loading" class="has-text-centered my-6">
+                        <span class="icon is-large">
+                            <i class="fas fa-spinner fa-pulse fa-3x"></i>
+                        </span>
+                        <p class="mt-4">Loading portfolio data...</p>
+                    </div>
+                    
+                    <div v-else-if="filteredPortfolioItems.length === 0" class="notification is-warning">
+                        <p>No portfolio data available. Please upload a CSV file to get started.</p>
+                    </div>
+                    
+                    <div v-else>
+                        <!-- Portfolio health metrics -->
+                        <div class="notification" :class="healthColorClass">
+                            <div class="level">
+                                <div class="level-item has-text-centered">
+                                    <div>
+                                        <p class="heading">Total Companies</p>
+                                        <p v-text="metrics.total"></p>
+                                    </div>
+                                </div>
+                                <div class="level-item has-text-centered">
+                                    <div>
+                                        <p class="heading">Portfolio Health</p>
+                                        <p><span v-text="metrics.health"></span>%</p>
+                                    </div>
+                                </div>
+                                <div class="level-item has-text-centered">
+                                    <div>
+                                        <p class="heading">Missing Prices</p>
+                                        <p v-text="metrics.missing"></p>
+                                    </div>
+                                </div>
+                                <div class="level-item has-text-centered">
+                                    <div>
+                                        <p class="heading">Total Value</p>
+                                        <p v-text="formatCurrency(metrics.totalValue)"></p>
+                                    </div>
+                                </div>
+                                <div class="level-item has-text-centered">
+                                    <div>
+                                        <p class="heading">Last Update</p>
+                                        <p v-text="formatDateAgo(metrics.lastUpdate)"></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Editable table -->
+                        <div v-if="loading" class="has-text-centered">
+                            <span class="icon">
+                                <i class="fas fa-spinner fa-spin"></i>
+                            </span>
+                            <p class="mt-4">Loading portfolio data...</p>
+                        </div>
+                        
+                        <div v-else-if="filteredPortfolioItems.length === 0" class="notification is-warning">
+                            <p>No portfolio data available. Please upload a CSV file to get started.</p>
+                        </div>
+                        
+                        <div v-else class="table-container">
+                            <table class="table is-striped is-hoverable is-fullwidth">
+                                <thead>
+                                    <tr>
+                                        <th>Update</th>
+                                        <th>Company</th>
+                                        <th>Portfolio</th>
+                                        <th>Category</th>
+                                        <th>Shares</th>
+                                        <th>Price (EUR)</th>
+                                        <th>Total Value</th>
+                                        <th>Total Invested</th>
+                                        <th>Last Update</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="item in filteredPortfolioItems" :key="item.id">
+                                        <td>
+                                            <button 
+                                                class="button is-small" 
+                                                @click="confirmPriceUpdate(item)"
+                                                :class="{'is-loading': isUpdating && selectedItem.id === item.id}"
+                                                :disabled="isUpdating">
+                                                <span class="icon is-small">
+                                                    <i class="fas fa-sync"></i>
+                                                </span>
+                                            </button>
+                                        </td>
+                                        <td>
+                                            <span v-text="item.company"></span>
+                                        </td>
+                                        <td>
+                                            <div class="select is-small">
+                                                <select v-model="item.portfolio" 
+                                                        @change="debouncedSavePortfolioChange(item)">
+                                                    <option value="">-</option>
+                                                    <option v-for="p in portfolioOptions" :key="p" :value="p">{{ p }}</option>
+                                                </select>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <input class="input is-small" type="text"
+                                                   v-model="item.category"
+                                                   @input="debouncedSaveCategoryChange(item)"
+                                                   @change="saveCategoryChange(item)">
+                                        </td>
+                                        <td>
+                                            <span v-text="formatNumber(item.shares)"></span>
+                                        </td>
+                                        <td :class="{'has-text-danger': !item.price_eur}">
+                                            <span v-text="item.price_eur ? formatCurrency(item.price_eur) : 'No price'"></span>
+                                        </td>
+                                        <td>
+                                            <span v-text="formatCurrency(item.price_eur * item.shares)"></span>
+                                        </td>
+                                        <td>
+                                            <span v-text="formatCurrency(item.total_invested)"></span>
+                                        </td>
+                                        <td>
+                                            <span v-text="formatDateAgo(item.last_updated)"></span>
+                                        </td>
+                                        <td>
+                                            <div class="buttons is-right">
+                                                <button 
+                                                    class="button is-small is-danger" 
+                                                    @click="confirmDelete(item)"
+                                                    :class="{'is-loading': isDeleting && selectedItem.id === item.id}"
+                                                    :disabled="isDeleting">
+                                                    <span class="icon is-small">
+                                                        <i class="fas fa-trash"></i>
+                                                    </span>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Delete Confirmation Modal -->
+                    <div class="modal" :class="{'is-active': showDeleteModal}">
+                        <div class="modal-background" @click="closeModal"></div>
+                        <div class="modal-card">
+                            <header class="modal-card-head">
+                                <p class="modal-card-title">Delete Confirmation</p>
+                                <button class="delete" aria-label="close" @click="closeModal"></button>
+                            </header>
+                            <section class="modal-card-body">
+                                <p>Are you sure you want to delete <span v-text="selectedItem.company"></span>?</p>
+                                <p>This action cannot be undone.</p>
+                            </section>
+                            <footer class="modal-card-foot">
+                                <button class="button is-danger" 
+                                        @click="deleteItem"
+                                        :class="{'is-loading': isDeleting}"
+                                        :disabled="isDeleting">
+                                    Delete
+                                </button>
+                                <button class="button" @click="closeModal">Cancel</button>
+                            </footer>
+                        </div>
+                    </div>
+                    
+                    <!-- Update Price Modal -->
+                    <div class="modal" :class="{'is-active': showUpdatePriceModal}">
+                        <div class="modal-background" @click="closeModal"></div>
+                        <div class="modal-card">
+                            <header class="modal-card-head">
+                                <p class="modal-card-title">Update Price</p>
+                                <button class="delete" aria-label="close" @click="closeModal"></button>
+                            </header>
+                            <section class="modal-card-body">
+                                <p>Do you want to fetch the latest price for <span v-text="selectedItem.company"></span>?</p>
+                                <p>Current price: <span v-text="selectedItem.price_eur ? formatCurrency(selectedItem.price_eur) : 'No price'"></span></p>
+                                <p>Last updated: <span v-text="formatDateAgo(selectedItem.last_updated)"></span></p>
+                            </section>
+                            <footer class="modal-card-foot">
+                                <button class="button is-success" 
+                                        @click="updatePrice"
+                                        :class="{'is-loading': isUpdating}"
+                                        :disabled="isUpdating">
+                                    Update Price
+                                </button>
+                                <button class="button" @click="closeModal">Cancel</button>
+                            </footer>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endmacro %}
+
+{% macro bulk_edit_modal(portfolios) %}
+<div id="bulk-edit-modal" class="modal">
+    <div class="modal-background"></div>
+    <div class="modal-card" style="width: 90%; max-width: 1000px;">
+        <div id="bulk-edit-app" v-cloak>
+            <header class="modal-card-head">
+                <p class="modal-card-title">Bulk Edit Companies</p>
+                <button class="delete" aria-label="close" @click="closeModal"></button>
+            </header>
+            <section class="modal-card-body">
+                <div v-if="loading" class="has-text-centered my-4">
+                    <span class="icon is-large">
+                        <i class="fas fa-spinner fa-pulse fa-2x"></i>
+                    </span>
+                    <p>Loading data...</p>
+                </div>
+                
+                <div v-else class="columns is-variable is-4">
+                    <!-- Left Column: Company Selection with Scrollbar -->
+                    <div class="column is-6">
+                        <div class="box">
+                            <!-- Filter -->
+                            <div class="field">
+                                <label class="label">Filter Companies</label>
+                                <div class="control has-icons-left">
+                                    <input class="input" type="text" v-model="searchQuery" placeholder="Type to filter companies">
+                                    <span class="icon is-small is-left">
+                                        <i class="fas fa-search"></i>
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <!-- Selection Summary -->
+                            <div class="notification is-info is-light mb-3" v-if="selectedCompanies.length > 0">
+                                <p class="has-text-centered">
+                                    <strong v-text="selectedCompanies.length"></strong> companies selected
+                                </p>
+                            </div>
+
+                            <!-- Companies selector grouped by portfolio (scrollable) -->
+                            <div class="company-list-container has-background-white" style="max-height: 400px; overflow-y: auto; padding: 0;">
+                                <div v-for="(companies, portfolio) in computedGroupedCompanies" :key="portfolio" class="portfolio-section">
+                                    <div class="portfolio-header is-flex is-align-items-center is-justify-content-space-between p-2 has-background-light">
+                                        <h5 v-text="portfolio" class="portfolio-title is-size-5 has-text-weight-semibold has-text-dark"></h5>
+                                        <div class="select-all">
+                                            <label class="checkbox">
+                                                <input type="checkbox" 
+                                                    @change="togglePortfolio(portfolio)"
+                                                    :checked="isPortfolioSelected(portfolio)">
+                                                <span class="ml-1 has-text-dark">Select All</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="company-list p-2 has-background-white">
+                                        <div v-for="company in companies" :key="company.id" class="py-1 px-2 company-item" :class="{'is-selected': selectedCompanies.includes(company.id)}">
+                                            <label class="checkbox is-flex is-align-items-center">
+                                                <input type="checkbox" v-model="selectedCompanies" :value="company.id">
+                                                <span class="ml-2 company-name has-text-dark" v-text="company.name"></span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- No companies found message -->
+                                <div v-if="Object.keys(computedGroupedCompanies).length === 0" class="notification is-warning">
+                                    <p>No companies found matching your filter criteria.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Right Column: Edit Options -->
+                    <div class="column is-6">
+                        <div class="box">
+                            <div class="tabs is-boxed mb-4">
+                                <ul>
+                                    <li :class="{'is-active': activeTab === 'portfolio'}" @click="activeTab = 'portfolio'">
+                                        <a>
+                                            <span>Change Portfolio</span>
+                                        </a>
+                                    </li>
+                                    <li :class="{'is-active': activeTab === 'category'}" @click="activeTab = 'category'">
+                                        <a>
+                                            <span>Change Category</span>
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
+                            
+                            <!-- Change Portfolio Tab -->
+                            <div v-show="activeTab === 'portfolio'" class="p-3">
+                                <div class="field">
+                                    <label class="label">Target Portfolio</label>
+                                    <div class="control">
+                                        <div class="select is-fullwidth">
+                                            <select v-model="targetPortfolio">
+                                                <option value="">Select portfolio</option>
+                                                {% for portfolio in portfolios %}
+                                                    <option value="{{ portfolio }}">{{ portfolio }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <p class="help">Choose the portfolio where selected companies will be moved</p>
+                                </div>
+                                
+                                <div class="field mt-4">
+                                    <label class="label">Action</label>
+                                    <div class="control">
+                                        <div class="field">
+                                            <label class="radio">
+                                                <input type="radio" v-model="portfolioAction" value="add">
+                                                <span class="ml-2">Move to this portfolio</span>
+                                            </label>
+                                        </div>
+                                        <div class="field">
+                                            <label class="radio">
+                                                <input type="radio" v-model="portfolioAction" value="remove" disabled>
+                                                <span class="ml-2">Remove from this portfolio</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="field mt-5">
+                                    <div class="control">
+                                        <button class="button is-primary" @click="applyPortfolioChanges" :class="{'is-loading': isLoading}">
+                                            <span class="icon"><i class="fas fa-check"></i></span>
+                                            <span>Apply Changes</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Change Category Tab -->
+                            <div v-show="activeTab === 'category'" class="p-3">
+                                <div class="field">
+                                    <label class="label">New Category</label>
+                                    <div class="control">
+                                        <input class="input" type="text" v-model="newCategory" placeholder="Enter category name">
+                                    </div>
+                                    <p class="help">Enter the category that will be applied to all selected companies</p>
+                                </div>
+                                
+                                <div class="field mt-5">
+                                    <div class="control">
+                                        <button class="button is-primary" @click="applyCategoryChanges" :class="{'is-loading': isLoading}">
+                                            <span class="icon"><i class="fas fa-check"></i></span>
+                                            <span>Apply Changes</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <footer class="modal-card-foot">
+                <button class="button" id="bulk-edit-save" @click="closeModal">
+                    <span class="icon"><i class="fas fa-times"></i></span>
+                    <span>Close</span>
+                </button>
+            </footer>
+        </div>
+    </div>
+</div>
+{% endmacro %}
