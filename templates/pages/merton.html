@@ -13,13 +13,11 @@
                 <span>Merton Allocation</span>
             </span>
         </h1>
-
-        <div class="notification is-info is-light">
-            <button class="delete"></button>
-            <p>The Merton model helps you optimize your portfolio based on risk-free rates,
-               risk aversion, and target return expectations. Use the form below to update
-               parameters and calculate recommended allocations.</p>
-        </div>
+        <p class="subtitle has-text-grey">
+            The Merton model helps you optimize your portfolio based on risk-free rates,
+            risk aversion, and target return expectations. Use the form below to update
+            parameters and calculate recommended allocations.
+        </p>
     </div>
 </div>
 
@@ -130,12 +128,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const mertonForm = document.getElementById('merton-params-form');
     const resultsDiv = document.getElementById('merton-results-content');
 
-    // Dismiss notifications
-    document.querySelectorAll('.notification .delete').forEach(delBtn => {
-        delBtn.addEventListener('click', () => {
-            delBtn.parentNode.remove();
-        });
-    });
+    // No longer needed as we removed the dismissible notifications
+    
 
     if(mertonForm) {
         mertonForm.addEventListener('submit', (e) => {
