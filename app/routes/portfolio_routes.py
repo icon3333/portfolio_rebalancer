@@ -189,10 +189,8 @@ def get_portfolios_api():
         # Convert set to list and sort alphabetically
         names = sorted(portfolio_names)
         
-        # Always include 'Default' in the portfolio options
-        if 'Default' not in names:
-            names.append('Default')
-            logger.info("Added 'Default' portfolio to the response")
+        # Don't hardcode any portfolio names - only use what's in the database
+        logger.info("Using only portfolio names from the database")
         
         logger.info(f"Combined portfolio names: {names}")
         

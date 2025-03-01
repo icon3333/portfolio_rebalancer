@@ -365,8 +365,11 @@
                             <div class="select">
                                 <select id="filter-portfolio" v-model="selectedPortfolio">
                                     <option value="">All Portfolios</option>
+                                    <option value="-">Default</option>
                                     {% for portfolio in portfolios %}
-                                        <option value="{{ portfolio }}">{{ portfolio }}</option>
+                                        {% if portfolio != 'Default' %}
+                                            <option value="{{ portfolio }}">{{ portfolio }}</option>
+                                        {% endif %}
                                     {% endfor %}
                                 </select>
                             </div>
@@ -483,9 +486,12 @@
                                             <div class="select is-small">
                                                 <select v-model="item.portfolio" 
                                                         @change="debouncedSavePortfolioChange(item)">
+                                                    <!-- Special handling for the default portfolio value '-' -->
                                                     <option value="-">Default</option>
                                                     {% for portfolio in portfolios %}
-                                                        <option value="{{ portfolio }}">{{ portfolio }}</option>
+                                                        {% if portfolio != 'Default' %}
+                                                            <option value="{{ portfolio }}">{{ portfolio }}</option>
+                                                        {% endif %}
                                                     {% endfor %}
                                                 </select>
                                             </div>
