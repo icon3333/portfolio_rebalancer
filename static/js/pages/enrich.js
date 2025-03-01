@@ -260,7 +260,9 @@ class PortfolioTableApp {
                         lastUpdate: null
                     },
                     selectedPortfolio: defaultPortfolio,
-                    showOnlyMissingPrices: false
+                    showOnlyMissingPrices: false,
+                    sortColumn: '',
+                    sortDirection: 'asc'
                 };
             },
             computed: {
@@ -280,6 +282,45 @@ class PortfolioTableApp {
                     // Then filter by missing prices if checkbox is checked
                     if (this.showOnlyMissingPrices) {
                         filtered = filtered.filter(item => !item.price_eur);
+                    }
+                    
+                    // Apply sorting if a sort column is specified
+                    if (this.sortColumn) {
+                        const direction = this.sortDirection === 'asc' ? 1 : -1;
+                        
+                        filtered = [...filtered].sort((a, b) => {
+                            // Handle special cases for calculated fields
+                            if (this.sortColumn === 'total_value') {
+                                const aValue = (a.price_eur || 0) * (a.shares || 0);
+                                const bValue = (b.price_eur || 0) * (b.shares || 0);
+                                return direction * (aValue - bValue);
+                            }
+                            
+                            // For regular fields
+                            let aVal = a[this.sortColumn];
+                            let bVal = b[this.sortColumn];
+                            
+                            // Handle null/undefined values
+                            if (aVal === null || aVal === undefined) aVal = '';
+                            if (bVal === null || bVal === undefined) bVal = '';
+                            
+                            // Convert to numbers for numeric fields
+                            if (this.sortColumn === 'shares' || this.sortColumn === 'price_eur' || this.sortColumn === 'total_invested') {
+                                aVal = parseFloat(aVal) || 0;
+                                bVal = parseFloat(bVal) || 0;
+                                return direction * (aVal - bVal);
+                            }
+                            
+                            // Handle dates
+                            if (this.sortColumn === 'last_updated') {
+                                const aDate = aVal ? new Date(aVal) : new Date(0);
+                                const bDate = bVal ? new Date(bVal) : new Date(0);
+                                return direction * (aDate - bDate);
+                            }
+                            
+                            // String comparison for text fields
+                            return direction * String(aVal).localeCompare(String(bVal));
+                        });
                     }
                     
                     return filtered;
@@ -646,6 +687,20 @@ class PortfolioTableApp {
                     if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
                     if (diff < 2592000) return `${Math.floor(diff / 86400)}d ago`;
                     return d.toLocaleDateString();
+                },
+                
+                // Sort table by column
+                sortBy(column) {
+                    // If clicking the same column, toggle direction
+                    if (this.sortColumn === column) {
+                        this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        // New column, default to ascending
+                        this.sortColumn = column;
+                        this.sortDirection = 'asc';
+                    }
+                    
+                    console.log(`Sorting by ${column} in ${this.sortDirection} order`);
                 }
             },
             mounted() {

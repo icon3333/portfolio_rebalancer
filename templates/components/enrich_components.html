@@ -449,20 +449,63 @@
                                 <thead>
                                     <tr>
                                         <th>Update</th>
-                                        <th>
+                                        <th @click="sortBy('identifier')" class="is-sortable">
                                             Identifier
                                             <span class="icon is-small has-tooltip-right" data-tooltip="Supported formats: Stock tickers (AAPL), Crypto (BTC-USD), or ISINs (US0378331005)">
                                                 <i class="fas fa-question-circle"></i>
                                             </span>
+                                            <span class="icon is-small ml-1" v-if="sortColumn === 'identifier'">
+                                                <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
+                                            </span>
                                         </th>
-                                        <th>Company</th>
-                                        <th>Portfolio</th>
-                                        <th>Category</th>
-                                        <th>Shares</th>
-                                        <th>Price (EUR)</th>
-                                        <th>Total Value</th>
-                                        <th>Total Invested</th>
-                                        <th>Last Update</th>
+                                        <th @click="sortBy('company')" class="is-sortable">
+                                            Company
+                                            <span class="icon is-small ml-1" v-if="sortColumn === 'company'">
+                                                <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
+                                            </span>
+                                        </th>
+                                        <th @click="sortBy('portfolio')" class="is-sortable">
+                                            Portfolio
+                                            <span class="icon is-small ml-1" v-if="sortColumn === 'portfolio'">
+                                                <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
+                                            </span>
+                                        </th>
+                                        <th @click="sortBy('category')" class="is-sortable">
+                                            Category
+                                            <span class="icon is-small ml-1" v-if="sortColumn === 'category'">
+                                                <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
+                                            </span>
+                                        </th>
+                                        <th @click="sortBy('shares')" class="is-sortable">
+                                            Shares
+                                            <span class="icon is-small ml-1" v-if="sortColumn === 'shares'">
+                                                <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
+                                            </span>
+                                        </th>
+                                        <th @click="sortBy('price_eur')" class="is-sortable">
+                                            Price (EUR)
+                                            <span class="icon is-small ml-1" v-if="sortColumn === 'price_eur'">
+                                                <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
+                                            </span>
+                                        </th>
+                                        <th @click="sortBy('total_value')" class="is-sortable">
+                                            Total Value
+                                            <span class="icon is-small ml-1" v-if="sortColumn === 'total_value'">
+                                                <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
+                                            </span>
+                                        </th>
+                                        <th @click="sortBy('total_invested')" class="is-sortable">
+                                            Total Invested
+                                            <span class="icon is-small ml-1" v-if="sortColumn === 'total_invested'">
+                                                <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
+                                            </span>
+                                        </th>
+                                        <th @click="sortBy('last_updated')" class="is-sortable">
+                                            Last Update
+                                            <span class="icon is-small ml-1" v-if="sortColumn === 'last_updated'">
+                                                <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
+                                            </span>
+                                        </th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
