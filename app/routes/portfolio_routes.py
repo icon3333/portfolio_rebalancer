@@ -68,14 +68,37 @@ def enrich():
     portfolio_data = get_portfolio_data(account_id)
     logger.info(f"Retrieved {len(portfolio_data)} portfolio items")
     
-    # Get portfolios for dropdown
+    # Get portfolios for dropdown (including valid portfolio names)
     with get_db() as db:
-        portfolios = query_db('''
+        # Get portfolio names from portfolios table - include all valid portfolios
+        portfolios_from_table = query_db('''
             SELECT name FROM portfolios 
-            WHERE account_id = ? AND name != '-' AND TRIM(name) != ''
+            WHERE account_id = ? AND name IS NOT NULL
             ORDER BY name
         ''', [account_id])
-        logger.info(f"Retrieved {len(portfolios)} portfolios")
+        logger.info(f"Retrieved {len(portfolios_from_table)} portfolios from portfolios table")
+        
+        # Get all portfolios directly from the portfolios table
+        portfolios_from_companies = query_db('''
+            SELECT DISTINCT p.name as name
+            FROM portfolios p
+            WHERE p.account_id = ? AND p.name IS NOT NULL
+        ''', [account_id])
+        logger.info(f"Retrieved {len(portfolios_from_companies)} portfolios from portfolios table")
+        
+        # Combine both sources and remove duplicates
+        portfolio_names = set()
+        for p in portfolios_from_table:
+            if p['name'] and p['name'].strip():
+                portfolio_names.add(p['name'])
+        
+        for p in portfolios_from_companies:
+            if p['name'] and p['name'].strip():
+                portfolio_names.add(p['name'])
+        
+        # Convert set to list and sort alphabetically
+        portfolios = [{'name': name} for name in sorted(portfolio_names)]
+        logger.info(f"Combined unique portfolios: {[p['name'] for p in portfolios]}")
     
     # Log template variables for debugging
     logger.debug(f"Template variables:")
@@ -138,18 +161,46 @@ def get_portfolios_api():
         account_id = session['account_id']
         logger.info(f"Getting portfolios for account_id: {account_id}")
         
-        # Get portfolios
-        portfolios = query_db('''
+        # Get portfolios using the same approach as in the enrich function
+        # Get portfolio names from portfolios table
+        portfolios_from_table = query_db('''
             SELECT name FROM portfolios 
-            WHERE account_id = ? AND name != '-' AND TRIM(name) != ''
+            WHERE account_id = ? AND name IS NOT NULL
             ORDER BY name
         ''', [account_id])
-        logger.info(f"Retrieved {len(portfolios)} portfolios")
         
-        # Return just the portfolio names array
-        portfolio_names = [p['name'] for p in portfolios]
-        logger.info(f"Returning portfolio names: {portfolio_names}")
-        return jsonify(portfolio_names)
+        # Get all portfolios directly from the portfolios table
+        portfolios_from_companies = query_db('''
+            SELECT DISTINCT p.name as name
+            FROM portfolios p
+            WHERE p.account_id = ? AND p.name IS NOT NULL
+        ''', [account_id])
+        
+        # Combine both sources and remove duplicates
+        portfolio_names = set()
+        for p in portfolios_from_table:
+            if p['name'] and p['name'].strip():
+                portfolio_names.add(p['name'])
+        
+        for p in portfolios_from_companies:
+            if p['name'] and p['name'].strip():
+                portfolio_names.add(p['name'])
+        
+        # Convert set to list and sort alphabetically
+        names = sorted(portfolio_names)
+        
+        # Always include 'Default' in the portfolio options
+        if 'Default' not in names:
+            names.append('Default')
+            logger.info("Added 'Default' portfolio to the response")
+        
+        logger.info(f"Combined portfolio names: {names}")
+        
+        # Debug the JSON serialization
+        json_response = jsonify(names)
+        logger.debug(f"JSON response to be sent: {json_response.data}")
+        
+        return json_response
         
     except Exception as e:
         logger.error(f"Error getting portfolios: {str(e)}", exc_info=True)
@@ -1008,11 +1059,23 @@ def get_portfolio_data(account_id):
         portfolio_data = []
         for _, row in df.iterrows():
             try:
+                # Check all column names for debugging
+                logger.debug(f"Available columns: {row.index.tolist()}")
+                
+                # Try both portfolio_name and name variations to be safe
+                portfolio_value = ''
+                if 'portfolio_name' in row:
+                    portfolio_value = row['portfolio_name']
+                elif 'portfolio' in row:
+                    portfolio_value = row['portfolio']
+                
+                logger.debug(f"Portfolio value for {row['name']}: '{portfolio_value}'")
+                
                 item = {
                     'id': row['id'],  # Add the id field
                     'company': row['name'],  # Changed from 'company' to 'name'
                     'identifier': row['identifier'],
-                    'portfolio': row.get('portfolio_name', ''),  # Try to get portfolio_name or fall back to empty string
+                    'portfolio': portfolio_value,  # Use the extracted portfolio value
                     'category': row['category'],
                     'shares': float(row['shares']) if pd.notna(row['shares']) else 0,
                     'override_share': float(row['override_share']) if pd.notna(row['override_share']) else None,

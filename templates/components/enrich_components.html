@@ -483,8 +483,10 @@
                                             <div class="select is-small">
                                                 <select v-model="item.portfolio" 
                                                         @change="debouncedSavePortfolioChange(item)">
-                                                    <option value="">-</option>
-                                                    <option v-for="p in portfolioOptions" :key="p" :value="p">{{ p }}</option>
+                                                    <option value="-">Default</option>
+                                                    {% for portfolio in portfolios %}
+                                                        <option value="{{ portfolio }}">{{ portfolio }}</option>
+                                                    {% endfor %}
                                                 </select>
                                             </div>
                                         </td>

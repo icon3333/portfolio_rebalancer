@@ -127,6 +127,12 @@
     box-shadow: none !important;
 }
 
+/* Ensure dropdown options are visible */
+option {
+    color: black !important;
+    background-color: white !important;
+}
+
 /* Buttons */
 .button {
     background: var(--white) !important;

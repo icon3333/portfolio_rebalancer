@@ -4,8 +4,9 @@ import os
 from datetime import datetime
 
 # Set up logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+logger.info("Logger initialized at DEBUG level")
 
 def create_app(config_name='default'):
     app = Flask(__name__, 

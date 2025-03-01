@@ -110,8 +110,20 @@ def load_portfolio_data(account_id=None, portfolio_id=None):
         if portfolio_id:
             query += ' AND c.portfolio_id = ?'
             params.append(portfolio_id)
-            
-        return query_db(query, params)
+        
+        # Execute query and get results
+        results = query_db(query, params)
+        
+        # Add debugging to log sample results
+        if results and len(results) > 0:
+            sample = results[0]
+            logger.debug(f"Sample portfolio data keys: {list(sample.keys())}")
+            if 'portfolio_name' in sample:
+                logger.debug(f"Sample portfolio_name value: '{sample['portfolio_name']}'")
+            else:
+                logger.debug("portfolio_name key not found in results")
+                
+        return results
         
     except Exception as e:
         logger.error(f"Error loading portfolio data: {str(e)}")

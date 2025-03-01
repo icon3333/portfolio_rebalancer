@@ -299,11 +299,27 @@ class PortfolioTableApp {
                 async loadData() {
                     this.loading = true;
                     try {
+                        // Load portfolio items
                         const response = await fetch('/portfolio/api/portfolio_data');
                         const data = await response.json();
                         this.portfolioItems = data;
+                        console.log('Loaded portfolio items:', this.portfolioItems);
                         this.updateMetrics();
                         this.updateFilteredMetrics();
+                        
+                        // Also refresh the portfolio options at the same time
+                        try {
+                            const portfoliosResponse = await fetch('/portfolio/api/portfolios');
+                            const portfoliosData = await portfoliosResponse.json();
+                            if (Array.isArray(portfoliosData) && portfoliosData.length > 0) {
+                                this.portfolioOptions = portfoliosData;
+                                console.log('Updated portfolio options:', this.portfolioOptions);
+                            } else {
+                                console.warn('No portfolio options received or empty array');
+                            }
+                        } catch (portfolioError) {
+                            console.error('Error refreshing portfolio options:', portfolioError);
+                        }
                     } catch (error) {
                         console.error('Error loading portfolio data:', error);
                     } finally {
@@ -443,7 +459,7 @@ class PortfolioTableApp {
                                 'Content-Type': 'application/json'
                             },
                             body: JSON.stringify({
-                                portfolio: item.portfolio || ''
+                                portfolio: item.portfolio || '-'
                             })
                         });
                         
@@ -600,7 +616,70 @@ class PortfolioTableApp {
             },
             mounted() {
                 console.log('Vue component mounted. Methods available:', Object.keys(this.$options.methods).join(', '));
-                this.loadData();
+                console.log('Initial portfolio options:', this.portfolioOptions);
+                
+                // First, normalize the initial portfolioOptions if they exist
+                console.log('Initial portfolio options type:', typeof this.portfolioOptions, Array.isArray(this.portfolioOptions));
+                
+                // Convert array of objects to array of strings if needed
+                if (Array.isArray(this.portfolioOptions)) {
+                    if (this.portfolioOptions.length > 0 && typeof this.portfolioOptions[0] === 'object' && this.portfolioOptions[0].name) {
+                        console.log('Converting portfolio options from objects to strings');
+                        this.portfolioOptions = this.portfolioOptions.map(p => p.name);
+                    }
+                    console.log('Normalized initial portfolio options:', this.portfolioOptions);
+                }
+                
+                // Always fetch fresh portfolio data from the server
+                console.log('Fetching up-to-date portfolio options from server...');
+                fetch('/portfolio/api/portfolios')
+                    .then(response => {
+                        console.log('Portfolio API response status:', response.status);
+                        if (!response.ok) {
+                            throw new Error(`HTTP error ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log('Portfolio options from server (RAW):', data);
+                        console.log('Portfolio options type:', typeof data, Array.isArray(data));
+                        
+                        if (Array.isArray(data)) {
+                            // Use exactly what the API returns without additional filtering
+                            this.portfolioOptions = data;
+                            console.log('Updated portfolio options array:', this.portfolioOptions);
+                            console.log('Individual portfolio options:');
+                            this.portfolioOptions.forEach((option, index) => {
+                                console.log(`Option ${index}:`, option, 'Type:', typeof option);
+                            });
+                            
+                            // Check if we have valid portfolio options
+                            if (this.portfolioOptions.length === 0) {
+                                console.warn('No portfolio options found from server');
+                            }
+                            
+                            // Log whether Default portfolio is in the options
+                            const hasDefault = this.portfolioOptions.includes('Default');
+                            console.log('Has Default portfolio in options:', hasDefault);
+                        } else {
+                            console.warn('Invalid portfolio options format from server');
+                            this.portfolioOptions = [];
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error fetching portfolio options:', error);
+                        // Fall back to options passed from template if API fails
+                        if (Array.isArray(this.portfolioOptions)) {
+                            console.log('Falling back to template-provided portfolio options');
+                            this.portfolioOptions = this.portfolioOptions.filter(p => p && p !== '-');
+                        } else {
+                            this.portfolioOptions = [];
+                        }
+                    })
+                    .finally(() => {
+                        // Load all data after portfolio options are handled
+                        this.loadData();
+                    });
             }
         });
         
@@ -933,9 +1012,12 @@ document.addEventListener('DOMContentLoaded', function() {
     if (portfoliosElement) {
         try {
             portfolios = JSON.parse(portfoliosElement.textContent);
+            console.log('Parsed portfolios from DOM:', portfolios);
         } catch (error) {
             console.error('Error parsing portfolios data:', error);
         }
+    } else {
+        console.warn('No portfolios-data element found in DOM');
     }
     
     // Check for default portfolio setting
