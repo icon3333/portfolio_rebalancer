@@ -37,6 +37,106 @@
                 margin-bottom: 1rem;
             }
         }
+        
+        /* Styling for Bulk Edit Modal */
+        .company-list-container {
+            border-radius: 4px;
+            background-color: #1e1e1e;
+            border: none;
+        }
+        
+        .company-list-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .company-list-container::-webkit-scrollbar-track {
+            background: #2b2b2b;
+            border-radius: 4px;
+        }
+        
+        .company-list-container::-webkit-scrollbar-thumb {
+            background: #444;
+            border-radius: 4px;
+        }
+        
+        .company-list-container::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        
+        .company-list .checkbox {
+            color: #ddd;
+        }
+        
+        .company-list .checkbox:hover {
+            background-color: rgba(50, 50, 50, 0.5);
+            border-radius: 4px;
+        }
+        
+        .modal-card-body {
+            padding: 20px 25px;
+        }
+        
+        /* Adjustments for Bulk Edit Modal */
+        .company-list-container {
+            max-height: 400px; 
+            overflow-y: auto; 
+            padding-right: 10px;
+        }
+        
+        .company-list {
+            padding-left: 1.5rem;
+        }
+        
+        .is-flex.is-justify-content-space-between.is-align-items-center.mb-2.px-2.py-1.has-background-light {
+            padding-left: 1.5rem;
+        }
+        
+        .level-item.has-text-centered {
+            display: flex;
+            align-items: center;
+        }
+        
+        .level-item.has-text-centered > div {
+            margin: 0 1rem;
+        }
+        
+        /* Fix select dropdown width */
+        .select.is-fullwidth {
+            width: 100%;
+        }
+        
+        /* Fix portfolio name alignment with "Select All" button */
+        .portfolio-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 1rem;
+            background-color: #2b2b2b;
+            margin-bottom: 0.5rem;
+        }
+        
+        .portfolio-title {
+            font-weight: bold;
+            color: #ffffff;
+            font-size: 1rem;
+            margin: 0;
+            flex-grow: 1; /* Ensure title takes up available space */
+        }
+        
+        .select-all {
+            margin-left: auto;
+            color: #ffffff;
+        }
+        
+        .select-all .checkbox {
+            color: #ffffff;
+        }
+        
+        .company-name {
+            color: #ddd;
+        }
+        
+        /* ... rest of your CSS ... */
     </style>
 {% endblock %}
 
@@ -273,7 +373,7 @@
                             </label>
                         </div>
                         <div class="control">
-                            <button class="button is-info is-light js-modal-trigger" data-target="bulk-edit-modal">
+                            <button class="button is-info is-light" @click="bulkEditApp.openModal()">
                                 <span class="icon">
                                     <i class="fas fa-edit"></i>
                                 </span>
@@ -347,7 +447,6 @@
                                 <thead>
                                     <tr>
                                         <th>Update</th>
-                                        <th>Identifier</th>
                                         <th>Company</th>
                                         <th>Portfolio</th>
                                         <th>Category</th>
@@ -373,12 +472,6 @@
                                             </button>
                                         </td>
                                         <td>
-                                            <input class="input is-small" type="text"
-                                                   v-model="item.identifier"
-                                                   @input="debouncedSaveIdentifierChange(item)"
-                                                   @change="saveIdentifierChange(item)">
-                                        </td>
-                                        <td>
                                             <span v-text="item.company"></span>
                                         </td>
                                         <td>
@@ -386,7 +479,7 @@
                                                 <select v-model="item.portfolio" 
                                                         @change="debouncedSavePortfolioChange(item)">
                                                     <option value="">-</option>
-                                                    <option v-for="p in portfolioOptions" :key="p" :value="p" v-text="p"></option>
+                                                    <option v-for="p in portfolioOptions" :key="p" :value="p">{{ p }}</option>
                                                 </select>
                                             </div>
                                         </td>
@@ -487,13 +580,13 @@
 <!-- Bulk Edit Modal -->
 <div id="bulk-edit-modal" class="modal">
     <div class="modal-background"></div>
-    <div class="modal-card">
-        <header class="modal-card-head">
-            <p class="modal-card-title">Bulk Edit Companies</p>
-            <button class="delete" aria-label="close"></button>
-        </header>
-        <section class="modal-card-body">
-            <div id="bulk-edit-app" v-cloak>
+    <div class="modal-card" style="width: 90%; max-width: 1000px;">
+        <div id="bulk-edit-app" v-cloak>
+            <header class="modal-card-head">
+                <p class="modal-card-title">Bulk Edit Companies</p>
+                <button class="delete" aria-label="close" @click="closeModal"></button>
+            </header>
+            <section class="modal-card-body">
                 <div v-if="loading" class="has-text-centered my-4">
                     <span class="icon is-large">
                         <i class="fas fa-spinner fa-pulse fa-2x"></i>
@@ -501,107 +594,139 @@
                     <p>Loading data...</p>
                 </div>
                 
-                <div v-else>
-                    <!-- Filter -->
-                    <div class="field">
-                        <label class="label">Filter Companies</label>
-                        <div class="control has-icons-left">
-                            <input class="input" type="text" v-model="searchQuery" placeholder="Type to filter companies">
-                            <span class="icon is-small is-left">
-                                <i class="fas fa-search"></i>
-                            </span>
-                        </div>
-                    </div>
-                    
-                    <!-- Companies selector grouped by portfolio -->
-                    <div v-for="(companies, portfolio) in computedGroupedCompanies" :key="portfolio" class="mb-5">
-                        <div class="is-flex is-justify-content-space-between is-align-items-center mb-2">
-                            <h5 class="title is-5">{{ portfolio }}</h5>
-                            <label class="checkbox">
-                                <input type="checkbox" 
-                                       @change="togglePortfolio(portfolio)"
-                                       :checked="isPortfolioSelected(portfolio)">
-                                Select All
-                            </label>
-                        </div>
-                        
-                        <div class="columns is-multiline">
-                            <div v-for="company in companies" :key="company.id" class="column is-6">
-                                <label class="checkbox">
-                                    <input type="checkbox" v-model="selectedCompanies" :value="company.id">
-                                    <span v-text="company.name"></span> (<span v-text="company.identifier"></span>)
-                                </label>
+                <div v-else class="columns is-variable is-4">
+                    <!-- Left Column: Company Selection with Scrollbar -->
+                    <div class="column is-6">
+                        <div class="box">
+                            <!-- Filter -->
+                            <div class="field">
+                                <label class="label">Filter Companies</label>
+                                <div class="control has-icons-left">
+                                    <input class="input" type="text" v-model="searchQuery" placeholder="Type to filter companies">
+                                    <span class="icon is-small is-left">
+                                        <i class="fas fa-search"></i>
+                                    </span>
+                                </div>
                             </div>
-                        </div>
-                        <hr>
-                    </div>
-                    
-                    <!-- No companies found message -->
-                    <div v-if="Object.keys(computedGroupedCompanies).length === 0" class="notification is-warning">
-                        <p>No companies found matching your filter criteria.</p>
-                    </div>
-                    
-                    <!-- Selection Summary -->
-                    <div class="notification is-info is-light" v-if="selectedCompanies.length > 0">
-                        <p><strong v-text="selectedCompanies.length"></strong> companies selected</p>
-                    </div>
-                    
-                    <div class="tabs">
-                        <ul>
-                            <li :class="{'is-active': activeTab === 'portfolio'}" @click="activeTab = 'portfolio'">
-                                <a>Change Portfolio</a>
-                            </li>
-                            <li :class="{'is-active': activeTab === 'category'}" @click="activeTab = 'category'">
-                                <a>Change Category</a>
-                            </li>
-                        </ul>
-                    </div>
-                    
-                    <!-- Change Portfolio Tab -->
-                    <div v-show="activeTab === 'portfolio'">
-                        <div class="field">
-                            <label class="label">Target Portfolio</label>
-                            <div class="control">
-                                <div class="select is-fullwidth">
-                                    <select v-model="targetPortfolio">
-                                        <option value="">Select portfolio</option>
-                                        <option v-for="p in portfolioOptions" :key="p" :value="p">{{ p }}</option>
-                                    </select>
+                            
+                            <!-- Selection Summary -->
+                            <div class="notification is-info is-light mb-3" v-if="selectedCompanies.length > 0">
+                                <p class="has-text-centered">
+                                    <strong v-text="selectedCompanies.length"></strong> companies selected
+                                </p>
+                            </div>
+
+                            <!-- Companies selector grouped by portfolio (scrollable) -->
+                            <div class="company-list-container" style="max-height: 400px; overflow-y: auto; padding-right: 10px;">
+                                <div v-for="(companies, portfolio) in computedGroupedCompanies" :key="portfolio" class="mb-4">
+                                    <div class="portfolio-header">
+                                        <h5 v-text="portfolio" class="portfolio-title" style="flex-grow: 1;"></h5>
+                                        <div class="select-all">
+                                            <label class="checkbox">
+                                                <input type="checkbox" 
+                                                    @change="togglePortfolio(portfolio)"
+                                                    :checked="isPortfolioSelected(portfolio)">
+                                                <span class="ml-1">Select All</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="company-list pl-3">
+                                        <div v-for="company in companies" :key="company.id" class="py-1">
+                                            <label class="checkbox">
+                                                <input type="checkbox" v-model="selectedCompanies" :value="company.id">
+                                                <span class="ml-2 company-name" v-text="company.name"></span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <hr class="my-2" style="background-color: #444; height: 1px;">
+                                </div>
+                                
+                                <!-- No companies found message -->
+                                <div v-if="Object.keys(computedGroupedCompanies).length === 0" class="notification is-warning">
+                                    <p>No companies found matching your filter criteria.</p>
                                 </div>
                             </div>
                         </div>
-                        
-                        <div class="field">
-                            <label class="label">Action</label>
-                            <div class="control">
-                                <label class="radio">
-                                    <input type="radio" v-model="portfolioAction" value="add">
-                                    Move to this portfolio
-                                </label>
-                                <label class="radio">
-                                    <input type="radio" v-model="portfolioAction" value="remove" disabled>
-                                    Remove from this portfolio
-                                </label>
-                            </div>
-                        </div>
                     </div>
                     
-                    <!-- Change Category Tab -->
-                    <div v-show="activeTab === 'category'">
-                        <div class="field">
-                            <label class="label">New Category</label>
-                            <div class="control">
-                                <input class="input" type="text" v-model="newCategory" placeholder="Enter category name">
+                    <!-- Right Column: Edit Options -->
+                    <div class="column is-6">
+                        <div class="box">
+                            <div class="tabs is-boxed mb-4">
+                                <ul>
+                                    <li :class="{'is-active': activeTab === 'portfolio'}" @click="activeTab = 'portfolio'">
+                                        <a>
+                                            <span>Change Portfolio</span>
+                                        </a>
+                                    </li>
+                                    <li :class="{'is-active': activeTab === 'category'}" @click="activeTab = 'category'">
+                                        <a>
+                                            <span>Change Category</span>
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
+                            
+                            <!-- Change Portfolio Tab -->
+                            <div v-show="activeTab === 'portfolio'" class="p-3">
+                                <div class="field">
+                                    <label class="label">Target Portfolio</label>
+                                    <div class="control">
+                                        <div class="select is-fullwidth">
+                                            <select v-model="targetPortfolio">
+                                                <option value="">Select portfolio</option>
+                                                <option v-for="p in portfolioOptions" :key="p" :value="p">{{ p }}</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <p class="help">Choose the portfolio where selected companies will be moved</p>
+                                </div>
+                                
+                                <div class="field mt-4">
+                                    <label class="label">Action</label>
+                                    <div class="control">
+                                        <div class="field">
+                                            <label class="radio">
+                                                <input type="radio" v-model="portfolioAction" value="add">
+                                                <span class="ml-2">Move to this portfolio</span>
+                                            </label>
+                                        </div>
+                                        <div class="field">
+                                            <label class="radio">
+                                                <input type="radio" v-model="portfolioAction" value="remove" disabled>
+                                                <span class="ml-2">Remove from this portfolio</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Change Category Tab -->
+                            <div v-show="activeTab === 'category'" class="p-3">
+                                <div class="field">
+                                    <label class="label">New Category</label>
+                                    <div class="control">
+                                        <input class="input" type="text" v-model="newCategory" placeholder="Enter category name">
+                                    </div>
+                                    <p class="help">Enter the category that will be applied to all selected companies</p>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        </section>
-        <footer class="modal-card-foot">
-            <button class="button is-success" id="bulk-edit-save">Apply Changes</button>
-            <button class="button modal-cancel">Cancel</button>
-        </footer>
+            </section>
+            <footer class="modal-card-foot">
+                <button class="button is-success" id="bulk-edit-save" @click="closeModal">
+                    <span class="icon"><i class="fas fa-check"></i></span>
+                    <span>Apply Changes</span>
+                </button>
+                <button class="button" @click="closeModal">
+                    <span class="icon"><i class="fas fa-times"></i></span>
+                    <span>Cancel</span>
+                </button>
+            </footer>
+        </div>
     </div>
 </div>
 
@@ -833,7 +958,7 @@ const app = new Vue({
     data() {
         return {
             portfolioItems: [],
-            portfolioOptions: [],
+            portfolioOptions: {{ portfolios|tojson|safe }},
             selectedItem: {},
             showUpdatePriceModal: false,
             showDeleteModal: false,
@@ -1190,18 +1315,8 @@ const app = new Vue({
         console.log('Vue component mounted. Methods available:', Object.keys(this.$options.methods).join(', '));
         this.loadData();
         
-        // Load portfolio options
-        fetch('/portfolio/api/portfolios')
-            .then(response => response.json())
-            .then(data => {
-                this.portfolioOptions = data;
-                {% if use_default_portfolio %}
-                this.selectedPortfolio = "-";
-                {% endif %}
-            })
-            .catch(error => {
-                console.error('Error loading portfolios:', error);
-            });
+        // Set default portfolio if needed
+        this.selectedPortfolio = "{{ use_default_portfolio|lower|default('false')|string }}" === "true" ? "-" : "";
     }
 });
 
@@ -1210,18 +1325,15 @@ const bulkEditApp = new Vue({
     el: '#bulk-edit-app',
     data() {
         return {
-            loading: false,
             companies: [],
-            filter: '',
-            activeTab: 'portfolio',
-            selectedPortfolios: [],
-            newPortfolio: '',
-            portfolioOptions: [],
+            portfolioOptions: {{ portfolios|tojson|safe }},
             targetPortfolio: '',
             portfolioAction: 'add',
-            newCategory: '',
+            activeTab: 'portfolio',
+            targetCategory: '',
+            selectedCompanies: [],
             searchQuery: '',
-            selectedCompanies: []
+            loading: false
         };
     },
     computed: {
@@ -1229,16 +1341,20 @@ const bulkEditApp = new Vue({
             // Group companies by portfolio
             const grouped = {};
             
-            if (!this.companies.length) {
+            // Ensure companies is an array before processing
+            if (!Array.isArray(this.companies) || this.companies.length === 0) {
+                console.log('No companies data available');
                 return {};
             }
             
             // Filter companies by search query if provided
             const filteredCompanies = this.searchQuery 
                 ? this.companies.filter(c => 
-                    c.name.toLowerCase().includes(this.searchQuery.toLowerCase()) || 
-                    c.identifier.toLowerCase().includes(this.searchQuery.toLowerCase()))
+                    c.name?.toLowerCase().includes(this.searchQuery.toLowerCase()) || 
+                    c.identifier?.toLowerCase().includes(this.searchQuery.toLowerCase()))
                 : this.companies;
+            
+            console.log(`Filtered ${filteredCompanies.length} companies from ${this.companies.length} total`);
             
             // Group by portfolio
             filteredCompanies.forEach(company => {
@@ -1249,39 +1365,56 @@ const bulkEditApp = new Vue({
                 grouped[portfolio].push(company);
             });
             
+            // Sort companies alphabetically within each portfolio
+            for (const portfolio in grouped) {
+                grouped[portfolio].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            }
+            
             return grouped;
         }
     },
     methods: {
         async loadPortfolioOptions() {
+            // This is now a no-op as portfolios are initialized from server-side data
             try {
-                const response = await fetch('/portfolio/api/portfolios');
-                if (!response.ok) {
-                    throw new Error('Failed to load portfolios');
-                }
-                const data = await response.json();
-                if (Array.isArray(data)) {
-                    this.portfolioOptions = data;
-                } else if (data.error) {
-                    throw new Error(data.error);
-                }
+                console.log('Portfolio options already loaded:', this.portfolioOptions);
             } catch (err) {
-                console.error('Error loading portfolio options:', err);
+                console.error('Error with portfolio options:', err);
             }
         },
         
         async loadCompanies() {
+            console.log('Starting to load companies');
             this.loading = true;
             try {
+                console.log('Fetching from /portfolio/api/portfolio_data');
                 const response = await fetch('/portfolio/api/portfolio_data');
+                console.log('Response received:', response);
                 if (!response.ok) {
-                    throw new Error('Failed to load companies');
+                    throw new Error(`Failed to load companies: ${response.status} ${response.statusText}`);
                 }
                 const data = await response.json();
-                this.companies = data;
+                console.log('Data received:', data ? `${data.length} items` : 'no data');
+                
+                // Map the data to ensure it has the correct structure
+                if (Array.isArray(data)) {
+                    this.companies = data.map(item => ({
+                        id: item.id,
+                        name: item.company || '',
+                        identifier: item.identifier || '',
+                        portfolio: item.portfolio || '',
+                        category: item.category || ''
+                    }));
+                    console.log('Processed company data:', this.companies.length, 'items');
+                } else {
+                    console.error('Received non-array data:', data);
+                    this.companies = []; // Ensure we have an empty array even on error
+                }
             } catch (err) {
                 console.error('Error loading companies:', err);
+                this.companies = []; // Ensure we have an empty array even on error
             } finally {
+                console.log('Finished loading companies, setting loading to false');
                 this.loading = false;
             }
         },
@@ -1308,9 +1441,29 @@ const bulkEditApp = new Vue({
                 const companyIds = companiesInPortfolio.map(company => company.id);
                 this.selectedCompanies = [...new Set([...this.selectedCompanies, ...companyIds])];
             }
+        },
+        
+        closeModal() {
+            // Close the bulk edit modal
+            const modal = document.getElementById('bulk-edit-modal');
+            if (modal) {
+                modal.classList.remove('is-active');
+                document.documentElement.classList.remove('is-clipped');
+            }
+        },
+        
+        openModal() {
+            // Open the bulk edit modal and refresh data
+            this.loadCompanies(); // Reload companies data
+            const modal = document.getElementById('bulk-edit-modal');
+            if (modal) {
+                modal.classList.add('is-active');
+                document.documentElement.classList.add('is-clipped');
+            }
         }
     },
     mounted() {
+        console.log('Bulk edit app mounted, loading data...');
         this.loadPortfolioOptions();
         this.loadCompanies();
     }
