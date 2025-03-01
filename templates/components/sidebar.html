@@ -1,8 +1,5 @@
 <aside class="menu p-4 has-background-light" style="height: 100%; min-height: calc(100vh - 3.25rem);">
     {% if session.account_id %}
-    <p class="menu-label">
-        Management
-    </p>
     <ul class="menu-list">
         <li>
             <a href="{{ url_for('account.index') }}" class="{{ 'is-active' if request.endpoint == 'account.index' }}">
@@ -14,6 +11,12 @@
                 </span>
             </a>
         </li>
+    </ul>
+    
+    <p class="menu-label mt-5">
+        Portfolios
+    </p>
+    <ul class="menu-list">
         <li>
             <a href="{{ url_for('portfolio.enrich') }}" class="{{ 'is-active' if request.endpoint == 'portfolio.enrich' }}">
                 <span class="icon-text">
@@ -21,6 +24,16 @@
                         <i class="fas fa-gem"></i>
                     </span>
                     <span>Enrich</span>
+                </span>
+            </a>
+        </li>
+        <li>
+            <a href="{{ url_for('analysis.index') }}" class="{{ 'is-active' if request.endpoint == 'analysis.index' }}">
+                <span class="icon-text">
+                    <span class="icon">
+                        <i class="fas fa-search"></i>
+                    </span>
+                    <span>Analyse</span>
                 </span>
             </a>
         </li>
@@ -47,22 +60,6 @@
                         <i class="fas fa-hammer"></i>
                     </span>
                     <span>Build</span>
-                </span>
-            </a>
-        </li>
-    </ul>
-    
-    <p class="menu-label mt-5">
-        Portfolio
-    </p>
-    <ul class="menu-list">
-        <li>
-            <a href="{{ url_for('analysis.index') }}" class="{{ 'is-active' if request.endpoint == 'analysis.index' }}">
-                <span class="icon-text">
-                    <span class="icon">
-                        <i class="fas fa-search"></i>
-                    </span>
-                    <span>Analyse</span>
                 </span>
             </a>
         </li>
