@@ -360,33 +360,62 @@
             <div id="portfolio-editor" class="portfolio-editor">
                 <!-- Vue.js component will be mounted here -->
                 <div id="portfolio-table-app" v-cloak>
-                    <div class="field is-grouped mb-4">
-                        <div class="control">
-                            <div class="select">
-                                <select id="filter-portfolio" v-model="selectedPortfolio">
-                                    <option value="">All Portfolios</option>
-                                    <option value="-">Default</option>
-                                    {% for portfolio in portfolios %}
-                                        {% if portfolio != 'Default' %}
-                                            <option value="{{ portfolio }}">{{ portfolio }}</option>
-                                        {% endif %}
-                                    {% endfor %}
-                                </select>
+                    <div class="portfolio-controls-container mb-4">
+                        <div class="controls-and-metrics-row">
+                            <!-- Controls -->
+                            <div class="controls-group">
+                                <div class="control">
+                                    <div class="select">
+                                        <select id="filter-portfolio" v-model="selectedPortfolio">
+                                            <option value="">All Portfolios</option>
+                                            <option value="-">Default</option>
+                                            {% for portfolio in portfolios %}
+                                                {% if portfolio != 'Default' %}
+                                                    <option value="{{ portfolio }}">{{ portfolio }}</option>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="control">
+                                    <label class="checkbox" style="display: flex; align-items: center; height: 2.5em; padding: 0 0.5em;">
+                                        <input type="checkbox" v-model="showOnlyMissingPrices">
+                                        <span style="margin-left: 0.5em;">No price</span>
+                                    </label>
+                                </div>
+                                <div class="control">
+                                    <button class="button is-info is-light" @click="bulkEditApp.openModal()">
+                                        <span class="icon">
+                                            <i class="fas fa-edit"></i>
+                                        </span>
+                                        <span>Bulk Edit</span>
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                        <div class="control">
-                            <label class="checkbox" style="display: flex; align-items: center; height: 2.5em; padding: 0 0.5em;">
-                                <input type="checkbox" v-model="showOnlyMissingPrices">
-                                <span style="margin-left: 0.5em;">No price</span>
-                            </label>
-                        </div>
-                        <div class="control">
-                            <button class="button is-info is-light" @click="bulkEditApp.openModal()">
-                                <span class="icon">
-                                    <i class="fas fa-edit"></i>
-                                </span>
-                                <span>Bulk Edit</span>
-                            </button>
+                            
+                            <!-- Metrics -->
+                            <div v-if="!loading && filteredPortfolioItems.length > 0" class="portfolio-metrics" :class="healthColorClass">
+                                <div class="metrics-item">
+                                    <span class="metric-label">Total:</span>
+                                    <span class="metric-value" v-text="metrics.total"></span>
+                                </div>
+                                <div class="metrics-item">
+                                    <span class="metric-label">Health:</span>
+                                    <span class="metric-value"><span v-text="metrics.health"></span>%</span>
+                                </div>
+                                <div class="metrics-item">
+                                    <span class="metric-label">Missing:</span>
+                                    <span class="metric-value" v-text="metrics.missing"></span>
+                                </div>
+                                <div class="metrics-item">
+                                    <span class="metric-label">Value:</span>
+                                    <span class="metric-value" v-text="formatCurrency(metrics.totalValue)"></span>
+                                </div>
+                                <div class="metrics-item">
+                                    <span class="metric-label">Updated:</span>
+                                    <span class="metric-value" v-text="formatDateAgo(metrics.lastUpdate)"></span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
@@ -402,41 +431,6 @@
                     </div>
                     
                     <div v-else>
-                        <!-- Portfolio health metrics -->
-                        <div class="notification" :class="healthColorClass">
-                            <div class="level">
-                                <div class="level-item has-text-centered">
-                                    <div>
-                                        <p class="heading">Total Companies</p>
-                                        <p v-text="metrics.total"></p>
-                                    </div>
-                                </div>
-                                <div class="level-item has-text-centered">
-                                    <div>
-                                        <p class="heading">Portfolio Health</p>
-                                        <p><span v-text="metrics.health"></span>%</p>
-                                    </div>
-                                </div>
-                                <div class="level-item has-text-centered">
-                                    <div>
-                                        <p class="heading">Missing Prices</p>
-                                        <p v-text="metrics.missing"></p>
-                                    </div>
-                                </div>
-                                <div class="level-item has-text-centered">
-                                    <div>
-                                        <p class="heading">Total Value</p>
-                                        <p v-text="formatCurrency(metrics.totalValue)"></p>
-                                    </div>
-                                </div>
-                                <div class="level-item has-text-centered">
-                                    <div>
-                                        <p class="heading">Last Update</p>
-                                        <p v-text="formatDateAgo(metrics.lastUpdate)"></p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
                         
                         <!-- Editable table -->
                         <div v-if="loading" class="has-text-centered">
@@ -455,6 +449,12 @@
                                 <thead>
                                     <tr>
                                         <th>Update</th>
+                                        <th>
+                                            Identifier
+                                            <span class="icon is-small has-tooltip-right" data-tooltip="Supported formats: Stock tickers (AAPL), Crypto (BTC-USD), or ISINs (US0378331005)">
+                                                <i class="fas fa-question-circle"></i>
+                                            </span>
+                                        </th>
                                         <th>Company</th>
                                         <th>Portfolio</th>
                                         <th>Category</th>
@@ -478,6 +478,12 @@
                                                     <i class="fas fa-sync"></i>
                                                 </span>
                                             </button>
+                                        </td>
+                                        <td>
+                                            <input class="input is-small" type="text"
+                                                   v-model="item.identifier"
+                                                   @input="debouncedSaveIdentifierChange(item)"
+                                                   @change="saveIdentifierChange(item)">
                                         </td>
                                         <td>
                                             <span v-text="item.company"></span>

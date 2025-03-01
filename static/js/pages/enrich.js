@@ -520,6 +520,40 @@ class PortfolioTableApp {
                             } else {
                                 console.log('Identifier updated successfully');
                             }
+                            
+                            // Trigger price update for this row after identifier change
+                            console.log('Triggering price update after identifier change for item:', item.id);
+                            try {
+                                const priceResponse = await fetch(`/portfolio/api/update_price/${item.id}`, {
+                                    method: 'POST'
+                                });
+                                
+                                const priceResult = await priceResponse.json();
+                                
+                                if (priceResponse.ok) {
+                                    // Refresh the data
+                                    await this.loadData();
+                                    
+                                    // Show success notification
+                                    if (typeof showNotification === 'function') {
+                                        showNotification('Price updated after identifier change', 'is-success');
+                                    } else {
+                                        console.log('Price updated after identifier change');
+                                    }
+                                } else {
+                                    // Show error notification
+                                    if (typeof showNotification === 'function') {
+                                        showNotification(priceResult.error || 'Failed to update price after identifier change', 'is-warning');
+                                    } else {
+                                        console.error('Error:', priceResult.error || 'Failed to update price after identifier change');
+                                    }
+                                }
+                            } catch (priceError) {
+                                console.error('Error updating price after identifier change:', priceError);
+                                if (typeof showNotification === 'function') {
+                                    showNotification('Error updating price after identifier change', 'is-warning');
+                                }
+                            }
                         } else {
                             // Show error notification
                             if (typeof showNotification === 'function') {

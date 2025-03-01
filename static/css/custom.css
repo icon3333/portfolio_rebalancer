@@ -115,6 +115,16 @@
     background-color: var(--blue-100) !important;
 }
 
+/* Improved table spacing */
+.table td, .table th {
+    padding: 0.65em 0.75em !important;
+}
+
+.table-container {
+    overflow-x: auto;
+    max-width: 100%;
+}
+
 /* Forms */
 .input, .textarea, .select select {
     background-color: var(--white) !important;
@@ -188,12 +198,13 @@ option {
 
 /* Layout */
 .section {
-    padding: 1.5rem !important;
+    padding: 2rem 2.5rem !important;
     background: var(--white) !important;
 }
 
 .container {
-    max-width: 1200px !important;
+    max-width: 95% !important;
+    width: 95% !important;
 }
 
 /* Transitions */
@@ -387,4 +398,129 @@ option {
 
 .parameter-input {
     flex-grow: 1;
+}
+
+/* Help icon for tooltips */
+.has-tooltip-right i.fa-question-circle {
+    color: #aaa;
+    font-size: 0.8rem;
+    margin-left: 5px;
+    cursor: help;
+}
+
+.has-tooltip-right i.fa-question-circle:hover {
+    color: var(--blue-500);
+}
+
+/* Portfolio controls and metrics */
+.portfolio-controls-container {
+    background-color: var(--white);
+    border-radius: 4px;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+}
+
+.controls-and-metrics-row {
+    display: flex;
+    align-items: stretch;
+    flex-wrap: nowrap;
+    height: 2.5em;
+}
+
+.controls-group {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    height: 100%;
+}
+
+.controls-group .control {
+    height: 100%;
+    display: flex;
+    align-items: center;
+}
+
+.portfolio-metrics {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    padding: 0 0.75rem;
+    border-radius: 4px;
+    background-color: rgba(0, 0, 0, 0.03);
+    justify-content: space-between;
+    margin-left: 1rem;
+    height: 100%;
+}
+
+.portfolio-metrics.is-success {
+    background-color: rgba(72, 199, 116, 0.1);
+}
+
+.portfolio-metrics.is-warning {
+    background-color: rgba(255, 224, 138, 0.2);
+}
+
+.portfolio-metrics.is-danger {
+    background-color: rgba(241, 70, 104, 0.1);
+}
+
+.metrics-item {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    justify-content: center;
+}
+
+.metric-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--dark-grey);
+    margin-right: 0.3rem;
+}
+
+.metric-value {
+    font-size: 0.85rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+/* Portfolio table specific styles */
+.table-container {
+    max-height: calc(100vh - 250px);
+    overflow-y: auto;
+    position: relative;
+    margin-top: 1rem;
+}
+
+.table-container table {
+    table-layout: auto;
+    width: 100%;
+}
+
+.table-container thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.table-container thead th {
+    background-color: var(--light-grey) !important;
+    box-shadow: 0 1px 0 0 var(--grey) !important;
+}
+
+/* Column width adjustments */
+.table-container th:nth-child(1), /* Update column */
+.table-container td:nth-child(1) {
+    width: 80px;
+}
+
+.table-container th:nth-child(2), /* Identifier column */
+.table-container td:nth-child(2) {
+    width: 120px;
+}
+
+.table-container th:nth-child(3), /* Company column */
+.table-container td:nth-child(3) {
+    min-width: 180px;
 }
