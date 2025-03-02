@@ -2,13 +2,11 @@
 from app.routes.main_routes import main_bp
 from app.routes.account_routes import account_bp
 from app.routes.portfolio_routes import portfolio_bp  
-from app.routes.analysis_routes import analysis_bp
 from app.routes.merton_routes import merton_bp
 
 __all__ = [
     'main_bp',
     'account_bp',
     'portfolio_bp',
-    'analysis_bp',
     'merton_bp'
 ]

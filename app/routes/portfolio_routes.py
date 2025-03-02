@@ -148,6 +148,32 @@ def get_portfolio_data_api():
         logger.error(f"Error getting portfolio data: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
+@portfolio_bp.route('/analyse')
+def analyse():
+    """Portfolio analysis page"""
+    logger.info("Accessing analyse page")
+    
+    # Check if user is authenticated with an account
+    if 'account_id' not in session:
+        logger.warning("No account_id in session")
+        flash('Please select an account first', 'warning')
+        return redirect(url_for('main.index'))
+    
+    account_id = session['account_id']
+    logger.info(f"Loading analyse page for account_id: {account_id}")
+    
+    # Verify account exists
+    account = query_db('SELECT * FROM accounts WHERE id = ?', 
+                      [account_id], one=True)
+    if not account:
+        logger.warning(f"Account {account_id} not found")
+        flash('Account not found', 'error')
+        return redirect(url_for('main.index'))
+    
+    logger.info(f"Account found: {account['username']}")
+    
+    return render_template('pages/analyse.html')
+
 @portfolio_bp.route('/api/portfolios')
 def get_portfolios_api():
     """API endpoint to get portfolios for an account"""

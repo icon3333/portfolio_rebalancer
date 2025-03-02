@@ -49,9 +49,6 @@ def create_app(config_name='default'):
     from app.routes.merton_routes import merton_bp
     app.register_blueprint(merton_bp, url_prefix='/merton')
     
-    from app.routes.analysis_routes import analysis_bp
-    app.register_blueprint(analysis_bp, url_prefix='/analysis')
-    
     # Initialize the database
     from app.database.db_manager import init_db
     init_db(app)

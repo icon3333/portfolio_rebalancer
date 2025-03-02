@@ -53,7 +53,7 @@
                                                     </td>
                                                     <td>
                                                         <div class="buttons are-small">
-                                                            <a href="{{ url_for('analysis.index') }}?portfolio={{ portfolio.name }}" class="button is-info is-small">
+                                                            <a href="{{ url_for('portfolio.analyse') }}?portfolio={{ portfolio.name }}" class="button is-info is-small">
                                                                 <span class="icon">
                                                                     <i class="fas fa-chart-bar"></i>
                                                                 </span>
@@ -126,7 +126,7 @@
                                 <p class="subtitle is-6">View portfolio analytics</p>
                             </div>
                             <footer class="card-footer">
-                                <a href="{{ url_for('analysis.index') }}" class="card-footer-item">Go</a>
+                                <a href="{{ url_for('portfolio.analyse') }}" class="card-footer-item">Go</a>
                             </footer>
                         </div>
                     </div>
