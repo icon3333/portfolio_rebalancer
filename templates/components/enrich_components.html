@@ -199,25 +199,21 @@
                             </label>
                         </div>
                         <p class="help">Upload a CSV file with your portfolio data.</p>
-                    </div>
-                    
-                    <div class="field">
-                        <div class="control">
-                            <button type="submit" class="button is-primary" id="upload-button" disabled>
-                                <span class="icon">
-                                    <i class="fas fa-cloud-upload-alt"></i>
-                                </span>
-                                <span>Upload and Process</span>
-                            </button>
-                            <span id="price-fetch-progress" class="ml-2" style="display: none; align-items: center;">
-                                <span class="icon is-small mr-1">
+                        
+                        <div id="price-fetch-progress" style="display: none; background-color: #222; border-radius: 4px; padding: 8px 12px; margin-top: 10px; border-left: 4px solid #3e8ed0;">
+                            <div class="is-flex is-align-items-center mb-2">
+                                <span class="icon mr-2 has-text-info">
                                     <i class="fas fa-sync fa-spin"></i>
                                 </span>
-                                <span>Fetching prices: <span id="progress-count">0</span>/<span id="progress-total">0</span> (<span id="progress-percentage">0%</span>)</span>
-                                <div class="progress-bar-container mt-1" style="width: 100%; height: 8px; background-color: #eee; border-radius: 4px; overflow: hidden;">
-                                    <div id="progress-bar" style="width: 0%; height: 100%; background-color: #00d1b2; transition: width 0.3s;"></div>
-                                </div>
-                            </span>
+                                <span class="has-text-weight-medium has-text-white">Processing Portfolio Data</span>
+                            </div>
+                            <div class="is-flex is-justify-content-space-between is-align-items-center mb-1">
+                                <span class="has-text-grey-lighter">Fetching prices:</span>
+                                <span class="has-text-weight-bold has-text-white"><span id="progress-count">0</span>/<span id="progress-total">0</span> (<span id="progress-percentage">0%</span>)</span>
+                            </div>
+                            <div class="progress-bar-container" style="width: 100%; height: 8px; background-color: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
+                                <div id="progress-bar" style="width: 0%; height: 100%; background-color: #3e8ed0; transition: width 0.3s ease-in-out;"></div>
+                            </div>
                         </div>
                     </div>
                 </form>

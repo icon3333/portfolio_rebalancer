@@ -8,14 +8,13 @@ const FileUploadHandler = {
     init() {
         const fileInput = document.querySelector('.file-input');
         const fileLabel = document.querySelector('.file-name');
-        const uploadButton = document.getElementById('upload-button');
         const progressElement = document.getElementById('price-fetch-progress');
         const progressCount = document.getElementById('progress-count');
         const progressTotal = document.getElementById('progress-total');
         const progressPercentage = document.getElementById('progress-percentage');
         const uploadForm = document.querySelector('form[action*="upload"]');
         
-        if (!fileInput || !fileLabel || !uploadButton) {
+        if (!fileInput || !fileLabel) {
             console.error('Required file upload elements not found');
             return;
         }
@@ -30,10 +29,42 @@ const FileUploadHandler = {
         fileInput.addEventListener('change', function() {
             if (fileInput.files.length > 0) {
                 fileLabel.textContent = fileInput.files[0].name;
-                uploadButton.disabled = false;
+                
+                // Show the progress indicator immediately
+                progressCount.textContent = '0';
+                progressTotal.textContent = '0';
+                progressPercentage.textContent = '0%';
+                progressElement.style.display = 'block';
+                progressElement.dataset.processing = 'true';
+                
+                // Start progress tracking
+                if (PriceProgressTracker.progressInterval) {
+                    clearInterval(PriceProgressTracker.progressInterval);
+                }
+                
+                PriceProgressTracker.progressInterval = setInterval(() => {
+                    PriceProgressTracker.checkProgress(
+                        progressElement,
+                        progressCount,
+                        progressTotal,
+                        progressPercentage
+                    );
+                }, 500);
+                
+                // Run once immediately
+                PriceProgressTracker.checkProgress(
+                    progressElement,
+                    progressCount,
+                    progressTotal,
+                    progressPercentage
+                );
+                
+                // Automatically submit the form
+                if (uploadForm) {
+                    uploadForm.submit();
+                }
             } else {
                 fileLabel.textContent = 'No file selected';
-                uploadButton.disabled = true;
             }
         });
         
@@ -48,7 +79,7 @@ const FileUploadHandler = {
                 progressPercentage.textContent = '0%';
                 
                 // Show the progress indicator immediately when the form is submitted
-                progressElement.style.display = 'inline-flex';
+                progressElement.style.display = 'block';
                 progressElement.dataset.processing = 'true';
                 
                 // Clear any existing interval and start a new one
@@ -109,8 +140,7 @@ const PriceProgressTracker = {
                 // Only show the progress indicator if there's actual progress happening
                 // or if we're in processing mode (set by form submission)
                 if (data.total > 0 || progressElement.dataset.processing === 'true') {
-                    progressElement.style.display = 'inline-flex';
-                    progressElement.style.flexDirection = 'column'; // Stack elements vertically
+                    progressElement.style.display = 'block';
                     
                     // If we're done, hide after a delay
                     if (data.current >= data.total && data.total > 0) {

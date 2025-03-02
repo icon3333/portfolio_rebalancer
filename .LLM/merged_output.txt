@@ -1,5 +1,5 @@
 This file is a merged representation of the entire codebase, combining all repository files into a single document.
-Generated on: 2025-03-01T13:26:31.114186
+Generated on: 2025-03-02T19:03:37.480759
 
 ================================================================
 Purpose:
@@ -32,7 +32,6 @@ app/
     main.py
     __init__.py
     routes/
-        analysis_routes.py
         account_routes.py
         __init__.py
         main_routes.py
@@ -45,11 +44,6 @@ app/
         db_manager.py
         backups/
         __pycache__/
-    models/
-        account.py
-        __init__.py
-        portfolio.py
-        market_data.py
     utils/
         __init__.py
         yfinance_utils.py
@@ -67,7 +61,6 @@ static/
     js/
         main.js
         pages/
-            analyse.js
             merton.js
             enrich.js
         components/
@@ -299,9 +292,6 @@ def create_app(config_name='default'):
     from app.routes.merton_routes import merton_bp
     app.register_blueprint(merton_bp, url_prefix='/merton')
     
-    from app.routes.analysis_routes import analysis_bp
-    app.register_blueprint(analysis_bp, url_prefix='/analysis')
-    
     # Initialize the database
     from app.database.db_manager import init_db
     init_db(app)
@@ -333,7 +323,6 @@ from app.database.db_manager import init_db
 from app.routes.main_routes import main_bp
 from app.routes.account_routes import account_bp
 from app.routes.portfolio_routes import portfolio_bp
-from app.routes.analysis_routes import analysis_bp
 from app.routes.merton_routes import merton_bp
 from app.main import create_app
 
@@ -343,446 +332,9 @@ __all__ = [
     'main_bp',
     'account_bp',
     'portfolio_bp',
-    'analysis_bp',
     'merton_bp',
     'create_app'
 ]
-###END_FILE###
-
-================================================================
-###START_FILE_PATH: app/routes/analysis_routes.py###
-from flask import (
-    Blueprint, render_template, redirect, url_for, 
-    request, flash, session, jsonify
-)
-from app.database.db_manager import query_db, execute_db
-import json
-from datetime import datetime
-import pandas as pd
-import numpy as np
-
-analysis_bp = Blueprint('analysis', __name__)
-
-@analysis_bp.route('/')
-def index():
-    """Portfolio analysis page"""
-    # Check if user is authenticated with an account
-    if 'account_id' not in session:
-        flash('Please select an account first', 'warning')
-        return redirect(url_for('main.index'))
-    
-    account_id = session['account_id']
-    
-    # Get portfolio data
-    portfolio_data = get_portfolio_data(account_id)
-    
-    # Calculate portfolio metrics
-    metrics = calculate_portfolio_metrics(portfolio_data)
-    
-    # Get portfolio allocations
-    allocations = get_portfolio_allocations(account_id)
-    
-    # Get allocation view preference
-    allocation_view = get_user_preference(account_id, 'analyse', 'allocation_view', 'relative')
-    
-    return render_template('pages/analyse.html',
-                           portfolio_data=portfolio_data,
-                           metrics=metrics,
-                           allocations=allocations,
-                           allocation_view=allocation_view)
-
-@analysis_bp.route('/api/metrics')
-def get_metrics_api():
-    """API endpoint to get portfolio metrics"""
-    if 'account_id' not in session:
-        return jsonify({'error': 'Not authenticated'}), 401
-    
-    account_id = session['account_id']
-    portfolio_data = get_portfolio_data(account_id)
-    metrics = calculate_portfolio_metrics(portfolio_data)
-    
-    return jsonify(metrics)
-
-@analysis_bp.route('/api/allocations')
-def get_allocations_api():
-    """API endpoint to get portfolio allocations"""
-    if 'account_id' not in session:
-        return jsonify({'error': 'Not authenticated'}), 401
-    
-    account_id = session['account_id']
-    allocations = get_portfolio_allocations(account_id)
-    
-    return jsonify(allocations)
-
-@analysis_bp.route('/api/set_preference', methods=['POST'])
-def set_preference_api():
-    """API endpoint to set user preferences"""
-    if 'account_id' not in session:
-        return jsonify({'error': 'Not authenticated'}), 401
-    
-    try:
-        account_id = session['account_id']
-        data = request.json
-        
-        if not data or 'name' not in data or 'value' not in data:
-            return jsonify({'error': 'Invalid request format'}), 400
-        
-        page_name = data.get('page', 'analyse')
-        variable_name = data['name']
-        variable_value = data['value']
-        variable_type = data.get('type', 'str')
-        
-        # Save preference
-        save_user_preference(account_id, page_name, variable_name, variable_value, variable_type)
-        
-        return jsonify({'success': True})
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@analysis_bp.route('/api/portfolio_sunburst')
-def get_sunburst_data():
-    """API endpoint to get sunburst chart data"""
-    if 'account_id' not in session:
-        return jsonify({'error': 'Not authenticated'}), 401
-    
-    account_id = session['account_id']
-    portfolio_data = get_portfolio_data(account_id)
-    
-    # Generate sunburst data
-    sunburst_data = generate_sunburst_data(portfolio_data)
-    
-    return jsonify(sunburst_data)
-
-def calculate_portfolio_metrics(portfolio_data):
-    """Calculate portfolio metrics"""
-    if not portfolio_data:
-        return {}
-    
-    # Convert to DataFrame for easier analysis
-    df = pd.DataFrame(portfolio_data)
-    
-    # Calculate basic metrics
-    total_value = df['total_value_eur'].sum()
-    total_invested = df['total_invested'].sum()
-    unrealized_gain = total_value - total_invested
-    unrealized_gain_percent = (unrealized_gain / total_invested * 100) if total_invested > 0 else 0
-    position_count = len(df)
-    
-    # Calculate portfolio breakdown
-    portfolio_breakdown = {}
-    for portfolio, group in df.groupby('portfolio'):
-        if portfolio == '-':
-            continue
-            
-        portfolio_value = group['total_value_eur'].sum()
-        portfolio_percent = (portfolio_value / total_value * 100) if total_value > 0 else 0
-        portfolio_positions = len(group)
-        
-        portfolio_breakdown[portfolio] = {
-            'value': portfolio_value,
-            'percent': portfolio_percent,
-            'positions': portfolio_positions
-        }
-    
-    # Calculate category breakdown
-    category_breakdown = {}
-    for category, group in df.groupby('category'):
-        if category == '-':
-            continue
-            
-        category_value = group['total_value_eur'].sum()
-        category_percent = (category_value / total_value * 100) if total_value > 0 else 0
-        category_positions = len(group)
-        
-        category_breakdown[category] = {
-            'value': category_value,
-            'percent': category_percent,
-            'positions': category_positions
-        }
-    
-    # Calculate currency exposure
-    currency_exposure = {}
-    for currency, group in df.groupby('currency'):
-        if not currency:
-            continue
-            
-        currency_value = group['total_value_eur'].sum()
-        currency_percent = (currency_value / total_value * 100) if total_value > 0 else 0
-        
-        currency_exposure[currency] = {
-            'value': currency_value,
-            'percent': currency_percent
-        }
-    
-    # Calculate concentration score (Herfindahl index)
-    if total_value > 0:
-        weights = df['total_value_eur'] / total_value
-        concentration_score = (weights ** 2).sum() * 100
-    else:
-        concentration_score = 0
-    
-    return {
-        'total_value': total_value,
-        'total_invested': total_invested,
-        'unrealized_gain': unrealized_gain,
-        'unrealized_gain_percent': unrealized_gain_percent,
-        'position_count': position_count,
-        'portfolio_breakdown': portfolio_breakdown,
-        'category_breakdown': category_breakdown,
-        'currency_exposure': currency_exposure,
-        'concentration_score': concentration_score
-    }
-
-def get_portfolio_allocations(account_id):
-    """Get portfolio allocations with targets"""
-    # Get portfolio data
-    portfolio_data = get_portfolio_data(account_id)
-    
-    if not portfolio_data:
-        return {}
-    
-    # Convert to DataFrame
-    df = pd.DataFrame(portfolio_data)
-    
-    # Calculate total value
-    total_value = df['total_value_eur'].sum()
-    
-    if total_value == 0:
-        return {}
-    
-    # Get current allocations at portfolio level
-    portfolio_allocations = {}
-    for portfolio, group in df.groupby('portfolio'):
-        portfolio_value = group['total_value_eur'].sum()
-        current_percent = (portfolio_value / total_value * 100) if total_value > 0 else 0
-        
-        # Get target allocation from user preferences
-        target_percent = float(get_user_preference(
-            account_id,
-            'allocation_builder',
-            f'{portfolio.lower()}_percent',
-            100 / df['portfolio'].nunique() if df['portfolio'].nunique() > 0 else 100
-        ))
-        
-        portfolio_allocations[portfolio] = {
-            'current': current_percent,
-            'target': target_percent,
-            'deviation': current_percent - target_percent,
-            'value': portfolio_value
-        }
-        
-        # Get position-level allocation
-        positions = {}
-        for _, row in group.iterrows():
-            company = row['company']
-            position_value = row['total_value_eur']
-            position_percent = (position_value / total_value * 100) if total_value > 0 else 0
-            
-            # Get target allocation for position
-            weighted_positions = json.loads(get_user_preference(
-                account_id,
-                'allocation_builder',
-                f'{portfolio.lower()}_weighted_positions',
-                '{}'
-            ))
-            
-            position_target = None
-            if company in weighted_positions:
-                # If explicitly weighted
-                position_target = float(weighted_positions[company]['percentage'])
-            else:
-                # Calculate based on even distribution
-                remaining_allocation = 100.0
-                total_positions = float(get_user_preference(
-                    account_id,
-                    'allocation_builder',
-                    f'{portfolio.lower()}_positions',
-                    len(group)
-                ))
-                
-                # Subtract weighted positions
-                weighted_total = sum(float(w['percentage']) for w in weighted_positions.values())
-                remaining_allocation -= weighted_total
-                remaining_positions = total_positions - len(weighted_positions)
-                
-                if remaining_positions > 0:
-                    position_target = remaining_allocation / remaining_positions
-                else:
-                    position_target = 0
-            
-            positions[company] = {
-                'current': position_percent,
-                'target': position_target,
-                'deviation': position_percent - position_target,
-                'value': position_value
-            }
-            
-        portfolio_allocations[portfolio]['positions'] = positions
-    
-    return portfolio_allocations
-
-def generate_sunburst_data(portfolio_data):
-    """Generate data structure for sunburst visualization"""
-    if not portfolio_data:
-        return []
-        
-    # Convert to dataframe for easier grouping
-    df = pd.DataFrame(portfolio_data)
-    
-    # Calculate total portfolio value
-    total_value = df['total_value_eur'].sum()
-    
-    # Initialize nodes list with root node
-    nodes = [{
-        'id': 'total',
-        'parent': '',
-        'name': 'Total',
-        'value': total_value,
-        'percentage': 100
-    }]
-    
-    # Group by portfolio
-    for portfolio, group in df.groupby('portfolio'):
-        portfolio_value = group['total_value_eur'].sum()
-        portfolio_percent = (portfolio_value / total_value * 100)
-        
-        nodes.append({
-            'id': f'portfolio_{portfolio}',
-            'parent': 'total',
-            'name': portfolio,
-            'value': portfolio_value,
-            'percentage': portfolio_percent
-        })
-        
-        # Add category nodes
-        for category, cat_group in group.groupby('category'):
-            if category == '-':
-                # For uncategorized stocks, add directly to portfolio
-                for _, row in cat_group.iterrows():
-                    stock_value = row['total_value_eur']
-                    stock_percent = (stock_value / portfolio_value * 100)
-                    
-                    nodes.append({
-                        'id': f'stock_{row["company"]}',
-                        'parent': f'portfolio_{portfolio}',
-                        'name': row['company'],
-                        'value': stock_value,
-                        'percentage': stock_percent,
-                        'identifier': row['identifier']
-                    })
-            else:
-                # Add category node
-                category_value = cat_group['total_value_eur'].sum()
-                category_percent = (category_value / portfolio_value * 100)
-                
-                nodes.append({
-                    'id': f'category_{portfolio}_{category}',
-                    'parent': f'portfolio_{portfolio}',
-                    'name': category,
-                    'value': category_value,
-                    'percentage': category_percent
-                })
-                
-                # Add stock nodes under category
-                for _, row in cat_group.iterrows():
-                    stock_value = row['total_value_eur']
-                    stock_percent = (stock_value / category_value * 100)
-                    
-                    nodes.append({
-                        'id': f'stock_{row["company"]}',
-                        'parent': f'category_{portfolio}_{category}',
-                        'name': row['company'],
-                        'value': stock_value,
-                        'percentage': stock_percent,
-                        'identifier': row['identifier']
-                    })
-    
-    return nodes
-
-def get_portfolio_data(account_id):
-    """Get portfolio data from the database"""
-    # Query to get portfolio data with prices
-    data = query_db('''
-        SELECT 
-            c.name AS company,
-            c.identifier,
-            p.name AS portfolio,
-            c.category,
-            cs.shares,
-            cs.override_share,
-            mp.price_eur,
-            mp.currency,
-            mp.last_updated,
-            c.total_invested
-        FROM companies c
-        LEFT JOIN company_shares cs ON c.id = cs.company_id
-        LEFT JOIN portfolios p ON c.portfolio_id = p.id
-        LEFT JOIN market_prices mp ON c.identifier = mp.identifier
-        WHERE c.account_id = ?
-    ''', [account_id])
-    
-    # Process data for frontend
-    for item in data:
-        # Handle empty values
-        if item['portfolio'] is None or item['portfolio'] == '':
-            item['portfolio'] = '-'
-        if item['category'] is None or item['category'] == '':
-            item['category'] = '-'
-        
-        # Calculate effective shares
-        if item['override_share'] is not None and item['override_share'] > 0:
-            item['effective_shares'] = item['override_share']
-        else:
-            item['effective_shares'] = item['shares'] if item['shares'] is not None else 0
-            
-        # Calculate total value
-        if item['price_eur'] is not None and item['effective_shares'] is not None:
-            item['total_value_eur'] = item['price_eur'] * item['effective_shares']
-        else:
-            item['total_value_eur'] = 0
-    
-    return data
-
-def get_user_preference(account_id, page_name, variable_name, default_value):
-    """Get user preference from expanded_state table"""
-    result = query_db('''
-        SELECT variable_value, variable_type
-        FROM expanded_state
-        WHERE account_id = ? AND page_name = ? AND variable_name = ?
-    ''', [account_id, page_name, variable_name], one=True)
-    
-    if result:
-        return result['variable_value']
-    else:
-        return default_value
-
-def save_user_preference(account_id, page_name, variable_name, variable_value, variable_type):
-    """Save user preference to expanded_state table"""
-    # Convert value to string for storage
-    if not isinstance(variable_value, str):
-        variable_value = json.dumps(variable_value)
-    
-    # Check if preference exists
-    existing = query_db('''
-        SELECT id FROM expanded_state
-        WHERE account_id = ? AND page_name = ? AND variable_name = ?
-    ''', [account_id, page_name, variable_name], one=True)
-    
-    if existing:
-        # Update existing
-        execute_db('''
-            UPDATE expanded_state
-            SET variable_value = ?, variable_type = ?
-            WHERE id = ?
-        ''', [variable_value, variable_type, existing['id']])
-    else:
-        # Insert new
-        execute_db('''
-            INSERT INTO expanded_state 
-            (account_id, page_name, variable_name, variable_type, variable_value)
-            VALUES (?, ?, ?, ?, ?)
-        ''', [account_id, page_name, variable_name, variable_type, variable_value])
 ###END_FILE###
 
 ================================================================
@@ -970,14 +522,12 @@ def delete_account():
 from app.routes.main_routes import main_bp
 from app.routes.account_routes import account_bp
 from app.routes.portfolio_routes import portfolio_bp  
-from app.routes.analysis_routes import analysis_bp
 from app.routes.merton_routes import merton_bp
 
 __all__ = [
     'main_bp',
     'account_bp',
     'portfolio_bp',
-    'analysis_bp',
     'merton_bp'
 ]
 ###END_FILE###
@@ -1149,7 +699,7 @@ def enrich():
         # Get portfolio names from portfolios table - include all valid portfolios
         portfolios_from_table = query_db('''
             SELECT name FROM portfolios 
-            WHERE account_id = ? AND name != '-' AND name IS NOT NULL
+            WHERE account_id = ? AND name IS NOT NULL
             ORDER BY name
         ''', [account_id])
         logger.info(f"Retrieved {len(portfolios_from_table)} portfolios from portfolios table")
@@ -1158,8 +708,7 @@ def enrich():
         portfolios_from_companies = query_db('''
             SELECT DISTINCT p.name as name
             FROM portfolios p
-            WHERE p.account_id = ? AND p.name IS NOT NULL 
-              AND p.name != '-'
+            WHERE p.account_id = ? AND p.name IS NOT NULL
         ''', [account_id])
         logger.info(f"Retrieved {len(portfolios_from_companies)} portfolios from portfolios table")
         
@@ -1225,6 +774,32 @@ def get_portfolio_data_api():
         logger.error(f"Error getting portfolio data: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
+@portfolio_bp.route('/analyse')
+def analyse():
+    """Portfolio analysis page"""
+    logger.info("Accessing analyse page")
+    
+    # Check if user is authenticated with an account
+    if 'account_id' not in session:
+        logger.warning("No account_id in session")
+        flash('Please select an account first', 'warning')
+        return redirect(url_for('main.index'))
+    
+    account_id = session['account_id']
+    logger.info(f"Loading analyse page for account_id: {account_id}")
+    
+    # Verify account exists
+    account = query_db('SELECT * FROM accounts WHERE id = ?', 
+                      [account_id], one=True)
+    if not account:
+        logger.warning(f"Account {account_id} not found")
+        flash('Account not found', 'error')
+        return redirect(url_for('main.index'))
+    
+    logger.info(f"Account found: {account['username']}")
+    
+    return render_template('pages/analyse.html')
+
 @portfolio_bp.route('/api/portfolios')
 def get_portfolios_api():
     """API endpoint to get portfolios for an account"""
@@ -1238,23 +813,39 @@ def get_portfolios_api():
         account_id = session['account_id']
         logger.info(f"Getting portfolios for account_id: {account_id}")
         
-        # Simplified query to get all valid portfolio names
-        portfolio_names = query_db('''
-            SELECT id, name FROM portfolios 
-            WHERE account_id = ? AND name IS NOT NULL AND name != ''
+        # Get portfolios using the same approach as in the enrich function
+        # Get portfolio names from portfolios table
+        portfolios_from_table = query_db('''
+            SELECT name FROM portfolios 
+            WHERE account_id = ? AND name IS NOT NULL
             ORDER BY name
         ''', [account_id])
         
-        logger.info(f"Raw portfolio data from database: {portfolio_names}")
+        # Get all portfolios directly from the portfolios table
+        portfolios_from_companies = query_db('''
+            SELECT DISTINCT p.name as name
+            FROM portfolios p
+            WHERE p.account_id = ? AND p.name IS NOT NULL
+        ''', [account_id])
         
-        # Extract just the name strings
-        names = [p['name'] for p in portfolio_names]
-        logger.info(f"Extracted portfolio names: {names}")
+        # Combine both sources and remove duplicates
+        portfolio_names = set()
+        for p in portfolios_from_table:
+            if p['name'] and p['name'].strip():
+                portfolio_names.add(p['name'])
         
-        # Double check each name to make sure none are empty
-        for i, name in enumerate(names):
-            logger.debug(f"Portfolio {i}: '{name}', Type: {type(name)}, Length: {len(name)}")
-            
+        for p in portfolios_from_companies:
+            if p['name'] and p['name'].strip():
+                portfolio_names.add(p['name'])
+        
+        # Convert set to list and sort alphabetically
+        names = sorted(portfolio_names)
+        
+        # Don't hardcode any portfolio names - only use what's in the database
+        logger.info("Using only portfolio names from the database")
+        
+        logger.info(f"Combined portfolio names: {names}")
+        
         # Debug the JSON serialization
         json_response = jsonify(names)
         logger.debug(f"JSON response to be sent: {json_response.data}")
@@ -2274,8 +1865,8 @@ def process_csv_data(account_id, file_content):
         if df.empty:
             return False, "No valid entries found in CSV file after converting numeric values", {}
         
-        # Calculate total invested
-        df['total_invested'] = df['shares'] * df['price']
+        # Calculate position value (shares * price) for each row
+        df['position_value'] = df['shares'] * df['price']
         
         # Group by company name to handle duplicates in the CSV
         logger.info(f"Before grouping: {len(df)} rows")
@@ -2286,12 +1877,19 @@ def process_csv_data(account_id, file_content):
             
             # Group by company name and aggregate
             df = df.groupby('holdingname', as_index=False).agg({
-                'identifier': 'first',  # Take the first identifier
-                'shares': 'sum',        # Sum the shares
-                'price': 'mean',        # Average the price
-                'total_invested': 'sum' # Sum the total invested
+                'identifier': 'first',     # Take the first identifier
+                'shares': 'sum',           # Sum the shares
+                'position_value': 'sum'    # Sum the position values
             })
+            
+            # Calculate weighted average price and total invested
+            df['price'] = df.apply(lambda row: row['position_value'] / row['shares'] if row['shares'] > 0 else 0, axis=1)
+            df['total_invested'] = df['position_value']  # Use the sum of position values
+            
             logger.info(f"After grouping: {len(df)} rows")
+        else:
+            # If no duplicates, total_invested equals position_value
+            df['total_invested'] = df['position_value']
         
         # Start database transaction
         cursor.execute('BEGIN TRANSACTION')
@@ -3705,26 +3303,6 @@ def get_background_db():
 ###END_FILE###
 
 ================================================================
-###START_FILE_PATH: app/models/account.py###
-
-###END_FILE###
-
-================================================================
-###START_FILE_PATH: app/models/__init__.py###
-# Models package initialization
-###END_FILE###
-
-================================================================
-###START_FILE_PATH: app/models/portfolio.py###
-
-###END_FILE###
-
-================================================================
-###START_FILE_PATH: app/models/market_data.py###
-
-###END_FILE###
-
-================================================================
 ###START_FILE_PATH: app/utils/__init__.py###
 # Utils package initialization
 ###END_FILE###
@@ -4864,6 +4442,33 @@ def format_info_text(text: str) -> str:
     background-color: var(--blue-100) !important;
 }
 
+/* Improved table spacing */
+.table td, .table th {
+    padding: 0.65em 0.75em !important;
+}
+
+.table-container {
+    overflow-x: auto;
+    max-width: 100%;
+}
+
+/* Sortable columns */
+.table th.is-sortable {
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    transition: background-color 0.2s ease;
+}
+
+.table th.is-sortable:hover {
+    background-color: var(--blue-200) !important;
+}
+
+.table th.is-sortable .icon {
+    vertical-align: middle;
+    margin-left: 5px;
+}
+
 /* Forms */
 .input, .textarea, .select select {
     background-color: var(--white) !important;
@@ -4937,12 +4542,13 @@ option {
 
 /* Layout */
 .section {
-    padding: 1.5rem !important;
+    padding: 2rem 2.5rem !important;
     background: var(--white) !important;
 }
 
 .container {
-    max-width: 1200px !important;
+    max-width: 95% !important;
+    width: 95% !important;
 }
 
 /* Transitions */
@@ -5136,6 +4742,131 @@ option {
 
 .parameter-input {
     flex-grow: 1;
+}
+
+/* Help icon for tooltips */
+.has-tooltip-right i.fa-question-circle {
+    color: #aaa;
+    font-size: 0.8rem;
+    margin-left: 5px;
+    cursor: help;
+}
+
+.has-tooltip-right i.fa-question-circle:hover {
+    color: var(--blue-500);
+}
+
+/* Portfolio controls and metrics */
+.portfolio-controls-container {
+    background-color: var(--white);
+    border-radius: 4px;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+}
+
+.controls-and-metrics-row {
+    display: flex;
+    align-items: stretch;
+    flex-wrap: nowrap;
+    height: 2.5em;
+}
+
+.controls-group {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    height: 100%;
+}
+
+.controls-group .control {
+    height: 100%;
+    display: flex;
+    align-items: center;
+}
+
+.portfolio-metrics {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    padding: 0 0.75rem;
+    border-radius: 4px;
+    background-color: rgba(0, 0, 0, 0.03);
+    justify-content: space-between;
+    margin-left: 1rem;
+    height: 100%;
+}
+
+.portfolio-metrics.is-success {
+    background-color: rgba(72, 199, 116, 0.1);
+}
+
+.portfolio-metrics.is-warning {
+    background-color: rgba(255, 224, 138, 0.2);
+}
+
+.portfolio-metrics.is-danger {
+    background-color: rgba(241, 70, 104, 0.1);
+}
+
+.metrics-item {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    justify-content: center;
+}
+
+.metric-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--dark-grey);
+    margin-right: 0.3rem;
+}
+
+.metric-value {
+    font-size: 0.85rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+/* Portfolio table specific styles */
+.table-container {
+    max-height: calc(100vh - 250px);
+    overflow-y: auto;
+    position: relative;
+    margin-top: 1rem;
+}
+
+.table-container table {
+    table-layout: auto;
+    width: 100%;
+}
+
+.table-container thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.table-container thead th {
+    background-color: var(--light-grey) !important;
+    box-shadow: 0 1px 0 0 var(--grey) !important;
+}
+
+/* Column width adjustments */
+.table-container th:nth-child(1), /* Update column */
+.table-container td:nth-child(1) {
+    width: 80px;
+}
+
+.table-container th:nth-child(2), /* Identifier column */
+.table-container td:nth-child(2) {
+    width: 120px;
+}
+
+.table-container th:nth-child(3), /* Company column */
+.table-container td:nth-child(3) {
+    min-width: 180px;
 }
 ###END_FILE###
 
@@ -5558,11 +5289,6 @@ window.portfolioManager = portfolioManager;
 ###END_FILE###
 
 ================================================================
-###START_FILE_PATH: static/js/pages/analyse.js###
-
-###END_FILE###
-
-================================================================
 ###START_FILE_PATH: static/js/pages/merton.js###
 
 ###END_FILE###
@@ -5831,7 +5557,9 @@ class PortfolioTableApp {
                         lastUpdate: null
                     },
                     selectedPortfolio: defaultPortfolio,
-                    showOnlyMissingPrices: false
+                    showOnlyMissingPrices: false,
+                    sortColumn: '',
+                    sortDirection: 'asc'
                 };
             },
             computed: {
@@ -5851,6 +5579,45 @@ class PortfolioTableApp {
                     // Then filter by missing prices if checkbox is checked
                     if (this.showOnlyMissingPrices) {
                         filtered = filtered.filter(item => !item.price_eur);
+                    }
+                    
+                    // Apply sorting if a sort column is specified
+                    if (this.sortColumn) {
+                        const direction = this.sortDirection === 'asc' ? 1 : -1;
+                        
+                        filtered = [...filtered].sort((a, b) => {
+                            // Handle special cases for calculated fields
+                            if (this.sortColumn === 'total_value') {
+                                const aValue = (a.price_eur || 0) * (a.shares || 0);
+                                const bValue = (b.price_eur || 0) * (b.shares || 0);
+                                return direction * (aValue - bValue);
+                            }
+                            
+                            // For regular fields
+                            let aVal = a[this.sortColumn];
+                            let bVal = b[this.sortColumn];
+                            
+                            // Handle null/undefined values
+                            if (aVal === null || aVal === undefined) aVal = '';
+                            if (bVal === null || bVal === undefined) bVal = '';
+                            
+                            // Convert to numbers for numeric fields
+                            if (this.sortColumn === 'shares' || this.sortColumn === 'price_eur' || this.sortColumn === 'total_invested') {
+                                aVal = parseFloat(aVal) || 0;
+                                bVal = parseFloat(bVal) || 0;
+                                return direction * (aVal - bVal);
+                            }
+                            
+                            // Handle dates
+                            if (this.sortColumn === 'last_updated') {
+                                const aDate = aVal ? new Date(aVal) : new Date(0);
+                                const bDate = bVal ? new Date(bVal) : new Date(0);
+                                return direction * (aDate - bDate);
+                            }
+                            
+                            // String comparison for text fields
+                            return direction * String(aVal).localeCompare(String(bVal));
+                        });
                     }
                     
                     return filtered;
@@ -6091,6 +5858,40 @@ class PortfolioTableApp {
                             } else {
                                 console.log('Identifier updated successfully');
                             }
+                            
+                            // Trigger price update for this row after identifier change
+                            console.log('Triggering price update after identifier change for item:', item.id);
+                            try {
+                                const priceResponse = await fetch(`/portfolio/api/update_price/${item.id}`, {
+                                    method: 'POST'
+                                });
+                                
+                                const priceResult = await priceResponse.json();
+                                
+                                if (priceResponse.ok) {
+                                    // Refresh the data
+                                    await this.loadData();
+                                    
+                                    // Show success notification
+                                    if (typeof showNotification === 'function') {
+                                        showNotification('Price updated after identifier change', 'is-success');
+                                    } else {
+                                        console.log('Price updated after identifier change');
+                                    }
+                                } else {
+                                    // Show error notification
+                                    if (typeof showNotification === 'function') {
+                                        showNotification(priceResult.error || 'Failed to update price after identifier change', 'is-warning');
+                                    } else {
+                                        console.error('Error:', priceResult.error || 'Failed to update price after identifier change');
+                                    }
+                                }
+                            } catch (priceError) {
+                                console.error('Error updating price after identifier change:', priceError);
+                                if (typeof showNotification === 'function') {
+                                    showNotification('Error updating price after identifier change', 'is-warning');
+                                }
+                            }
                         } else {
                             // Show error notification
                             if (typeof showNotification === 'function') {
@@ -6183,6 +5984,20 @@ class PortfolioTableApp {
                     if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
                     if (diff < 2592000) return `${Math.floor(diff / 86400)}d ago`;
                     return d.toLocaleDateString();
+                },
+                
+                // Sort table by column
+                sortBy(column) {
+                    // If clicking the same column, toggle direction
+                    if (this.sortColumn === column) {
+                        this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        // New column, default to ascending
+                        this.sortColumn = column;
+                        this.sortDirection = 'asc';
+                    }
+                    
+                    console.log(`Sorting by ${column} in ${this.sortDirection} order`);
                 }
             },
             mounted() {
@@ -6228,6 +6043,10 @@ class PortfolioTableApp {
                             if (this.portfolioOptions.length === 0) {
                                 console.warn('No portfolio options found from server');
                             }
+                            
+                            // Log whether Default portfolio is in the options
+                            const hasDefault = this.portfolioOptions.includes('Default');
+                            console.log('Has Default portfolio in options:', hasDefault);
                         } else {
                             console.warn('Invalid portfolio options format from server');
                             this.portfolioOptions = [];
@@ -6634,6 +6453,9 @@ document.addEventListener('DOMContentLoaded', function() {
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
+    <!-- Bulma Tooltip Extension -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma-tooltip@3.0.2/dist/css/bulma-tooltip.min.css">
+    
     <!-- Plotly.js -->
     <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
     
@@ -6745,7 +6567,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                                     </td>
                                                     <td>
                                                         <div class="buttons are-small">
-                                                            <a href="{{ url_for('analysis.index') }}?portfolio={{ portfolio.name }}" class="button is-info is-small">
+                                                            <a href="{{ url_for('portfolio.analyse') }}?portfolio={{ portfolio.name }}" class="button is-info is-small">
                                                                 <span class="icon">
                                                                     <i class="fas fa-chart-bar"></i>
                                                                 </span>
@@ -6818,7 +6640,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <p class="subtitle is-6">View portfolio analytics</p>
                             </div>
                             <footer class="card-footer">
-                                <a href="{{ url_for('analysis.index') }}" class="card-footer-item">Go</a>
+                                <a href="{{ url_for('portfolio.analyse') }}" class="card-footer-item">Go</a>
                             </footer>
                         </div>
                     </div>
@@ -7496,13 +7318,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span>Merton Allocation</span>
             </span>
         </h1>
-
-        <div class="notification is-info is-light">
-            <button class="delete"></button>
-            <p>The Merton model helps you optimize your portfolio based on risk-free rates,
-               risk aversion, and target return expectations. Use the form below to update
-               parameters and calculate recommended allocations.</p>
-        </div>
+        <p class="subtitle has-text-grey">
+            The Merton model helps you optimize your portfolio based on risk-free rates,
+            risk aversion, and target return expectations. Use the form below to update
+            parameters and calculate recommended allocations.
+        </p>
     </div>
 </div>
 
@@ -7613,12 +7433,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const mertonForm = document.getElementById('merton-params-form');
     const resultsDiv = document.getElementById('merton-results-content');
 
-    // Dismiss notifications
-    document.querySelectorAll('.notification .delete').forEach(delBtn => {
-        delBtn.addEventListener('click', () => {
-            delBtn.parentNode.remove();
-        });
-    });
+    // No longer needed as we removed the dismissible notifications
+    
 
     if(mertonForm) {
         mertonForm.addEventListener('submit', (e) => {
@@ -7962,227 +7778,733 @@ document.addEventListener('DOMContentLoaded', () => {
 ###START_FILE_PATH: templates/pages/analyse.html###
 {% extends "base.html" %}
 
-{% block title %}Portfolio Analysis - Portfolio Manager{% endblock %}
+{% block title %}Portfolio Analysis{% endblock %}
 
 {% block content %}
-<div class="columns">
-    <div class="column is-12">
-        <h1 class="title">
-            <span class="icon-text">
-                <span class="icon">
-                    <i class="fas fa-chart-bar"></i>
-                </span>
-                <span>Portfolio Analysis</span>
-            </span>
-        </h1>
-
-        <div class="notification is-info is-light">
-            <button class="delete"></button>
-            <p>This page provides insights into your portfolio performance, category breakdowns,
-               and potential rebalancing strategies.</p>
-        </div>
+<div class="container">
+    <h1 class="title">Portfolio Analysis</h1>
+    
+    <!-- Loading indicator -->
+    <div id="loadingIndicator" class="has-text-centered my-6">
+        <p class="mb-3">Loading portfolio data...</p>
+        <progress class="progress is-info" max="100"></progress>
     </div>
-</div>
-
-<!-- Portfolio Metrics Section -->
-<div class="columns is-multiline">
-    <div class="column is-12">
-        <div class="card mb-5">
-            <header class="card-header">
-                <p class="card-header-title">
-                    <span class="icon-text">
-                        <span class="icon">
-                            <i class="fas fa-info-circle"></i>
-                        </span>
-                        <span>Key Metrics</span>
-                    </span>
-                </p>
-            </header>
-            <div class="card-content">
-                <div class="content">
-                    <!-- Example container for summary statistics (populated by analysis API) -->
-                    <div class="columns is-multiline">
-                        <div class="column is-3 has-text-centered">
-                            <p class="heading">Total Value (EUR)</p>
-                            <p class="title" id="analysis-total-value">-</p>
-                        </div>
-                        <div class="column is-3 has-text-centered">
-                            <p class="heading">Total Invested (EUR)</p>
-                            <p class="title" id="analysis-total-invested">-</p>
-                        </div>
-                        <div class="column is-3 has-text-centered">
-                            <p class="heading">Unrealized Gain (EUR)</p>
-                            <p class="title" id="analysis-unrealized-gain">-</p>
-                        </div>
-                        <div class="column is-3 has-text-centered">
-                            <p class="heading">Positions Count</p>
-                            <p class="title" id="analysis-positions-count">-</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Category Breakdown Chart -->
-    <div class="column is-12">
-        <div class="card mb-5">
-            <header class="card-header">
-                <p class="card-header-title">
-                    <span class="icon-text">
-                        <span class="icon">
-                            <i class="fas fa-chart-pie"></i>
-                        </span>
-                        <span>Category Breakdown</span>
-                    </span>
-                </p>
-            </header>
-            <div class="card-content">
-                <div class="content">
-                    <div id="category-breakdown-chart" style="height: 400px;"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Rebalancing / Concentration Section -->
-    <div class="column is-12">
+    
+    <div id="analysisContent" style="display: none;">
+        <!-- Global Overview Section -->
         <div class="card">
-            <header class="card-header">
-                <p class="card-header-title">
-                    <span class="icon-text">
-                        <span class="icon">
-                            <i class="fas fa-sync-alt"></i>
-                        </span>
-                        <span>Rebalancing & Concentration</span>
-                    </span>
-                </p>
-            </header>
-            <div class="card-content">
-                <div class="content">
-                    <p>Below is a sample view of your concentration score and suggested
-                       rebalancing approach. This helps ensure you don’t exceed your desired
-                       allocation in any one stock or sector.</p>
-
-                    <article class="message is-warning mb-4">
-                        <div class="message-header">
-                            <p>Concentration Score</p>
-                        </div>
-                        <div class="message-body">
-                            <span id="analysis-concentration-score">N/A</span> 
-                            <small>(Herfindahl Index * 100)</small>
-                        </div>
-                    </article>
-
-                    <button class="button is-info" id="analysis-rebalance-btn">
-                        <span class="icon">
-                            <i class="fas fa-balance-scale"></i>
-                        </span>
-                        <span>Suggest Rebalancing</span>
-                    </button>
-                    <div class="notification is-light mt-4" id="analysis-rebalance-suggestion" style="display:none;">
-                        <!-- This could be populated with dynamic rebalancing suggestions from the backend. -->
+            <div class="card-header">
+                <p class="card-header-title">Global Overview</p>
+                <div class="card-header-icon">
+                    <div id="portfolioFilters" class="is-flex is-flex-wrap-wrap">
+                        <!-- Portfolio checkboxes will be added here dynamically -->
                     </div>
+                </div>
+            </div>
+            <div class="card-content">
+                <div class="columns">
+                    <div class="column is-half">
+                        <h3 class="subtitle">Portfolio Allocations</h3>
+                        <div class="chart-container" style="height: 350px;">
+                            <canvas id="portfolioAllocationsChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="column is-half">
+                        <h3 class="subtitle">Company Allocations (All Portfolios)</h3>
+                        <div class="chart-container" style="height: 350px;">
+                            <canvas id="companyAllocationsChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Portfolio Overview Section -->
+        <h2 class="title is-4 mt-5">Portfolio Overview</h2>
+        <div id="portfolioSections">
+            <!-- Portfolio sections will be added here dynamically -->
+        </div>
+        
+        <!-- Detailed Overview Section -->
+        <h2 class="title is-4 mt-5">Detailed Overview</h2>
+        <div class="card mt-4">
+            <div class="card-content">
+                <div id="detailedOverview">
+                    <!-- Detailed metrics will be added here dynamically -->
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-{% endblock %}
+<!-- Include Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- Include Chart.js DataLabels plugin -->
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
 
-{% block scripts %}
+<!-- JavaScript for interactivity -->
 <script>
-document.addEventListener('DOMContentLoaded', () => {
-    // Sample placeholders to fetch analysis data via AJAX
-    // Adjust or remove as desired for your actual implementation.
-
-    // 1. Fetch key metrics
-    axios.get('/analysis/api/metrics')
-        .then(response => {
-            if(response.data) {
-                const metrics = response.data;
-                document.getElementById('analysis-total-value').textContent =
-                    portfolioManager.formatCurrency(metrics.total_value || 0);
-                document.getElementById('analysis-total-invested').textContent =
-                    portfolioManager.formatCurrency(metrics.total_invested || 0);
-                document.getElementById('analysis-unrealized-gain').textContent =
-                    portfolioManager.formatCurrency(metrics.unrealized_gain || 0);
-                document.getElementById('analysis-positions-count').textContent =
-                    metrics.position_count || '-';
-                if(metrics.concentration_score !== undefined) {
-                    document.getElementById('analysis-concentration-score').textContent =
-                        metrics.concentration_score.toFixed(2);
-                }
-            }
-        })
-        .catch(err => {
-            console.error('Error fetching analysis metrics:', err);
-        });
-
-    // 2. Fetch category breakdown for chart
-    axios.get('/analysis/api/metrics')
-        .then(response => {
-            if(response.data && response.data.category_breakdown) {
-                const chartData = response.data.category_breakdown;
-                // Build arrays for a pie chart
-                const labels = [];
-                const values = [];
-                chartData.forEach(cat => {
-                    labels.push(cat);
-                    values.push(chartData[cat].value);
-                });
-
-                const data = [{
-                    labels: labels,
-                    values: values,
-                    type: 'pie',
-                    textinfo: 'label+percent',
-                    hoverinfo: 'label+value'
-                }];
-
-                Plotly.newPlot('category-breakdown-chart', data, {
-                    margin: { t: 30, b: 30 }
-                });
-            }
-        })
-        .catch(err => {
-            console.error('Error building category breakdown chart:', err);
-        });
-
-    // 3. Rebalancing suggestions
-    const rebalanceBtn = document.getElementById('analysis-rebalance-btn');
-    const suggestionDiv = document.getElementById('analysis-rebalance-suggestion');
-    if(rebalanceBtn) {
-        rebalanceBtn.addEventListener('click', () => {
-            axios.get('/analysis/api/rebalance_suggestion')
-                .then(response => {
-                    if(response.data && response.data.suggestion) {
-                        suggestionDiv.style.display = 'block';
-                        suggestionDiv.innerHTML = `
-                            <p><strong>Suggested Rebalance:</strong></p>
-                            <p>${response.data.suggestion}</p>
-                        `;
+    // Register the DataLabels plugin with Chart.js
+    Chart.register(ChartDataLabels);
+    document.addEventListener('DOMContentLoaded', function() {
+        // Store data
+        let portfolios = [];
+        let portfolioData = [];
+        let selectedPortfolioIds = [];
+        let portfolioCharts = {};
+        
+        // Charts
+        let portfolioAllocationsChart = null;
+        let companyAllocationsChart = null;
+        
+        // Centralized chart configuration
+        function getPieChartOptions() {
+            return {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const value = context.raw;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((value / total) * 100).toFixed(1);
+                                return ` ${context.label}: ${formatCurrency(value)} (${percentage}%)`;
+                            }
+                        }
+                    },
+                    datalabels: {
+                        font: {
+                            weight: 'bold',
+                            size: 11
+                        },
+                        formatter: function(value, context) {
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((value / total) * 100).toFixed(1);
+                            if (percentage < 3) return ''; // Hide labels for very small segments
+                            return `${context.chart.data.labels[context.dataIndex]}\n${percentage}%`;
+                        },
+                        color: function(context) {
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((context.dataset.data[context.dataIndex] / total) * 100);
+                            // Use white for larger segments (inside) and dark for smaller segments (outside)
+                            return percentage >= 8 ? '#fff' : '#333';
+                        },
+                        textAlign: 'center',
+                        anchor: function(context) {
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((context.dataset.data[context.dataIndex] / total) * 100);
+                            // Use center for larger segments, end (outside) for smaller segments
+                            return percentage >= 8 ? 'center' : 'end';
+                        },
+                        align: function(context) {
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((context.dataset.data[context.dataIndex] / total) * 100);
+                            // Use center for larger segments, outside for smaller segments
+                            return percentage >= 8 ? 'center' : 'end';
+                        },
+                        offset: function(context) {
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((context.dataset.data[context.dataIndex] / total) * 100);
+                            // Add offset for outside labels
+                            return percentage >= 8 ? 0 : 10;
+                        },
+                        backgroundColor: function(context) {
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((context.dataset.data[context.dataIndex] / total) * 100);
+                            // Add semi-transparent background for outside labels
+                            return percentage >= 8 ? null : 'rgba(255, 255, 255, 0.7)';
+                        },
+                        borderRadius: 4,
+                        padding: function(context) {
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((context.dataset.data[context.dataIndex] / total) * 100);
+                            // Add padding for outside labels
+                            return percentage >= 8 ? 0 : 3;
+                        }
                     }
-                })
-                .catch(error => {
-                    console.error('Error fetching rebalancing suggestion:', error);
-                    portfolioManager.showNotification('Failed to fetch rebalancing suggestion.', 'is-danger');
-                });
+                }
+            };
+        }
+        
+        // Format functions
+        function formatCurrency(value) {
+            return '€' + value.toLocaleString('de-DE', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 2
+            });
+        }
+        
+        function formatPercentage(value) {
+            return value.toFixed(1) + '%';
+        }
+        
+        // Load data and initialize
+        Promise.all([
+            fetchPortfolios(),
+            fetchPortfolioData()
+        ]).then(([portfoliosList, data]) => {
+            // Process the data
+            processData(portfoliosList, data);
+            
+            // Initialize the UI
+            initializePortfolioFilters();
+            initializeCharts();
+            renderPortfolioSections();
+            renderDetailedOverview();
+            
+            // Hide loading indicator and show content
+            document.getElementById('loadingIndicator').style.display = 'none';
+            document.getElementById('analysisContent').style.display = 'block';
+        }).catch(error => {
+            console.error('Error loading data:', error);
+            document.getElementById('loadingIndicator').innerHTML = `
+                <p class="has-text-danger">Error loading data: ${error.message}</p>
+                <button class="button is-info mt-3" onclick="location.reload()">Try Again</button>
+            `;
         });
-    }
-
-    // Auto-dismiss notifications
-    const notifs = document.querySelectorAll('.notification .delete');
-    notifs.forEach(del => {
-        del.addEventListener('click', () => {
-            del.parentNode.remove();
-        });
+        
+        // Fetch list of portfolios
+        async function fetchPortfolios() {
+            const response = await fetch('/portfolio/api/portfolios');
+            if (!response.ok) {
+                throw new Error('Failed to fetch portfolios');
+            }
+            return await response.json();
+        }
+        
+        // Fetch portfolio data
+        async function fetchPortfolioData() {
+            const response = await fetch('/portfolio/api/portfolio_data');
+            if (!response.ok) {
+                throw new Error('Failed to fetch portfolio data');
+            }
+            return await response.json();
+        }
+        
+        // Process the data
+        function processData(portfoliosList, data) {
+            // Create portfolio structure
+            portfolios = portfoliosList.map((name, index) => ({
+                id: index + 1,
+                name: name
+            }));
+            
+            // Group data by portfolio
+            const portfolioMap = {};
+            
+            data.forEach(item => {
+                const portfolioName = item.portfolio;
+                
+                if (!portfolioMap[portfolioName]) {
+                    const portfolio = portfolios.find(p => p.name === portfolioName);
+                    if (portfolio) {
+                        portfolioMap[portfolioName] = {
+                            id: portfolio.id,
+                            name: portfolioName,
+                            companies: [],
+                            totalValue: 0,
+                            totalInvested: 0
+                        };
+                    }
+                }
+                
+                if (portfolioMap[portfolioName]) {
+                    // Calculate current value
+                    const price = item.price_eur || 0;
+                    const shares = item.shares || 0;
+                    const currentValue = price * shares;
+                    const totalInvested = item.total_invested || 0;
+                    
+                    // Add company to portfolio
+                    portfolioMap[portfolioName].companies.push({
+                        id: item.id,
+                        name: item.company,
+                        category: item.category || 'Uncategorized',
+                        shares: shares,
+                        priceEur: price,
+                        currentValue: currentValue,
+                        totalInvested: totalInvested,
+                        portfolioId: portfolioMap[portfolioName].id,
+                        portfolioName: portfolioName
+                    });
+                    
+                    // Update portfolio totals
+                    portfolioMap[portfolioName].totalValue += currentValue;
+                    portfolioMap[portfolioName].totalInvested += totalInvested;
+                }
+            });
+            
+            // Convert map to array
+            portfolioData = Object.values(portfolioMap);
+            
+            // Calculate percentages for each company within its portfolio
+            portfolioData.forEach(portfolio => {
+                if (portfolio.totalValue > 0) {
+                    portfolio.companies.forEach(company => {
+                        company.percentage = (company.currentValue / portfolio.totalValue) * 100;
+                    });
+                }
+                
+                // Sort companies by value (descending)
+                portfolio.companies.sort((a, b) => b.currentValue - a.currentValue);
+            });
+            
+            // All portfolios are selected by default
+            selectedPortfolioIds = portfolios.map(p => p.id);
+        }
+        
+        // Initialize portfolio filter checkboxes
+        function initializePortfolioFilters() {
+            const filterContainer = document.getElementById('portfolioFilters');
+            
+            portfolios.forEach(portfolio => {
+                const checkboxDiv = document.createElement('div');
+                checkboxDiv.className = 'control mx-1';
+                
+                const label = document.createElement('label');
+                label.className = 'checkbox';
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.value = portfolio.id;
+                checkbox.checked = true; // All checked by default
+                checkbox.dataset.portfolioName = portfolio.name;
+                
+                // Add change event listener
+                checkbox.addEventListener('change', handlePortfolioFilterChange);
+                
+                label.appendChild(checkbox);
+                label.appendChild(document.createTextNode(' ' + portfolio.name));
+                
+                checkboxDiv.appendChild(label);
+                filterContainer.appendChild(checkboxDiv);
+            });
+        }
+        
+        // Handle portfolio filter change
+        function handlePortfolioFilterChange(event) {
+            const checkbox = event.target;
+            const portfolioId = parseInt(checkbox.value);
+            
+            if (checkbox.checked) {
+                if (!selectedPortfolioIds.includes(portfolioId)) {
+                    selectedPortfolioIds.push(portfolioId);
+                }
+            } else {
+                selectedPortfolioIds = selectedPortfolioIds.filter(id => id !== portfolioId);
+            }
+            
+            // Update everything based on new selection
+            updateCharts();
+            updatePortfolioSectionVisibility();
+            renderDetailedOverview();
+        }
+        
+        // Update visibility of portfolio sections
+        function updatePortfolioSectionVisibility() {
+            const portfolioSections = document.querySelectorAll('.portfolio-section');
+            
+            portfolioSections.forEach(section => {
+                const portfolioId = parseInt(section.dataset.portfolioId);
+                section.style.display = selectedPortfolioIds.includes(portfolioId) ? 'block' : 'none';
+            });
+        }
+        
+        // Initialize charts
+        function initializeCharts() {
+            initializePortfolioAllocationsChart();
+            initializeCompanyAllocationsChart();
+        }
+        
+        // Update charts based on selected portfolios
+        function updateCharts() {
+            updatePortfolioAllocationsChart();
+            updateCompanyAllocationsChart();
+        }
+        
+        // Initialize portfolio allocations chart
+        function initializePortfolioAllocationsChart() {
+            const ctx = document.getElementById('portfolioAllocationsChart').getContext('2d');
+            
+            // Prepare chart data
+            const filteredPortfolios = portfolioData.filter(p => selectedPortfolioIds.includes(p.id));
+            const labels = filteredPortfolios.map(p => p.name);
+            const values = filteredPortfolios.map(p => p.totalValue);
+            const colors = generateColors(labels.length);
+            
+            // Create chart
+            portfolioAllocationsChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: colors,
+                        borderWidth: 1
+                    }]
+                },
+                options: getPieChartOptions()
+            });
+        }
+        
+        // Update portfolio allocations chart
+        function updatePortfolioAllocationsChart() {
+            if (!portfolioAllocationsChart) return;
+            
+            // Prepare chart data
+            const filteredPortfolios = portfolioData.filter(p => selectedPortfolioIds.includes(p.id));
+            const labels = filteredPortfolios.map(p => p.name);
+            const values = filteredPortfolios.map(p => p.totalValue);
+            const colors = generateColors(labels.length);
+            
+            // Update chart
+            portfolioAllocationsChart.data.labels = labels;
+            portfolioAllocationsChart.data.datasets[0].data = values;
+            portfolioAllocationsChart.data.datasets[0].backgroundColor = colors;
+            portfolioAllocationsChart.update();
+        }
+        
+        // Initialize company allocations chart
+        function initializeCompanyAllocationsChart() {
+            const ctx = document.getElementById('companyAllocationsChart').getContext('2d');
+            
+            // Get all companies from selected portfolios
+            const allCompanies = getAllCompaniesFromSelectedPortfolios();
+            
+            // Group companies by name and sum values
+            const companyGroups = groupCompaniesByName(allCompanies);
+            
+            // Sort and prepare chart data
+            const { labels, values } = prepareChartData(companyGroups);
+            const colors = generateColors(labels.length);
+            
+            // Create chart
+            companyAllocationsChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: colors,
+                        borderWidth: 1
+                    }]
+                },
+                options: getPieChartOptions()
+            });
+        }
+        
+        // Update company allocations chart
+        function updateCompanyAllocationsChart() {
+            if (!companyAllocationsChart) return;
+            
+            // Get all companies from selected portfolios
+            const allCompanies = getAllCompaniesFromSelectedPortfolios();
+            
+            // Group companies by name and sum values
+            const companyGroups = groupCompaniesByName(allCompanies);
+            
+            // Sort and prepare chart data
+            const { labels, values } = prepareChartData(companyGroups);
+            const colors = generateColors(labels.length);
+            
+            // Update chart
+            companyAllocationsChart.data.labels = labels;
+            companyAllocationsChart.data.datasets[0].data = values;
+            companyAllocationsChart.data.datasets[0].backgroundColor = colors;
+            companyAllocationsChart.update();
+        }
+        
+        // Get all companies from selected portfolios
+        function getAllCompaniesFromSelectedPortfolios() {
+            return portfolioData
+                .filter(p => selectedPortfolioIds.includes(p.id))
+                .flatMap(p => p.companies);
+        }
+        
+        // Group companies by name and sum values
+        function groupCompaniesByName(companies) {
+            const groups = {};
+            
+            companies.forEach(company => {
+                const name = company.name;
+                
+                if (!groups[name]) {
+                    groups[name] = {
+                        name: name,
+                        currentValue: 0,
+                        totalInvested: 0
+                    };
+                }
+                
+                groups[name].currentValue += company.currentValue;
+                groups[name].totalInvested += company.totalInvested;
+            });
+            
+            return Object.values(groups);
+        }
+        
+        // Prepare chart data (labels and values)
+        function prepareChartData(companies) {
+            // Sort by value
+            const sortedCompanies = [...companies].sort((a, b) => b.currentValue - a.currentValue);
+            
+            let labels = [];
+            let values = [];
+            
+            if (sortedCompanies.length > 10) {
+                // Take top 10 companies
+                const top10 = sortedCompanies.slice(0, 10);
+                const others = sortedCompanies.slice(10);
+                
+                labels = top10.map(c => c.name);
+                values = top10.map(c => c.currentValue);
+                
+                // Add "Others" category
+                const othersValue = others.reduce((sum, c) => sum + c.currentValue, 0);
+                if (othersValue > 0) {
+                    labels.push('Others');
+                    values.push(othersValue);
+                }
+            } else {
+                labels = sortedCompanies.map(c => c.name);
+                values = sortedCompanies.map(c => c.currentValue);
+            }
+            
+            return { labels, values };
+        }
+        
+        // Generate colors for chart segments
+        function generateColors(count) {
+            const colors = [];
+            for (let i = 0; i < count; i++) {
+                const hue = i * (360 / count);
+                colors.push(`hsl(${hue}, 70%, 65%)`);
+            }
+            return colors;
+        }
+        
+        // Render portfolio sections
+        function renderPortfolioSections() {
+            const container = document.getElementById('portfolioSections');
+            
+            // Sort portfolios by name
+            const sortedPortfolios = [...portfolioData].sort((a, b) => a.name.localeCompare(b.name));
+            
+            sortedPortfolios.forEach(portfolio => {
+                const section = document.createElement('div');
+                section.className = 'card mt-4 portfolio-section';
+                section.dataset.portfolioId = portfolio.id;
+                
+                const header = document.createElement('div');
+                header.className = 'card-header';
+                header.innerHTML = `<p class="card-header-title">${portfolio.name}</p>`;
+                
+                const content = document.createElement('div');
+                content.className = 'card-content';
+                
+                const columns = document.createElement('div');
+                columns.className = 'columns';
+                
+                // Table column
+                const tableColumn = document.createElement('div');
+                tableColumn.className = 'column is-7';
+                tableColumn.innerHTML = `
+                    <div class="table-container">
+                        <table class="table is-fullwidth is-striped is-hoverable">
+                            <thead>
+                                <tr>
+                                    <th>Company</th>
+                                    <th>Category</th>
+                                    <th>% of Portfolio</th>
+                                    <th>Current Value</th>
+                                    <th>Total Invested</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${renderCompanyRows(portfolio)}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                
+                // Chart column
+                const chartColumn = document.createElement('div');
+                chartColumn.className = 'column is-5';
+                
+                const chartContainer = document.createElement('div');
+                chartContainer.className = 'chart-container';
+                chartContainer.style.height = '350px';
+                
+                const canvas = document.createElement('canvas');
+                canvas.id = `portfolioChart${portfolio.id}`;
+                
+                chartContainer.appendChild(canvas);
+                chartColumn.appendChild(chartContainer);
+                
+                columns.appendChild(tableColumn);
+                columns.appendChild(chartColumn);
+                
+                content.appendChild(columns);
+                
+                section.appendChild(header);
+                section.appendChild(content);
+                
+                container.appendChild(section);
+                
+                // Initialize chart for this portfolio
+                initializePortfolioChart(portfolio);
+            });
+        }
+        
+        // Render company rows for a portfolio
+        function renderCompanyRows(portfolio) {
+            if (portfolio.companies.length === 0) {
+                return `<tr><td colspan="5" class="has-text-centered">No companies in this portfolio</td></tr>`;
+            }
+            
+            return portfolio.companies.map(company => `
+                <tr>
+                    <td>${company.name}</td>
+                    <td>${company.category}</td>
+                    <td>${company.percentage ? formatPercentage(company.percentage) : '-'}</td>
+                    <td>${formatCurrency(company.currentValue)}</td>
+                    <td>${formatCurrency(company.totalInvested)}</td>
+                </tr>
+            `).join('');
+        }
+        
+        // Initialize chart for a specific portfolio
+        function initializePortfolioChart(portfolio) {
+            const ctx = document.getElementById(`portfolioChart${portfolio.id}`).getContext('2d');
+            
+            // Prepare chart data for portfolio companies
+            let { labels, values } = prepareChartData(portfolio.companies);
+            const colors = generateColors(labels.length);
+            
+            // Create chart
+            portfolioCharts[portfolio.id] = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: colors,
+                        borderWidth: 1
+                    }]
+                },
+                options: getPieChartOptions()
+            });
+        }
+        
+        // Render detailed overview section
+        function renderDetailedOverview() {
+            const container = document.getElementById('detailedOverview');
+            
+            // Calculate totals across all selected portfolios
+            const selectedPortfolios = portfolioData.filter(p => selectedPortfolioIds.includes(p.id));
+            const totalValue = selectedPortfolios.reduce((sum, p) => sum + p.totalValue, 0);
+            const totalInvested = selectedPortfolios.reduce((sum, p) => sum + p.totalInvested, 0);
+            const profitLoss = totalValue - totalInvested;
+            const profitLossPercentage = totalInvested > 0 ? (profitLoss / totalInvested) * 100 : 0;
+            
+            // Get all companies from selected portfolios
+            const allCompanies = getAllCompaniesFromSelectedPortfolios();
+            const uniqueCompanies = new Set(allCompanies.map(c => c.name)).size;
+            
+            // Group by category
+            const categoryGroups = {};
+            allCompanies.forEach(company => {
+                const category = company.category;
+                
+                if (!categoryGroups[category]) {
+                    categoryGroups[category] = {
+                        name: category,
+                        currentValue: 0,
+                        totalInvested: 0,
+                        count: 0
+                    };
+                }
+                
+                categoryGroups[category].currentValue += company.currentValue;
+                categoryGroups[category].totalInvested += company.totalInvested;
+                categoryGroups[category].count += 1;
+            });
+            
+            // Sort categories by value
+            const sortedCategories = Object.values(categoryGroups).sort((a, b) => b.currentValue - a.currentValue);
+            
+            // Render HTML
+            container.innerHTML = `
+                <div class="columns">
+                    <div class="column is-3">
+                        <div class="box has-text-centered">
+                            <p class="heading">Total Value</p>
+                            <p class="title is-4">${formatCurrency(totalValue)}</p>
+                        </div>
+                    </div>
+                    <div class="column is-3">
+                        <div class="box has-text-centered">
+                            <p class="heading">Total Invested</p>
+                            <p class="title is-4">${formatCurrency(totalInvested)}</p>
+                        </div>
+                    </div>
+                    <div class="column is-3">
+                        <div class="box has-text-centered">
+                            <p class="heading">Profit/Loss</p>
+                            <p class="title is-4 ${profitLoss >= 0 ? 'has-text-success' : 'has-text-danger'}">
+                                ${formatCurrency(profitLoss)} (${profitLossPercentage.toFixed(1)}%)
+                            </p>
+                        </div>
+                    </div>
+                    <div class="column is-3">
+                        <div class="box has-text-centered">
+                            <p class="heading">Unique Companies</p>
+                            <p class="title is-4">${uniqueCompanies}</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <h3 class="title is-5 mt-4">Category Breakdown</h3>
+                <div class="table-container">
+                    <table class="table is-fullwidth is-striped is-hoverable">
+                        <thead>
+                            <tr>
+                                <th>Category</th>
+                                <th>Companies</th>
+                                <th>Current Value</th>
+                                <th>% of Portfolio</th>
+                                <th>Total Invested</th>
+                                <th>Profit/Loss</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${sortedCategories.map(category => {
+                                const catProfitLoss = category.currentValue - category.totalInvested;
+                                const catPercentage = totalValue > 0 ? (category.currentValue / totalValue) * 100 : 0;
+                                
+                                return `<tr>
+                                    <td>${category.name}</td>
+                                    <td>${category.count}</td>
+                                    <td>${formatCurrency(category.currentValue)}</td>
+                                    <td>${formatPercentage(catPercentage)}</td>
+                                    <td>${formatCurrency(category.totalInvested)}</td>
+                                    <td class="${catProfitLoss >= 0 ? 'has-text-success' : 'has-text-danger'}">
+                                        ${formatCurrency(catProfitLoss)}
+                                    </td>
+                                </tr>`;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
     });
-});
 </script>
 {% endblock %}
-
 ###END_FILE###
 
 ================================================================
@@ -8451,9 +8773,6 @@ document.addEventListener('DOMContentLoaded', () => {
 ###START_FILE_PATH: templates/components/sidebar.html###
 <aside class="menu p-4 has-background-light" style="height: 100%; min-height: calc(100vh - 3.25rem);">
     {% if session.account_id %}
-    <p class="menu-label">
-        Management
-    </p>
     <ul class="menu-list">
         <li>
             <a href="{{ url_for('account.index') }}" class="{{ 'is-active' if request.endpoint == 'account.index' }}">
@@ -8465,6 +8784,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 </span>
             </a>
         </li>
+    </ul>
+    
+    <p class="menu-label mt-5">
+        Portfolios
+    </p>
+    <ul class="menu-list">
         <li>
             <a href="{{ url_for('portfolio.enrich') }}" class="{{ 'is-active' if request.endpoint == 'portfolio.enrich' }}">
                 <span class="icon-text">
@@ -8472,6 +8797,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         <i class="fas fa-gem"></i>
                     </span>
                     <span>Enrich</span>
+                </span>
+            </a>
+        </li>
+        <li>
+            <a href="{{ url_for('portfolio.analyse') }}" class="{{ 'is-active' if request.endpoint == 'portfolio.analyse' }}">
+                <span class="icon-text">
+                    <span class="icon">
+                        <i class="fas fa-search"></i>
+                    </span>
+                    <span>Analyse</span>
                 </span>
             </a>
         </li>
@@ -8498,22 +8833,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         <i class="fas fa-hammer"></i>
                     </span>
                     <span>Build</span>
-                </span>
-            </a>
-        </li>
-    </ul>
-    
-    <p class="menu-label mt-5">
-        Portfolio
-    </p>
-    <ul class="menu-list">
-        <li>
-            <a href="{{ url_for('analysis.index') }}" class="{{ 'is-active' if request.endpoint == 'analysis.index' }}">
-                <span class="icon-text">
-                    <span class="icon">
-                        <i class="fas fa-search"></i>
-                    </span>
-                    <span>Analyse</span>
                 </span>
             </a>
         </li>
@@ -8917,30 +9236,62 @@ document.addEventListener('DOMContentLoaded', () => {
             <div id="portfolio-editor" class="portfolio-editor">
                 <!-- Vue.js component will be mounted here -->
                 <div id="portfolio-table-app" v-cloak>
-                    <div class="field is-grouped mb-4">
-                        <div class="control">
-                            <div class="select">
-                                <select id="filter-portfolio" v-model="selectedPortfolio">
-                                    <option value="">All Portfolios</option>
-                                    {% for portfolio in portfolios %}
-                                        <option value="{{ portfolio }}">{{ portfolio }}</option>
-                                    {% endfor %}
-                                </select>
+                    <div class="portfolio-controls-container mb-4">
+                        <div class="controls-and-metrics-row">
+                            <!-- Controls -->
+                            <div class="controls-group">
+                                <div class="control">
+                                    <div class="select">
+                                        <select id="filter-portfolio" v-model="selectedPortfolio">
+                                            <option value="">All Portfolios</option>
+                                            <option value="-">Default</option>
+                                            {% for portfolio in portfolios %}
+                                                {% if portfolio != 'Default' %}
+                                                    <option value="{{ portfolio }}">{{ portfolio }}</option>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="control">
+                                    <label class="checkbox" style="display: flex; align-items: center; height: 2.5em; padding: 0 0.5em;">
+                                        <input type="checkbox" v-model="showOnlyMissingPrices">
+                                        <span style="margin-left: 0.5em;">No price</span>
+                                    </label>
+                                </div>
+                                <div class="control">
+                                    <button class="button is-info is-light" @click="bulkEditApp.openModal()">
+                                        <span class="icon">
+                                            <i class="fas fa-edit"></i>
+                                        </span>
+                                        <span>Bulk Edit</span>
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                        <div class="control">
-                            <label class="checkbox" style="display: flex; align-items: center; height: 2.5em; padding: 0 0.5em;">
-                                <input type="checkbox" v-model="showOnlyMissingPrices">
-                                <span style="margin-left: 0.5em;">No price</span>
-                            </label>
-                        </div>
-                        <div class="control">
-                            <button class="button is-info is-light" @click="bulkEditApp.openModal()">
-                                <span class="icon">
-                                    <i class="fas fa-edit"></i>
-                                </span>
-                                <span>Bulk Edit</span>
-                            </button>
+                            
+                            <!-- Metrics -->
+                            <div v-if="!loading && filteredPortfolioItems.length > 0" class="portfolio-metrics" :class="healthColorClass">
+                                <div class="metrics-item">
+                                    <span class="metric-label">Total:</span>
+                                    <span class="metric-value" v-text="metrics.total"></span>
+                                </div>
+                                <div class="metrics-item">
+                                    <span class="metric-label">Health:</span>
+                                    <span class="metric-value"><span v-text="metrics.health"></span>%</span>
+                                </div>
+                                <div class="metrics-item">
+                                    <span class="metric-label">Missing:</span>
+                                    <span class="metric-value" v-text="metrics.missing"></span>
+                                </div>
+                                <div class="metrics-item">
+                                    <span class="metric-label">Value:</span>
+                                    <span class="metric-value" v-text="formatCurrency(metrics.totalValue)"></span>
+                                </div>
+                                <div class="metrics-item">
+                                    <span class="metric-label">Updated:</span>
+                                    <span class="metric-value" v-text="formatDateAgo(metrics.lastUpdate)"></span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
@@ -8956,41 +9307,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                     
                     <div v-else>
-                        <!-- Portfolio health metrics -->
-                        <div class="notification" :class="healthColorClass">
-                            <div class="level">
-                                <div class="level-item has-text-centered">
-                                    <div>
-                                        <p class="heading">Total Companies</p>
-                                        <p v-text="metrics.total"></p>
-                                    </div>
-                                </div>
-                                <div class="level-item has-text-centered">
-                                    <div>
-                                        <p class="heading">Portfolio Health</p>
-                                        <p><span v-text="metrics.health"></span>%</p>
-                                    </div>
-                                </div>
-                                <div class="level-item has-text-centered">
-                                    <div>
-                                        <p class="heading">Missing Prices</p>
-                                        <p v-text="metrics.missing"></p>
-                                    </div>
-                                </div>
-                                <div class="level-item has-text-centered">
-                                    <div>
-                                        <p class="heading">Total Value</p>
-                                        <p v-text="formatCurrency(metrics.totalValue)"></p>
-                                    </div>
-                                </div>
-                                <div class="level-item has-text-centered">
-                                    <div>
-                                        <p class="heading">Last Update</p>
-                                        <p v-text="formatDateAgo(metrics.lastUpdate)"></p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
                         
                         <!-- Editable table -->
                         <div v-if="loading" class="has-text-centered">
@@ -9009,14 +9325,63 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <thead>
                                     <tr>
                                         <th>Update</th>
-                                        <th>Company</th>
-                                        <th>Portfolio</th>
-                                        <th>Category</th>
-                                        <th>Shares</th>
-                                        <th>Price (EUR)</th>
-                                        <th>Total Value</th>
-                                        <th>Total Invested</th>
-                                        <th>Last Update</th>
+                                        <th @click="sortBy('identifier')" class="is-sortable">
+                                            Identifier
+                                            <span class="icon is-small has-tooltip-right" data-tooltip="Supported formats: Stock tickers (AAPL), Crypto (BTC-USD), or ISINs (US0378331005)">
+                                                <i class="fas fa-question-circle"></i>
+                                            </span>
+                                            <span class="icon is-small ml-1" v-if="sortColumn === 'identifier'">
+                                                <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
+                                            </span>
+                                        </th>
+                                        <th @click="sortBy('company')" class="is-sortable">
+                                            Company
+                                            <span class="icon is-small ml-1" v-if="sortColumn === 'company'">
+                                                <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
+                                            </span>
+                                        </th>
+                                        <th @click="sortBy('portfolio')" class="is-sortable">
+                                            Portfolio
+                                            <span class="icon is-small ml-1" v-if="sortColumn === 'portfolio'">
+                                                <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
+                                            </span>
+                                        </th>
+                                        <th @click="sortBy('category')" class="is-sortable">
+                                            Category
+                                            <span class="icon is-small ml-1" v-if="sortColumn === 'category'">
+                                                <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
+                                            </span>
+                                        </th>
+                                        <th @click="sortBy('shares')" class="is-sortable">
+                                            Shares
+                                            <span class="icon is-small ml-1" v-if="sortColumn === 'shares'">
+                                                <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
+                                            </span>
+                                        </th>
+                                        <th @click="sortBy('price_eur')" class="is-sortable">
+                                            Price (EUR)
+                                            <span class="icon is-small ml-1" v-if="sortColumn === 'price_eur'">
+                                                <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
+                                            </span>
+                                        </th>
+                                        <th @click="sortBy('total_value')" class="is-sortable">
+                                            Total Value
+                                            <span class="icon is-small ml-1" v-if="sortColumn === 'total_value'">
+                                                <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
+                                            </span>
+                                        </th>
+                                        <th @click="sortBy('total_invested')" class="is-sortable">
+                                            Total Invested
+                                            <span class="icon is-small ml-1" v-if="sortColumn === 'total_invested'">
+                                                <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
+                                            </span>
+                                        </th>
+                                        <th @click="sortBy('last_updated')" class="is-sortable">
+                                            Last Update
+                                            <span class="icon is-small ml-1" v-if="sortColumn === 'last_updated'">
+                                                <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
+                                            </span>
+                                        </th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
@@ -9034,14 +9399,25 @@ document.addEventListener('DOMContentLoaded', () => {
                                             </button>
                                         </td>
                                         <td>
+                                            <input class="input is-small" type="text"
+                                                   v-model="item.identifier"
+                                                   @input="debouncedSaveIdentifierChange(item)"
+                                                   @change="saveIdentifierChange(item)">
+                                        </td>
+                                        <td>
                                             <span v-text="item.company"></span>
                                         </td>
                                         <td>
                                             <div class="select is-small">
                                                 <select v-model="item.portfolio" 
                                                         @change="debouncedSavePortfolioChange(item)">
+                                                    <!-- Special handling for the default portfolio value '-' -->
                                                     <option value="-">Default</option>
-                                                    <option v-for="p in portfolioOptions" :key="p" :value="p">{{ p }}</option>
+                                                    {% for portfolio in portfolios %}
+                                                        {% if portfolio != 'Default' %}
+                                                            <option value="{{ portfolio }}">{{ portfolio }}</option>
+                                                        {% endif %}
+                                                    {% endfor %}
                                                 </select>
                                             </div>
                                         </td>
