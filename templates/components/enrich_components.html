@@ -637,7 +637,7 @@
 
 {% macro bulk_edit_modal(portfolios) %}
 <div id="bulk-edit-modal" class="modal">
-    <div class="modal-background"></div>
+    <div class="modal-background" @click="closeModal"></div>
     <div class="modal-card" style="width: 95%; max-width: 1200px; min-height: 80vh;">
         <div id="bulk-edit-app" v-cloak>
             <header class="modal-card-head">
@@ -986,50 +986,5 @@
         </div>
     </div>
 </div>
-
-<!-- CSS moved to the modal section for better organization -->
-    
-    /* Override default dark background colors with light theme */
-    #bulk-edit-modal .company-list-container,
-    #bulk-edit-modal .company-list,
-    #bulk-edit-modal .company-item {
-        background-color: #fff !important;
-        color: #333 !important;
-    }
-    
-    #bulk-edit-modal .portfolio-header {
-        background-color: #f5f5f5 !important;
-        color: #333 !important;
-        border-bottom: 1px solid #e0e0e0;
-    }
-    
-    /* Hover and selection states */
-    #bulk-edit-modal .company-item:hover {
-        background-color: #f5f5f5 !important;
-    }
-    
-    #bulk-edit-modal .company-item.is-selected {
-        background-color: #e3f2fd !important;
-    }
-    
-    /* Fix all text coloring in the modal */
-    #bulk-edit-modal .modal-card-body,
-    #bulk-edit-modal .box,
-    #bulk-edit-modal label,
-    #bulk-edit-modal .title,
-    #bulk-edit-modal .help,
-    #bulk-edit-modal .company-name,
-    #bulk-edit-modal .checkbox,
-    #bulk-edit-modal .portfolio-title {
-        color: #333 !important;
-    }
-    
-    /* Ensure dropdown options are visible */
-    #bulk-edit-modal select,
-    #bulk-edit-modal select option {
-        color: #333 !important;
-        background-color: #fff !important;
-        border-color: #dbdbdb;
-    }
 </style>
 {% endmacro %}

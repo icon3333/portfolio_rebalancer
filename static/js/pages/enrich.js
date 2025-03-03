@@ -1016,6 +1016,14 @@ class BulkEditApp {
                     if (modal) {
                         modal.classList.remove('is-active');
                         document.documentElement.classList.remove('is-clipped');
+                        
+                        // Reload the portfolio data table to see the latest updates
+                        if (window.portfolioTableApp && typeof window.portfolioTableApp.loadData === 'function') {
+                            console.log('Reloading portfolio data table after closing bulk edit modal');
+                            window.portfolioTableApp.loadData();
+                        } else {
+                            console.warn('Could not find portfolioTableApp to reload data');
+                        }
                     }
                 },
                 
@@ -1521,7 +1529,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize Vue apps (if their mount points exist)
     if (document.getElementById('portfolio-table-app')) {
-        const portfolioApp = new PortfolioTableApp(portfolios, defaultPortfolio);
+        // Create global portfolioTableApp instance to ensure it's accessible outside this scope
+        window.portfolioTableApp = new PortfolioTableApp(portfolios, defaultPortfolio);
+        
+        // Log that the app has been initialized
+        console.log('PortfolioTableApp initialized globally as window.portfolioTableApp');
     }
     
     if (document.getElementById('bulk-edit-app')) {
