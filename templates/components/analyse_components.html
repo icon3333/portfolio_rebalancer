@@ -1,0 +1,64 @@
+{% macro loading_indicator() %}
+<div class="has-text-centered my-6">
+    <span class="icon is-large">
+        <i class="fas fa-spinner fa-pulse fa-3x"></i>
+    </span>
+    <p class="mt-4">Loading data...</p>
+</div>
+{% endmacro %}
+
+{% macro error_message(message) %}
+<div class="notification is-danger">
+    <button class="delete"></button>
+    <p>{{ message }}</p>
+</div>
+{% endmacro %}
+
+{% macro chart_container(id, title) %}
+<div class="column">
+    <h5 class="title is-6 has-text-centered">{{ title }}</h5>
+    <div class="chart-container" id="{{ id }}"></div>
+</div>
+{% endmacro %}
+
+{% macro portfolio_filter(portfolios) %}
+<div class="field">
+    <label class="label">Filter Portfolios</label>
+    <div class="control">
+        {% for portfolio in portfolios %}
+        <label class="checkbox">
+            <input type="checkbox" value="{{ portfolio.name }}" checked>
+            <span>{{ portfolio.name }}</span>
+        </label>
+        <br>
+        {% endfor %}
+    </div>
+</div>
+{% endmacro %}
+
+{% macro metrics_card(title, icon, metrics) %}
+<div class="card">
+    <header class="card-header">
+        <p class="card-header-title">
+            <span class="icon-text">
+                <span class="icon">
+                    <i class="fas fa-{{ icon }}"></i>
+                </span>
+                <span>{{ title }}</span>
+            </span>
+        </p>
+    </header>
+    <div class="card-content">
+        <div class="columns is-multiline">
+            {% for metric in metrics %}
+            <div class="column is-3">
+                <div class="box">
+                    <p class="heading">{{ metric.label }}</p>
+                    <p class="title is-5">{{ metric.value }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endmacro %}

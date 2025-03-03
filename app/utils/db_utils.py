@@ -5,15 +5,16 @@ from app.database.db_manager import query_db, execute_db
 
 logger = logging.getLogger(__name__)
 
-def update_price_in_db(identifier: str, price: float, currency: str, price_eur: float) -> bool:
+def update_price_in_db(identifier: str, price: float, currency: str, price_eur: float, modified_identifier: str = None) -> bool:
     """
     Update price in database for a single identifier.
     
     Args:
-        identifier: Stock identifier (ISIN)
+        identifier: Stock identifier (ISIN or ticker)
         price: Price in original currency
         currency: Currency code
         price_eur: Price in EUR
+        modified_identifier: If provided, update the company's identifier to this value
         
     Returns:
         Success status
@@ -25,7 +26,23 @@ def update_price_in_db(identifier: str, price: float, currency: str, price_eur: 
             
         now = datetime.now().isoformat()
         
-        # Check if the record exists
+        # If we have a modified identifier, update the company records first
+        if modified_identifier:
+            logger.info(f"⚠️ Updating identifier in database from {identifier} to {modified_identifier}")
+            
+            # Update identifier in companies table
+            rows_updated = execute_db('''
+                UPDATE companies 
+                SET identifier = ?
+                WHERE identifier = ?
+            ''', [modified_identifier, identifier])
+            
+            logger.info(f"Updated {rows_updated} company records with new identifier {modified_identifier}")
+            
+            # Use the modified identifier for all subsequent operations
+            identifier = modified_identifier
+        
+        # Check if the record exists in market_prices
         existing = query_db(
             'SELECT 1 FROM market_prices WHERE identifier = ?',
             [identifier],
@@ -39,6 +56,7 @@ def update_price_in_db(identifier: str, price: float, currency: str, price_eur: 
                 SET price = ?, currency = ?, price_eur = ?, last_updated = ?
                 WHERE identifier = ?
             ''', [price, currency, price_eur, now, identifier])
+            logger.info(f"Updated existing price record for {identifier}")
         else:
             # Insert new record
             execute_db('''
@@ -46,6 +64,7 @@ def update_price_in_db(identifier: str, price: float, currency: str, price_eur: 
                 (identifier, price, currency, price_eur, last_updated)
                 VALUES (?, ?, ?, ?, ?)
             ''', [identifier, price, currency, price_eur, now])
+            logger.info(f"Created new price record for {identifier}")
         
         # Update last_price_update in accounts table for all accounts that have this identifier
         execute_db('''
@@ -180,24 +199,36 @@ def process_portfolio_dataframe(df, account_id=None, portfolio_id=None):
 def update_batch_prices_in_db(results):
     """Update market prices with results from batch processing."""
     success_count = 0
+    modified_count = 0
     failed_count = 0
     
     try:
         for isin, result in results.items():
             if result.get('success') and result.get('price') is not None:
+                # Check if we have a modified identifier
+                modified_identifier = result.get('modified_identifier')
+                
+                if modified_identifier:
+                    logger.info(f"📝 Found modified identifier: {isin} -> {modified_identifier}")
+                    modified_count += 1
+                
                 success = update_price_in_db(
                     isin,
                     result.get('price'),
                     result.get('currency', 'USD'),
-                    result.get('price_eur', result.get('price'))
+                    result.get('price_eur', result.get('price')),
+                    modified_identifier  # Pass modified_identifier if present
                 )
                 
                 if success:
                     success_count += 1
+                    if modified_identifier:
+                        logger.info(f"✅ Successfully updated price AND identifier for {isin} -> {modified_identifier}")
                 else:
                     failed_count += 1
+                    logger.warning(f"❌ Failed to update price for {isin}")
         
-        logger.info(f"Batch update complete. Success: {success_count}, Failed: {failed_count}")
+        logger.info(f"Batch update complete. Success: {success_count}, Modified: {modified_count}, Failed: {failed_count}")
         return True
     except Exception as e:
         logger.error(f"Error updating batch prices in database: {str(e)}")

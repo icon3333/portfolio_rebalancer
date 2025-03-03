@@ -1,5 +1,5 @@
 This file is a merged representation of the entire codebase, combining all repository files into a single document.
-Generated on: 2025-03-02T19:03:37.480759
+Generated on: 2025-03-03T06:46:04.856502
 
 ================================================================
 Purpose:
@@ -83,6 +83,7 @@ templates/
         footer.html
         messages.html
         sidebar.html
+        analyse_components.html
         enrich_components.html
 __pycache__/
 
@@ -1748,7 +1749,7 @@ def get_portfolio_data(account_id):
         return []
 
 def process_csv_data(account_id, file_content):
-    """Process and import CSV data into the database"""
+    """Process and import CSV data into the database using FIFO (First In, First Out) method"""
     db = None
     cursor = None
     try:
@@ -1756,23 +1757,14 @@ def process_csv_data(account_id, file_content):
         db = get_db()
         cursor = db.cursor()
         
-        # Get all existing companies for this account
-        existing_companies = query_db(
-            'SELECT id, name, identifier, total_invested FROM companies WHERE account_id = ?',
-            [account_id]
-        )
-        
-        # Create a mapping of company names to their data for quick lookup
-        existing_company_map = {company['name']: company for company in existing_companies}
-        
-        # Create a set to track processed company IDs
-        processed_company_ids = set()
+        # Create backup before making changes
+        backup_database()
         
         # Clean data
         df = pd.read_csv(io.StringIO(file_content), 
-                        delimiter=';',
-                        decimal=',',  # Use comma as decimal separator
-                        thousands='.')  # Use dot as thousands separator
+                         delimiter=';',
+                         decimal=',',  # Use comma as decimal separator
+                         thousands='.')  # Use dot as thousands separator
         
         # Make column names lowercase for comparison
         df.columns = df.columns.str.lower()
@@ -1782,24 +1774,26 @@ def process_csv_data(account_id, file_content):
             "identifier": ["identifier", "isin", "symbol"],
             "holdingname": ["holdingname", "name", "securityname"],
             "shares": ["shares", "quantity", "units"],
-            "price": ["price", "unitprice", "priceperunit"]
+            "price": ["price", "unitprice", "priceperunit"],
+            "type": ["type", "transactiontype"]
         }
         
         # Optional columns with defaults
         optional_columns = {
-            "type": ["type", "transactiontype"],
             "broker": ["broker", "brokername"],
-            "assettype": ["assettype", "type", "securitytype"],
+            "assettype": ["assettype", "securitytype"],
             "wkn": ["wkn"],
             "currency": ["currency"],
-            "exchange": ["exchange", "market"]
+            "exchange": ["exchange", "market"],
+            "date": ["date", "transactiondate", "datetime"],
+            "fee": ["fee", "commission", "costs"],  # Added fee/costs tracking
+            "tax": ["tax", "taxes"]  # Added tax tracking
         }
         
-        # Try to map essential columns first
+        # Map columns
         column_mapping = {}
         missing_columns = []
         
-        # Try to find matching columns for essential fields
         for required_col, alternatives in essential_columns.items():
             found = False
             for alt in alternatives:
@@ -1811,12 +1805,10 @@ def process_csv_data(account_id, file_content):
             if not found:
                 missing_columns.append(required_col)
         
-        # Check for essential columns
         if missing_columns:
             logger.warning(f"Missing essential columns: {missing_columns}")
             return False, f"Missing required columns: {', '.join(missing_columns)}", {}
         
-        # Try to map optional columns
         for opt_col, alternatives in optional_columns.items():
             for alt in alternatives:
                 matching_cols = [col for col in df.columns if alt in col]
@@ -1824,72 +1816,163 @@ def process_csv_data(account_id, file_content):
                     column_mapping[opt_col] = matching_cols[0]
                     break
         
-        # Rename columns to match our format
+        # Rename columns
         df = df.rename(columns=column_mapping)
         
-        # Set default values for missing optional columns
-        if 'type' not in df.columns:
-            df['type'] = 'Buy'  # Default to Buy type
+        # Set defaults
         if 'currency' not in df.columns:
-            df['currency'] = 'EUR'  # Default to EUR
+            df['currency'] = 'EUR'
+        if 'fee' not in df.columns:
+            df['fee'] = 0
+        if 'tax' not in df.columns:
+            df['tax'] = 0
+        if 'date' not in df.columns:
+            # Create a date column with default values to ensure chronological ordering
+            df['date'] = pd.Timestamp.now()
         
-        # Clean up data
+        # Clean data
         df['identifier'] = df['identifier'].apply(lambda x: str(x).strip() if pd.notna(x) else '')
         df['holdingname'] = df['holdingname'].apply(lambda x: str(x).strip() if pd.notna(x) else '')
+        df['type'] = df['type'].str.lower() if 'type' in df.columns else 'buy'
         
         # Filter out rows with empty identifiers
         df = df[df['identifier'].str.len() > 0]
-        
         if len(df) == 0:
             return False, "No valid entries found in CSV file", {}
         
-        # Convert numeric columns - handle both string and numeric inputs
+        # Convert numeric columns
         def convert_numeric(val):
             if pd.isna(val):
-                return None
+                return 0
             if isinstance(val, (int, float)):
                 return float(val)
             try:
-                # Convert string to float, handling European number format
                 val_str = str(val).strip().replace(',', '.')
                 return float(val_str)
             except (ValueError, TypeError):
-                return None
-
+                return 0
+        
         df['shares'] = df['shares'].apply(convert_numeric)
         df['price'] = df['price'].apply(convert_numeric)
+        df['fee'] = df['fee'].apply(convert_numeric)
+        df['tax'] = df['tax'].apply(convert_numeric)
         
         # Remove rows with invalid numeric values
         df = df.dropna(subset=['shares', 'price'])
-        
         if df.empty:
             return False, "No valid entries found in CSV file after converting numeric values", {}
         
-        # Calculate position value (shares * price) for each row
-        df['position_value'] = df['shares'] * df['price']
+        # Convert dates and sort chronologically
+        df['date'] = pd.to_datetime(df['date'], errors='coerce')
+        # Ensure all dates are valid; use current time for invalid dates
+        df['date'] = df['date'].fillna(pd.Timestamp.now())
+        df = df.sort_values('date')
         
-        # Group by company name to handle duplicates in the CSV
-        logger.info(f"Before grouping: {len(df)} rows")
-        # Check for duplicate company names
-        duplicate_names = df[df.duplicated('holdingname', keep=False)]['holdingname'].unique()
-        if len(duplicate_names) > 0:
-            logger.info(f"Found duplicate company names in CSV: {duplicate_names}")
+        # Initialize company data structure for FIFO accounting
+        company_positions = {}
+        
+        # Process transactions using FIFO method
+        for idx, row in df.iterrows():
+            company_name = row['holdingname']
+            transaction_type = row['type'].lower()
+            shares = float(row['shares'])
+            price = float(row['price'])
+            identifier = row['identifier']
+            fee = float(row['fee']) if 'fee' in row else 0
+            tax = float(row['tax']) if 'tax' in row else 0
+            transaction_date = row['date']
             
-            # Group by company name and aggregate
-            df = df.groupby('holdingname', as_index=False).agg({
-                'identifier': 'first',     # Take the first identifier
-                'shares': 'sum',           # Sum the shares
-                'position_value': 'sum'    # Sum the position values
-            })
+            # Initialize company data if not exists
+            if company_name not in company_positions:
+                company_positions[company_name] = {
+                    'identifier': identifier,
+                    'lots': [],                # List of purchase lots with FIFO tracking
+                    'total_shares': 0,         # Total shares across all lots
+                    'total_cost': 0,           # Total cost basis across all lots
+                    'total_fees': 0,           # Track total fees
+                    'total_taxes': 0           # Track total taxes
+                }
             
-            # Calculate weighted average price and total invested
-            df['price'] = df.apply(lambda row: row['position_value'] / row['shares'] if row['shares'] > 0 else 0, axis=1)
-            df['total_invested'] = df['position_value']  # Use the sum of position values
+            company = company_positions[company_name]
             
-            logger.info(f"After grouping: {len(df)} rows")
-        else:
-            # If no duplicates, total_invested equals position_value
-            df['total_invested'] = df['position_value']
+            # Process based on transaction type
+            if transaction_type in ['buy', 'transferin']:
+                # Add a new lot with this purchase
+                lot_cost = (shares * price) + fee + tax
+                company['lots'].append({
+                    'date': transaction_date,
+                    'shares': shares,
+                    'price': price,
+                    'fee': fee,
+                    'tax': tax,
+                    'cost': lot_cost            # Total cost including fees and taxes
+                })
+                
+                # Update company totals
+                company['total_shares'] += shares
+                company['total_cost'] += lot_cost
+                company['total_fees'] += fee
+                company['total_taxes'] += tax
+                
+                avg_cost = company['total_cost'] / company['total_shares'] if company['total_shares'] > 0 else 0
+                logger.info(f"Buy: {company_name}, +{shares} @ {price}, new avg cost: {avg_cost:.4f}, " 
+                           f"total shares: {company['total_shares']}, total cost: {company['total_cost']:.2f}")
+                
+            elif transaction_type in ['sell', 'transferout']:
+                # Can't sell more than we have
+                if shares > company['total_shares']:
+                    shares = company['total_shares']
+                
+                if shares <= 0:
+                    continue
+                
+                # Use FIFO to determine which lots to sell from
+                shares_to_sell = shares
+                cost_basis_reduction = 0
+                
+                # Keep processing lots until we've sold all required shares
+                i = 0
+                while shares_to_sell > 0 and i < len(company['lots']):
+                    lot = company['lots'][i]
+                    
+                    if lot['shares'] <= shares_to_sell:
+                        # Use the entire lot
+                        shares_from_lot = lot['shares']
+                        cost_from_lot = lot['cost']
+                        
+                        # Remove this lot completely
+                        cost_basis_reduction += cost_from_lot
+                        shares_to_sell -= shares_from_lot
+                        company['lots'].pop(i)  # Remove the lot at position i
+                    else:
+                        # Use partial lot
+                        shares_from_lot = shares_to_sell
+                        cost_per_share = lot['cost'] / lot['shares']
+                        cost_from_lot = cost_per_share * shares_from_lot
+                        
+                        # Update this lot
+                        cost_basis_reduction += cost_from_lot
+                        lot['shares'] -= shares_from_lot
+                        lot['cost'] -= cost_from_lot
+                        shares_to_sell = 0
+                        i += 1  # Move to next lot
+                
+                # Update company totals
+                company['total_shares'] -= shares
+                company['total_cost'] -= cost_basis_reduction
+                # We don't add fees and taxes from sell/transferout transactions to the position's cost basis
+                
+                # Log the transaction
+                if transaction_type == 'transferout':
+                    logger.info(f"TransferOut: {company_name}, -{shares} shares, cost basis reduction: {cost_basis_reduction:.2f}, " 
+                               f"remaining: {company['total_shares']}, remaining cost: {company['total_cost']:.2f}")
+                else:
+                    logger.info(f"Sell: {company_name}, -{shares} @ {price}, cost basis reduction: {cost_basis_reduction:.2f}, " 
+                               f"remaining: {company['total_shares']}, remaining cost: {company['total_cost']:.2f}")
+                
+                # Update fees and taxes
+                company['total_fees'] += fee
+                company['total_taxes'] += tax
         
         # Start database transaction
         cursor.execute('BEGIN TRANSACTION')
@@ -1900,7 +1983,6 @@ def process_csv_data(account_id, file_content):
             [account_id],
             one=True
         )
-        
         if not default_portfolio:
             cursor.execute(
                 'INSERT INTO portfolios (name, account_id) VALUES (?, ?)',
@@ -1910,101 +1992,69 @@ def process_csv_data(account_id, file_content):
         else:
             default_portfolio_id = default_portfolio['id']
         
-        # Get existing shares data for comparison
-        existing_shares = query_db(
-            '''SELECT cs.company_id, cs.shares, c.name 
-               FROM company_shares cs 
-               JOIN companies c ON cs.company_id = c.id 
-               WHERE c.account_id = ?''',
+        # Get existing companies
+        existing_companies = query_db(
+            'SELECT id, name, identifier FROM companies WHERE account_id = ?',
             [account_id]
         )
+        existing_company_map = {company['name']: company for company in existing_companies}
         
-        # Create a mapping of company names to their current shares
-        company_shares_map = {}
-        for share_data in existing_shares:
-            company_shares_map[share_data['name']] = share_data['shares']
-        
-        # Process each row
+        # Track results
         positions_added = []
         positions_updated = []
         positions_removed = []
+        failed_prices = []
         
-        for _, row in df.iterrows():
-            company_name = row['holdingname']
-            identifier = row['identifier']
-            share_count = float(row['shares'])
-            total_invested = float(row['total_invested'])
-            
+        # Update database based on final positions
+        for company_name, position in company_positions.items():
             # Handle floating point precision
-            if abs(share_count) < 1e-10:
-                share_count = 0
-                total_invested = 0
+            current_shares = position['total_shares']  # Changed from 'current_shares' to 'total_shares'
+            total_cost = position['total_cost']
             
-            # Check if company exists
-            company = existing_company_map.get(company_name)
+            if abs(current_shares) < 1e-6:
+                current_shares = 0
+                total_cost = 0
             
-            if share_count <= 0:
-                # Remove company if it exists
-                if company:
-                    # Delete shares first
-                    cursor.execute(
-                        'DELETE FROM company_shares WHERE company_id = ?',
-                        [company['id']]
-                    )
-                    # Then delete company
-                    cursor.execute(
-                        'DELETE FROM companies WHERE id = ?',
-                        [company['id']]
-                    )
+            # Skip or remove companies with zero shares
+            if current_shares <= 0:
+                if company_name in existing_company_map:
+                    company_id = existing_company_map[company_name]['id']
+                    cursor.execute('DELETE FROM company_shares WHERE company_id = ?', [company_id])
+                    cursor.execute('DELETE FROM companies WHERE id = ?', [company_id])
                     positions_removed.append(company_name)
                 continue
             
-            if company:
-                # Check if data has actually changed
-                current_shares = company_shares_map.get(company_name, 0)
-                current_identifier = company['identifier']
-                current_total_invested = company['total_invested']
-                
-                # Only mark as updated if something significant changed
-                data_changed = (
-                    abs(current_shares - share_count) > 1e-10 or
-                    current_identifier != identifier or
-                    abs(current_total_invested - total_invested) > 1e-10
-                )
-                
-                # Update existing company
+            # Calculate entry price for display
+            entry_price = 0
+            if current_shares > 0:
+                entry_price = total_cost / current_shares
+            
+            logger.info(f"Final position: {company_name}, Shares: {current_shares}, " 
+                       f"Total Cost: {total_cost:.2f}, Entry Price: {entry_price:.4f}")
+            
+            # Update or add company
+            if company_name in existing_company_map:
+                company_id = existing_company_map[company_name]['id']
                 cursor.execute('''
                     UPDATE companies 
                     SET identifier = ?, total_invested = ?
                     WHERE id = ?
-                ''', [identifier, total_invested, company['id']])
+                ''', [position['identifier'], total_cost, company_id])
                 
-                # Update shares
-                share_exists = query_db(
-                    'SELECT company_id, shares FROM company_shares WHERE company_id = ?',
-                    [company['id']],
-                    one=True
-                )
+                cursor.execute('''
+                    UPDATE company_shares 
+                    SET shares = ?
+                    WHERE company_id = ?
+                ''', [current_shares, company_id])
                 
-                if share_exists:
-                    cursor.execute('''
-                        UPDATE company_shares 
-                        SET shares = ?
-                        WHERE company_id = ?
-                    ''', [share_count, company['id']])
-                else:
+                if not cursor.rowcount:
                     cursor.execute('''
                         INSERT INTO company_shares (company_id, shares)
                         VALUES (?, ?)
-                    ''', [company['id'], share_count])
-                
-                # Only add to positions_updated if data actually changed
-                if data_changed:
-                    positions_updated.append(company_name)
-                
-                processed_company_ids.add(company['id'])  # Track this company as processed
+                    ''', [company_id, current_shares])
+                    
+                positions_updated.append(company_name)
             else:
-                # Insert new company
                 cursor.execute('''
                     INSERT INTO companies (
                         name, identifier, category, portfolio_id, 
@@ -2012,96 +2062,51 @@ def process_csv_data(account_id, file_content):
                     ) VALUES (?, ?, ?, ?, ?, ?)
                 ''', [
                     company_name,
-                    identifier,
-                    '',  # Empty category
+                    position['identifier'],
+                    '',
                     default_portfolio_id,
                     account_id,
-                    total_invested
+                    total_cost
                 ])
-                
                 company_id = cursor.lastrowid
                 
-                # Insert shares
                 cursor.execute('''
                     INSERT INTO company_shares (company_id, shares)
                     VALUES (?, ?)
-                ''', [company_id, share_count])
+                ''', [company_id, current_shares])
                 
                 positions_added.append(company_name)
-                processed_company_ids.add(company_id)  # Track new company as processed
-        
-        # Now delete companies that were not in the CSV
-        for company in existing_companies:
-            if company['id'] not in processed_company_ids:
-                # Delete shares first
-                cursor.execute(
-                    'DELETE FROM company_shares WHERE company_id = ?',
-                    [company['id']]
-                )
-                # Then delete company
-                cursor.execute(
-                    'DELETE FROM companies WHERE id = ?',
-                    [company['id']]
-                )
-                positions_removed.append(company['name'])
         
         # Commit transaction
         db.commit()
         
-        # Clear data caches to force refresh
+        # Clear data caches
         clear_data_caches()
         
-        # Fetch prices for newly added companies
-        newly_added_identifiers = []
-        newly_added_company_ids = []
-        
+        # Update prices for new companies
         for company_name in positions_added:
-            # Find the company ID and identifier for each newly added company
             company = query_db(
                 'SELECT id, identifier FROM companies WHERE name = ? AND account_id = ?',
                 [company_name, account_id],
                 one=True
             )
             if company and company['identifier']:
-                newly_added_identifiers.append(company['identifier'])
-                newly_added_company_ids.append(company['id'])
-        
-        # Store progress information in the global variable
-        global price_fetch_progress
-        if newly_added_identifiers:
-            price_fetch_progress['total'] = len(newly_added_identifiers)
-            price_fetch_progress['current'] = 0
-            price_fetch_progress['start_time'] = datetime.now().isoformat()
-        
-        # Update prices for new companies
-        failed_prices = []
-        for i, identifier in enumerate(newly_added_identifiers):
-            company_id = newly_added_company_ids[i]
-            try:
-                # Update the progress counter
-                price_fetch_progress['current'] = i + 1
-                
-                # Use the same logic as single price update
-                result = get_isin_data(identifier)
-                
-                if result['success'] and result.get('price') is not None:
-                    price = result.get('price')
-                    currency = result.get('currency', 'USD')
-                    price_eur = result.get('price_eur', price)
-                    
-                    if update_price_in_db(identifier, price, currency, price_eur):
-                        logger.info(f"Updated price for newly added company: {identifier}")
+                try:
+                    identifier = company['identifier']
+                    result = get_isin_data(identifier)
+                    if result['success'] and result.get('price') is not None:
+                        price = result.get('price')
+                        currency = result.get('currency', 'USD')
+                        price_eur = result.get('price_eur', price)
+                        if not update_price_in_db(identifier, price, currency, price_eur):
+                            failed_prices.append(identifier)
                     else:
                         failed_prices.append(identifier)
-                        logger.warning(f"Failed to update price for newly added company: {identifier}")
-                else:
+                except Exception as e:
+                    logger.error(f"Error updating price for {identifier}: {str(e)}")
                     failed_prices.append(identifier)
-                    logger.warning(f"Failed to get price for newly added company: {identifier}")
-            except Exception as e:
-                failed_prices.append(identifier)
-                logger.error(f"Error updating price for {identifier}: {str(e)}")
         
-        return True, "CSV data imported successfully", {
+        return True, "CSV data imported successfully with weighted average cost calculation", {
             'added': positions_added,
             'updated': positions_updated,
             'removed': positions_removed,
@@ -2114,7 +2119,6 @@ def process_csv_data(account_id, file_content):
             db.rollback()
         return False, str(e), {}
     finally:
-        # Clean up cursor and connection
         if cursor:
             cursor.close()
 
@@ -3340,7 +3344,7 @@ def find_ticker_for_isin(isin: str) -> str:
         logger.error(f"Error finding ticker for ISIN {isin}: {str(e)}")
         return None
 
-def get_price_for_ticker(ticker: str) -> float:
+def get_price_for_ticker(ticker: str) -> Dict[str, Any]:
     """
     Get the current price for a ticker symbol.
     
@@ -3348,10 +3352,10 @@ def get_price_for_ticker(ticker: str) -> float:
         ticker (str): Ticker symbol (e.g., 'AAPL')
         
     Returns:
-        float: Current price or None if not available
+        Dict with price and error information
     """
     if not ticker:
-        return None
+        return {"price": None, "error": "No ticker provided", "success": False}
     
     logger.info(f"Getting price for ticker: {ticker}")
     try:
@@ -3362,9 +3366,17 @@ def get_price_for_ticker(ticker: str) -> float:
         try:
             info = ticker_obj.info
             if 'currentPrice' in info and info['currentPrice'] is not None:
-                return float(info['currentPrice'])
+                return {
+                    "price": float(info['currentPrice']),
+                    "error": None,
+                    "success": True
+                }
             if 'regularMarketPrice' in info and info['regularMarketPrice'] is not None:
-                return float(info['regularMarketPrice'])
+                return {
+                    "price": float(info['regularMarketPrice']),
+                    "error": None,
+                    "success": True
+                }
         except Exception as e:
             logger.warning(f"Error getting info price for {ticker}: {str(e)}")
         
@@ -3373,7 +3385,11 @@ def get_price_for_ticker(ticker: str) -> float:
             if hasattr(ticker_obj, 'fast_info'):
                 price = ticker_obj.fast_info.get('last_price') or ticker_obj.fast_info.get('regularMarketPrice')
                 if price is not None:
-                    return float(price)
+                    return {
+                        "price": float(price),
+                        "error": None,
+                        "success": True
+                    }
         except Exception as e:
             logger.warning(f"Error getting fast_info price for {ticker}: {str(e)}")
         
@@ -3381,64 +3397,116 @@ def get_price_for_ticker(ticker: str) -> float:
         try:
             data = ticker_obj.history(period="1d")
             if not data.empty and 'Close' in data.columns:
-                return float(data['Close'].iloc[-1])
+                return {
+                    "price": float(data['Close'].iloc[-1]),
+                    "error": None,
+                    "success": True
+                }
         except Exception as e:
             logger.warning(f"Error getting historical price for {ticker}: {str(e)}")
         
         logger.warning(f"All methods failed to get price for {ticker}")
-        return None
+        return {"price": None, "error": "All price fetch methods failed", "success": False}
     except Exception as e:
         logger.error(f"Error getting price data for {ticker}: {str(e)}")
-        return None
+        return {"price": None, "error": str(e), "success": False}
 
 def get_isin_data(isin: str) -> Dict[str, Any]:
     """
-    Get stock data for a given ISIN
+    Get stock data for a given ISIN or ticker
     
     Args:
-        isin (str): ISIN code (e.g., 'US0378331005')
+        isin (str): ISIN code (e.g., 'US0378331005') or ticker symbol
         
     Returns:
-        Dict[str, Any]: Dictionary containing ISIN information
+        Dict[str, Any]: Dictionary containing ISIN/ticker information
     """
-    logger.info(f"Processing ISIN: {isin}")
+    logger.info(f"Processing identifier: {isin}")
+    
+    # Initialize variables
+    price = None
+    ticker = None
+    modified_identifier = None
+    success = False
+    error_message = None
+    tried_crypto_format = False
+    
     try:
-        # Step 1: Find the ticker for this ISIN
-        ticker = find_ticker_for_isin(isin)
+        # Step 1: Try standard approach with original identifier
+        try:
+            ticker = find_ticker_for_isin(isin)
+            if ticker:
+                price_result = get_price_for_ticker(ticker)
+                price = price_result.get("price")
+                if price is not None:
+                    success = True
+                else:
+                    error_message = price_result.get("error", "No price data available")
+        except Exception as e:
+            error_message = str(e)
+            logger.warning(f"Standard approach failed for {isin}: {error_message}")
         
-        # Step 2: Get the price for this ticker
-        price = None
-        if ticker:
-            price = get_price_for_ticker(ticker)
+        # Step 2: If standard approach failed AND identifier is likely a crypto symbol,
+        # try appending -USD
+        if (not success) and (len(isin) < 12):
+            tried_crypto_format = True
+            crypto_identifier = f"{isin}-USD"
+            logger.info(f"🔄 Trying crypto format: {crypto_identifier}")
             
-        # Step 3: Prepare result
+            try:
+                # Try to get price with the modified identifier
+                price_result = get_price_for_ticker(crypto_identifier)
+                crypto_price = price_result.get("price")
+                
+                # If successful, use this price and modified identifier
+                if crypto_price is not None:
+                    price = crypto_price
+                    ticker = crypto_identifier
+                    modified_identifier = crypto_identifier
+                    success = True
+                    logger.info(f"✅ Crypto format successful for {isin}! Using {crypto_identifier} with price {price}")
+                else:
+                    error_message = price_result.get("error", "No price data available for crypto format")
+                    logger.warning(f"Crypto format failed for {isin}: {error_message}")
+            except Exception as e:
+                error_message = str(e)
+                logger.warning(f"Error trying crypto format for {isin}: {error_message}")
+        
+        # Prepare result
         result = {
-            'success': ticker is not None and price is not None,
+            'success': success,
             'isin': isin,
             'ticker': ticker,
             'price': price,
             'currency': 'USD',  # Default currency
             'price_eur': price,  # Assuming 1:1 for simplicity
-            'status': 'processed' if (ticker and price is not None) else 'ticker_not_found' if not ticker else 'price_not_found',
-            'timestamp': datetime.now().isoformat()
+            'status': 'processed' if success else 'failed',
+            'error': error_message,
+            'timestamp': datetime.now().isoformat(),
+            'tried_crypto_format': tried_crypto_format
         }
         
+        # Add modified_identifier if applicable 
+        if modified_identifier:
+            result['modified_identifier'] = modified_identifier
+            
         # Log appropriate message based on result
         if result['success']:
             logger.info(f"Successfully retrieved price {price} for {isin} (ticker: {ticker})")
         else:
-            logger.warning(f"Failed to retrieve valid data for {isin}: ticker={ticker}, price={price}")
+            logger.warning(f"Failed to retrieve valid data for {isin}: ticker={ticker}, price={price}, error={error_message}")
             
         return result
             
     except Exception as e:
-        logger.error(f"Error processing ISIN {isin}: {str(e)}")
+        logger.error(f"Error processing identifier {isin}: {str(e)}")
         return {
             'success': False,
             'isin': isin,
             'error': str(e),
             'status': 'error',
-            'timestamp': datetime.now().isoformat()
+            'timestamp': datetime.now().isoformat(),
+            'tried_crypto_format': tried_crypto_format
         }
 
 def get_yfinance_info(identifier: str) -> Dict[str, Any]:
@@ -3453,11 +3521,11 @@ def get_yfinance_info(identifier: str) -> Dict[str, Any]:
     """
     logger.info(f"Fetching data for identifier={identifier!r}")
     
-    # Just use get_isin_data for consistency - it handles both ISINs and tickers
+    # Get data using our enhanced get_isin_data function
     result = get_isin_data(identifier)
     
     # Format return value for compatibility with expected structure
-    return {
+    response = {
         "success": result['success'],
         "identifier": identifier,
         "ticker": result.get('ticker'),
@@ -3467,6 +3535,12 @@ def get_yfinance_info(identifier: str) -> Dict[str, Any]:
         "error": result.get('error'),
         "timestamp": result.get('timestamp')
     }
+    
+    # Include modified identifier if present
+    if 'modified_identifier' in result:
+        response['modified_identifier'] = result['modified_identifier']
+    
+    return response
 ###END_FILE###
 
 ================================================================
@@ -3478,15 +3552,16 @@ from app.database.db_manager import query_db, execute_db
 
 logger = logging.getLogger(__name__)
 
-def update_price_in_db(identifier: str, price: float, currency: str, price_eur: float) -> bool:
+def update_price_in_db(identifier: str, price: float, currency: str, price_eur: float, modified_identifier: str = None) -> bool:
     """
     Update price in database for a single identifier.
     
     Args:
-        identifier: Stock identifier (ISIN)
+        identifier: Stock identifier (ISIN or ticker)
         price: Price in original currency
         currency: Currency code
         price_eur: Price in EUR
+        modified_identifier: If provided, update the company's identifier to this value
         
     Returns:
         Success status
@@ -3498,7 +3573,23 @@ def update_price_in_db(identifier: str, price: float, currency: str, price_eur: 
             
         now = datetime.now().isoformat()
         
-        # Check if the record exists
+        # If we have a modified identifier, update the company records first
+        if modified_identifier:
+            logger.info(f"⚠️ Updating identifier in database from {identifier} to {modified_identifier}")
+            
+            # Update identifier in companies table
+            rows_updated = execute_db('''
+                UPDATE companies 
+                SET identifier = ?
+                WHERE identifier = ?
+            ''', [modified_identifier, identifier])
+            
+            logger.info(f"Updated {rows_updated} company records with new identifier {modified_identifier}")
+            
+            # Use the modified identifier for all subsequent operations
+            identifier = modified_identifier
+        
+        # Check if the record exists in market_prices
         existing = query_db(
             'SELECT 1 FROM market_prices WHERE identifier = ?',
             [identifier],
@@ -3512,6 +3603,7 @@ def update_price_in_db(identifier: str, price: float, currency: str, price_eur: 
                 SET price = ?, currency = ?, price_eur = ?, last_updated = ?
                 WHERE identifier = ?
             ''', [price, currency, price_eur, now, identifier])
+            logger.info(f"Updated existing price record for {identifier}")
         else:
             # Insert new record
             execute_db('''
@@ -3519,6 +3611,7 @@ def update_price_in_db(identifier: str, price: float, currency: str, price_eur: 
                 (identifier, price, currency, price_eur, last_updated)
                 VALUES (?, ?, ?, ?, ?)
             ''', [identifier, price, currency, price_eur, now])
+            logger.info(f"Created new price record for {identifier}")
         
         # Update last_price_update in accounts table for all accounts that have this identifier
         execute_db('''
@@ -3653,24 +3746,36 @@ def process_portfolio_dataframe(df, account_id=None, portfolio_id=None):
 def update_batch_prices_in_db(results):
     """Update market prices with results from batch processing."""
     success_count = 0
+    modified_count = 0
     failed_count = 0
     
     try:
         for isin, result in results.items():
             if result.get('success') and result.get('price') is not None:
+                # Check if we have a modified identifier
+                modified_identifier = result.get('modified_identifier')
+                
+                if modified_identifier:
+                    logger.info(f"📝 Found modified identifier: {isin} -> {modified_identifier}")
+                    modified_count += 1
+                
                 success = update_price_in_db(
                     isin,
                     result.get('price'),
                     result.get('currency', 'USD'),
-                    result.get('price_eur', result.get('price'))
+                    result.get('price_eur', result.get('price')),
+                    modified_identifier  # Pass modified_identifier if present
                 )
                 
                 if success:
                     success_count += 1
+                    if modified_identifier:
+                        logger.info(f"✅ Successfully updated price AND identifier for {isin} -> {modified_identifier}")
                 else:
                     failed_count += 1
+                    logger.warning(f"❌ Failed to update price for {isin}")
         
-        logger.info(f"Batch update complete. Success: {success_count}, Failed: {failed_count}")
+        logger.info(f"Batch update complete. Success: {success_count}, Modified: {modified_count}, Failed: {failed_count}")
         return True
     except Exception as e:
         logger.error(f"Error updating batch prices in database: {str(e)}")
@@ -5305,14 +5410,13 @@ const FileUploadHandler = {
     init() {
         const fileInput = document.querySelector('.file-input');
         const fileLabel = document.querySelector('.file-name');
-        const uploadButton = document.getElementById('upload-button');
         const progressElement = document.getElementById('price-fetch-progress');
         const progressCount = document.getElementById('progress-count');
         const progressTotal = document.getElementById('progress-total');
         const progressPercentage = document.getElementById('progress-percentage');
         const uploadForm = document.querySelector('form[action*="upload"]');
         
-        if (!fileInput || !fileLabel || !uploadButton) {
+        if (!fileInput || !fileLabel) {
             console.error('Required file upload elements not found');
             return;
         }
@@ -5327,10 +5431,42 @@ const FileUploadHandler = {
         fileInput.addEventListener('change', function() {
             if (fileInput.files.length > 0) {
                 fileLabel.textContent = fileInput.files[0].name;
-                uploadButton.disabled = false;
+                
+                // Show the progress indicator immediately
+                progressCount.textContent = '0';
+                progressTotal.textContent = '0';
+                progressPercentage.textContent = '0%';
+                progressElement.style.display = 'block';
+                progressElement.dataset.processing = 'true';
+                
+                // Start progress tracking
+                if (PriceProgressTracker.progressInterval) {
+                    clearInterval(PriceProgressTracker.progressInterval);
+                }
+                
+                PriceProgressTracker.progressInterval = setInterval(() => {
+                    PriceProgressTracker.checkProgress(
+                        progressElement,
+                        progressCount,
+                        progressTotal,
+                        progressPercentage
+                    );
+                }, 500);
+                
+                // Run once immediately
+                PriceProgressTracker.checkProgress(
+                    progressElement,
+                    progressCount,
+                    progressTotal,
+                    progressPercentage
+                );
+                
+                // Automatically submit the form
+                if (uploadForm) {
+                    uploadForm.submit();
+                }
             } else {
                 fileLabel.textContent = 'No file selected';
-                uploadButton.disabled = true;
             }
         });
         
@@ -5345,7 +5481,7 @@ const FileUploadHandler = {
                 progressPercentage.textContent = '0%';
                 
                 // Show the progress indicator immediately when the form is submitted
-                progressElement.style.display = 'inline-flex';
+                progressElement.style.display = 'block';
                 progressElement.dataset.processing = 'true';
                 
                 // Clear any existing interval and start a new one
@@ -5406,8 +5542,7 @@ const PriceProgressTracker = {
                 // Only show the progress indicator if there's actual progress happening
                 // or if we're in processing mode (set by form submission)
                 if (data.total > 0 || progressElement.dataset.processing === 'true') {
-                    progressElement.style.display = 'inline-flex';
-                    progressElement.style.flexDirection = 'column'; // Stack elements vertically
+                    progressElement.style.display = 'block';
                     
                     // If we're done, hide after a delay
                     if (data.current >= data.total && data.total > 0) {
@@ -8873,6 +9008,74 @@ document.addEventListener('DOMContentLoaded', () => {
 ###END_FILE###
 
 ================================================================
+###START_FILE_PATH: templates/components/analyse_components.html###
+{% macro loading_indicator() %}
+<div class="has-text-centered my-6">
+    <span class="icon is-large">
+        <i class="fas fa-spinner fa-pulse fa-3x"></i>
+    </span>
+    <p class="mt-4">Loading data...</p>
+</div>
+{% endmacro %}
+
+{% macro error_message(message) %}
+<div class="notification is-danger">
+    <button class="delete"></button>
+    <p>{{ message }}</p>
+</div>
+{% endmacro %}
+
+{% macro chart_container(id, title) %}
+<div class="column">
+    <h5 class="title is-6 has-text-centered">{{ title }}</h5>
+    <div class="chart-container" id="{{ id }}"></div>
+</div>
+{% endmacro %}
+
+{% macro portfolio_filter(portfolios) %}
+<div class="field">
+    <label class="label">Filter Portfolios</label>
+    <div class="control">
+        {% for portfolio in portfolios %}
+        <label class="checkbox">
+            <input type="checkbox" value="{{ portfolio.name }}" checked>
+            <span>{{ portfolio.name }}</span>
+        </label>
+        <br>
+        {% endfor %}
+    </div>
+</div>
+{% endmacro %}
+
+{% macro metrics_card(title, icon, metrics) %}
+<div class="card">
+    <header class="card-header">
+        <p class="card-header-title">
+            <span class="icon-text">
+                <span class="icon">
+                    <i class="fas fa-{{ icon }}"></i>
+                </span>
+                <span>{{ title }}</span>
+            </span>
+        </p>
+    </header>
+    <div class="card-content">
+        <div class="columns is-multiline">
+            {% for metric in metrics %}
+            <div class="column is-3">
+                <div class="box">
+                    <p class="heading">{{ metric.label }}</p>
+                    <p class="title is-5">{{ metric.value }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endmacro %}
+###END_FILE###
+
+================================================================
 ###START_FILE_PATH: templates/components/enrich_components.html###
 {% macro head_extras() %}
     <!-- Add Lodash -->
@@ -9075,25 +9278,21 @@ document.addEventListener('DOMContentLoaded', () => {
                             </label>
                         </div>
                         <p class="help">Upload a CSV file with your portfolio data.</p>
-                    </div>
-                    
-                    <div class="field">
-                        <div class="control">
-                            <button type="submit" class="button is-primary" id="upload-button" disabled>
-                                <span class="icon">
-                                    <i class="fas fa-cloud-upload-alt"></i>
-                                </span>
-                                <span>Upload and Process</span>
-                            </button>
-                            <span id="price-fetch-progress" class="ml-2" style="display: none; align-items: center;">
-                                <span class="icon is-small mr-1">
+                        
+                        <div id="price-fetch-progress" style="display: none; background-color: #222; border-radius: 4px; padding: 8px 12px; margin-top: 10px; border-left: 4px solid #3e8ed0;">
+                            <div class="is-flex is-align-items-center mb-2">
+                                <span class="icon mr-2 has-text-info">
                                     <i class="fas fa-sync fa-spin"></i>
                                 </span>
-                                <span>Fetching prices: <span id="progress-count">0</span>/<span id="progress-total">0</span> (<span id="progress-percentage">0%</span>)</span>
-                                <div class="progress-bar-container mt-1" style="width: 100%; height: 8px; background-color: #eee; border-radius: 4px; overflow: hidden;">
-                                    <div id="progress-bar" style="width: 0%; height: 100%; background-color: #00d1b2; transition: width 0.3s;"></div>
-                                </div>
-                            </span>
+                                <span class="has-text-weight-medium has-text-white">Processing Portfolio Data</span>
+                            </div>
+                            <div class="is-flex is-justify-content-space-between is-align-items-center mb-1">
+                                <span class="has-text-grey-lighter">Fetching prices:</span>
+                                <span class="has-text-weight-bold has-text-white"><span id="progress-count">0</span>/<span id="progress-total">0</span> (<span id="progress-percentage">0%</span>)</span>
+                            </div>
+                            <div class="progress-bar-container" style="width: 100%; height: 8px; background-color: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
+                                <div id="progress-bar" style="width: 0%; height: 100%; background-color: #3e8ed0; transition: width 0.3s ease-in-out;"></div>
+                            </div>
                         </div>
                     </div>
                 </form>
