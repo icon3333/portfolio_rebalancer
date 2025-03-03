@@ -508,10 +508,11 @@
                                     <tr v-for="item in filteredPortfolioItems" :key="item.id">
                                         <td>
                                             <button 
-                                                class="button is-small" 
+                                                class="button is-small is-info" 
                                                 @click="confirmPriceUpdate(item)"
                                                 :class="{'is-loading': isUpdating && selectedItem.id === item.id}"
-                                                :disabled="isUpdating">
+                                                :disabled="isUpdating"
+                                                title="Update price immediately">
                                                 <span class="icon is-small">
                                                     <i class="fas fa-sync"></i>
                                                 </span>

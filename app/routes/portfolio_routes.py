@@ -1169,7 +1169,7 @@ def get_portfolio_data(account_id):
         return []
 
 def process_csv_data(account_id, file_content):
-    """Process and import CSV data into the database using FIFO (First In, First Out) method"""
+    """Process and import CSV data into the database using simple +/- approach"""
     db = None
     cursor = None
     try:
@@ -1206,8 +1206,8 @@ def process_csv_data(account_id, file_content):
             "currency": ["currency"],
             "exchange": ["exchange", "market"],
             "date": ["date", "transactiondate", "datetime"],
-            "fee": ["fee", "commission", "costs"],  # Added fee/costs tracking
-            "tax": ["tax", "taxes"]  # Added tax tracking
+            "fee": ["fee", "commission", "costs"],
+            "tax": ["tax", "taxes"]
         }
         
         # Map columns
@@ -1247,20 +1247,42 @@ def process_csv_data(account_id, file_content):
         if 'tax' not in df.columns:
             df['tax'] = 0
         if 'date' not in df.columns:
-            # Create a date column with default values to ensure chronological ordering
             df['date'] = pd.Timestamp.now()
         
         # Clean data
         df['identifier'] = df['identifier'].apply(lambda x: str(x).strip() if pd.notna(x) else '')
         df['holdingname'] = df['holdingname'].apply(lambda x: str(x).strip() if pd.notna(x) else '')
-        df['type'] = df['type'].str.lower() if 'type' in df.columns else 'buy'
+        
+        # Normalized transaction types to handle variations in case and formatting
+        def normalize_transaction_type(t):
+            if pd.isna(t):
+                return 'buy'  # Default to buy if missing
+            
+            t = str(t).strip().lower()
+            # Map similar transaction types to our standard types
+            if t in ['buy', 'purchase', 'bought', 'acquire', 'deposit']:
+                return 'buy'
+            elif t in ['sell', 'sold', 'dispose', 'withdrawal']:
+                return 'sell'
+            elif t in ['transferin', 'transfer in', 'transfer-in', 'move in', 'movein', 'deposit']:
+                return 'transferin'
+            elif t in ['transferout', 'transfer out', 'transfer-out', 'move out', 'moveout', 'withdrawal']:
+                return 'transferout'
+            elif t in ['dividend', 'div', 'dividends', 'income', 'interest']:
+                return 'dividend'  # Explicitly recognize dividend transactions
+            else:
+                # If unknown, default to buy
+                logger.warning(f"Unknown transaction type '{t}', defaulting to 'buy'")
+                return 'buy'
+                
+        df['type'] = df['type'].apply(normalize_transaction_type)
         
         # Filter out rows with empty identifiers
         df = df[df['identifier'].str.len() > 0]
         if len(df) == 0:
             return False, "No valid entries found in CSV file", {}
         
-        # Convert numeric columns
+        # Convert numeric columns with improved precision
         def convert_numeric(val):
             if pd.isna(val):
                 return 0
@@ -1282,117 +1304,173 @@ def process_csv_data(account_id, file_content):
         if df.empty:
             return False, "No valid entries found in CSV file after converting numeric values", {}
         
-        # Convert dates and sort chronologically
-        df['date'] = pd.to_datetime(df['date'], errors='coerce')
-        # Ensure all dates are valid; use current time for invalid dates
-        df['date'] = df['date'].fillna(pd.Timestamp.now())
-        df = df.sort_values('date')
+        # Convert dates and ensure proper chronological ordering
+        try:
+            # First try to parse datetime column which is more reliable
+            if 'datetime' in df.columns:
+                df['parsed_date'] = pd.to_datetime(df['datetime'], errors='coerce')
+                # Only fall back to date column for rows where datetime parsing failed
+                mask = df['parsed_date'].isna()
+                if mask.any():
+                    # Try European format first for the date column
+                    df.loc[mask, 'parsed_date'] = pd.to_datetime(df.loc[mask, 'date'], format='%d.%m.%Y', errors='coerce')
+                    
+                    # For any remaining NaT values, try flexible parsing as last resort
+                    still_mask = df['parsed_date'].isna()
+                    if still_mask.any():
+                        df.loc[still_mask, 'parsed_date'] = pd.to_datetime(df.loc[still_mask, 'date'], dayfirst=True, errors='coerce')
+            else:
+                # No datetime column, so use date column directly
+                # First attempt with explicit European format
+                df['parsed_date'] = pd.to_datetime(df['date'], format='%d.%m.%Y', errors='coerce')
+                
+                # For any remaining NaT values, try flexible parsing
+                mask = df['parsed_date'].isna()
+                if mask.any():
+                    df.loc[mask, 'parsed_date'] = pd.to_datetime(df.loc[mask, 'date'], dayfirst=True, errors='coerce')
+        except Exception as e:
+            logger.warning(f"Error during date parsing: {str(e)}. Falling back to default parsing.")
+            # Fallback to more flexible parsing with dayfirst=True to handle European format
+            df['parsed_date'] = pd.to_datetime(df['date'], dayfirst=True, errors='coerce')
         
-        # Initialize company data structure for FIFO accounting
+        # Log any remaining NaT values before filling them
+        nat_count = df['parsed_date'].isna().sum()
+        if nat_count > 0:
+            logger.warning(f"{nat_count} dates could not be parsed and will be set to current time")
+            
+        # Ensure all dates are valid; use current time for invalid dates
+        df['parsed_date'] = df['parsed_date'].fillna(pd.Timestamp.now())
+        
+        # Explicitly ensure we're sorting in ascending order (oldest first)
+        df = df.sort_values('parsed_date', ascending=True)
+        
+        # Debug log to verify sort order
+        logger.info(f"Transaction order after sorting:")
+        for idx, row in df.iterrows():
+            logger.info(f"Processing order: {row['parsed_date']} - {row['type']} - {row['holdingname']} - {row['shares']} shares")
+        
+        # Initialize company data structure - simplified without FIFO
         company_positions = {}
         
-        # Process transactions using FIFO method
+        # Two-pass approach: first buy/transferin, then sell/transferout
+        # Separating buys and sells allows us to ensure all buys are processed before sells
+        
+        # First pass: Process only buy and transferin transactions
+        logger.info("FIRST PASS: Processing buy and transferin transactions")
         for idx, row in df.iterrows():
             company_name = row['holdingname']
-            transaction_type = row['type'].lower()
-            shares = float(row['shares'])
+            transaction_type = row['type']  # Already normalized above
+            
+            # Skip 'dividend' transactions completely
+            if transaction_type == 'dividend':
+                logger.info(f"Skipping dividend transaction for {company_name}")
+                continue
+                
+            # ONLY PROCESS BUY AND TRANSFERIN in first pass
+            if transaction_type not in ['buy', 'transferin']:
+                continue
+                
+            shares = round(float(row['shares']), 6)  # Round to 6 decimal places for precision
             price = float(row['price'])
             identifier = row['identifier']
             fee = float(row['fee']) if 'fee' in row else 0
             tax = float(row['tax']) if 'tax' in row else 0
-            transaction_date = row['date']
+            
+            # Skip transactions with zero shares
+            if shares <= 0:
+                logger.info(f"Skipping {transaction_type} transaction with zero shares for {company_name}")
+                continue
             
             # Initialize company data if not exists
             if company_name not in company_positions:
                 company_positions[company_name] = {
                     'identifier': identifier,
-                    'lots': [],                # List of purchase lots with FIFO tracking
-                    'total_shares': 0,         # Total shares across all lots
-                    'total_cost': 0,           # Total cost basis across all lots
-                    'total_fees': 0,           # Track total fees
-                    'total_taxes': 0           # Track total taxes
+                    'total_shares': 0,         # Total shares 
+                    'total_invested': 0        # Total cost basis 
                 }
             
             company = company_positions[company_name]
             
-            # Process based on transaction type
-            if transaction_type in ['buy', 'transferin']:
-                # Add a new lot with this purchase
-                lot_cost = (shares * price) + fee + tax
-                company['lots'].append({
-                    'date': transaction_date,
-                    'shares': shares,
-                    'price': price,
-                    'fee': fee,
-                    'tax': tax,
-                    'cost': lot_cost            # Total cost including fees and taxes
-                })
+            # Calculate transaction amount
+            transaction_amount = shares * price
+            
+            # Add shares and investment
+            company['total_shares'] = round(company['total_shares'] + shares, 6)
+            company['total_invested'] = round(company['total_invested'] + transaction_amount, 2)
+            
+            logger.info(f"Buy/TransferIn: {company_name}, +{shares} @ {price}, " 
+                       f"total shares: {company['total_shares']}, total invested: {company['total_invested']:.2f}")
+        
+        # Second pass: Process only sell and transferout transactions
+        logger.info("SECOND PASS: Processing sell and transferout transactions")
+        for idx, row in df.iterrows():
+            company_name = row['holdingname']
+            transaction_type = row['type']
+            
+            # Skip 'dividend' transactions completely
+            if transaction_type == 'dividend':
+                logger.info(f"Skipping dividend transaction for {company_name}")
+                continue
                 
-                # Update company totals
-                company['total_shares'] += shares
-                company['total_cost'] += lot_cost
-                company['total_fees'] += fee
-                company['total_taxes'] += tax
+            # ONLY PROCESS SELL AND TRANSFEROUT in second pass
+            if transaction_type not in ['sell', 'transferout']:
+                continue
                 
-                avg_cost = company['total_cost'] / company['total_shares'] if company['total_shares'] > 0 else 0
-                logger.info(f"Buy: {company_name}, +{shares} @ {price}, new avg cost: {avg_cost:.4f}, " 
-                           f"total shares: {company['total_shares']}, total cost: {company['total_cost']:.2f}")
+            shares = round(float(row['shares']), 6)
+            price = float(row['price'])
+            fee = float(row['fee']) if 'fee' in row else 0
+            tax = float(row['tax']) if 'tax' in row else 0
+            
+            # Skip transactions with zero shares
+            if shares <= 0:
+                logger.info(f"Skipping {transaction_type} transaction with zero shares for {company_name}")
+                continue
                 
-            elif transaction_type in ['sell', 'transferout']:
-                # Can't sell more than we have
-                if shares > company['total_shares']:
-                    shares = company['total_shares']
+            # Skip if company doesn't exist (should not happen normally)
+            if company_name not in company_positions:
+                logger.warning(f"Cannot {transaction_type} shares of {company_name} - company not in positions")
+                continue
                 
-                if shares <= 0:
-                    continue
+            company = company_positions[company_name]
+            
+            # Log before processing
+            logger.info(f"Processing {transaction_type} of {shares} shares for {company_name} (current total: {company['total_shares']}")
+            
+            # Limit to available shares with a small tolerance for floating point issues
+            if shares > (company['total_shares'] + 1e-6):
+                logger.warning(f"Attempting to {transaction_type} more shares ({shares}) than available ({company['total_shares']}). Limiting to available shares.")
+                shares = company['total_shares']
+            
+            if shares <= 0:
+                logger.info(f"Skipping {transaction_type} with zero or negative shares")
+                continue
+            
+            # Calculate proportion of total investment being sold
+            proportion_sold = shares / company['total_shares'] if company['total_shares'] > 0 else 0
+            investment_reduction = company['total_invested'] * proportion_sold
+            
+            # Subtract shares and reduce investment proportionally
+            company['total_shares'] = round(company['total_shares'] - shares, 6)
+            company['total_invested'] = round(company['total_invested'] - investment_reduction, 2)
+            
+            # If all shares are sold (or very close to it), zero out both shares and investment
+            # This ensures we don't have floating point issues where tiny amounts remain
+            if abs(company['total_shares']) < 1e-6 or company['total_shares'] <= 0:
+                logger.info(f"All shares sold for {company_name}, zeroing out shares and investment")
+                company['total_shares'] = 0
+                company['total_invested'] = 0
+            
+            # We're ignoring fees and taxes as requested
+            
+            logger.info(f"Sell/TransferOut: {company_name}, -{shares} @ {price}, " 
+                       f"remaining shares: {company['total_shares']}, remaining invested: {company['total_invested']:.2f}")
                 
-                # Use FIFO to determine which lots to sell from
-                shares_to_sell = shares
-                cost_basis_reduction = 0
-                
-                # Keep processing lots until we've sold all required shares
-                i = 0
-                while shares_to_sell > 0 and i < len(company['lots']):
-                    lot = company['lots'][i]
-                    
-                    if lot['shares'] <= shares_to_sell:
-                        # Use the entire lot
-                        shares_from_lot = lot['shares']
-                        cost_from_lot = lot['cost']
-                        
-                        # Remove this lot completely
-                        cost_basis_reduction += cost_from_lot
-                        shares_to_sell -= shares_from_lot
-                        company['lots'].pop(i)  # Remove the lot at position i
-                    else:
-                        # Use partial lot
-                        shares_from_lot = shares_to_sell
-                        cost_per_share = lot['cost'] / lot['shares']
-                        cost_from_lot = cost_per_share * shares_from_lot
-                        
-                        # Update this lot
-                        cost_basis_reduction += cost_from_lot
-                        lot['shares'] -= shares_from_lot
-                        lot['cost'] -= cost_from_lot
-                        shares_to_sell = 0
-                        i += 1  # Move to next lot
-                
-                # Update company totals
-                company['total_shares'] -= shares
-                company['total_cost'] -= cost_basis_reduction
-                # We don't add fees and taxes from sell/transferout transactions to the position's cost basis
-                
-                # Log the transaction
-                if transaction_type == 'transferout':
-                    logger.info(f"TransferOut: {company_name}, -{shares} shares, cost basis reduction: {cost_basis_reduction:.2f}, " 
-                               f"remaining: {company['total_shares']}, remaining cost: {company['total_cost']:.2f}")
-                else:
-                    logger.info(f"Sell: {company_name}, -{shares} @ {price}, cost basis reduction: {cost_basis_reduction:.2f}, " 
-                               f"remaining: {company['total_shares']}, remaining cost: {company['total_cost']:.2f}")
-                
-                # Update fees and taxes
-                company['total_fees'] += fee
-                company['total_taxes'] += tax
+            # This additional check is redundant since we now handle zeroing immediately after share calculation
+            # Keeping it as a safety net with a more lenient threshold
+            if abs(company['total_shares']) < 1e-6 or company['total_shares'] < 0:
+                logger.info(f"Zeroing out shares for {company_name}: was {company['total_shares']}, setting to 0")
+                company['total_shares'] = 0
+                company['total_invested'] = 0
         
         # Start database transaction
         cursor.execute('BEGIN TRANSACTION')
@@ -1425,49 +1503,96 @@ def process_csv_data(account_id, file_content):
         positions_removed = []
         failed_prices = []
         
+        # Track all unique company names in CSV for later comparison
+        csv_company_names = set(company_positions.keys())
+        
         # Update database based on final positions
         for company_name, position in company_positions.items():
             # Handle floating point precision
-            current_shares = position['total_shares']  # Changed from 'current_shares' to 'total_shares'
-            total_cost = position['total_cost']
+            current_shares = position['total_shares']
+            total_invested = position['total_invested']
             
-            if abs(current_shares) < 1e-6:
+            # Use a more lenient threshold for zeroing out shares to catch floating point issues
+            if abs(current_shares) < 1e-6 or current_shares <= 0:
+                logger.info(f"Zeroing out final shares for {company_name}: was {current_shares}, setting to 0")
                 current_shares = 0
-                total_cost = 0
+                total_invested = 0
+            else:
+                # Keep the precise value, but round for display
+                current_shares = round(current_shares, 6)
+                total_invested = round(total_invested, 2)
             
-            # Skip or remove companies with zero shares
+            # Skip or remove companies with zero shares (using <= to catch both zero and negative cases)
+            # Add extra logging to debug share calculation issues
+            logger.info(f"Final share calculation for {company_name}: {current_shares} shares, total_invested: {total_invested}")
             if current_shares <= 0:
+                logger.info(f"Company {company_name} has {current_shares} shares - marking for removal or skipping")
                 if company_name in existing_company_map:
                     company_id = existing_company_map[company_name]['id']
+                    identifier = existing_company_map[company_name]['identifier']
+                    
+                    # Log before deleting to confirm what's being removed
+                    existing_shares = query_db(
+                        'SELECT shares FROM company_shares WHERE company_id = ?', 
+                        [company_id], 
+                        one=True
+                    )
+                    logger.info(f"Removing company {company_name} (ID: {company_id}) with {existing_shares['shares'] if existing_shares else 0} shares")
+                    
+                    # Delete from company_shares
                     cursor.execute('DELETE FROM company_shares WHERE company_id = ?', [company_id])
+                    
+                    # Delete from companies
                     cursor.execute('DELETE FROM companies WHERE id = ?', [company_id])
+                    
+                    # Only clean up market_prices if no other account uses this identifier
+                    if identifier:
+                        other_companies_count = query_db(
+                            'SELECT COUNT(*) as count FROM companies WHERE identifier = ? AND account_id != ?', 
+                            [identifier, account_id],
+                            one=True
+                        )
+                        
+                        if other_companies_count and other_companies_count['count'] == 0:
+                            logger.info(f"No other accounts use {identifier}, removing from market_prices")
+                            cursor.execute('DELETE FROM market_prices WHERE identifier = ?', [identifier])
+                    
                     positions_removed.append(company_name)
                 continue
             
-            # Calculate entry price for display
-            entry_price = 0
-            if current_shares > 0:
-                entry_price = total_cost / current_shares
-            
+            # Average cost per share (for information only)
+            avg_cost_per_share = total_invested / current_shares if current_shares > 0 else 0
             logger.info(f"Final position: {company_name}, Shares: {current_shares}, " 
-                       f"Total Cost: {total_cost:.2f}, Entry Price: {entry_price:.4f}")
+                       f"Total Invested: {total_invested:.2f}, Avg Cost: {avg_cost_per_share:.4f}")
             
             # Update or add company
             if company_name in existing_company_map:
                 company_id = existing_company_map[company_name]['id']
+                # Update company with the new data
                 cursor.execute('''
                     UPDATE companies 
                     SET identifier = ?, total_invested = ?
                     WHERE id = ?
-                ''', [position['identifier'], total_cost, company_id])
+                ''', [
+                    position['identifier'], 
+                    total_invested,
+                    company_id
+                ])
                 
-                cursor.execute('''
-                    UPDATE company_shares 
-                    SET shares = ?
-                    WHERE company_id = ?
-                ''', [current_shares, company_id])
+                # Check if company_shares record exists
+                share_exists = query_db(
+                    'SELECT 1 FROM company_shares WHERE company_id = ?',
+                    [company_id],
+                    one=True
+                )
                 
-                if not cursor.rowcount:
+                if share_exists:
+                    cursor.execute('''
+                        UPDATE company_shares 
+                        SET shares = ?
+                        WHERE company_id = ?
+                    ''', [current_shares, company_id])
+                else:
                     cursor.execute('''
                         INSERT INTO company_shares (company_id, shares)
                         VALUES (?, ?)
@@ -1486,7 +1611,7 @@ def process_csv_data(account_id, file_content):
                     '',
                     default_portfolio_id,
                     account_id,
-                    total_cost
+                    total_invested
                 ])
                 company_id = cursor.lastrowid
                 
@@ -1497,52 +1622,100 @@ def process_csv_data(account_id, file_content):
                 
                 positions_added.append(company_name)
         
+        # Remove companies that exist in the database but not in the CSV
+        # This makes the CSV the single source of truth
+        db_company_names = {company['name'] for company in existing_companies}
+        companies_to_remove = db_company_names - csv_company_names
+        
+        for company_name in companies_to_remove:
+            company_id = existing_company_map[company_name]['id']
+            identifier = existing_company_map[company_name]['identifier']
+            
+            logger.info(f"Removing company {company_name} (not present in CSV)")
+            
+            # Delete from company_shares
+            cursor.execute('DELETE FROM company_shares WHERE company_id = ?', [company_id])
+            
+            # Delete from companies
+            cursor.execute('DELETE FROM companies WHERE id = ?', [company_id])
+            
+            # Only clean up market_prices if no other account uses this identifier
+            if identifier:
+                other_companies_count = query_db(
+                    'SELECT COUNT(*) as count FROM companies WHERE identifier = ? AND account_id != ?', 
+                    [identifier, account_id],
+                    one=True
+                )
+                
+                if other_companies_count and other_companies_count['count'] == 0:
+                    logger.info(f"No other accounts use {identifier}, removing from market_prices")
+                    cursor.execute('DELETE FROM market_prices WHERE identifier = ?', [identifier])
+            
+            positions_removed.append(company_name)
+        
         # Commit transaction
         db.commit()
         
         # Clear data caches
         clear_data_caches()
         
-        # Update prices for new companies
-        if positions_added:
-            # Initialize progress tracking for the new companies
+        # Collect all identifiers that need metadata updates (both new and existing companies)
+        all_identifiers = set()
+        for company_name in positions_added + positions_updated:
+            company = query_db(
+                'SELECT id, identifier FROM companies WHERE name = ? AND account_id = ?',
+                [company_name, account_id],
+                one=True
+            )
+            if company and company['identifier']:
+                all_identifiers.add(company['identifier'])
+        
+        # Update prices and metadata for all companies (new and existing)
+        if all_identifiers:
+            # Initialize progress tracking
             global price_fetch_progress
             price_fetch_progress['current'] = 0
-            price_fetch_progress['total'] = len(positions_added)
+            price_fetch_progress['total'] = len(all_identifiers)
             price_fetch_progress['start_time'] = datetime.now().isoformat()
             
-            for i, company_name in enumerate(positions_added):
+            logger.info(f"Updating prices and metadata for {len(all_identifiers)} companies")
+            
+            for i, identifier in enumerate(all_identifiers):
                 # Update progress counter
                 price_fetch_progress['current'] = i + 1
                 
-                company = query_db(
-                    'SELECT id, identifier FROM companies WHERE name = ? AND account_id = ?',
-                    [company_name, account_id],
-                    one=True
-                )
-                if company and company['identifier']:
-                    try:
-                        identifier = company['identifier']
-                        result = get_isin_data(identifier)
-                        if result['success'] and result.get('price') is not None:
-                            price = result.get('price')
-                            currency = result.get('currency', 'USD')
-                            price_eur = result.get('price_eur', price)
-                            country = result.get('country')
-                            sector = result.get('sector')
-                            industry = result.get('industry')
-                            if not update_price_in_db(identifier, price, currency, price_eur, country, sector, industry):
-                                logger.warning(f"Failed to update price in database for {identifier}")
-                                failed_prices.append(identifier)
-                        else:
-                            error_reason = "No price data returned" if result.get('success') else result.get('error', 'Unknown error')
-                            logger.warning(f"Failed to fetch price for {identifier}: {error_reason}")
+                try:
+                    result = get_isin_data(identifier)
+                    if result['success'] and result.get('price') is not None:
+                        price = result.get('price')
+                        currency = result.get('currency', 'USD')
+                        price_eur = result.get('price_eur', price)
+                        country = result.get('country')
+                        sector = result.get('sector')
+                        industry = result.get('industry')
+                        
+                        logger.info(f"Updating metadata for {identifier}: Country: {country}, Sector: {sector}, Industry: {industry}")
+                        
+                        if not update_price_in_db(identifier, price, currency, price_eur, country, sector, industry):
+                            logger.warning(f"Failed to update price and metadata in database for {identifier}")
                             failed_prices.append(identifier)
-                    except Exception as e:
-                        logger.error(f"Error updating price for {identifier}: {str(e)}")
+                    else:
+                        error_reason = "No price data returned" if result.get('success') else result.get('error', 'Unknown error')
+                        logger.warning(f"Failed to fetch price for {identifier}: {error_reason}")
                         failed_prices.append(identifier)
+                except Exception as e:
+                    logger.error(f"Error updating price for {identifier}: {str(e)}")
+                    failed_prices.append(identifier)
         
-        return True, "CSV data imported successfully with weighted average cost calculation", {
+        # Prepare message with notification about removed companies
+        message = "CSV data imported successfully with simple add/subtract calculation"
+        if positions_removed:
+            removed_details = ', '.join(positions_removed)
+            if len(removed_details) > 100:  # Truncate if too long
+                removed_details = removed_details[:97] + '...'
+            message += f". <strong>Removed {len(positions_removed)} companies</strong> that had zero shares or were not in the CSV: {removed_details}"
+            
+        return True, message, {
             'added': positions_added,
             'updated': positions_updated,
             'removed': positions_removed,

@@ -423,7 +423,8 @@ class PortfolioTableApp {
         
                 confirmPriceUpdate(item) {
                     this.selectedItem = item;
-                    this.showUpdatePriceModal = true;
+                    // Instead of showing modal, directly update the price
+                    this.updatePrice();
                 },
         
                 confirmDelete(item) {
@@ -481,7 +482,8 @@ class PortfolioTableApp {
                         }
                     } finally {
                         this.isUpdating = false;
-                        this.closeModal();
+                        // Reset the selected item after update is complete
+                        this.selectedItem = {};
                     }
                 },
         
@@ -901,11 +903,11 @@ class BulkEditApp {
                         console.log('Portfolio options from server (RAW):', JSON.stringify(data));
                         console.log('Portfolio options type:', typeof data, Array.isArray(data));
                         
-                        // Hard-code some default portfolios for testing if data is empty or invalid
+                        // If no data is returned, just use an empty array with the default option
                         if (!Array.isArray(data) || data.length === 0) {
-                            console.warn('Invalid or empty data from server, using hardcoded fallback');
-                            // For testing - add some hardcoded options if none are returned
-                            this.portfolioOptions = ['-', 'crypto', 'dividend', 'value'];
+                            console.warn('No portfolios returned from server');
+                            // Only include the default portfolio option
+                            this.portfolioOptions = ['-'];
                             return;
                         }
                         

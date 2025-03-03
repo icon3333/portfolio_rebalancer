@@ -93,216 +93,180 @@ def get_price_for_ticker(ticker: str) -> Dict[str, Any]:
     
     logger.info(f"Getting price for ticker: {ticker}")
     
-    # Try alternative data sources for certain tickers (manual override)
-    manual_price_map = {
-        # Add manual price overrides for tickers that consistently fail
-        'VWAGY': {'price': 13.21, 'currency': 'USD'},  # Volkswagen ADR
-        'STLA': {'price': 21.45, 'currency': 'USD'},   # Stellantis
-        # Add some cryptocurrencies with manual fallbacks
-        'BTC-USD': {'price': 65982.12, 'currency': 'USD'},  # Bitcoin
-        'ETH-USD': {'price': 3428.75, 'currency': 'USD'},   # Ethereum
-        'ATOM-USD': {'price': 8.23, 'currency': 'USD'},     # Cosmos
-        'SOL-USD': {'price': 146.29, 'currency': 'USD'},    # Solana
-        'DOGE-USD': {'price': 0.122, 'currency': 'USD'},    # Dogecoin
-        'LRC-USD': {'price': 0.295, 'currency': 'USD'},     # Loopring
-    }
-    
-    # Check if we have a manual override for this ticker
-    if ticker in manual_price_map:
-        logger.info(f"Using manual price data for {ticker}: {manual_price_map[ticker]}")
-        price_data = manual_price_map[ticker]
-        return {
-            "price": price_data['price'],
-            "currency": price_data['currency'],
-            "error": None,
-            "success": True,
-            "note": "Using fallback price data"
-        }
-    
-    # Special handling for crypto currencies with -USD suffix
-    if ticker.endswith('-USD') or ticker.upper().endswith('-USD'):
-        crypto_result = get_crypto_price(ticker.upper())  # Standardize to uppercase
-        logger.info(f"Got crypto result for {ticker}: {crypto_result['success']}")
-        if crypto_result['success']:
-            return crypto_result
+    # Initialize variables
+    price = None
+    currency = None
+    error_messages = []
     
     try:
-        # Use different methods with better error handling
-        ticker_obj = None
-        currency = None
-        error_messages = []
+        ticker_obj = yf.Ticker(ticker)
         
-        # Safely create the ticker object
+        # Method 1: Use info approach - most reliable for getting both price and currency
         try:
-            ticker_obj = yf.Ticker(ticker)
-        except Exception as e:
-            error_msg = f"Failed to create Ticker object for {ticker}: {str(e)}"
-            logger.error(error_msg)
-            error_messages.append(error_msg)
-            return {"price": None, "currency": None, "error": error_msg, "success": False}
-            
-        # Method 1: Try info approach with additional error handling
-        try:
-            # Use a timeout to prevent hanging on problematic tickers
-            import threading
+            # Create a timeout to prevent hanging
             info_result = [None]
             info_error = [None]
             
             def get_info():
                 try:
-                    # Standard approach for yfinance 0.2.54
                     info_result[0] = ticker_obj.info
                 except Exception as e:
                     info_error[0] = str(e)
             
+            import threading
             info_thread = threading.Thread(target=get_info)
             info_thread.daemon = True
             info_thread.start()
             info_thread.join(timeout=5)  # 5 second timeout
             
             if info_error[0]:
-                error_msg = f"Error getting info: {info_error[0]}"
+                error_msg = f"Error getting info data: {info_error[0]}"
                 logger.warning(error_msg)
                 error_messages.append(error_msg)
             elif info_result[0]:
                 info = info_result[0]
                 
-                # Get currency information
+                # Extract currency information - required for valid result
                 if 'currency' in info and info['currency'] is not None:
                     currency = info['currency']
+                    
+                    # Validate currency format (must be 3 characters)
+                    if not isinstance(currency, str) or len(currency) != 3:
+                        error_msg = f"Invalid currency format from info: {currency}"
+                        logger.warning(error_msg)
+                        error_messages.append(error_msg)
+                        currency = None
+                else:
+                    error_msg = "No currency information found in ticker info"
+                    logger.warning(error_msg)
+                    error_messages.append(error_msg)
                 
-                if 'currentPrice' in info and info['currentPrice'] is not None:
-                    return {
-                        "price": float(info['currentPrice']),
-                        "currency": currency,
-                        "error": None,
-                        "success": True
-                    }
-                if 'regularMarketPrice' in info and info['regularMarketPrice'] is not None:
-                    return {
-                        "price": float(info['regularMarketPrice']),
-                        "currency": currency,
-                        "error": None,
-                        "success": True
-                    }
-        except Exception as e:
-            error_msg = f"Error getting info price for {ticker}: {str(e)}"
-            logger.warning(error_msg)
-            error_messages.append(error_msg)
-        
-        # Method 2: Safe attempt to use fast_info
-        try:
-            if hasattr(ticker_obj, 'fast_info'):
-                try:
-                    # Different attribute access for different yfinance versions
-                    if isinstance(ticker_obj.fast_info, dict):
-                        price = ticker_obj.fast_info.get('last_price') or ticker_obj.fast_info.get('regularMarketPrice')
-                    else:
-                        # Object-style access for newer versions
-                        try:
-                            price = ticker_obj.fast_info.last_price
-                        except:
-                            try:
-                                price = ticker_obj.fast_info.regular_market_price
-                            except:
-                                price = None
-                                
-                    if price is not None and isinstance(price, (int, float)):
+                # Check if we have both price and currency before returning
+                if currency:
+                    # Try different price fields
+                    if 'currentPrice' in info and info['currentPrice'] is not None:
+                        price = float(info['currentPrice'])
+                    elif 'regularMarketPrice' in info and info['regularMarketPrice'] is not None:
+                        price = float(info['regularMarketPrice'])
+                    
+                    if price is not None:
                         return {
-                            "price": float(price),
+                            "price": price,
                             "currency": currency,
                             "error": None,
                             "success": True
                         }
-                except Exception as inner_e:
-                    error_msg = f"Fast info access error for {ticker}: {str(inner_e)}"
-                    logger.warning(error_msg)
-                    error_messages.append(error_msg)
         except Exception as e:
-            error_msg = f"Error with fast_info for {ticker}: {str(e)}"
+            error_msg = f"Error in info method: {str(e)}"
             logger.warning(error_msg)
             error_messages.append(error_msg)
         
-        # Method 3: Fallback to historical data with improved error handling
-        try:
-            # For yfinance 0.2.54, we can use the standard approach
-            data = ticker_obj.history(period="1d")
-            if not data.empty and 'Close' in data.columns:
-                last_close = data['Close'].iloc[-1]
-                if isinstance(last_close, (int, float)) and last_close > 0:
-                    return {
-                        "price": float(last_close),
-                        "currency": currency,
-                        "error": None,
-                        "success": True
-                    }
-        except Exception as e:
-            error_msg = f"Error getting historical price for {ticker}: {str(e)}"
-            logger.warning(error_msg)
-            error_messages.append(error_msg)
+        # Method 2: Try fast_info if info method didn't provide both price and currency
+        if price is None or currency is None:
+            try:
+                if hasattr(ticker_obj, 'fast_info'):
+                    # First, try to get currency from fast_info
+                    if hasattr(ticker_obj.fast_info, 'currency'):
+                        currency = ticker_obj.fast_info.currency
+                        # Validate currency format
+                        if not isinstance(currency, str) or len(currency) != 3:
+                            error_msg = f"Invalid currency format from fast_info: {currency}"
+                            logger.warning(error_msg)
+                            error_messages.append(error_msg)
+                            currency = None
+                    
+                    # Then try to get price if we have a valid currency
+                    if currency:
+                        if isinstance(ticker_obj.fast_info, dict):
+                            price = ticker_obj.fast_info.get('last_price') or ticker_obj.fast_info.get('regularMarketPrice')
+                        else:
+                            try:
+                                price = ticker_obj.fast_info.last_price
+                            except:
+                                try:
+                                    price = ticker_obj.fast_info.regular_market_price
+                                except:
+                                    price = None
+                                    
+                        if price is not None and isinstance(price, (int, float)):
+                            return {
+                                "price": float(price),
+                                "currency": currency,
+                                "error": None,
+                                "success": True
+                            }
+            except Exception as e:
+                error_msg = f"Error in fast_info method: {str(e)}"
+                logger.warning(error_msg)
+                error_messages.append(error_msg)
         
-        # If all methods failed, try one more direct approach
-        try:
-            # For yfinance 0.2.54, we can use standard datetime operations
-            import datetime
-            end_date = datetime.datetime.now()
-            start_date = end_date - datetime.timedelta(days=7)
-            
-            # Format the dates as strings for the download call
-            end_str = end_date.strftime('%Y-%m-%d')
-            start_str = start_date.strftime('%Y-%m-%d')
-            
-            logger.info(f"Trying yf.download with date range: {start_str} to {end_str}")
-            data = yf.download(ticker, start=start_str, end=end_str, progress=False)
-            if not data.empty and 'Close' in data.columns:
-                last_close = data['Close'].iloc[-1]
-                if isinstance(last_close, (int, float)) and last_close > 0:
-                    return {
-                        "price": float(last_close),
-                        "currency": currency,
-                        "error": None,
-                        "success": True
-                    }
-        except Exception as e:
-            error_msg = f"Error with direct download for {ticker}: {str(e)}"
-            logger.warning(error_msg)
-            error_messages.append(error_msg)
+        # Method 3: Try to get currency directly from the ticker symbol
+        # Only for special cases where the ticker contains exchange information
+        if currency is None:
+            # Don't proceed further without currency info - this is a requirement
+            logger.error(f"Could not determine currency for {ticker}")
+            error_messages.append("Could not determine currency from any available method")
+            return {
+                "price": price,  # Return price if we found it
+                "currency": None,
+                "error": "No currency information available. " + " | ".join(error_messages),
+                "success": False
+            }
         
-        # Combine error messages for better debugging
-        all_errors = " | ".join(error_messages)
-        logger.warning(f"All methods failed to get price for {ticker}")
+        # If we reach here, we have currency but no price - try historical data
+        if price is None and currency is not None:
+            try:
+                # For yfinance 0.2.54, we can use the standard approach
+                data = ticker_obj.history(period="1d")
+                if not data.empty and 'Close' in data.columns:
+                    last_close = data['Close'].iloc[-1]
+                    if isinstance(last_close, (int, float)) and last_close > 0:
+                        return {
+                            "price": float(last_close),
+                            "currency": currency,
+                            "error": None,
+                            "success": True
+                        }
+            except Exception as e:
+                error_msg = f"Error getting historical price: {str(e)}"
+                logger.warning(error_msg)
+                error_messages.append(error_msg)
         
-        # Try crypto format if it looks like it might be a cryptocurrency and not already in crypto format
-        if not ticker.endswith('-USD'):
-            # Common cryptocurrency symbols
-            crypto_symbols = ['BTC', 'ETH', 'LRC', 'ATOM', 'SOL', 'DOGE', 'XRP', 'ADA', 'DOT', 'AVAX']
-            # Check if ticker might be a cryptocurrency
-            if ticker.upper() in crypto_symbols:
-                crypto_ticker = f"{ticker.upper()}-USD"
-                logger.info(f"🔄 Trying crypto format: {crypto_ticker}")
-                crypto_result = get_crypto_price(crypto_ticker)
-                logger.info(f"Crypto price result: {crypto_result}")
-                if crypto_result['success']:
-                    return crypto_result
-                else:
-                    logger.warning(f"Crypto format failed for {ticker}: {crypto_result['error']}")
-            
-            # Also try some additional common formats for crypto
-            if ticker.upper() in ['BITCOIN', 'BTC.X']:
-                crypto_result = get_crypto_price('BTC-USD')
-                if crypto_result['success']:
-                    return crypto_result
-            elif ticker.upper() in ['ETHEREUM', 'ETH.X']:
-                crypto_result = get_crypto_price('ETH-USD')
-                if crypto_result['success']:
-                    return crypto_result
-        
+        # If we still have no price, try direct download method
+        if price is None and currency is not None:
+            try:
+                import datetime
+                end_date = datetime.datetime.now()
+                start_date = end_date - datetime.timedelta(days=7)
+                
+                # Format the dates as strings for the download call
+                end_str = end_date.strftime('%Y-%m-%d')
+                start_str = start_date.strftime('%Y-%m-%d')
+                
+                logger.info(f"Trying direct download with date range: {start_str} to {end_str}")
+                data = yf.download(ticker, start=start_str, end=end_str, progress=False)
+                if not data.empty and 'Close' in data.columns:
+                    last_close = data['Close'].iloc[-1]
+                    if isinstance(last_close, (int, float)) and last_close > 0:
+                        return {
+                            "price": float(last_close),
+                            "currency": currency,
+                            "error": None,
+                            "success": True
+                        }
+            except Exception as e:
+                error_msg = f"Error with direct download: {str(e)}"
+                logger.warning(error_msg)
+                error_messages.append(error_msg)
+                
+        # If we get here, we couldn't get both valid price and currency
         return {
-            "price": None, 
-            "currency": currency, 
-            "error": f"Failed to retrieve price data: {all_errors}", 
+            "price": price,
+            "currency": currency,
+            "error": f"Failed to retrieve complete data: {' | '.join(error_messages)}",
             "success": False
         }
+        
     except Exception as e:
         logger.error(f"Error getting price data for {ticker}: {str(e)}")
         return {"price": None, "currency": None, "error": str(e), "success": False}
