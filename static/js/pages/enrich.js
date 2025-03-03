@@ -82,13 +82,13 @@ const FileUploadHandler = {
                 progressElement.style.display = 'block';
                 progressElement.dataset.processing = 'true';
                 
-                // Clear any existing interval and start a new one
-                if (this.progressInterval) {
-                    clearInterval(this.progressInterval);
+                // Clear any existing interval and start a new one - use PriceProgressTracker consistently
+                if (PriceProgressTracker.progressInterval) {
+                    clearInterval(PriceProgressTracker.progressInterval);
                 }
                 
                 // Create a new interval with more frequent updates during processing
-                this.progressInterval = setInterval(() => {
+                PriceProgressTracker.progressInterval = setInterval(() => {
                     PriceProgressTracker.checkProgress(
                         progressElement,
                         progressCount,
@@ -134,7 +134,8 @@ const PriceProgressTracker = {
                 // Update progress bar
                 const progressBar = document.getElementById('progress-bar');
                 if (progressBar) {
-                    progressBar.style.width = percentage + '%';
+                    // Update the value attribute instead of the width style
+                    progressBar.value = percentage;
                 }
                 
                 // Only show the progress indicator if there's actual progress happening

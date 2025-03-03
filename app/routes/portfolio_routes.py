@@ -1457,27 +1457,37 @@ def process_csv_data(account_id, file_content):
         clear_data_caches()
         
         # Update prices for new companies
-        for company_name in positions_added:
-            company = query_db(
-                'SELECT id, identifier FROM companies WHERE name = ? AND account_id = ?',
-                [company_name, account_id],
-                one=True
-            )
-            if company and company['identifier']:
-                try:
-                    identifier = company['identifier']
-                    result = get_isin_data(identifier)
-                    if result['success'] and result.get('price') is not None:
-                        price = result.get('price')
-                        currency = result.get('currency', 'USD')
-                        price_eur = result.get('price_eur', price)
-                        if not update_price_in_db(identifier, price, currency, price_eur):
+        if positions_added:
+            # Initialize progress tracking for the new companies
+            global price_fetch_progress
+            price_fetch_progress['current'] = 0
+            price_fetch_progress['total'] = len(positions_added)
+            price_fetch_progress['start_time'] = datetime.now().isoformat()
+            
+            for i, company_name in enumerate(positions_added):
+                # Update progress counter
+                price_fetch_progress['current'] = i + 1
+                
+                company = query_db(
+                    'SELECT id, identifier FROM companies WHERE name = ? AND account_id = ?',
+                    [company_name, account_id],
+                    one=True
+                )
+                if company and company['identifier']:
+                    try:
+                        identifier = company['identifier']
+                        result = get_isin_data(identifier)
+                        if result['success'] and result.get('price') is not None:
+                            price = result.get('price')
+                            currency = result.get('currency', 'USD')
+                            price_eur = result.get('price_eur', price)
+                            if not update_price_in_db(identifier, price, currency, price_eur):
+                                failed_prices.append(identifier)
+                        else:
                             failed_prices.append(identifier)
-                    else:
+                    except Exception as e:
+                        logger.error(f"Error updating price for {identifier}: {str(e)}")
                         failed_prices.append(identifier)
-                except Exception as e:
-                    logger.error(f"Error updating price for {identifier}: {str(e)}")
-                    failed_prices.append(identifier)
         
         return True, "CSV data imported successfully with weighted average cost calculation", {
             'added': positions_added,
