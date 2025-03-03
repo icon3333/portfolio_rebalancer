@@ -811,9 +811,16 @@ def update_price_by_id_api(company_id):
         # Instead of using batch processing for a single item, call get_isin_data directly
         result = get_isin_data(identifier)
         
+        # Improved error handling
         if not result['success']:
+            error_message = result.get('error', 'Unknown error')
+            logger.warning(f"Price lookup failed for {company_name} ({identifier}): {error_message}")
+            
+            # Return more useful error message to frontend
             return jsonify({
-                'error': f"Failed to get price for {company_name}: {result.get('error', 'Unknown error')}"
+                'error': f"Failed to get price for {company_name}: {error_message}",
+                'details': "The system could not find a valid stock ticker for this identifier. "
+                          "If this is a valid stock, try manually updating the identifier in the database."
             }), 400
             
         # Update price in database
@@ -821,7 +828,16 @@ def update_price_by_id_api(company_id):
         currency = result.get('currency', 'USD')
         price_eur = result.get('price_eur', price)
         
-        if price and update_price_in_db(identifier, price, currency, price_eur):
+        if price is None:
+            logger.warning(f"No price found for {company_name} ({identifier})")
+            return jsonify({
+                'error': f'No price data available for {company_name}',
+                'details': "The system found the ticker but could not retrieve its current price."
+            }), 400
+        
+        # Attempt to update the price in the database
+        if update_price_in_db(identifier, price, currency, price_eur):
+            logger.info(f"Successfully updated price for {company_name} to {price} {currency} ({price_eur} EUR)")
             return jsonify({
                 'success': True,
                 'message': f'Updated price for {company_name}',
@@ -833,8 +849,9 @@ def update_price_by_id_api(company_id):
                 }
             })
         else:
+            logger.error(f"Database update failed for {company_name}")
             return jsonify({
-                'error': f'Failed to update price for {company_name}'
+                'error': f'Failed to update price for {company_name} in database'
             }), 500
             
     except Exception as e:

@@ -453,22 +453,31 @@ class PortfolioTableApp {
                             
                             // Show success notification
                             if (typeof showNotification === 'function') {
-                                showNotification('Price updated successfully', 'is-success');
+                                showNotification(result.message || 'Price updated successfully', 'is-success');
                             } else {
-                                console.log('Price updated successfully');
+                                console.log(result.message || 'Price updated successfully');
                             }
                         } else {
+                            // Construct a meaningful error message
+                            let errorMessage = result.error || 'Failed to update price';
+                            
+                            // If we have additional details, add them
+                            if (result.details) {
+                                errorMessage += `\n\n${result.details}`;
+                                console.error('Detailed error:', result.details);
+                            }
+                            
                             // Show error notification
                             if (typeof showNotification === 'function') {
-                                showNotification(result.error || 'Failed to update price', 'is-danger');
+                                showNotification(errorMessage, 'is-danger');
                             } else {
-                                console.error('Error:', result.error || 'Failed to update price');
+                                console.error('Error:', errorMessage);
                             }
                         }
                     } catch (error) {
                         console.error('Error updating price:', error);
                         if (typeof showNotification === 'function') {
-                            showNotification('Error updating price', 'is-danger');
+                            showNotification('Network error while updating price. Please try again.', 'is-danger');
                         }
                     } finally {
                         this.isUpdating = false;
