@@ -1152,6 +1152,9 @@ def get_portfolio_data(account_id):
                     'override_share': float(row['override_share']) if pd.notna(row['override_share']) else None,
                     'price_eur': float(row['price_eur']) if pd.notna(row['price_eur']) else None,
                     'currency': row['currency'],
+                    'country': row['country'] if 'country' in row and pd.notna(row['country']) else None,
+                    'industry': row['industry'] if 'industry' in row and pd.notna(row['industry']) else None,
+                    'sector': row['sector'] if 'sector' in row and pd.notna(row['sector']) else None,
                     'total_invested': float(row['total_invested']) if pd.notna(row['total_invested']) else 0,
                     'last_updated': row['last_updated'] if isinstance(row['last_updated'], str) else 
                                    (row['last_updated'].isoformat() if pd.notna(row['last_updated']) else None)

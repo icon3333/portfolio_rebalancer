@@ -501,18 +501,39 @@ def get_isin_data(isin: str) -> Dict[str, Any]:
         # Fetch additional data like country, sector, and industry if we have a ticker
         if ticker and success:
             try:
-                # Try to get additional information from yfinance
-                ticker_obj = yf.Ticker(ticker)
-                info = ticker_obj.info
-                
-                # Extract additional data
-                country = info.get('country')
-                sector = info.get('sector')
-                industry = info.get('industry')
-                
-                logger.info(f"Additional data for {ticker}: country={country}, sector={sector}, industry={industry}")
+                # Skip metadata fetch for cryptocurrencies (they don't have country, sector, industry)
+                if '-USD' in ticker or ticker.lower() in ['btc', 'eth', 'doge', 'atom', 'sol', 'ada', 'link', 'pepe', 'apu']:
+                    logger.info(f"Skipping metadata fetch for cryptocurrency {ticker}")
+                    country = None
+                    sector = None
+                    industry = None
+                else:
+                    # Try to get additional information from yfinance
+                    # Avoid the cookie clearing issue
+                    try:
+                        import importlib
+                        requests_module = importlib.import_module('requests')
+                        # Add a clear method to cookies if it doesn't exist
+                        if not hasattr(requests_module.cookies, 'clear'):
+                            requests_module.cookies.clear = lambda: None
+                    except Exception as e:
+                        logger.warning(f"Failed to patch requests.cookies: {str(e)}")
+                    
+                    ticker_obj = yf.Ticker(ticker)
+                    info = ticker_obj.info
+                    
+                    # Extract additional data
+                    country = info.get('country')
+                    sector = info.get('sector')
+                    industry = info.get('industry')
+                    
+                    logger.info(f"Additional data for {ticker}: country={country}, sector={sector}, industry={industry}")
             except Exception as e:
                 logger.warning(f"Error fetching additional data for {ticker}: {str(e)}")
+                # Continue with None values if we had an error
+                country = None
+                sector = None
+                industry = None
         
         # Prepare result
         result = {
