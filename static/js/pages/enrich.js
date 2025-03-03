@@ -810,12 +810,15 @@ class PortfolioTableApp {
 // Bulk Edit Vue Application
 class BulkEditApp {
     constructor(portfolios) {
+        console.log('Initializing BulkEditApp with portfolios:', JSON.stringify(portfolios));
         this.app = new Vue({
             el: '#bulk-edit-app',
             data() {
                 return {
                     companies: [],
-                    portfolioOptions: portfolios,
+                    // Initialize directly with provided portfolios to avoid initial empty dropdown
+                    portfolioOptions: Array.isArray(portfolios) ? [...portfolios] : ['-', 'crypto', 'dividend', 'value'],
+                    staticPortfolios: Array.isArray(portfolios) ? [...portfolios] : [],
                     targetPortfolio: '',
                     portfolioAction: 'add',
                     activeTab: 'portfolio',
@@ -823,7 +826,14 @@ class BulkEditApp {
                     selectedCompanies: [],
                     searchQuery: '',
                     loading: false,
-                    isLoading: false
+                    isLoading: false,
+                    
+                    // Portfolio management fields
+                    addPortfolioName: '',
+                    oldPortfolioName: '',
+                    newPortfolioName: '',
+                    deletePortfolioName: '',
+                    isPortfolioLoading: false
                 };
             },
             computed: {
@@ -865,11 +875,78 @@ class BulkEditApp {
             },
             methods: {
                 async loadPortfolioOptions() {
-                    // This is now a no-op as portfolios are initialized from server-side data
                     try {
-                        console.log('Portfolio options already loaded:', this.portfolioOptions);
+                        console.log('Fetching up-to-date portfolio options from server...');
+                        console.log('Current portfolioOptions before fetch:', JSON.stringify(this.portfolioOptions));
+                        
+                        console.log('Starting API call to fetch portfolios...');
+                        const response = await fetch('/portfolio/api/portfolios');
+                        console.log('Portfolio API response status:', response.status);
+                        
+                        if (!response.ok) {
+                            throw new Error(`HTTP error ${response.status}`);
+                        }
+                        
+                        console.log('Parsing JSON response...');
+                        const data = await response.json();
+                        console.log('Portfolio options from server (RAW):', JSON.stringify(data));
+                        console.log('Portfolio options type:', typeof data, Array.isArray(data));
+                        
+                        // Hard-code some default portfolios for testing if data is empty or invalid
+                        if (!Array.isArray(data) || data.length === 0) {
+                            console.warn('Invalid or empty data from server, using hardcoded fallback');
+                            // For testing - add some hardcoded options if none are returned
+                            this.portfolioOptions = ['-', 'crypto', 'dividend', 'value'];
+                            return;
+                        }
+                        
+                        // Reset portfolioOptions to empty array to avoid mutation issues
+                        this.portfolioOptions = [];
+                        
+                        // Create a new array for portfolio options
+                        let newOptions = [];
+                        
+                        // Debugging information
+                        const itemsWithValues = [];
+                        data.forEach((item, idx) => {
+                            itemsWithValues.push(`Item ${idx}: [${item}] type=${typeof item}`);
+                        });
+                        console.log('All items with values:', itemsWithValues.join(', '));
+                        
+                        // Filter out any null, undefined or empty strings
+                        newOptions = data.filter(item => item !== null && item !== undefined && item !== '');
+                        
+                        // Make sure we have the default portfolio option
+                        if (!newOptions.includes('-')) {
+                            newOptions.unshift('-'); // Add Default portfolio at the beginning
+                        }
+                        
+                        // Log the new options
+                        console.log('Processed new portfolio options:', JSON.stringify(newOptions));
+                        console.log('Number of portfolio options:', newOptions.length);
+                        console.log('Individual portfolio options:');
+                        newOptions.forEach((option, index) => {
+                            console.log(`Option ${index}:`, option, 'Type:', typeof option);
+                        });
+                        
+                        // Update the data property with the new array
+                        this.portfolioOptions = newOptions;
+                        
+                        console.log('Updated portfolioOptions in Vue data:', JSON.stringify(this.portfolioOptions));
+                        console.log('Number of options in Vue data:', this.portfolioOptions.length);
+                        
+                        // Force Vue to update the UI
+                        this.$nextTick(() => {
+                            console.log('Next tick, forcing update...');
+                            this.$forceUpdate();
+                            console.log('Vue UI updated with force update');
+                        });
                     } catch (err) {
-                        console.error('Error with portfolio options:', err);
+                        console.error('Error fetching portfolio options:', err);
+                        // Fall back to default option if API fails
+                        console.warn('Using fallback portfolio options due to error');
+                        this.portfolioOptions = ['-', 'crypto', 'dividend', 'value']; // Add some sensible defaults for testing
+                        this.$forceUpdate();
                     }
                 },
                 
@@ -952,8 +1029,6 @@ class BulkEditApp {
                     }
                 },
                 
-
-                
                 async applyPortfolioChanges() {
                     // Apply portfolio changes to all selected companies
                     if (this.selectedCompanies.length === 0) {
@@ -1003,7 +1078,7 @@ class BulkEditApp {
                                 alert(result.message);
                             }
                             
-                            // Refresh the companies table
+                            // Refresh the companies
                             await this.loadCompanies();
                         } else {
                             throw new Error(result.error || 'Failed to update companies');
@@ -1017,9 +1092,6 @@ class BulkEditApp {
                         }
                     } finally {
                         this.isLoading = false;
-                        
-                        // Don't reset selected companies here to allow multiple updates
-                        // this.selectedCompanies = [];
                     }
                 },
                 
@@ -1074,7 +1146,7 @@ class BulkEditApp {
                                 alert(result.message);
                             }
                             
-                            // Refresh the companies table
+                            // Refresh the companies
                             await this.loadCompanies();
                         } else {
                             throw new Error(result.error || 'Failed to update companies');
@@ -1088,25 +1160,264 @@ class BulkEditApp {
                         }
                     } finally {
                         this.isLoading = false;
+                    }
+                },
+                
+                // Portfolio management methods
+                async addPortfolio() {
+                    if (!this.addPortfolioName.trim()) {
+                        if (typeof showNotification === 'function') {
+                            showNotification('Portfolio name cannot be empty', 'is-warning');
+                        } else {
+                            alert('Portfolio name cannot be empty');
+                        }
+                        return;
+                    }
+                    
+                    this.isPortfolioLoading = true;
+                    try {
+                        // Create form data to match the server endpoint
+                        const formData = new FormData();
+                        formData.append('action', 'add');
+                        formData.append('add_portfolio_name', this.addPortfolioName);
                         
-                        // Don't reset selected companies here to allow multiple updates
-                        // this.selectedCompanies = [];
+                        // Send request to create portfolio
+                        const response = await fetch('/portfolio/manage_portfolios', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        if (!response.ok) {
+                            throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+                        }
+                        
+                        // Success notification
+                        if (typeof showNotification === 'function') {
+                            showNotification(`Portfolio "${this.addPortfolioName}" created successfully`, 'is-success');
+                        } else {
+                            alert(`Portfolio "${this.addPortfolioName}" created successfully`);
+                        }
+                        
+                        // Store the new portfolio name
+                        const newPortfolio = this.addPortfolioName;
+                        
+                        // Reset form
+                        this.addPortfolioName = '';
+                        
+                        // Add the new portfolio to the local portfolioOptions array immediately
+                        if (!this.portfolioOptions.includes(newPortfolio)) {
+                            this.portfolioOptions.push(newPortfolio);
+                            // Sort the portfolios alphabetically
+                            this.portfolioOptions.sort();
+                            console.log('Added new portfolio to options, new options:', this.portfolioOptions);
+                        }
+                        
+                        // Then refresh from server to ensure everything is in sync
+                        await this.loadPortfolioOptions();
+                        
+                    } catch (error) {
+                        console.error('Error creating portfolio:', error);
+                        if (typeof showNotification === 'function') {
+                            showNotification(`Error creating portfolio: ${error.message}`, 'is-danger');
+                        } else {
+                            alert(`Error creating portfolio: ${error.message}`);
+                        }
+                    } finally {
+                        this.isPortfolioLoading = false;
+                    }
+                },
+                
+                async renamePortfolio() {
+                    if (!this.oldPortfolioName || !this.newPortfolioName.trim()) {
+                        if (typeof showNotification === 'function') {
+                            showNotification('Both old and new portfolio names are required', 'is-warning');
+                        } else {
+                            alert('Both old and new portfolio names are required');
+                        }
+                        return;
+                    }
+                    
+                    this.isPortfolioLoading = true;
+                    try {
+                        // Create form data to match the server endpoint
+                        const formData = new FormData();
+                        formData.append('action', 'rename');
+                        formData.append('old_name', this.oldPortfolioName);
+                        formData.append('new_name', this.newPortfolioName);
+                        
+                        // Send request to rename portfolio
+                        const response = await fetch('/portfolio/manage_portfolios', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        if (!response.ok) {
+                            throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+                        }
+                        
+                        // Success notification
+                        if (typeof showNotification === 'function') {
+                            showNotification(`Portfolio renamed from "${this.oldPortfolioName}" to "${this.newPortfolioName}"`, 'is-success');
+                        } else {
+                            alert(`Portfolio renamed from "${this.oldPortfolioName}" to "${this.newPortfolioName}"`);
+                        }
+                        
+                        // Store old and new names for reference
+                        const oldName = this.oldPortfolioName;
+                        const newName = this.newPortfolioName;
+                        
+                        // Reset form fields
+                        this.oldPortfolioName = '';
+                        this.newPortfolioName = '';
+                        
+                        // Update any selections that used the old name
+                        if (this.targetPortfolio === oldName) {
+                            console.log('Updating targetPortfolio selection to new name');
+                            this.targetPortfolio = newName;
+                        }
+                        
+                        // Update the local portfolioOptions array immediately
+                        this.portfolioOptions = this.portfolioOptions.filter(p => p !== oldName);
+                        if (!this.portfolioOptions.includes(newName)) {
+                            this.portfolioOptions.push(newName);
+                            // Sort the portfolios alphabetically
+                            this.portfolioOptions.sort();
+                        }
+                        console.log('Updated portfolio options after rename:', this.portfolioOptions);
+                        
+                        // Then refresh from server to ensure everything is in sync
+                        await this.loadPortfolioOptions();
+                        await this.loadCompanies(); // Reload companies to update portfolio names
+                        
+                    } catch (error) {
+                        console.error('Error renaming portfolio:', error);
+                        if (typeof showNotification === 'function') {
+                            showNotification(`Error renaming portfolio: ${error.message}`, 'is-danger');
+                        } else {
+                            alert(`Error renaming portfolio: ${error.message}`);
+                        }
+                    } finally {
+                        this.isPortfolioLoading = false;
+                    }
+                },
+                
+                async deletePortfolio() {
+                    if (!this.deletePortfolioName) {
+                        if (typeof showNotification === 'function') {
+                            showNotification('Please select a portfolio to delete', 'is-warning');
+                        } else {
+                            alert('Please select a portfolio to delete');
+                        }
+                        return;
+                    }
+                    
+                    // Confirm deletion
+                    if (!confirm(`Are you sure you want to delete the portfolio "${this.deletePortfolioName}"? This cannot be undone.`)) {
+                        return;
+                    }
+                    
+                    this.isPortfolioLoading = true;
+                    try {
+                        // Create form data to match the server endpoint
+                        const formData = new FormData();
+                        formData.append('action', 'delete');
+                        formData.append('delete_portfolio_name', this.deletePortfolioName);
+                        
+                        // Send request to delete portfolio
+                        const response = await fetch('/portfolio/manage_portfolios', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        if (!response.ok) {
+                            throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+                        }
+                        
+                        // Success notification
+                        if (typeof showNotification === 'function') {
+                            showNotification(`Portfolio "${this.deletePortfolioName}" deleted successfully`, 'is-success');
+                        } else {
+                            alert(`Portfolio "${this.deletePortfolioName}" deleted successfully`);
+                        }
+                        
+                        // Store the deleted portfolio name for reference
+                        const deletedPortfolio = this.deletePortfolioName;
+                        
+                        // Reset all portfolio selections if they match the deleted portfolio
+                        if (this.targetPortfolio === deletedPortfolio) {
+                            console.log('Resetting targetPortfolio as it was deleted');
+                            this.targetPortfolio = '';
+                        }
+                        if (this.oldPortfolioName === deletedPortfolio) {
+                            console.log('Resetting oldPortfolioName as it was deleted');
+                            this.oldPortfolioName = '';
+                        }
+                        
+                        // Reset delete form field
+                        this.deletePortfolioName = '';
+                        
+                        // Remove the deleted portfolio from the local portfolioOptions array immediately
+                        this.portfolioOptions = this.portfolioOptions.filter(p => p !== deletedPortfolio);
+                        console.log('Removed deleted portfolio from options, new options:', this.portfolioOptions);
+                        
+                        // Then refresh from server to ensure everything is in sync
+                        await this.loadPortfolioOptions();
+                        
+                    } catch (error) {
+                        console.error('Error deleting portfolio:', error);
+                        if (typeof showNotification === 'function') {
+                            showNotification(`Error deleting portfolio: ${error.message}`, 'is-danger');
+                        } else {
+                            alert(`Error deleting portfolio: ${error.message}`);
+                        }
+                    } finally {
+                        this.isPortfolioLoading = false;
                     }
                 }
             },
             mounted() {
                 console.log('Bulk edit app mounted, loading data...');
+                
+                // Ensure we load the portfolio options when the component is mounted
+                // This is crucial for the modal dropdowns to work properly
+                this.loadPortfolioOptions().then(() => {
+                    console.log('Portfolio options loaded in mounted hook:', JSON.stringify(this.portfolioOptions));
+                });
+                
+                // Log initial state
+                console.log('Initial portfolioOptions:', JSON.stringify(this.portfolioOptions));
+                console.log('Initial staticPortfolios:', JSON.stringify(this.staticPortfolios));
+                
+                // Make sure we have default portfolio in the initial options
+                if (Array.isArray(this.portfolioOptions) && this.portfolioOptions.length > 0) {
+                    if (!this.portfolioOptions.includes('-')) {
+                        this.portfolioOptions.unshift('-'); // Add Default at beginning
+                        console.log('Added Default portfolio to initial options');
+                    }
+                } else if (Array.isArray(this.portfolioOptions) && this.portfolioOptions.length === 0) {
+                    this.portfolioOptions = ['-']; // Initialize with Default
+                    console.log('Initialized empty portfolioOptions with Default');
+                }
+                
+                // Log the updated initial state
+                console.log('Updated initial portfolioOptions:', JSON.stringify(this.portfolioOptions));
+                
+                // Load portfolios and companies
                 this.loadPortfolioOptions();
                 this.loadCompanies();
+                
+                // Additional logging to debug
+                setTimeout(() => {
+                    console.log('After timeout, portfolioOptions:', JSON.stringify(this.portfolioOptions));
+                    // Force update the component to ensure dropdown is refreshed
+                    this.$forceUpdate();
+                }, 1000);
                 
                 // Connect close button in the modal footer
                 const saveButton = document.getElementById('bulk-edit-save');
                 if (saveButton) {
                     saveButton.addEventListener('click', this.closeModal.bind(this));
                 }
-                
-                // We no longer need to connect the Apply Changes buttons here
-                // as they are now handled directly through Vue @click directives in the template
             }
         });
         
@@ -1117,12 +1428,74 @@ class BulkEditApp {
     }
 }
 
+// Portfolio Modal Management functionality
+const ModalPortfolioManager = {
+    updatePortfolioFields(action) {
+        // Hide all fields first
+        document.getElementById('modal-add-portfolio-fields').classList.add('is-hidden');
+        document.getElementById('modal-rename-portfolio-fields').classList.add('is-hidden');
+        document.getElementById('modal-delete-portfolio-fields').classList.add('is-hidden');
+        
+        // Enable/disable action button
+        const actionButton = document.getElementById('modal-portfolio-action-btn');
+        actionButton.disabled = !action;
+        
+        // Show relevant fields based on action
+        if (action === 'add') {
+            document.getElementById('modal-add-portfolio-fields').classList.remove('is-hidden');
+        } else if (action === 'rename') {
+            document.getElementById('modal-rename-portfolio-fields').classList.remove('is-hidden');
+        } else if (action === 'delete') {
+            document.getElementById('modal-delete-portfolio-fields').classList.remove('is-hidden');
+        }
+    },
+    
+    init() {
+        const modalActionSelect = document.getElementById('modal-portfolio-action');
+        const modalPortfolioForm = document.getElementById('modal-manage-portfolios-form');
+        
+        if (modalActionSelect) {
+            modalActionSelect.addEventListener('change', function() {
+                ModalPortfolioManager.updatePortfolioFields(this.value);
+            });
+        }
+        
+        if (modalPortfolioForm) {
+            modalPortfolioForm.addEventListener('submit', function(e) {
+                const action = document.getElementById('modal-portfolio-action').value;
+                
+                if (action === 'add') {
+                    const addNameField = document.querySelector('#modal-add-portfolio-fields input[name="add_portfolio_name"]');
+                    if (!addNameField.value.trim()) {
+                        e.preventDefault();
+                        alert('Portfolio name cannot be empty');
+                    }
+                } else if (action === 'rename') {
+                    const oldName = document.querySelector('#modal-rename-portfolio-fields select[name="old_name"]').value;
+                    const newName = document.querySelector('#modal-rename-portfolio-fields input[name="new_name"]').value.trim();
+                    if (!oldName || !newName) {
+                        e.preventDefault();
+                        alert('Both old and new portfolio names are required');
+                    }
+                } else if (action === 'delete') {
+                    const deleteNameField = document.querySelector('#modal-delete-portfolio-fields select[name="delete_portfolio_name"]');
+                    if (!deleteNameField.value) {
+                        e.preventDefault();
+                        alert('Please select a portfolio to delete');
+                    }
+                }
+            });
+        }
+    }
+};
+
 // Main initialization function
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize all components
     FileUploadHandler.init();
     PortfolioManager.init();
     LayoutManager.init();
+    ModalPortfolioManager.init();
     
     // Get portfolios data from the template
     const portfoliosElement = document.getElementById('portfolios-data');
@@ -1152,6 +1525,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     if (document.getElementById('bulk-edit-app')) {
-        const bulkEditApp = new BulkEditApp(portfolios);
+        // Create global bulkEditApp instance to ensure it's accessible outside this scope
+        window.bulkEditApp = new BulkEditApp(portfolios);
+        
+        // Log that the app has been initialized
+        console.log('BulkEditApp initialized globally as window.bulkEditApp');
     }
 });

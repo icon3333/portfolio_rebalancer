@@ -215,10 +215,12 @@ def get_portfolios_api():
         # Convert set to list and sort alphabetically
         names = sorted(portfolio_names)
         
-        # Don't hardcode any portfolio names - only use what's in the database
-        logger.info("Using only portfolio names from the database")
+        # Ensure the default portfolio '-' is always available
+        if '-' not in names:
+            names.insert(0, '-')  # Add Default portfolio at the beginning
+            logger.info("Added default portfolio '-' to the results")
         
-        logger.info(f"Combined portfolio names: {names}")
+        logger.info(f"Combined portfolio names with Default: {names}")
         
         # Debug the JSON serialization
         json_response = jsonify(names)
@@ -284,14 +286,42 @@ def upload_csv():
             warnings = []
             if result.get('failed'):
                 warnings.append(f"Failed to process {len(result['failed'])} companies")
-            if result.get('failed_prices'):
-                warnings.append(f"Failed to fetch prices for {len(result['failed_prices'])} identifiers")
+                
+            # If there are failed price fetches, only report the ones from this session
+            if result.get('failed_prices') and result.get('added'):
+                # Get only the failed prices from this upload session
+                # by checking if the companies are also in the 'added' list
+                current_failed_prices = []
+                
+                # Map company names to their identifiers
+                company_identifiers = {}
+                for company_name in result.get('added', []):
+                    company = query_db(
+                        'SELECT identifier FROM companies WHERE name = ? AND account_id = ?',
+                        [company_name, account_id],
+                        one=True
+                    )
+                    if company and company['identifier']:
+                        company_identifiers[company['identifier']] = company_name
+                
+                # Now filter the failed_prices to only those that match our newly added companies
+                session_failed_prices = []
+                for identifier in result.get('failed_prices', []):
+                    if identifier in company_identifiers:
+                        session_failed_prices.append(identifier)
+                
+                # Only report and log the failures from this session
+                if session_failed_prices:
+                    current_failure_count = len(session_failed_prices)
+                    logger.warning(f"Failed to fetch prices for {current_failure_count} identifiers from this upload: {', '.join(session_failed_prices)}")
+                    warnings.append(f"Failed to fetch prices for {current_failure_count} identifiers from this upload. Check logs for details.")
             
             # Show price update success message if relevant
             added_count = len(result.get('added', []))
-            failed_prices_count = len(result.get('failed_prices', []))
             if added_count > 0:
-                prices_updated_count = added_count - failed_prices_count
+                # Calculate the success count - if session_failed_prices exists, use it, otherwise assume all succeeded
+                failure_count = len(session_failed_prices) if 'session_failed_prices' in locals() and session_failed_prices else 0
+                prices_updated_count = added_count - failure_count
                 if prices_updated_count > 0:
                     flash(f"Successfully updated prices for {prices_updated_count} out of {added_count} newly added companies", 'success')
             
@@ -1482,8 +1512,11 @@ def process_csv_data(account_id, file_content):
                             currency = result.get('currency', 'USD')
                             price_eur = result.get('price_eur', price)
                             if not update_price_in_db(identifier, price, currency, price_eur):
+                                logger.warning(f"Failed to update price in database for {identifier}")
                                 failed_prices.append(identifier)
                         else:
+                            error_reason = "No price data returned" if result.get('success') else result.get('error', 'Unknown error')
+                            logger.warning(f"Failed to fetch price for {identifier}: {error_reason}")
                             failed_prices.append(identifier)
                     except Exception as e:
                         logger.error(f"Error updating price for {identifier}: {str(e)}")

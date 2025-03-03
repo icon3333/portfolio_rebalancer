@@ -1,5 +1,5 @@
 This file is a merged representation of the entire codebase, combining all repository files into a single document.
-Generated on: 2025-03-03T06:46:38.429450
+Generated on: 2025-03-03T08:35:21.079510
 
 ================================================================
 Purpose:
@@ -911,14 +911,42 @@ def upload_csv():
             warnings = []
             if result.get('failed'):
                 warnings.append(f"Failed to process {len(result['failed'])} companies")
-            if result.get('failed_prices'):
-                warnings.append(f"Failed to fetch prices for {len(result['failed_prices'])} identifiers")
+                
+            # If there are failed price fetches, only report the ones from this session
+            if result.get('failed_prices') and result.get('added'):
+                # Get only the failed prices from this upload session
+                # by checking if the companies are also in the 'added' list
+                current_failed_prices = []
+                
+                # Map company names to their identifiers
+                company_identifiers = {}
+                for company_name in result.get('added', []):
+                    company = query_db(
+                        'SELECT identifier FROM companies WHERE name = ? AND account_id = ?',
+                        [company_name, account_id],
+                        one=True
+                    )
+                    if company and company['identifier']:
+                        company_identifiers[company['identifier']] = company_name
+                
+                # Now filter the failed_prices to only those that match our newly added companies
+                session_failed_prices = []
+                for identifier in result.get('failed_prices', []):
+                    if identifier in company_identifiers:
+                        session_failed_prices.append(identifier)
+                
+                # Only report and log the failures from this session
+                if session_failed_prices:
+                    current_failure_count = len(session_failed_prices)
+                    logger.warning(f"Failed to fetch prices for {current_failure_count} identifiers from this upload: {', '.join(session_failed_prices)}")
+                    warnings.append(f"Failed to fetch prices for {current_failure_count} identifiers from this upload. Check logs for details.")
             
             # Show price update success message if relevant
             added_count = len(result.get('added', []))
-            failed_prices_count = len(result.get('failed_prices', []))
             if added_count > 0:
-                prices_updated_count = added_count - failed_prices_count
+                # Calculate the success count - if session_failed_prices exists, use it, otherwise assume all succeeded
+                failure_count = len(session_failed_prices) if 'session_failed_prices' in locals() and session_failed_prices else 0
+                prices_updated_count = added_count - failure_count
                 if prices_updated_count > 0:
                     flash(f"Successfully updated prices for {prices_updated_count} out of {added_count} newly added companies", 'success')
             
@@ -2084,27 +2112,40 @@ def process_csv_data(account_id, file_content):
         clear_data_caches()
         
         # Update prices for new companies
-        for company_name in positions_added:
-            company = query_db(
-                'SELECT id, identifier FROM companies WHERE name = ? AND account_id = ?',
-                [company_name, account_id],
-                one=True
-            )
-            if company and company['identifier']:
-                try:
-                    identifier = company['identifier']
-                    result = get_isin_data(identifier)
-                    if result['success'] and result.get('price') is not None:
-                        price = result.get('price')
-                        currency = result.get('currency', 'USD')
-                        price_eur = result.get('price_eur', price)
-                        if not update_price_in_db(identifier, price, currency, price_eur):
+        if positions_added:
+            # Initialize progress tracking for the new companies
+            global price_fetch_progress
+            price_fetch_progress['current'] = 0
+            price_fetch_progress['total'] = len(positions_added)
+            price_fetch_progress['start_time'] = datetime.now().isoformat()
+            
+            for i, company_name in enumerate(positions_added):
+                # Update progress counter
+                price_fetch_progress['current'] = i + 1
+                
+                company = query_db(
+                    'SELECT id, identifier FROM companies WHERE name = ? AND account_id = ?',
+                    [company_name, account_id],
+                    one=True
+                )
+                if company and company['identifier']:
+                    try:
+                        identifier = company['identifier']
+                        result = get_isin_data(identifier)
+                        if result['success'] and result.get('price') is not None:
+                            price = result.get('price')
+                            currency = result.get('currency', 'USD')
+                            price_eur = result.get('price_eur', price)
+                            if not update_price_in_db(identifier, price, currency, price_eur):
+                                logger.warning(f"Failed to update price in database for {identifier}")
+                                failed_prices.append(identifier)
+                        else:
+                            error_reason = "No price data returned" if result.get('success') else result.get('error', 'Unknown error')
+                            logger.warning(f"Failed to fetch price for {identifier}: {error_reason}")
                             failed_prices.append(identifier)
-                    else:
+                    except Exception as e:
+                        logger.error(f"Error updating price for {identifier}: {str(e)}")
                         failed_prices.append(identifier)
-                except Exception as e:
-                    logger.error(f"Error updating price for {identifier}: {str(e)}")
-                    failed_prices.append(identifier)
         
         return True, "CSV data imported successfully with weighted average cost calculation", {
             'added': positions_added,
@@ -5484,13 +5525,13 @@ const FileUploadHandler = {
                 progressElement.style.display = 'block';
                 progressElement.dataset.processing = 'true';
                 
-                // Clear any existing interval and start a new one
-                if (this.progressInterval) {
-                    clearInterval(this.progressInterval);
+                // Clear any existing interval and start a new one - use PriceProgressTracker consistently
+                if (PriceProgressTracker.progressInterval) {
+                    clearInterval(PriceProgressTracker.progressInterval);
                 }
                 
                 // Create a new interval with more frequent updates during processing
-                this.progressInterval = setInterval(() => {
+                PriceProgressTracker.progressInterval = setInterval(() => {
                     PriceProgressTracker.checkProgress(
                         progressElement,
                         progressCount,
@@ -5536,7 +5577,8 @@ const PriceProgressTracker = {
                 // Update progress bar
                 const progressBar = document.getElementById('progress-bar');
                 if (progressBar) {
-                    progressBar.style.width = percentage + '%';
+                    // Update the value attribute instead of the width style
+                    progressBar.value = percentage;
                 }
                 
                 // Only show the progress indicator if there's actual progress happening
@@ -6211,12 +6253,14 @@ class PortfolioTableApp {
 // Bulk Edit Vue Application
 class BulkEditApp {
     constructor(portfolios) {
+        console.log('Initializing BulkEditApp with portfolios:', portfolios);
         this.app = new Vue({
             el: '#bulk-edit-app',
             data() {
                 return {
                     companies: [],
-                    portfolioOptions: portfolios,
+                    portfolioOptions: Array.isArray(portfolios) ? portfolios : [],
+                    staticPortfolios: Array.isArray(portfolios) ? [...portfolios] : [],
                     targetPortfolio: '',
                     portfolioAction: 'add',
                     activeTab: 'portfolio',
@@ -6224,7 +6268,14 @@ class BulkEditApp {
                     selectedCompanies: [],
                     searchQuery: '',
                     loading: false,
-                    isLoading: false
+                    isLoading: false,
+                    
+                    // Portfolio management fields
+                    addPortfolioName: '',
+                    oldPortfolioName: '',
+                    newPortfolioName: '',
+                    deletePortfolioName: '',
+                    isPortfolioLoading: false
                 };
             },
             computed: {
@@ -6266,11 +6317,62 @@ class BulkEditApp {
             },
             methods: {
                 async loadPortfolioOptions() {
-                    // This is now a no-op as portfolios are initialized from server-side data
                     try {
-                        console.log('Portfolio options already loaded:', this.portfolioOptions);
+                        console.log('Fetching up-to-date portfolio options from server...');
+                        const response = await fetch('/portfolio/api/portfolios');
+                        console.log('Portfolio API response status:', response.status);
+                        
+                        if (!response.ok) {
+                            throw new Error(`HTTP error ${response.status}`);
+                        }
+                        
+                        const data = await response.json();
+                        console.log('Portfolio options from server:', data);
+                        
+                        if (Array.isArray(data)) {
+                            // Filter out any empty portfolio names and create a clean array
+                            let portfolios = data.filter(p => p && p.trim() !== '');
+                            
+                            // Make sure we have the Default portfolio
+                            if (!portfolios.includes('-')) {
+                                console.log('Adding Default portfolio to options');
+                                portfolios.unshift('-'); // Add Default portfolio at the beginning
+                            }
+                            
+                            // Sort the portfolios (keeping Default at the beginning)
+                            const defaultPortfolio = portfolios.find(p => p === '-');
+                            const otherPortfolios = portfolios.filter(p => p !== '-').sort();
+                            
+                            if (defaultPortfolio) {
+                                portfolios = [defaultPortfolio, ...otherPortfolios];
+                            } else {
+                                portfolios = otherPortfolios;
+                            }
+                            
+                            this.portfolioOptions = portfolios;
+                            console.log('Updated portfolio options array:', this.portfolioOptions);
+                            
+                            // Force Vue to update the UI
+                            this.$forceUpdate();
+                        } else {
+                            console.warn('Invalid portfolio options format from server');
+                            this.portfolioOptions = ['-']; // Always include Default portfolio
+                        }
                     } catch (err) {
-                        console.error('Error with portfolio options:', err);
+                        console.error('Error fetching portfolio options:', err);
+                        // Fall back to options passed from template if API fails
+                        if (Array.isArray(this.portfolioOptions)) {
+                            console.log('Falling back to template-provided portfolio options');
+                            // Make sure we have the Default portfolio
+                            if (!this.portfolioOptions.includes('-')) {
+                                this.portfolioOptions.unshift('-');
+                            }
+                        } else {
+                            this.portfolioOptions = ['-']; // Always include Default portfolio
+                        }
+                        
+                        // Force Vue to update the UI
+                        this.$forceUpdate();
                     }
                 },
                 
@@ -6353,8 +6455,6 @@ class BulkEditApp {
                     }
                 },
                 
-
-                
                 async applyPortfolioChanges() {
                     // Apply portfolio changes to all selected companies
                     if (this.selectedCompanies.length === 0) {
@@ -6404,7 +6504,7 @@ class BulkEditApp {
                                 alert(result.message);
                             }
                             
-                            // Refresh the companies table
+                            // Refresh the companies
                             await this.loadCompanies();
                         } else {
                             throw new Error(result.error || 'Failed to update companies');
@@ -6418,9 +6518,6 @@ class BulkEditApp {
                         }
                     } finally {
                         this.isLoading = false;
-                        
-                        // Don't reset selected companies here to allow multiple updates
-                        // this.selectedCompanies = [];
                     }
                 },
                 
@@ -6475,7 +6572,7 @@ class BulkEditApp {
                                 alert(result.message);
                             }
                             
-                            // Refresh the companies table
+                            // Refresh the companies
                             await this.loadCompanies();
                         } else {
                             throw new Error(result.error || 'Failed to update companies');
@@ -6489,14 +6586,232 @@ class BulkEditApp {
                         }
                     } finally {
                         this.isLoading = false;
+                    }
+                },
+                
+                // Portfolio management methods
+                async addPortfolio() {
+                    if (!this.addPortfolioName.trim()) {
+                        if (typeof showNotification === 'function') {
+                            showNotification('Portfolio name cannot be empty', 'is-warning');
+                        } else {
+                            alert('Portfolio name cannot be empty');
+                        }
+                        return;
+                    }
+                    
+                    this.isPortfolioLoading = true;
+                    try {
+                        // Create form data to match the server endpoint
+                        const formData = new FormData();
+                        formData.append('action', 'add');
+                        formData.append('add_portfolio_name', this.addPortfolioName);
                         
-                        // Don't reset selected companies here to allow multiple updates
-                        // this.selectedCompanies = [];
+                        // Send request to create portfolio
+                        const response = await fetch('/portfolio/manage_portfolios', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        if (!response.ok) {
+                            throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+                        }
+                        
+                        // Success notification
+                        if (typeof showNotification === 'function') {
+                            showNotification(`Portfolio "${this.addPortfolioName}" created successfully`, 'is-success');
+                        } else {
+                            alert(`Portfolio "${this.addPortfolioName}" created successfully`);
+                        }
+                        
+                        // Store the new portfolio name
+                        const newPortfolio = this.addPortfolioName;
+                        
+                        // Reset form
+                        this.addPortfolioName = '';
+                        
+                        // Add the new portfolio to the local portfolioOptions array immediately
+                        if (!this.portfolioOptions.includes(newPortfolio)) {
+                            this.portfolioOptions.push(newPortfolio);
+                            // Sort the portfolios alphabetically
+                            this.portfolioOptions.sort();
+                            console.log('Added new portfolio to options, new options:', this.portfolioOptions);
+                        }
+                        
+                        // Then refresh from server to ensure everything is in sync
+                        await this.loadPortfolioOptions();
+                        
+                    } catch (error) {
+                        console.error('Error creating portfolio:', error);
+                        if (typeof showNotification === 'function') {
+                            showNotification(`Error creating portfolio: ${error.message}`, 'is-danger');
+                        } else {
+                            alert(`Error creating portfolio: ${error.message}`);
+                        }
+                    } finally {
+                        this.isPortfolioLoading = false;
+                    }
+                },
+                
+                async renamePortfolio() {
+                    if (!this.oldPortfolioName || !this.newPortfolioName.trim()) {
+                        if (typeof showNotification === 'function') {
+                            showNotification('Both old and new portfolio names are required', 'is-warning');
+                        } else {
+                            alert('Both old and new portfolio names are required');
+                        }
+                        return;
+                    }
+                    
+                    this.isPortfolioLoading = true;
+                    try {
+                        // Create form data to match the server endpoint
+                        const formData = new FormData();
+                        formData.append('action', 'rename');
+                        formData.append('old_name', this.oldPortfolioName);
+                        formData.append('new_name', this.newPortfolioName);
+                        
+                        // Send request to rename portfolio
+                        const response = await fetch('/portfolio/manage_portfolios', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        if (!response.ok) {
+                            throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+                        }
+                        
+                        // Success notification
+                        if (typeof showNotification === 'function') {
+                            showNotification(`Portfolio renamed from "${this.oldPortfolioName}" to "${this.newPortfolioName}"`, 'is-success');
+                        } else {
+                            alert(`Portfolio renamed from "${this.oldPortfolioName}" to "${this.newPortfolioName}"`);
+                        }
+                        
+                        // Store old and new names for reference
+                        const oldName = this.oldPortfolioName;
+                        const newName = this.newPortfolioName;
+                        
+                        // Reset form fields
+                        this.oldPortfolioName = '';
+                        this.newPortfolioName = '';
+                        
+                        // Update any selections that used the old name
+                        if (this.targetPortfolio === oldName) {
+                            console.log('Updating targetPortfolio selection to new name');
+                            this.targetPortfolio = newName;
+                        }
+                        
+                        // Update the local portfolioOptions array immediately
+                        this.portfolioOptions = this.portfolioOptions.filter(p => p !== oldName);
+                        if (!this.portfolioOptions.includes(newName)) {
+                            this.portfolioOptions.push(newName);
+                            // Sort the portfolios alphabetically
+                            this.portfolioOptions.sort();
+                        }
+                        console.log('Updated portfolio options after rename:', this.portfolioOptions);
+                        
+                        // Then refresh from server to ensure everything is in sync
+                        await this.loadPortfolioOptions();
+                        await this.loadCompanies(); // Reload companies to update portfolio names
+                        
+                    } catch (error) {
+                        console.error('Error renaming portfolio:', error);
+                        if (typeof showNotification === 'function') {
+                            showNotification(`Error renaming portfolio: ${error.message}`, 'is-danger');
+                        } else {
+                            alert(`Error renaming portfolio: ${error.message}`);
+                        }
+                    } finally {
+                        this.isPortfolioLoading = false;
+                    }
+                },
+                
+                async deletePortfolio() {
+                    if (!this.deletePortfolioName) {
+                        if (typeof showNotification === 'function') {
+                            showNotification('Please select a portfolio to delete', 'is-warning');
+                        } else {
+                            alert('Please select a portfolio to delete');
+                        }
+                        return;
+                    }
+                    
+                    // Confirm deletion
+                    if (!confirm(`Are you sure you want to delete the portfolio "${this.deletePortfolioName}"? This cannot be undone.`)) {
+                        return;
+                    }
+                    
+                    this.isPortfolioLoading = true;
+                    try {
+                        // Create form data to match the server endpoint
+                        const formData = new FormData();
+                        formData.append('action', 'delete');
+                        formData.append('delete_portfolio_name', this.deletePortfolioName);
+                        
+                        // Send request to delete portfolio
+                        const response = await fetch('/portfolio/manage_portfolios', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        if (!response.ok) {
+                            throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+                        }
+                        
+                        // Success notification
+                        if (typeof showNotification === 'function') {
+                            showNotification(`Portfolio "${this.deletePortfolioName}" deleted successfully`, 'is-success');
+                        } else {
+                            alert(`Portfolio "${this.deletePortfolioName}" deleted successfully`);
+                        }
+                        
+                        // Store the deleted portfolio name for reference
+                        const deletedPortfolio = this.deletePortfolioName;
+                        
+                        // Reset all portfolio selections if they match the deleted portfolio
+                        if (this.targetPortfolio === deletedPortfolio) {
+                            console.log('Resetting targetPortfolio as it was deleted');
+                            this.targetPortfolio = '';
+                        }
+                        if (this.oldPortfolioName === deletedPortfolio) {
+                            console.log('Resetting oldPortfolioName as it was deleted');
+                            this.oldPortfolioName = '';
+                        }
+                        
+                        // Reset delete form field
+                        this.deletePortfolioName = '';
+                        
+                        // Remove the deleted portfolio from the local portfolioOptions array immediately
+                        this.portfolioOptions = this.portfolioOptions.filter(p => p !== deletedPortfolio);
+                        console.log('Removed deleted portfolio from options, new options:', this.portfolioOptions);
+                        
+                        // Then refresh from server to ensure everything is in sync
+                        await this.loadPortfolioOptions();
+                        
+                    } catch (error) {
+                        console.error('Error deleting portfolio:', error);
+                        if (typeof showNotification === 'function') {
+                            showNotification(`Error deleting portfolio: ${error.message}`, 'is-danger');
+                        } else {
+                            alert(`Error deleting portfolio: ${error.message}`);
+                        }
+                    } finally {
+                        this.isPortfolioLoading = false;
                     }
                 }
             },
             mounted() {
                 console.log('Bulk edit app mounted, loading data...');
+                console.log('Initial portfolioOptions:', this.portfolioOptions);
+                console.log('Initial staticPortfolios:', this.staticPortfolios);
+                
+                // Ensure portfolioOptions is initialized with the initial data
+                if (this.portfolioOptions.length === 0) {
+                    console.log('No initial portfolio options, loading from API...');
+                }
+                
+                // Always load the latest portfolio options from the API
                 this.loadPortfolioOptions();
                 this.loadCompanies();
                 
@@ -6505,9 +6820,6 @@ class BulkEditApp {
                 if (saveButton) {
                     saveButton.addEventListener('click', this.closeModal.bind(this));
                 }
-                
-                // We no longer need to connect the Apply Changes buttons here
-                // as they are now handled directly through Vue @click directives in the template
             }
         });
         
@@ -6518,12 +6830,74 @@ class BulkEditApp {
     }
 }
 
+// Portfolio Modal Management functionality
+const ModalPortfolioManager = {
+    updatePortfolioFields(action) {
+        // Hide all fields first
+        document.getElementById('modal-add-portfolio-fields').classList.add('is-hidden');
+        document.getElementById('modal-rename-portfolio-fields').classList.add('is-hidden');
+        document.getElementById('modal-delete-portfolio-fields').classList.add('is-hidden');
+        
+        // Enable/disable action button
+        const actionButton = document.getElementById('modal-portfolio-action-btn');
+        actionButton.disabled = !action;
+        
+        // Show relevant fields based on action
+        if (action === 'add') {
+            document.getElementById('modal-add-portfolio-fields').classList.remove('is-hidden');
+        } else if (action === 'rename') {
+            document.getElementById('modal-rename-portfolio-fields').classList.remove('is-hidden');
+        } else if (action === 'delete') {
+            document.getElementById('modal-delete-portfolio-fields').classList.remove('is-hidden');
+        }
+    },
+    
+    init() {
+        const modalActionSelect = document.getElementById('modal-portfolio-action');
+        const modalPortfolioForm = document.getElementById('modal-manage-portfolios-form');
+        
+        if (modalActionSelect) {
+            modalActionSelect.addEventListener('change', function() {
+                ModalPortfolioManager.updatePortfolioFields(this.value);
+            });
+        }
+        
+        if (modalPortfolioForm) {
+            modalPortfolioForm.addEventListener('submit', function(e) {
+                const action = document.getElementById('modal-portfolio-action').value;
+                
+                if (action === 'add') {
+                    const addNameField = document.querySelector('#modal-add-portfolio-fields input[name="add_portfolio_name"]');
+                    if (!addNameField.value.trim()) {
+                        e.preventDefault();
+                        alert('Portfolio name cannot be empty');
+                    }
+                } else if (action === 'rename') {
+                    const oldName = document.querySelector('#modal-rename-portfolio-fields select[name="old_name"]').value;
+                    const newName = document.querySelector('#modal-rename-portfolio-fields input[name="new_name"]').value.trim();
+                    if (!oldName || !newName) {
+                        e.preventDefault();
+                        alert('Both old and new portfolio names are required');
+                    }
+                } else if (action === 'delete') {
+                    const deleteNameField = document.querySelector('#modal-delete-portfolio-fields select[name="delete_portfolio_name"]');
+                    if (!deleteNameField.value) {
+                        e.preventDefault();
+                        alert('Please select a portfolio to delete');
+                    }
+                }
+            });
+        }
+    }
+};
+
 // Main initialization function
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize all components
     FileUploadHandler.init();
     PortfolioManager.init();
     LayoutManager.init();
+    ModalPortfolioManager.init();
     
     // Get portfolios data from the template
     const portfoliosElement = document.getElementById('portfolios-data');
@@ -9256,7 +9630,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </span>
             </button>
         </header>
-        <div class="card-content" style="flex-grow: 1; display: flex; flex-direction: column; justify-content: flex-start; padding: 0.75rem;">
+        <div class="card-content" style="flex-grow: 1; display: flex; flex-direction: column; justify-content: space-between; padding: 0.75rem;">
             <div class="content">
                 <form action="{{ url_for('portfolio.upload_csv') }}" method="post" enctype="multipart/form-data">
                     <div class="field">
@@ -9278,24 +9652,23 @@ document.addEventListener('DOMContentLoaded', () => {
                             </label>
                         </div>
                         <p class="help">Upload a CSV file with your portfolio data.</p>
-                        
-                        <div id="price-fetch-progress" style="display: none; background-color: #222; border-radius: 4px; padding: 8px 12px; margin-top: 10px; border-left: 4px solid #3e8ed0;">
-                            <div class="is-flex is-align-items-center mb-2">
-                                <span class="icon mr-2 has-text-info">
-                                    <i class="fas fa-sync fa-spin"></i>
-                                </span>
-                                <span class="has-text-weight-medium has-text-white">Processing Portfolio Data</span>
-                            </div>
-                            <div class="is-flex is-justify-content-space-between is-align-items-center mb-1">
-                                <span class="has-text-grey-lighter">Fetching prices:</span>
-                                <span class="has-text-weight-bold has-text-white"><span id="progress-count">0</span>/<span id="progress-total">0</span> (<span id="progress-percentage">0%</span>)</span>
-                            </div>
-                            <div class="progress-bar-container" style="width: 100%; height: 8px; background-color: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
-                                <div id="progress-bar" style="width: 0%; height: 100%; background-color: #3e8ed0; transition: width 0.3s ease-in-out;"></div>
-                            </div>
-                        </div>
                     </div>
                 </form>
+                
+                <!-- Progress tracker integrated directly into the card -->
+                <div id="price-fetch-progress" style="display: none; margin-top: auto;" class="mt-4">
+                    <div class="is-flex is-align-items-center mb-2">
+                        <span class="icon mr-2 has-text-info">
+                            <i class="fas fa-sync fa-spin"></i>
+                        </span>
+                        <span class="has-text-weight-medium">Processing Portfolio Data</span>
+                    </div>
+                    <div class="is-flex is-justify-content-space-between is-align-items-center mb-1">
+                        <span>Fetching prices:</span>
+                        <span class="has-text-weight-bold"><span id="progress-count">0</span>/<span id="progress-total">0</span> (<span id="progress-percentage">0%</span>)</span>
+                    </div>
+                    <progress id="progress-bar" class="progress is-info" value="0" max="100"></progress>
+                </div>
             </div>
         </div>
     </div>
@@ -9718,10 +10091,10 @@ document.addEventListener('DOMContentLoaded', () => {
 {% macro bulk_edit_modal(portfolios) %}
 <div id="bulk-edit-modal" class="modal">
     <div class="modal-background"></div>
-    <div class="modal-card" style="width: 90%; max-width: 1000px;">
+    <div class="modal-card" style="width: 95%; max-width: 1200px; min-height: 80vh;">
         <div id="bulk-edit-app" v-cloak>
             <header class="modal-card-head">
-                <p class="modal-card-title">Bulk Edit Companies</p>
+                <p class="modal-card-title">Portfolio Management</p>
                 <button class="delete" aria-label="close" @click="closeModal"></button>
             </header>
             <section class="modal-card-body">
@@ -9732,10 +10105,205 @@ document.addEventListener('DOMContentLoaded', () => {
                     <p>Loading data...</p>
                 </div>
                 
-                <div v-else class="columns is-variable is-4">
-                    <!-- Left Column: Company Selection with Scrollbar -->
+                <div v-else class="columns is-variable is-2">
+                    <!-- Column 1: Sidebar -->
+                    <div class="column is-2">
+                        <aside class="menu">
+                            <p class="menu-label">Bulk Edit</p>
+                            <ul class="menu-list">
+                                <li><a :class="{'is-active': activeTab === 'portfolio'}" @click="activeTab = 'portfolio'">
+                                    <span class="icon-text">
+                                        <span class="icon"><i class="fas fa-folder-open"></i></span>
+                                        <span>Change Portfolio</span>
+                                    </span>
+                                </a></li>
+                                <li><a :class="{'is-active': activeTab === 'category'}" @click="activeTab = 'category'">
+                                    <span class="icon-text">
+                                        <span class="icon"><i class="fas fa-tag"></i></span>
+                                        <span>Change Category</span>
+                                    </span>
+                                </a></li>
+                            </ul>
+                            
+                            <p class="menu-label mt-4">Portfolio Management</p>
+                            <ul class="menu-list">
+                                <li><a :class="{'is-active': activeTab === 'add-portfolio'}" @click="activeTab = 'add-portfolio'">
+                                    <span class="icon-text">
+                                        <span class="icon"><i class="fas fa-plus"></i></span>
+                                        <span>Add</span>
+                                    </span>
+                                </a></li>
+                                <li><a :class="{'is-active': activeTab === 'rename-portfolio'}" @click="activeTab = 'rename-portfolio'">
+                                    <span class="icon-text">
+                                        <span class="icon"><i class="fas fa-edit"></i></span>
+                                        <span>Rename</span>
+                                    </span>
+                                </a></li>
+                                <li><a :class="{'is-active': activeTab === 'delete-portfolio'}" @click="activeTab = 'delete-portfolio'">
+                                    <span class="icon-text">
+                                        <span class="icon"><i class="fas fa-trash"></i></span>
+                                        <span>Delete</span>
+                                    </span>
+                                </a></li>
+                            </ul>
+                        </aside>
+                    </div>
+                    
+                    <!-- Column 2: Tab Content -->
+                    <div class="column is-4">
+                        <div class="box" style="height: 100%;">
+                            <!-- Change Portfolio Tab -->
+                            <div v-show="activeTab === 'portfolio'" class="p-3">
+                                <h4 class="title is-5">Change Portfolio</h4>
+                                <div class="field">
+                                    <label class="label">Target Portfolio</label>
+                                    <div class="control">
+                                        <div class="select is-fullwidth">
+                                            <select v-model="targetPortfolio" style="color: black !important;">
+                                                <option value="" style="color: black !important;">Select portfolio</option>
+                                                <option value="-" style="color: black !important;">Default</option>
+                                                <option v-for="portfolio in portfolioOptions" :key="portfolio" :value="portfolio" style="color: black !important;">{{ portfolio }}</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <p class="help">Choose the portfolio where selected companies will be moved</p>
+                                </div>
+                                
+                                <div class="field mt-4">
+                                    <label class="label">Action</label>
+                                    <div class="control">
+                                        <div class="field">
+                                            <label class="radio">
+                                                <input type="radio" v-model="portfolioAction" value="add">
+                                                <span class="ml-2">Move to this portfolio</span>
+                                            </label>
+                                        </div>
+                                        <div class="field">
+                                            <label class="radio">
+                                                <input type="radio" v-model="portfolioAction" value="remove" disabled>
+                                                <span class="ml-2">Remove from this portfolio</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="field mt-5">
+                                    <div class="control">
+                                        <button class="button is-primary" @click="applyPortfolioChanges" :class="{'is-loading': isLoading}">
+                                            <span class="icon"><i class="fas fa-check"></i></span>
+                                            <span>Apply Changes</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Change Category Tab -->
+                            <div v-show="activeTab === 'category'" class="p-3">
+                                <h4 class="title is-5">Change Category</h4>
+                                <div class="field">
+                                    <label class="label">New Category</label>
+                                    <div class="control">
+                                        <input class="input" type="text" v-model="newCategory" placeholder="Enter category name">
+                                    </div>
+                                    <p class="help">Enter the category that will be applied to all selected companies</p>
+                                </div>
+                                
+                                <div class="field mt-5">
+                                    <div class="control">
+                                        <button class="button is-primary" @click="applyCategoryChanges" :class="{'is-loading': isLoading}">
+                                            <span class="icon"><i class="fas fa-check"></i></span>
+                                            <span>Apply Changes</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Add Portfolio Tab -->
+                            <div v-show="activeTab === 'add-portfolio'" class="p-3">
+                                <h4 class="title is-5">Add Portfolio</h4>
+                                <div class="field">
+                                    <label class="label">Portfolio Name</label>
+                                    <div class="control">
+                                        <input class="input" type="text" v-model="addPortfolioName" placeholder="Enter portfolio name">
+                                    </div>
+                                </div>
+                                
+                                <div class="field mt-5">
+                                    <div class="control">
+                                        <button class="button is-info" @click="addPortfolio" :class="{'is-loading': isPortfolioLoading}">
+                                            <span class="icon"><i class="fas fa-plus"></i></span>
+                                            <span>Add Portfolio</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Rename Portfolio Tab -->
+                            <div v-show="activeTab === 'rename-portfolio'" class="p-3">
+                                <h4 class="title is-5">Rename Portfolio</h4>
+                                <div class="field">
+                                    <label class="label">Select Portfolio</label>
+                                    <div class="control">
+                                        <div class="select is-fullwidth">
+                                            <select v-model="oldPortfolioName" style="color: black !important;">
+                                                <option value="" style="color: black !important;">Select portfolio</option>
+                                                <option v-for="portfolio in portfolioOptions" :key="portfolio" :value="portfolio" style="color: black !important;">{{ portfolio }}</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="field">
+                                    <label class="label">New Name</label>
+                                    <div class="control">
+                                        <input class="input" type="text" v-model="newPortfolioName" placeholder="Enter new name">
+                                    </div>
+                                </div>
+                                
+                                <div class="field mt-5">
+                                    <div class="control">
+                                        <button class="button is-info" @click="renamePortfolio" :class="{'is-loading': isPortfolioLoading}" :disabled="!oldPortfolioName || !newPortfolioName">
+                                            <span class="icon"><i class="fas fa-edit"></i></span>
+                                            <span>Rename Portfolio</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Delete Portfolio Tab -->
+                            <div v-show="activeTab === 'delete-portfolio'" class="p-3">
+                                <h4 class="title is-5">Delete Portfolio</h4>
+                                <div class="field">
+                                    <label class="label">Select Portfolio to Delete</label>
+                                    <div class="control">
+                                        <div class="select is-fullwidth">
+                                            <select v-model="deletePortfolioName" style="color: black !important;">
+                                                <option value="" style="color: black !important;">Select portfolio</option>
+                                                <option v-for="portfolio in portfolioOptions" :key="portfolio" :value="portfolio" style="color: black !important;">{{ portfolio }}</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="notification is-warning is-light mt-3">
+                                    <strong>Warning:</strong> Portfolio must be empty to delete.
+                                </div>
+                                
+                                <div class="field mt-4">
+                                    <div class="control">
+                                        <button class="button is-danger" @click="deletePortfolio" :class="{'is-loading': isPortfolioLoading}" :disabled="!deletePortfolioName">
+                                            <span class="icon"><i class="fas fa-trash"></i></span>
+                                            <span>Delete Portfolio</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Column 3: Company Selection with Scrollbar -->
                     <div class="column is-6">
-                        <div class="box">
+                        <div class="box" style="height: 100%;">
                             <!-- Filter -->
                             <div class="field">
                                 <label class="label">Filter Companies</label>
@@ -9782,91 +10350,6 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <!-- No companies found message -->
                                 <div v-if="Object.keys(computedGroupedCompanies).length === 0" class="notification is-warning">
                                     <p>No companies found matching your filter criteria.</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Right Column: Edit Options -->
-                    <div class="column is-6">
-                        <div class="box">
-                            <div class="tabs is-boxed mb-4">
-                                <ul>
-                                    <li :class="{'is-active': activeTab === 'portfolio'}" @click="activeTab = 'portfolio'">
-                                        <a>
-                                            <span>Change Portfolio</span>
-                                        </a>
-                                    </li>
-                                    <li :class="{'is-active': activeTab === 'category'}" @click="activeTab = 'category'">
-                                        <a>
-                                            <span>Change Category</span>
-                                        </a>
-                                    </li>
-                                </ul>
-                            </div>
-                            
-                            <!-- Change Portfolio Tab -->
-                            <div v-show="activeTab === 'portfolio'" class="p-3">
-                                <div class="field">
-                                    <label class="label">Target Portfolio</label>
-                                    <div class="control">
-                                        <div class="select is-fullwidth">
-                                            <select v-model="targetPortfolio">
-                                                <option value="">Select portfolio</option>
-                                                {% for portfolio in portfolios %}
-                                                    <option value="{{ portfolio }}">{{ portfolio }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <p class="help">Choose the portfolio where selected companies will be moved</p>
-                                </div>
-                                
-                                <div class="field mt-4">
-                                    <label class="label">Action</label>
-                                    <div class="control">
-                                        <div class="field">
-                                            <label class="radio">
-                                                <input type="radio" v-model="portfolioAction" value="add">
-                                                <span class="ml-2">Move to this portfolio</span>
-                                            </label>
-                                        </div>
-                                        <div class="field">
-                                            <label class="radio">
-                                                <input type="radio" v-model="portfolioAction" value="remove" disabled>
-                                                <span class="ml-2">Remove from this portfolio</span>
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="field mt-5">
-                                    <div class="control">
-                                        <button class="button is-primary" @click="applyPortfolioChanges" :class="{'is-loading': isLoading}">
-                                            <span class="icon"><i class="fas fa-check"></i></span>
-                                            <span>Apply Changes</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Change Category Tab -->
-                            <div v-show="activeTab === 'category'" class="p-3">
-                                <div class="field">
-                                    <label class="label">New Category</label>
-                                    <div class="control">
-                                        <input class="input" type="text" v-model="newCategory" placeholder="Enter category name">
-                                    </div>
-                                    <p class="help">Enter the category that will be applied to all selected companies</p>
-                                </div>
-                                
-                                <div class="field mt-5">
-                                    <div class="control">
-                                        <button class="button is-primary" @click="applyCategoryChanges" :class="{'is-loading': isLoading}">
-                                            <span class="icon"><i class="fas fa-check"></i></span>
-                                            <span>Apply Changes</span>
-                                        </button>
-                                    </div>
                                 </div>
                             </div>
                         </div>

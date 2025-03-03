@@ -33,11 +33,11 @@
             }
         }
         
-        /* Styling for Bulk Edit Modal */
+        /* Styling for Bulk Edit Modal - Light Theme */
         .company-list-container {
             border-radius: 4px;
-            background-color: #1e1e1e;
-            border: none;
+            background-color: #ffffff;
+            border: 1px solid #dbdbdb;
         }
         
         .company-list-container::-webkit-scrollbar {
@@ -45,21 +45,21 @@
         }
         
         .company-list-container::-webkit-scrollbar-track {
-            background: #2b2b2b;
+            background: #f1f1f1;
             border-radius: 4px;
         }
         
         .company-list-container::-webkit-scrollbar-thumb {
-            background: #444;
+            background: #c1c1c1;
             border-radius: 4px;
         }
         
         .company-list-container::-webkit-scrollbar-thumb:hover {
-            background: #555;
+            background: #a8a8a8;
         }
         
         .company-list .checkbox {
-            color: #ddd;
+            color: #333;
         }
         
         .company-list .checkbox:hover {
@@ -638,13 +638,75 @@
 {% macro bulk_edit_modal(portfolios) %}
 <div id="bulk-edit-modal" class="modal">
     <div class="modal-background"></div>
-    <div class="modal-card" style="width: 90%; max-width: 1000px;">
+    <div class="modal-card" style="width: 95%; max-width: 1200px; min-height: 80vh;">
         <div id="bulk-edit-app" v-cloak>
             <header class="modal-card-head">
-                <p class="modal-card-title">Bulk Edit Companies</p>
+                <p class="modal-card-title">Portfolio Management</p>
                 <button class="delete" aria-label="close" @click="closeModal"></button>
             </header>
             <section class="modal-card-body">
+                <!-- Add this style tag to fix dropdown text visibility -->
+                <style>
+                    /* Enhanced fix for dropdown text visibility */
+                    #bulk-edit-modal select,
+                    #bulk-edit-modal select option,
+                    .select select,
+                    .select select option {
+                        color: #333 !important;
+                        background-color: #fff !important;
+                    }
+                    
+                    /* Fix for dropdown display issues */
+                    .select,
+                    .select select {
+                        width: 100%;
+                    }
+                    
+                    /* Ensure dropdown options are visible */
+                    select option {
+                        color: #333 !important;
+                        background-color: #fff !important;
+                        text-shadow: none !important;
+                    }
+                    
+                    /* Style adjustments for bulk edit modal */
+                    .company-list-container {
+                        border-radius: 4px;
+                        border: 1px solid #ddd;
+                        background-color: #fff !important; /* Override the dark background */
+                    }
+                    
+                    .company-item {
+                        transition: background-color 0.2s ease;
+                        cursor: pointer;
+                    }
+                    
+                    .company-item:hover {
+                        background-color: #f5f5f5;
+                    }
+                    
+                    .company-item.is-selected {
+                        background-color: #e3f2fd;
+                    }
+                    
+                    .portfolio-header {
+                        background-color: #f5f5f5 !important;
+                        border-bottom: 1px solid #e0e0e0;
+                    }
+                    
+                    .portfolio-title {
+                        margin-bottom: 0 !important;
+                    }
+                    
+                    /* Fix text coloring in dark mode */
+                    .modal-card-body {
+                        color: #333;
+                    }
+                    
+                    .box label, .box .title, .box .help {
+                        color: #333 !important;
+                    }
+                </style>
                 <div v-if="loading" class="has-text-centered my-4">
                     <span class="icon is-large">
                         <i class="fas fa-spinner fa-pulse fa-2x"></i>
@@ -652,10 +714,217 @@
                     <p>Loading data...</p>
                 </div>
                 
-                <div v-else class="columns is-variable is-4">
-                    <!-- Left Column: Company Selection with Scrollbar -->
+                <div v-else class="columns is-variable is-2">
+                    <!-- Column 1: Sidebar -->
+                    <div class="column is-2">
+                        <aside class="menu">
+                            <p class="menu-label">Bulk Edit</p>
+                            <ul class="menu-list">
+                                <li><a :class="{'is-active': activeTab === 'portfolio'}" @click="activeTab = 'portfolio'">
+                                    <span class="icon-text">
+                                        <span class="icon"><i class="fas fa-folder-open"></i></span>
+                                        <span>Change Portfolio</span>
+                                    </span>
+                                </a></li>
+                                <li><a :class="{'is-active': activeTab === 'category'}" @click="activeTab = 'category'">
+                                    <span class="icon-text">
+                                        <span class="icon"><i class="fas fa-tag"></i></span>
+                                        <span>Change Category</span>
+                                    </span>
+                                </a></li>
+                            </ul>
+                            
+                            <p class="menu-label mt-4">Portfolio Management</p>
+                            <ul class="menu-list">
+                                <li><a :class="{'is-active': activeTab === 'add-portfolio'}" @click="activeTab = 'add-portfolio'">
+                                    <span class="icon-text">
+                                        <span class="icon"><i class="fas fa-plus"></i></span>
+                                        <span>Add</span>
+                                    </span>
+                                </a></li>
+                                <li><a :class="{'is-active': activeTab === 'rename-portfolio'}" @click="activeTab = 'rename-portfolio'">
+                                    <span class="icon-text">
+                                        <span class="icon"><i class="fas fa-edit"></i></span>
+                                        <span>Rename</span>
+                                    </span>
+                                </a></li>
+                                <li><a :class="{'is-active': activeTab === 'delete-portfolio'}" @click="activeTab = 'delete-portfolio'">
+                                    <span class="icon-text">
+                                        <span class="icon"><i class="fas fa-trash"></i></span>
+                                        <span>Delete</span>
+                                    </span>
+                                </a></li>
+                            </ul>
+                        </aside>
+                    </div>
+                    
+                    <!-- Column 2: Tab Content -->
+                    <div class="column is-4">
+                        <div class="box" style="height: 100%;">
+                            <!-- Change Portfolio Tab -->
+                            <div v-show="activeTab === 'portfolio'" class="p-3">
+                                <h4 class="title is-5">Change Portfolio</h4>
+                                <div class="field">
+                                    <label class="label">Target Portfolio</label>
+                                    <div class="control">
+                                        <div class="select is-fullwidth">
+                                            <select v-model="targetPortfolio" style="color: #333 !important; background-color: #fff !important;">
+                                                <option value="" style="color: #333 !important; background-color: #fff !important;">Select portfolio</option>
+                                                <!-- Debug info to help troubleshoot -->
+                                                <option v-if="portfolioOptions.length === 0" value="debug-empty" disabled style="color: red !important;">No options loaded</option>
+                                                <!-- Explicit loop through portfolio options -->
+                                                <option 
+                                                    v-for="(portfolio, index) in portfolioOptions" 
+                                                    :key="index" 
+                                                    :value="portfolio" 
+                                                    style="color: #333 !important; background-color: #fff !important;">
+                                                    {% raw %}{{ portfolio }}{% endraw %}
+                                                </option>
+                                            </select>
+                                        </div>
+                                        <!-- Debug display to see portfolio options -->
+                                        <div v-if="portfolioOptions.length > 0" class="is-size-7 my-1 has-text-grey">
+                                            Available options: {% raw %}{{ portfolioOptions.length }}{% endraw %}
+                                        </div>
+                                    </div>
+                                    <p class="help">Choose the portfolio where selected companies will be moved</p>
+                                </div>
+                                
+                                <div class="field mt-4">
+                                    <label class="label">Action</label>
+                                    <div class="control">
+                                        <div class="field">
+                                            <label class="radio">
+                                                <input type="radio" v-model="portfolioAction" value="add">
+                                                <span class="ml-2">Move to this portfolio</span>
+                                            </label>
+                                        </div>
+                                        <div class="field">
+                                            <label class="radio">
+                                                <input type="radio" v-model="portfolioAction" value="remove" disabled>
+                                                <span class="ml-2">Remove from this portfolio</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="field mt-5">
+                                    <div class="control">
+                                        <button class="button is-primary" @click="applyPortfolioChanges" :class="{'is-loading': isLoading}">
+                                            <span class="icon"><i class="fas fa-check"></i></span>
+                                            <span>Apply Changes</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Change Category Tab -->
+                            <div v-show="activeTab === 'category'" class="p-3">
+                                <h4 class="title is-5">Change Category</h4>
+                                <div class="field">
+                                    <label class="label">New Category</label>
+                                    <div class="control">
+                                        <input class="input" type="text" v-model="newCategory" placeholder="Enter category name">
+                                    </div>
+                                    <p class="help">Enter the category that will be applied to all selected companies</p>
+                                </div>
+                                
+                                <div class="field mt-5">
+                                    <div class="control">
+                                        <button class="button is-primary" @click="applyCategoryChanges" :class="{'is-loading': isLoading}">
+                                            <span class="icon"><i class="fas fa-check"></i></span>
+                                            <span>Apply Changes</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Add Portfolio Tab -->
+                            <div v-show="activeTab === 'add-portfolio'" class="p-3">
+                                <h4 class="title is-5">Add Portfolio</h4>
+                                <div class="field">
+                                    <label class="label">Portfolio Name</label>
+                                    <div class="control">
+                                        <input class="input" type="text" v-model="addPortfolioName" placeholder="Enter portfolio name">
+                                    </div>
+                                </div>
+                                
+                                <div class="field mt-5">
+                                    <div class="control">
+                                        <button class="button is-info" @click="addPortfolio" :class="{'is-loading': isPortfolioLoading}">
+                                            <span class="icon"><i class="fas fa-plus"></i></span>
+                                            <span>Add Portfolio</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Rename Portfolio Tab -->
+                            <div v-show="activeTab === 'rename-portfolio'" class="p-3">
+                                <h4 class="title is-5">Rename Portfolio</h4>
+                                <div class="field">
+                                    <label class="label">Select Portfolio</label>
+                                    <div class="control">
+                                        <div class="select is-fullwidth">
+                                            <select v-model="oldPortfolioName" style="color: #333 !important; background-color: #fff !important;">
+                                                <option value="" style="color: #333 !important; background-color: #fff !important;">Select portfolio</option>
+                                                <option v-for="(portfolio, index) in portfolioOptions" :key="index" :value="portfolio" style="color: #333 !important; background-color: #fff !important;">{% raw %}{{ portfolio }}{% endraw %}</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="field">
+                                    <label class="label">New Name</label>
+                                    <div class="control">
+                                        <input class="input" type="text" v-model="newPortfolioName" placeholder="Enter new name">
+                                    </div>
+                                </div>
+                                
+                                <div class="field mt-5">
+                                    <div class="control">
+                                        <button class="button is-info" @click="renamePortfolio" :class="{'is-loading': isPortfolioLoading}" :disabled="!oldPortfolioName || !newPortfolioName">
+                                            <span class="icon"><i class="fas fa-edit"></i></span>
+                                            <span>Rename Portfolio</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Delete Portfolio Tab -->
+                            <div v-show="activeTab === 'delete-portfolio'" class="p-3">
+                                <h4 class="title is-5">Delete Portfolio</h4>
+                                <div class="field">
+                                    <label class="label">Select Portfolio to Delete</label>
+                                    <div class="control">
+                                        <div class="select is-fullwidth">
+                                            <select v-model="deletePortfolioName" style="color: #333 !important; background-color: #fff !important;">
+                                                <option value="" style="color: #333 !important; background-color: #fff !important;">Select portfolio</option>
+                                                <option v-for="(portfolio, index) in portfolioOptions" :key="index" :value="portfolio" style="color: #333 !important; background-color: #fff !important;">{% raw %}{{ portfolio }}{% endraw %}</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="notification is-warning is-light mt-3">
+                                    <strong>Warning:</strong> Portfolio must be empty to delete.
+                                </div>
+                                
+                                <div class="field mt-4">
+                                    <div class="control">
+                                        <button class="button is-danger" @click="deletePortfolio" :class="{'is-loading': isPortfolioLoading}" :disabled="!deletePortfolioName">
+                                            <span class="icon"><i class="fas fa-trash"></i></span>
+                                            <span>Delete Portfolio</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Column 3: Company Selection with Scrollbar -->
                     <div class="column is-6">
-                        <div class="box">
+                        <div class="box" style="height: 100%;">
                             <!-- Filter -->
                             <div class="field">
                                 <label class="label">Filter Companies</label>
@@ -706,91 +975,6 @@
                             </div>
                         </div>
                     </div>
-                    
-                    <!-- Right Column: Edit Options -->
-                    <div class="column is-6">
-                        <div class="box">
-                            <div class="tabs is-boxed mb-4">
-                                <ul>
-                                    <li :class="{'is-active': activeTab === 'portfolio'}" @click="activeTab = 'portfolio'">
-                                        <a>
-                                            <span>Change Portfolio</span>
-                                        </a>
-                                    </li>
-                                    <li :class="{'is-active': activeTab === 'category'}" @click="activeTab = 'category'">
-                                        <a>
-                                            <span>Change Category</span>
-                                        </a>
-                                    </li>
-                                </ul>
-                            </div>
-                            
-                            <!-- Change Portfolio Tab -->
-                            <div v-show="activeTab === 'portfolio'" class="p-3">
-                                <div class="field">
-                                    <label class="label">Target Portfolio</label>
-                                    <div class="control">
-                                        <div class="select is-fullwidth">
-                                            <select v-model="targetPortfolio">
-                                                <option value="">Select portfolio</option>
-                                                {% for portfolio in portfolios %}
-                                                    <option value="{{ portfolio }}">{{ portfolio }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <p class="help">Choose the portfolio where selected companies will be moved</p>
-                                </div>
-                                
-                                <div class="field mt-4">
-                                    <label class="label">Action</label>
-                                    <div class="control">
-                                        <div class="field">
-                                            <label class="radio">
-                                                <input type="radio" v-model="portfolioAction" value="add">
-                                                <span class="ml-2">Move to this portfolio</span>
-                                            </label>
-                                        </div>
-                                        <div class="field">
-                                            <label class="radio">
-                                                <input type="radio" v-model="portfolioAction" value="remove" disabled>
-                                                <span class="ml-2">Remove from this portfolio</span>
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="field mt-5">
-                                    <div class="control">
-                                        <button class="button is-primary" @click="applyPortfolioChanges" :class="{'is-loading': isLoading}">
-                                            <span class="icon"><i class="fas fa-check"></i></span>
-                                            <span>Apply Changes</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Change Category Tab -->
-                            <div v-show="activeTab === 'category'" class="p-3">
-                                <div class="field">
-                                    <label class="label">New Category</label>
-                                    <div class="control">
-                                        <input class="input" type="text" v-model="newCategory" placeholder="Enter category name">
-                                    </div>
-                                    <p class="help">Enter the category that will be applied to all selected companies</p>
-                                </div>
-                                
-                                <div class="field mt-5">
-                                    <div class="control">
-                                        <button class="button is-primary" @click="applyCategoryChanges" :class="{'is-loading': isLoading}">
-                                            <span class="icon"><i class="fas fa-check"></i></span>
-                                            <span>Apply Changes</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </section>
             <footer class="modal-card-foot">
@@ -802,4 +986,50 @@
         </div>
     </div>
 </div>
+
+<!-- CSS moved to the modal section for better organization -->
+    
+    /* Override default dark background colors with light theme */
+    #bulk-edit-modal .company-list-container,
+    #bulk-edit-modal .company-list,
+    #bulk-edit-modal .company-item {
+        background-color: #fff !important;
+        color: #333 !important;
+    }
+    
+    #bulk-edit-modal .portfolio-header {
+        background-color: #f5f5f5 !important;
+        color: #333 !important;
+        border-bottom: 1px solid #e0e0e0;
+    }
+    
+    /* Hover and selection states */
+    #bulk-edit-modal .company-item:hover {
+        background-color: #f5f5f5 !important;
+    }
+    
+    #bulk-edit-modal .company-item.is-selected {
+        background-color: #e3f2fd !important;
+    }
+    
+    /* Fix all text coloring in the modal */
+    #bulk-edit-modal .modal-card-body,
+    #bulk-edit-modal .box,
+    #bulk-edit-modal label,
+    #bulk-edit-modal .title,
+    #bulk-edit-modal .help,
+    #bulk-edit-modal .company-name,
+    #bulk-edit-modal .checkbox,
+    #bulk-edit-modal .portfolio-title {
+        color: #333 !important;
+    }
+    
+    /* Ensure dropdown options are visible */
+    #bulk-edit-modal select,
+    #bulk-edit-modal select option {
+        color: #333 !important;
+        background-color: #fff !important;
+        border-color: #dbdbdb;
+    }
+</style>
 {% endmacro %}
