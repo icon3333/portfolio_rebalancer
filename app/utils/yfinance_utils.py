@@ -174,7 +174,7 @@ def get_isin_data(isin: str) -> Dict[str, Any]:
         isin (str): ISIN code (e.g., 'US0378331005') or ticker symbol
         
     Returns:
-        Dict[str, Any]: Dictionary containing ISIN/ticker information
+        Dict[str, Any]: Dictionary containing ISIN/ticker information including country, sector, and industry
     """
     logger.info(f"Processing identifier: {isin}")
     
@@ -187,6 +187,9 @@ def get_isin_data(isin: str) -> Dict[str, Any]:
     error_message = None
     tried_crypto_format = False
     price_eur = None
+    country = None
+    sector = None
+    industry = None
     
     try:
         # Step 1: Try standard approach with original identifier
@@ -251,6 +254,22 @@ def get_isin_data(isin: str) -> Dict[str, Any]:
                 exchange_rate = get_exchange_rate(currency, "EUR")
                 price_eur = price * exchange_rate
                 logger.info(f"Converted {price} {currency} to {price_eur} EUR (rate: {exchange_rate})")
+                
+        # Fetch additional data like country, sector, and industry if we have a ticker
+        if ticker and success:
+            try:
+                # Try to get additional information from yfinance
+                ticker_obj = yf.Ticker(ticker)
+                info = ticker_obj.info
+                
+                # Extract additional data
+                country = info.get('country')
+                sector = info.get('sector')
+                industry = info.get('industry')
+                
+                logger.info(f"Additional data for {ticker}: country={country}, sector={sector}, industry={industry}")
+            except Exception as e:
+                logger.warning(f"Error fetching additional data for {ticker}: {str(e)}")
         
         # Prepare result
         result = {
@@ -260,6 +279,9 @@ def get_isin_data(isin: str) -> Dict[str, Any]:
             'price': price,
             'currency': currency,  # Now using actual currency
             'price_eur': price_eur,  # Converted to EUR if needed
+            'country': country,     # Include country data
+            'sector': sector,       # Include sector data
+            'industry': industry,   # Include industry data
             'status': 'processed' if success else 'failed',
             'error': error_message,
             'timestamp': datetime.now().isoformat(),
@@ -272,7 +294,7 @@ def get_isin_data(isin: str) -> Dict[str, Any]:
             
         # Log appropriate message based on result
         if result['success']:
-            logger.info(f"Successfully retrieved price {price} {currency} ({price_eur} EUR) for {isin} (ticker: {ticker})")
+            logger.info(f"Successfully retrieved price {price} {currency} ({price_eur} EUR) for {isin} (ticker: {ticker}), with country={country}, sector={sector}, industry={industry}")
         else:
             logger.warning(f"Failed to retrieve valid data for {isin}: ticker={ticker}, price={price}, error={error_message}")
             
@@ -297,21 +319,27 @@ def get_yfinance_info(identifier: str) -> Dict[str, Any]:
         identifier (str): Stock identifier (ticker or ISIN)
         
     Returns:
-        Dict[str, Any]: Dictionary containing stock information
+        Dict[str, Any]: Dictionary containing stock information including country, sector, and industry
     """
     logger.info(f"Fetching data for identifier={identifier!r}")
     
-    # Get data using our enhanced get_isin_data function
+    # Get data using our enhanced get_isin_data function which now includes country, sector, and industry
     result = get_isin_data(identifier)
+    
+    # Extract ticker and additional fields
+    ticker = result.get('ticker')
     
     # Format return value for compatibility with expected structure
     response = {
         "success": result['success'],
         "identifier": identifier,
-        "ticker": result.get('ticker'),
+        "ticker": ticker,
         "price": result.get('price'),
         "currency": result.get('currency', 'USD'),
         "price_eur": result.get('price_eur'),
+        "country": result.get('country'),  # Use country from get_isin_data
+        "sector": result.get('sector'),    # Use sector from get_isin_data
+        "industry": result.get('industry'), # Use industry from get_isin_data
         "error": result.get('error'),
         "timestamp": result.get('timestamp')
     }

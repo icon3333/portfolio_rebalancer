@@ -1511,7 +1511,10 @@ def process_csv_data(account_id, file_content):
                             price = result.get('price')
                             currency = result.get('currency', 'USD')
                             price_eur = result.get('price_eur', price)
-                            if not update_price_in_db(identifier, price, currency, price_eur):
+                            country = result.get('country')
+                            sector = result.get('sector')
+                            industry = result.get('industry')
+                            if not update_price_in_db(identifier, price, currency, price_eur, country, sector, industry):
                                 logger.warning(f"Failed to update price in database for {identifier}")
                                 failed_prices.append(identifier)
                         else:

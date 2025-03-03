@@ -69,7 +69,10 @@ def process_isins(app, job_id, isins):
                         isin, 
                         result.get('price'), 
                         result.get('currency', 'USD'),
-                        result.get('price_eur', result.get('price'))
+                        result.get('price_eur', result.get('price')),
+                        result.get('country'),  # Add country information
+                        result.get('sector'),   # Add sector information
+                        result.get('industry')  # Add industry information
                     )
                     
                     if success:

@@ -5,7 +5,7 @@ from app.database.db_manager import query_db, execute_db
 
 logger = logging.getLogger(__name__)
 
-def update_price_in_db(identifier: str, price: float, currency: str, price_eur: float, modified_identifier: str = None) -> bool:
+def update_price_in_db(identifier: str, price: float, currency: str, price_eur: float, country: str = None, sector: str = None, industry: str = None, modified_identifier: str = None) -> bool:
     """
     Update price in database for a single identifier.
     
@@ -14,6 +14,9 @@ def update_price_in_db(identifier: str, price: float, currency: str, price_eur: 
         price: Price in original currency
         currency: Currency code
         price_eur: Price in EUR
+        country: Country of the company
+        sector: Sector of the company
+        industry: Industry of the company
         modified_identifier: If provided, update the company's identifier to this value
         
     Returns:
@@ -53,18 +56,19 @@ def update_price_in_db(identifier: str, price: float, currency: str, price_eur: 
             # Update existing record
             execute_db('''
                 UPDATE market_prices 
-                SET price = ?, currency = ?, price_eur = ?, last_updated = ?
+                SET price = ?, currency = ?, price_eur = ?, last_updated = ?, 
+                    country = ?, sector = ?, industry = ?
                 WHERE identifier = ?
-            ''', [price, currency, price_eur, now, identifier])
-            logger.info(f"Updated existing price record for {identifier}")
+            ''', [price, currency, price_eur, now, country, sector, industry, identifier])
+            logger.info(f"Updated existing price record for {identifier} with additional data")
         else:
             # Insert new record
             execute_db('''
                 INSERT INTO market_prices 
-                (identifier, price, currency, price_eur, last_updated)
-                VALUES (?, ?, ?, ?, ?)
-            ''', [identifier, price, currency, price_eur, now])
-            logger.info(f"Created new price record for {identifier}")
+                (identifier, price, currency, price_eur, last_updated, country, sector, industry)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', [identifier, price, currency, price_eur, now, country, sector, industry])
+            logger.info(f"Created new price record for {identifier} with additional data")
         
         # Update last_price_update in accounts table for all accounts that have this identifier
         execute_db('''
@@ -77,7 +81,7 @@ def update_price_in_db(identifier: str, price: float, currency: str, price_eur: 
             )
         ''', [now, identifier])
         
-        logger.info(f"Successfully updated price for {identifier}: {price} {currency} ({price_eur} EUR)")
+        logger.info(f"Successfully updated price for {identifier}: {price} {currency} ({price_eur} EUR) with country={country}, sector={sector}, industry={industry}")
         return True
         
     except Exception as e:
@@ -114,7 +118,7 @@ def load_portfolio_data(account_id=None, portfolio_id=None):
         params = []
         query = '''
             SELECT c.*, cs.shares, cs.override_share, mp.price, mp.currency, mp.price_eur, mp.last_updated,
-                   p.name as portfolio_name
+                   mp.country, mp.sector, mp.industry, p.name as portfolio_name
             FROM companies c
             LEFT JOIN company_shares cs ON c.id = cs.company_id
             LEFT JOIN market_prices mp ON c.identifier = mp.identifier
@@ -217,7 +221,10 @@ def update_batch_prices_in_db(results):
                     result.get('price'),
                     result.get('currency', 'USD'),
                     result.get('price_eur', result.get('price')),
-                    modified_identifier  # Pass modified_identifier if present
+                    result.get('country'),  # Add country information
+                    result.get('sector'),    # Add sector information 
+                    result.get('industry'),  # Add industry information
+                    modified_identifier      # Pass modified_identifier if present
                 )
                 
                 if success:
@@ -264,8 +271,8 @@ def update_prices(portfolio_items, get_price_function=None):
             success, price_data = get_price_function(identifier)
         else:
             # Use default implementation
-            from app.utils.yfinance_utils import get_isin_data
-            result = get_isin_data(identifier)
+            from app.utils.yfinance_utils import get_yfinance_info
+            result = get_yfinance_info(identifier)  # Use get_yfinance_info which includes all data fields
             success = result.get('success', False)
             price_data = result if success else None
             
@@ -274,17 +281,23 @@ def update_prices(portfolio_items, get_price_function=None):
             price = price_data.get('price')
             currency = price_data.get('currency', 'USD')
             price_eur = price_data.get('price_eur', price)
+            country = price_data.get('country')
+            sector = price_data.get('sector')
+            industry = price_data.get('industry')
             
             # Update database
             updated = update_price_in_db(
-                identifier, price, currency, price_eur
+                identifier, price, currency, price_eur, country, sector, industry
             )
             
             if updated:
-                # Update item with new price
+                # Update item with new price and additional data
                 item['price'] = price
                 item['currency'] = currency
                 item['price_eur'] = price_eur
+                item['country'] = country
+                item['sector'] = sector
+                item['industry'] = industry
                 item['last_updated'] = datetime.now().isoformat()
                 success_count += 1
             else:
