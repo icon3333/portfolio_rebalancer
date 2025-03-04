@@ -396,6 +396,30 @@ def get_exchange_rate(from_currency: str, to_currency: str = 'EUR') -> float:
         logger.warning(f"Missing currency code: from={from_currency}, to={to_currency}")
         return 1.0
     
+    # Special handling for GBp (British pence)
+    # GBp needs to be converted to GBP first (divide by 100)
+    if from_currency == 'GBp':
+        logger.info(f"Converting from GBp (pence) to {to_currency}")
+        # First get GBP to target currency rate - use direct approach to avoid recursive call
+        try:
+            # Use yfinance to get the GBP to target currency exchange rate
+            ticker = f"GBP{to_currency}=X"
+            forex = yf.Ticker(ticker)
+            
+            # Try to get the latest price
+            data = forex.history(period="1d")
+            if not data.empty and 'Close' in data.columns:
+                gbp_rate = float(data['Close'].iloc[-1])
+                logger.info(f"GBp conversion: Exchange rate GBP to {to_currency}: {gbp_rate}")
+                # Apply 1/100 conversion from pence to pounds
+                final_rate = gbp_rate / 100.0
+                logger.info(f"GBp conversion: Final rate (with 1/100 factor): {final_rate}")
+                return final_rate
+        except Exception as e:
+            logger.warning(f"Error in GBp special handling: {str(e)}")
+            # Fallback: use 1/100 of the standard rate (approximation)
+            return 0.01  # Approximate GBp to EUR rate as fallback
+    
     try:
         # Use yfinance to get the exchange rate
         ticker = f"{from_currency}{to_currency}=X"
@@ -522,6 +546,10 @@ def get_isin_data(isin: str) -> Dict[str, Any]:
                 exchange_rate = get_exchange_rate(currency, "EUR")
                 price_eur = price * exchange_rate
                 logger.info(f"Converted {price} {currency} to {price_eur} EUR (rate: {exchange_rate})")
+                
+                # Log additional information for GBp conversions
+                if currency == "GBp":
+                    logger.info(f"GBp conversion: {price} pence = {price/100.0} GBP, final EUR value: {price_eur}")
                 
         # Fetch additional data like country, sector, and industry if we have a ticker
         if ticker and success:

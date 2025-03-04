@@ -436,6 +436,9 @@ class PortfolioTableApp {
                     this.showUpdatePriceModal = false;
                     this.showDeleteModal = false;
                     this.selectedItem = {};
+                    
+                    // Reload data when modal is closed to ensure table has latest data
+                    this.loadData();
                 },
         
                 async updatePrice() {
@@ -879,6 +882,28 @@ class PortfolioTableApp {
                         // Load all data after portfolio options are handled
                         this.loadData();
                     });
+                    
+                // Add event listeners for the delete confirmation modal and update price modal
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape' && (this.showDeleteModal || this.showUpdatePriceModal)) {
+                        this.closeModal();
+                    }
+                });
+                
+                // Ensure the X button and background clicks close the modals properly
+                this.$nextTick(() => {
+                    // For Delete Modal
+                    const deleteModalCloseBtn = document.querySelector('.modal:has(.modal-card-title:contains("Delete Confirmation")) .delete');
+                    if (deleteModalCloseBtn) {
+                        deleteModalCloseBtn.addEventListener('click', this.closeModal.bind(this));
+                    }
+                    
+                    // For Update Price Modal
+                    const updatePriceModalCloseBtn = document.querySelector('.modal:has(.modal-card-title:contains("Update Price")) .delete');
+                    if (updatePriceModalCloseBtn) {
+                        updatePriceModalCloseBtn.addEventListener('click', this.closeModal.bind(this));
+                    }
+                });
             }
         });
         
@@ -1099,7 +1124,11 @@ class BulkEditApp {
                         // Reload the portfolio data table to see the latest updates
                         if (window.portfolioTableApp && typeof window.portfolioTableApp.loadData === 'function') {
                             console.log('Reloading portfolio data table after closing bulk edit modal');
-                            window.portfolioTableApp.loadData();
+                            // Ensure we reload the data with a small delay to allow any backend operations to complete
+                            setTimeout(() => {
+                                window.portfolioTableApp.loadData();
+                                console.log('Portfolio data table reloaded after modal close');
+                            }, 100);
                         } else {
                             console.warn('Could not find portfolioTableApp to reload data');
                         }
@@ -1504,6 +1533,17 @@ class BulkEditApp {
                 const saveButton = document.getElementById('bulk-edit-save');
                 if (saveButton) {
                     saveButton.addEventListener('click', this.closeModal.bind(this));
+                }
+                
+                // Connect the X button and background click in the modal
+                const modalCloseButton = document.querySelector('#bulk-edit-modal .delete');
+                if (modalCloseButton) {
+                    modalCloseButton.addEventListener('click', this.closeModal.bind(this));
+                }
+                
+                const modalBackground = document.querySelector('#bulk-edit-modal .modal-background');
+                if (modalBackground) {
+                    modalBackground.addEventListener('click', this.closeModal.bind(this));
                 }
             }
         });

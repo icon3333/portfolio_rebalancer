@@ -692,15 +692,17 @@ def update_single_portfolio_api(company_id):
                     'message': 'No fields to update'
                 })
             
-            # Build and execute update query
-            update_query = f'''
-                UPDATE companies 
-                SET {', '.join(update_fields)}
-                WHERE id = ?
-            '''
-            update_values.append(company_id)
-            
-            cursor.execute(update_query, update_values)
+            # Only execute the companies update query if there are fields to update
+            if update_fields:
+                # Build and execute update query
+                update_query = f'''
+                    UPDATE companies 
+                    SET {', '.join(update_fields)}
+                    WHERE id = ?
+                '''
+                update_values.append(company_id)
+                
+                cursor.execute(update_query, update_values)
             db.commit()
             
             # Get updated company data with shares information
