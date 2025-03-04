@@ -4,6 +4,210 @@
  */
 
 // DOM Elements and Utility Functions
+const UpdateAllDataHandler = {
+    init() {
+        const updateAllDataBtn = document.getElementById('update-all-data-btn');
+        const progressElement = document.getElementById('price-fetch-progress');
+        const progressCount = document.getElementById('progress-count');
+        const progressTotal = document.getElementById('progress-total');
+        const progressPercentage = document.getElementById('progress-percentage');
+        
+        if (!updateAllDataBtn) {
+            console.error('Update all data button not found');
+            return;
+        }
+        
+        updateAllDataBtn.addEventListener('click', async function() {
+            try {
+                // Disable the button to prevent multiple clicks
+                updateAllDataBtn.disabled = true;
+                updateAllDataBtn.classList.add('is-loading');
+                
+                // Show the progress indicator
+                progressCount.textContent = '0';
+                progressTotal.textContent = '0';
+                progressPercentage.textContent = '0%';
+                progressElement.style.display = 'block';
+                progressElement.dataset.processing = 'true';
+                
+                // Start progress tracking
+                if (PriceProgressTracker.progressInterval) {
+                    clearInterval(PriceProgressTracker.progressInterval);
+                }
+                
+                PriceProgressTracker.progressInterval = setInterval(() => {
+                    PriceProgressTracker.checkProgress(
+                        progressElement,
+                        progressCount,
+                        progressTotal,
+                        progressPercentage
+                    );
+                }, 500);
+                
+                // Make the API call
+                const response = await fetch('/portfolio/api/update_all_prices', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    // Show success notification
+                    if (typeof showNotification === 'function') {
+                        showNotification(result.message || 'Started updating all prices and metadata', 'is-success');
+                    } else {
+                        console.log('Success:', result.message || 'Started updating all prices and metadata');
+                    }
+                    
+                    // If there's a job ID, start polling for status updates
+                    if (result.job_id) {
+                        const jobId = result.job_id;
+                        console.log('Job ID:', jobId);
+                        
+                        // Update the progress display immediately from the total_companies info
+                        const totalCompanies = result.total_companies || 0;
+                        if (progressCount && progressTotal && progressPercentage) {
+                            progressCount.textContent = '0';
+                            progressTotal.textContent = totalCompanies.toString();
+                            progressPercentage.textContent = '0%';
+                        }
+                        
+                        // Poll for job status
+                        const statusInterval = setInterval(async () => {
+                            try {
+                                // Try fetching the job status first
+                                const statusResponse = await fetch(`/portfolio/api/price_update_status/${jobId}`);
+                                
+                                if (statusResponse.ok) {
+                                    const statusResult = await statusResponse.json();
+                                    console.log('Job status:', statusResult);
+                                    
+                                    // Update progress display if available
+                                    if (progressCount && progressTotal && progressPercentage && statusResult.progress) {
+                                        progressCount.textContent = statusResult.progress.current;
+                                        progressTotal.textContent = statusResult.progress.total;
+                                        progressPercentage.textContent = `${statusResult.progress.percentage}%`;
+                                        
+                                        // Update progress bar
+                                        const progressBar = document.getElementById('progress-bar');
+                                        if (progressBar) {
+                                            progressBar.value = statusResult.progress.percentage;
+                                        }
+                                    }
+                                    
+                                    // If job is completed, stop polling and reload data
+                                    if (statusResult.status === 'completed' || statusResult.is_complete) {
+                                        clearInterval(statusInterval);
+                                        
+                                        // Also clear the PriceProgressTracker interval to ensure it stops completely
+                                        if (PriceProgressTracker.progressInterval) {
+                                            clearInterval(PriceProgressTracker.progressInterval);
+                                            PriceProgressTracker.progressInterval = null;
+                                        }
+                                        
+                                        // Show completion notification
+                                        if (typeof showNotification === 'function') {
+                                            showNotification(`Price update complete! Updated all companies successfully.`, 'is-success');
+                                        }
+                                        
+                                        // Reset the button state
+                                        updateAllDataBtn.disabled = false;
+                                        updateAllDataBtn.classList.remove('is-loading');
+                                        
+                                        // Hide progress after a short delay
+                                        setTimeout(() => {
+                                            progressElement.style.display = 'none';
+                                            delete progressElement.dataset.processing;
+                                        }, 3000);
+                                        
+                                        // Reload portfolio data to show updated prices
+                                        if (window.portfolioTableApp && typeof window.portfolioTableApp.app.loadData === 'function') {
+                                            window.portfolioTableApp.app.loadData();
+                                        }
+                                    }
+                                } else {
+                                    // Fall back to checking the progress endpoint if the status endpoint fails
+                                    console.log("Falling back to progress endpoint check");
+                                    const progressResponse = await fetch('/portfolio/api/price_fetch_progress');
+                                    
+                                    if (progressResponse.ok) {
+                                        const progressData = await progressResponse.json();
+                                        console.log('Progress data:', progressData);
+                                        
+                                        // Update the progress display
+                                        if (progressCount && progressTotal && progressPercentage) {
+                                            progressCount.textContent = progressData.current;
+                                            progressTotal.textContent = progressData.total;
+                                            progressPercentage.textContent = `${progressData.percentage}%`;
+                                        }
+                                        
+                                        // If completed, stop polling
+                                        if (progressData.status === 'completed' || progressData.is_complete) {
+                                            clearInterval(statusInterval);
+                                            
+                                            // Reset UI and reload data
+                                            updateAllDataBtn.disabled = false;
+                                            updateAllDataBtn.classList.remove('is-loading');
+                                            
+                                            setTimeout(() => {
+                                                progressElement.style.display = 'none';
+                                                delete progressElement.dataset.processing;
+                                            }, 3000);
+                                            
+                                            // Reload portfolio data
+                                            if (window.portfolioTableApp && typeof window.portfolioTableApp.app.loadData === 'function') {
+                                                window.portfolioTableApp.app.loadData();
+                                            }
+                                        }
+                                    }
+                                }
+                            } catch (statusError) {
+                                console.error('Error checking job status:', statusError);
+                            }
+                        }, 2000);
+                        
+                        // Stop polling after 5 minutes (300000ms) to prevent infinite polling
+                        setTimeout(() => {
+                            clearInterval(statusInterval);
+                            
+                            // Also clear the PriceProgressTracker interval
+                            if (PriceProgressTracker.progressInterval) {
+                                clearInterval(PriceProgressTracker.progressInterval);
+                                PriceProgressTracker.progressInterval = null;
+                            }
+                            
+                            // Reset UI after timeout
+                            updateAllDataBtn.disabled = false;
+                            updateAllDataBtn.classList.remove('is-loading');
+                            progressElement.style.display = 'none';
+                            delete progressElement.dataset.processing;
+                        }, 300000);
+                    }
+                } else {
+                    // Show error notification
+                    if (typeof showNotification === 'function') {
+                        showNotification(result.error || 'Failed to update prices', 'is-danger');
+                    } else {
+                        console.error('Error:', result.error || 'Failed to update prices');
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating all prices:', error);
+                if (typeof showNotification === 'function') {
+                    showNotification('An error occurred while updating prices', 'is-danger');
+                }
+            } finally {
+                // Re-enable the button
+                updateAllDataBtn.disabled = false;
+                updateAllDataBtn.classList.remove('is-loading');
+            }
+        });
+    }
+};
+
 const FileUploadHandler = {
     init() {
         const fileInput = document.querySelector('.file-input');
@@ -143,10 +347,26 @@ const PriceProgressTracker = {
                 if (data.total > 0 || progressElement.dataset.processing === 'true') {
                     progressElement.style.display = 'block';
                     
-                    // If we're done, hide after a delay
+                    // If we're done, hide after a delay and refresh the portfolio table
                     if (data.current >= data.total && data.total > 0) {
-                        console.log("Process complete, hiding indicator soon");
+                        console.log("Process complete, refreshing data and hiding indicator");
                         clearInterval(this.progressInterval);
+                        this.progressInterval = null;
+                        
+                        // Refresh the portfolio table data if available
+                        if (window.portfolioTableApp && typeof window.portfolioTableApp.app.loadData === 'function') {
+                            window.portfolioTableApp.app.loadData().then(() => {
+                                console.log("Portfolio data refreshed after update");
+                            });
+                        }
+                        
+                        // Reset button state
+                        const updateAllDataBtn = document.getElementById('update-all-data-btn');
+                        if (updateAllDataBtn) {
+                            updateAllDataBtn.disabled = false;
+                            updateAllDataBtn.classList.remove('is-loading');
+                        }
+                        
                         setTimeout(() => {
                             progressElement.style.display = 'none';
                             // Clear processing flag
@@ -296,6 +516,10 @@ class PortfolioTableApp {
                     sortDirection: 'asc'
                 };
             },
+            mounted() {
+                // Link DOM elements to Vue model for two-way binding
+                this.syncUIWithVueModel();
+            },
             computed: {
                 healthColorClass() {
                     if (!this.portfolioItems.length) return 'is-info';
@@ -368,6 +592,43 @@ class PortfolioTableApp {
                 }
             },
             methods: {
+                // Sync UI controls with Vue model for two-way binding
+                syncUIWithVueModel() {
+                    // Setup two-way binding with portfolio dropdown
+                    const portfolioDropdown = document.getElementById('filter-portfolio');
+                    if (portfolioDropdown) {
+                        // Initial value from Vue to DOM
+                        portfolioDropdown.value = this.selectedPortfolio;
+                        
+                        // DOM to Vue binding
+                        portfolioDropdown.addEventListener('change', () => {
+                            this.selectedPortfolio = portfolioDropdown.value;
+                        });
+                        
+                        // Vue to DOM binding
+                        this.$watch('selectedPortfolio', (newVal) => {
+                            portfolioDropdown.value = newVal;
+                        });
+                    }
+                    
+                    // Setup two-way binding with missing prices checkbox
+                    const missingPricesCheckbox = document.getElementById('show-only-missing-prices');
+                    if (missingPricesCheckbox) {
+                        // Initial value from Vue to DOM
+                        missingPricesCheckbox.checked = this.showOnlyMissingPrices;
+                        
+                        // DOM to Vue binding
+                        missingPricesCheckbox.addEventListener('change', () => {
+                            this.showOnlyMissingPrices = missingPricesCheckbox.checked;
+                        });
+                        
+                        // Vue to DOM binding
+                        this.$watch('showOnlyMissingPrices', (newVal) => {
+                            missingPricesCheckbox.checked = newVal;
+                        });
+                    }
+                },
+                
                 async loadData() {
                     this.loading = true;
                     try {
@@ -1619,6 +1880,7 @@ const ModalPortfolioManager = {
 // Main initialization function
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize all components
+    UpdateAllDataHandler.init();
     FileUploadHandler.init();
     PortfolioManager.init();
     LayoutManager.init();
@@ -1658,6 +1920,18 @@ document.addEventListener('DOMContentLoaded', function() {
     if (document.getElementById('bulk-edit-app')) {
         // Create global bulkEditApp instance to ensure it's accessible outside this scope
         window.bulkEditApp = new BulkEditApp(portfolios);
+        
+        // Set up click handler for the bulk edit button
+        const bulkEditBtn = document.getElementById('open-bulk-edit-btn');
+        if (bulkEditBtn) {
+            bulkEditBtn.addEventListener('click', function() {
+                if (window.bulkEditApp) {
+                    window.bulkEditApp.openModal();
+                } else {
+                    console.error('bulkEditApp is not defined');
+                }
+            });
+        }
         
         // Log that the app has been initialized
         console.log('BulkEditApp initialized globally as window.bulkEditApp');

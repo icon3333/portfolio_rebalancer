@@ -555,11 +555,11 @@ def get_isin_data(isin: str) -> Dict[str, Any]:
         if ticker and success:
             try:
                 # Skip metadata fetch for cryptocurrencies (they don't have country, sector, industry)
-                if '-USD' in ticker or ticker.lower() in ['btc', 'eth', 'doge', 'atom', 'sol', 'ada', 'link', 'pepe', 'apu']:
+                if '-USD' in ticker or ticker.lower() in ['btc', 'eth', 'doge', 'atom', 'sol', 'ada', 'link', 'pepe', 'apu'] or ticker.endswith('.X'):
                     logger.info(f"Skipping metadata fetch for cryptocurrency {ticker}")
-                    country = None
-                    sector = None
-                    industry = None
+                    country = 'Global'
+                    sector = 'Cryptocurrency'
+                    industry = 'Digital Currency'
                 else:
                     # Try to get additional information from yfinance
                     # Avoid the cookie clearing issue
@@ -572,6 +572,7 @@ def get_isin_data(isin: str) -> Dict[str, Any]:
                     except Exception as e:
                         logger.warning(f"Failed to patch requests.cookies: {str(e)}")
                     
+                    # Try multiple approaches to get ticker info
                     ticker_obj = yf.Ticker(ticker)
                     info = ticker_obj.info
                     
@@ -579,6 +580,96 @@ def get_isin_data(isin: str) -> Dict[str, Any]:
                     country = info.get('country')
                     sector = info.get('sector')
                     industry = info.get('industry')
+                    
+                    # If we couldn't get the data, try a fallback approach
+                    if not country or not sector or not industry:
+                        logger.info(f"Missing metadata for {ticker}, trying fallback approach")
+                        try:
+                            # Try to infer data based on ticker patterns
+                            if ticker.endswith('.DE'):
+                                country = country or 'Germany'
+                                sector = sector or 'Unknown'
+                                industry = industry or 'Unknown'
+                            elif ticker.endswith('.L'):
+                                country = country or 'United Kingdom'
+                                sector = sector or 'Unknown'
+                                industry = industry or 'Unknown'
+                            elif ticker.endswith('.PA'):
+                                country = country or 'France'
+                                sector = sector or 'Unknown'
+                                industry = industry or 'Unknown'
+                            elif ticker.endswith('.AS'):
+                                country = country or 'Netherlands'
+                                sector = sector or 'Unknown'
+                                industry = industry or 'Unknown'
+                            elif ticker.endswith('.MI'):
+                                country = country or 'Italy'
+                                sector = sector or 'Unknown'
+                                industry = industry or 'Unknown'
+                            elif ticker.endswith('.MC'):
+                                country = country or 'Spain'
+                                sector = sector or 'Unknown'
+                                industry = industry or 'Unknown'
+                            elif ticker.endswith('.SW') or ticker.endswith('.VX'):
+                                country = country or 'Switzerland'
+                                sector = sector or 'Unknown'
+                                industry = industry or 'Unknown'
+                            elif ticker.endswith('.BR'):
+                                country = country or 'Belgium'
+                                sector = sector or 'Unknown'
+                                industry = industry or 'Unknown'
+                            elif ticker.endswith('.VI'):
+                                country = country or 'Austria'
+                                sector = sector or 'Unknown'
+                                industry = industry or 'Unknown'
+                            elif ticker.endswith('.HE'):
+                                country = country or 'Finland'
+                                sector = sector or 'Unknown'
+                                industry = industry or 'Unknown'
+                            elif ticker.endswith('.CO'):
+                                country = country or 'Denmark'
+                                sector = sector or 'Unknown'
+                                industry = industry or 'Unknown'
+                            elif ticker.endswith('.ST'):
+                                country = country or 'Sweden'
+                                sector = sector or 'Unknown'
+                                industry = industry or 'Unknown'
+                            elif ticker.endswith('.OL'):
+                                country = country or 'Norway'
+                                sector = sector or 'Unknown'
+                                industry = industry or 'Unknown'
+                            elif ticker.endswith('.LS'):
+                                country = country or 'Portugal'
+                                sector = sector or 'Unknown'
+                                industry = industry or 'Unknown'
+                            elif ticker.endswith('.AT'):
+                                country = country or 'Greece'
+                                sector = sector or 'Unknown'
+                                industry = industry or 'Unknown'
+                            elif ticker.endswith('.IR'):
+                                country = country or 'Ireland'
+                                sector = sector or 'Unknown'
+                                industry = industry or 'Unknown'
+                            elif ticker.endswith('.PR'):
+                                country = country or 'Czech Republic'
+                                sector = sector or 'Unknown'
+                                industry = industry or 'Unknown'
+                            elif ticker.endswith('.WA'):
+                                country = country or 'Poland'
+                                sector = sector or 'Unknown'
+                                industry = industry or 'Unknown'
+                            elif ticker.endswith('.BU'):
+                                country = country or 'Hungary'
+                                sector = sector or 'Unknown'
+                                industry = industry or 'Unknown'
+                            else:
+                                # For US tickers without suffix
+                                if not any(char in ticker for char in ['.', '-', '/']):
+                                    country = country or 'United States'
+                                    sector = sector or 'Unknown'
+                                    industry = industry or 'Unknown'
+                        except Exception as e:
+                            logger.warning(f"Error in fallback metadata approach for {ticker}: {str(e)}")
                     
                     logger.info(f"Additional data for {ticker}: country={country}, sector={sector}, industry={industry}")
             except Exception as e:

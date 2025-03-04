@@ -1,5 +1,5 @@
 This file is a merged representation of the entire codebase, combining all repository files into a single document.
-Generated on: 2025-03-03T21:57:40.002433
+Generated on: 2025-03-04T20:56:37.199614
 
 ================================================================
 Purpose:
@@ -153,12 +153,19 @@ config = {
 ================================================================
 ###START_FILE_PATH: run.py###
 from app.main import create_app
+import argparse
 
 # Create the Flask application
 app = create_app()
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Run the Portfolio Rebalancing Flask application')
+    parser.add_argument('--port', type=int, default=5000, help='Port to run the application on')
+    args = parser.parse_args()
+    
+    # Run the application with the specified port
+    app.run(host='0.0.0.0', port=args.port, debug=True)
 ###END_FILE###
 
 ================================================================
@@ -770,37 +777,17 @@ def enrich():
     portfolio_data = get_portfolio_data(account_id)
     logger.info(f"Retrieved {len(portfolio_data)} portfolio items")
     
-    # Get portfolios for dropdown (including valid portfolio names)
-    with get_db() as db:
-        # Get portfolio names from portfolios table - include all valid portfolios
-        portfolios_from_table = query_db('''
-            SELECT name FROM portfolios 
-            WHERE account_id = ? AND name IS NOT NULL
-            ORDER BY name
-        ''', [account_id])
-        logger.info(f"Retrieved {len(portfolios_from_table)} portfolios from portfolios table")
-        
-        # Get all portfolios directly from the portfolios table
-        portfolios_from_companies = query_db('''
-            SELECT DISTINCT p.name as name
-            FROM portfolios p
-            WHERE p.account_id = ? AND p.name IS NOT NULL
-        ''', [account_id])
-        logger.info(f"Retrieved {len(portfolios_from_companies)} portfolios from portfolios table")
-        
-        # Combine both sources and remove duplicates
-        portfolio_names = set()
-        for p in portfolios_from_table:
-            if p['name'] and p['name'].strip():
-                portfolio_names.add(p['name'])
-        
-        for p in portfolios_from_companies:
-            if p['name'] and p['name'].strip():
-                portfolio_names.add(p['name'])
-        
-        # Convert set to list and sort alphabetically
-        portfolios = [{'name': name} for name in sorted(portfolio_names)]
-        logger.info(f"Combined unique portfolios: {[p['name'] for p in portfolios]}")
+    # Get portfolios from the portfolios table
+    portfolios_from_table = query_db('''
+        SELECT name FROM portfolios 
+        WHERE account_id = ? AND name IS NOT NULL
+        ORDER BY name
+    ''', [account_id])
+    
+    # Extract portfolio names
+    portfolios = [{'name': p['name']} for p in portfolios_from_table if p['name'] and p['name'].strip()]
+    
+    logger.info(f"Retrieved {len(portfolios)} portfolios from the portfolios table: {[p['name'] for p in portfolios]}")
     
     # Log template variables for debugging
     logger.debug(f"Template variables:")
@@ -889,7 +876,6 @@ def get_portfolios_api():
         account_id = session['account_id']
         logger.info(f"Getting portfolios for account_id: {account_id}")
         
-        # Get portfolios using the same approach as in the enrich function
         # Get portfolio names from portfolios table
         portfolios_from_table = query_db('''
             SELECT name FROM portfolios 
@@ -897,32 +883,10 @@ def get_portfolios_api():
             ORDER BY name
         ''', [account_id])
         
-        # Get all portfolios directly from the portfolios table
-        portfolios_from_companies = query_db('''
-            SELECT DISTINCT p.name as name
-            FROM portfolios p
-            WHERE p.account_id = ? AND p.name IS NOT NULL
-        ''', [account_id])
+        # Extract names from the query results
+        names = [p['name'] for p in portfolios_from_table if p['name'] and p['name'].strip()]
         
-        # Combine both sources and remove duplicates
-        portfolio_names = set()
-        for p in portfolios_from_table:
-            if p['name'] and p['name'].strip():
-                portfolio_names.add(p['name'])
-        
-        for p in portfolios_from_companies:
-            if p['name'] and p['name'].strip():
-                portfolio_names.add(p['name'])
-        
-        # Convert set to list and sort alphabetically
-        names = sorted(portfolio_names)
-        
-        # Ensure the default portfolio '-' is always available
-        if '-' not in names:
-            names.insert(0, '-')  # Add Default portfolio at the beginning
-            logger.info("Added default portfolio '-' to the results")
-        
-        logger.info(f"Combined portfolio names with Default: {names}")
+        logger.info(f"Retrieved {len(names)} portfolio names from portfolios table: {names}")
         
         # Debug the JSON serialization
         json_response = jsonify(names)
@@ -1396,29 +1360,66 @@ def update_single_portfolio_api(company_id):
                 update_fields.append('identifier = ?')
                 update_values.append(data['identifier'])
             
-            # If no fields to update, return success
-            if not update_fields:
+            # Handle shares update separately since it's in a different table
+            shares_updated = False
+            if 'shares' in data:
+                try:
+                    # Convert to float to ensure it's a valid number
+                    shares_value = float(data['shares'])
+                    
+                    # Check if there's an existing record in company_shares
+                    shares_record = query_db(
+                        'SELECT * FROM company_shares WHERE company_id = ?',
+                        [company_id],
+                        one=True
+                    )
+                    
+                    if shares_record:
+                        # Update existing record
+                        cursor.execute(
+                            'UPDATE company_shares SET shares = ? WHERE company_id = ?',
+                            [shares_value, company_id]
+                        )
+                    else:
+                        # Insert new record
+                        cursor.execute(
+                            'INSERT INTO company_shares (company_id, shares) VALUES (?, ?)',
+                            [company_id, shares_value]
+                        )
+                    
+                    shares_updated = True
+                except (ValueError, TypeError) as e:
+                    return jsonify({
+                        'success': False,
+                        'error': f'Invalid shares value: {str(e)}'
+                    }), 400
+            
+            # If no fields to update and shares not updated, return success
+            if not update_fields and not shares_updated:
                 return jsonify({
                     'success': True,
                     'message': 'No fields to update'
                 })
             
-            # Build and execute update query
-            update_query = f'''
-                UPDATE companies 
-                SET {', '.join(update_fields)}
-                WHERE id = ?
-            '''
-            update_values.append(company_id)
-            
-            cursor.execute(update_query, update_values)
+            # Only execute the companies update query if there are fields to update
+            if update_fields:
+                # Build and execute update query
+                update_query = f'''
+                    UPDATE companies 
+                    SET {', '.join(update_fields)}
+                    WHERE id = ?
+                '''
+                update_values.append(company_id)
+                
+                cursor.execute(update_query, update_values)
             db.commit()
             
-            # Get updated company data
+            # Get updated company data with shares information
             updated_company = query_db('''
-                SELECT c.*, p.name as portfolio_name 
+                SELECT c.*, p.name as portfolio_name, cs.shares
                 FROM companies c
                 LEFT JOIN portfolios p ON c.portfolio_id = p.id
+                LEFT JOIN company_shares cs ON c.id = cs.company_id
                 WHERE c.id = ?
             ''', [company_id], one=True)
             
@@ -1428,7 +1429,8 @@ def update_single_portfolio_api(company_id):
                     'id': updated_company['id'],
                     'portfolio': updated_company['portfolio_name'],
                     'category': updated_company['category'],
-                    'identifier': updated_company['identifier']
+                    'identifier': updated_company['identifier'],
+                    'shares': updated_company['shares'] if 'shares' in updated_company else None
                 }
             })
             
@@ -1854,6 +1856,9 @@ def get_portfolio_data(account_id):
                     'override_share': float(row['override_share']) if pd.notna(row['override_share']) else None,
                     'price_eur': float(row['price_eur']) if pd.notna(row['price_eur']) else None,
                     'currency': row['currency'],
+                    'country': row['country'] if 'country' in row and pd.notna(row['country']) else None,
+                    'industry': row['industry'] if 'industry' in row and pd.notna(row['industry']) else None,
+                    'sector': row['sector'] if 'sector' in row and pd.notna(row['sector']) else None,
                     'total_invested': float(row['total_invested']) if pd.notna(row['total_invested']) else 0,
                     'last_updated': row['last_updated'] if isinstance(row['last_updated'], str) else 
                                    (row['last_updated'].isoformat() if pd.notna(row['last_updated']) else None)
@@ -3619,8 +3624,13 @@ def get_background_db():
 ###START_FILE_PATH: app/utils/yfinance_utils.py###
 import logging
 import yfinance as yf
+import requests
 from datetime import datetime
 from typing import Dict, Any
+import warnings
+
+# Suppress specific yfinance warnings that might clutter the logs
+warnings.filterwarnings("ignore", message="^[Tt]he 'period'")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -3697,6 +3707,19 @@ def find_ticker_for_isin(isin: str) -> str:
         return isin
 
 # Changes for get_price_for_ticker() function
+# Create a session creation function that we can reset when needed
+def get_fresh_session():
+    """Create a fresh requests session with appropriate headers to avoid Yahoo Finance blocking"""
+    session = requests.Session()
+    session.headers.update({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Connection': 'keep-alive',
+    })
+    return session
+
+
 def get_price_for_ticker(ticker: str) -> Dict[str, Any]:
     """
     Get the current price and currency for a ticker symbol.
@@ -3712,216 +3735,184 @@ def get_price_for_ticker(ticker: str) -> Dict[str, Any]:
     
     logger.info(f"Getting price for ticker: {ticker}")
     
-    # Try alternative data sources for certain tickers (manual override)
-    manual_price_map = {
-        # Add manual price overrides for tickers that consistently fail
-        'VWAGY': {'price': 13.21, 'currency': 'USD'},  # Volkswagen ADR
-        'STLA': {'price': 21.45, 'currency': 'USD'},   # Stellantis
-        # Add some cryptocurrencies with manual fallbacks
-        'BTC-USD': {'price': 65982.12, 'currency': 'USD'},  # Bitcoin
-        'ETH-USD': {'price': 3428.75, 'currency': 'USD'},   # Ethereum
-        'ATOM-USD': {'price': 8.23, 'currency': 'USD'},     # Cosmos
-        'SOL-USD': {'price': 146.29, 'currency': 'USD'},    # Solana
-        'DOGE-USD': {'price': 0.122, 'currency': 'USD'},    # Dogecoin
-        'LRC-USD': {'price': 0.295, 'currency': 'USD'},     # Loopring
-    }
+    # Initialize variables
+    price = None
+    currency = None
+    error_messages = []
     
-    # Check if we have a manual override for this ticker
-    if ticker in manual_price_map:
-        logger.info(f"Using manual price data for {ticker}: {manual_price_map[ticker]}")
-        price_data = manual_price_map[ticker]
-        return {
-            "price": price_data['price'],
-            "currency": price_data['currency'],
-            "error": None,
-            "success": True,
-            "note": "Using fallback price data"
-        }
-    
-    # Special handling for crypto currencies with -USD suffix
-    if ticker.endswith('-USD') or ticker.upper().endswith('-USD'):
-        crypto_result = get_crypto_price(ticker.upper())  # Standardize to uppercase
-        logger.info(f"Got crypto result for {ticker}: {crypto_result['success']}")
-        if crypto_result['success']:
-            return crypto_result
+    # Create a fresh session for this request
+    session = get_fresh_session()
     
     try:
-        # Use different methods with better error handling
-        ticker_obj = None
-        currency = None
-        error_messages = []
+        # Use our custom session to avoid the 'cookies.update' error
+        ticker_obj = yf.Ticker(ticker, session=session)
         
-        # Safely create the ticker object
+        # Method 1: Use info approach - most reliable for getting both price and currency
         try:
-            ticker_obj = yf.Ticker(ticker)
-        except Exception as e:
-            error_msg = f"Failed to create Ticker object for {ticker}: {str(e)}"
-            logger.error(error_msg)
-            error_messages.append(error_msg)
-            return {"price": None, "currency": None, "error": error_msg, "success": False}
-            
-        # Method 1: Try info approach with additional error handling
-        try:
-            # Use a timeout to prevent hanging on problematic tickers
-            import threading
+            # Create a timeout to prevent hanging
             info_result = [None]
             info_error = [None]
             
             def get_info():
                 try:
-                    # Standard approach for yfinance 0.2.54
                     info_result[0] = ticker_obj.info
                 except Exception as e:
                     info_error[0] = str(e)
             
+            import threading
             info_thread = threading.Thread(target=get_info)
             info_thread.daemon = True
             info_thread.start()
             info_thread.join(timeout=5)  # 5 second timeout
             
             if info_error[0]:
-                error_msg = f"Error getting info: {info_error[0]}"
+                error_msg = f"Error getting info data: {info_error[0]}"
                 logger.warning(error_msg)
                 error_messages.append(error_msg)
             elif info_result[0]:
                 info = info_result[0]
                 
-                # Get currency information
+                # Extract currency information - required for valid result
                 if 'currency' in info and info['currency'] is not None:
                     currency = info['currency']
+                    
+                    # Validate currency format (must be 3 characters)
+                    if not isinstance(currency, str) or len(currency) != 3:
+                        error_msg = f"Invalid currency format from info: {currency}"
+                        logger.warning(error_msg)
+                        error_messages.append(error_msg)
+                        currency = None
+                else:
+                    error_msg = "No currency information found in ticker info"
+                    logger.warning(error_msg)
+                    error_messages.append(error_msg)
                 
-                if 'currentPrice' in info and info['currentPrice'] is not None:
-                    return {
-                        "price": float(info['currentPrice']),
-                        "currency": currency,
-                        "error": None,
-                        "success": True
-                    }
-                if 'regularMarketPrice' in info and info['regularMarketPrice'] is not None:
-                    return {
-                        "price": float(info['regularMarketPrice']),
-                        "currency": currency,
-                        "error": None,
-                        "success": True
-                    }
-        except Exception as e:
-            error_msg = f"Error getting info price for {ticker}: {str(e)}"
-            logger.warning(error_msg)
-            error_messages.append(error_msg)
-        
-        # Method 2: Safe attempt to use fast_info
-        try:
-            if hasattr(ticker_obj, 'fast_info'):
-                try:
-                    # Different attribute access for different yfinance versions
-                    if isinstance(ticker_obj.fast_info, dict):
-                        price = ticker_obj.fast_info.get('last_price') or ticker_obj.fast_info.get('regularMarketPrice')
-                    else:
-                        # Object-style access for newer versions
-                        try:
-                            price = ticker_obj.fast_info.last_price
-                        except:
-                            try:
-                                price = ticker_obj.fast_info.regular_market_price
-                            except:
-                                price = None
-                                
-                    if price is not None and isinstance(price, (int, float)):
+                # Check if we have both price and currency before returning
+                if currency:
+                    # Try different price fields
+                    if 'currentPrice' in info and info['currentPrice'] is not None:
+                        price = float(info['currentPrice'])
+                    elif 'regularMarketPrice' in info and info['regularMarketPrice'] is not None:
+                        price = float(info['regularMarketPrice'])
+                    
+                    if price is not None:
                         return {
-                            "price": float(price),
+                            "price": price,
                             "currency": currency,
                             "error": None,
                             "success": True
                         }
-                except Exception as inner_e:
-                    error_msg = f"Fast info access error for {ticker}: {str(inner_e)}"
-                    logger.warning(error_msg)
-                    error_messages.append(error_msg)
         except Exception as e:
-            error_msg = f"Error with fast_info for {ticker}: {str(e)}"
+            error_msg = f"Error in info method: {str(e)}"
             logger.warning(error_msg)
             error_messages.append(error_msg)
         
-        # Method 3: Fallback to historical data with improved error handling
-        try:
-            # For yfinance 0.2.54, we can use the standard approach
-            data = ticker_obj.history(period="1d")
-            if not data.empty and 'Close' in data.columns:
-                last_close = data['Close'].iloc[-1]
-                if isinstance(last_close, (int, float)) and last_close > 0:
-                    return {
-                        "price": float(last_close),
-                        "currency": currency,
-                        "error": None,
-                        "success": True
-                    }
-        except Exception as e:
-            error_msg = f"Error getting historical price for {ticker}: {str(e)}"
-            logger.warning(error_msg)
-            error_messages.append(error_msg)
+        # Method 2: Try fast_info if info method didn't provide both price and currency
+        if price is None or currency is None:
+            try:
+                if hasattr(ticker_obj, 'fast_info'):
+                    # First, try to get currency from fast_info
+                    if hasattr(ticker_obj.fast_info, 'currency'):
+                        currency = ticker_obj.fast_info.currency
+                        # Validate currency format
+                        if not isinstance(currency, str) or len(currency) != 3:
+                            error_msg = f"Invalid currency format from fast_info: {currency}"
+                            logger.warning(error_msg)
+                            error_messages.append(error_msg)
+                            currency = None
+                    
+                    # Then try to get price if we have a valid currency
+                    if currency:
+                        if isinstance(ticker_obj.fast_info, dict):
+                            price = ticker_obj.fast_info.get('last_price') or ticker_obj.fast_info.get('regularMarketPrice')
+                        else:
+                            try:
+                                price = ticker_obj.fast_info.last_price
+                            except:
+                                try:
+                                    price = ticker_obj.fast_info.regular_market_price
+                                except:
+                                    price = None
+                                    
+                        if price is not None and isinstance(price, (int, float)):
+                            return {
+                                "price": float(price),
+                                "currency": currency,
+                                "error": None,
+                                "success": True
+                            }
+            except Exception as e:
+                error_msg = f"Error in fast_info method: {str(e)}"
+                logger.warning(error_msg)
+                error_messages.append(error_msg)
         
-        # If all methods failed, try one more direct approach
-        try:
-            # For yfinance 0.2.54, we can use standard datetime operations
-            import datetime
-            end_date = datetime.datetime.now()
-            start_date = end_date - datetime.timedelta(days=7)
-            
-            # Format the dates as strings for the download call
-            end_str = end_date.strftime('%Y-%m-%d')
-            start_str = start_date.strftime('%Y-%m-%d')
-            
-            logger.info(f"Trying yf.download with date range: {start_str} to {end_str}")
-            data = yf.download(ticker, start=start_str, end=end_str, progress=False)
-            if not data.empty and 'Close' in data.columns:
-                last_close = data['Close'].iloc[-1]
-                if isinstance(last_close, (int, float)) and last_close > 0:
-                    return {
-                        "price": float(last_close),
-                        "currency": currency,
-                        "error": None,
-                        "success": True
-                    }
-        except Exception as e:
-            error_msg = f"Error with direct download for {ticker}: {str(e)}"
-            logger.warning(error_msg)
-            error_messages.append(error_msg)
+        # Method 3: Try to get currency directly from the ticker symbol
+        # Only for special cases where the ticker contains exchange information
+        if currency is None:
+            # Don't proceed further without currency info - this is a requirement
+            logger.error(f"Could not determine currency for {ticker}")
+            error_messages.append("Could not determine currency from any available method")
+            return {
+                "price": price,  # Return price if we found it
+                "currency": None,
+                "error": "No currency information available. " + " | ".join(error_messages),
+                "success": False
+            }
         
-        # Combine error messages for better debugging
-        all_errors = " | ".join(error_messages)
-        logger.warning(f"All methods failed to get price for {ticker}")
+        # If we reach here, we have currency but no price - try historical data
+        if price is None and currency is not None:
+            try:
+                # For yfinance 0.2.54, we can use the standard approach
+                data = ticker_obj.history(period="1d")
+                if not data.empty and 'Close' in data.columns:
+                    last_close = data['Close'].iloc[-1]
+                    if isinstance(last_close, (int, float)) and last_close > 0:
+                        return {
+                            "price": float(last_close),
+                            "currency": currency,
+                            "error": None,
+                            "success": True
+                        }
+            except Exception as e:
+                error_msg = f"Error getting historical price: {str(e)}"
+                logger.warning(error_msg)
+                error_messages.append(error_msg)
         
-        # Try crypto format if it looks like it might be a cryptocurrency and not already in crypto format
-        if not ticker.endswith('-USD'):
-            # Common cryptocurrency symbols
-            crypto_symbols = ['BTC', 'ETH', 'LRC', 'ATOM', 'SOL', 'DOGE', 'XRP', 'ADA', 'DOT', 'AVAX']
-            # Check if ticker might be a cryptocurrency
-            if ticker.upper() in crypto_symbols:
-                crypto_ticker = f"{ticker.upper()}-USD"
-                logger.info(f"🔄 Trying crypto format: {crypto_ticker}")
-                crypto_result = get_crypto_price(crypto_ticker)
-                logger.info(f"Crypto price result: {crypto_result}")
-                if crypto_result['success']:
-                    return crypto_result
-                else:
-                    logger.warning(f"Crypto format failed for {ticker}: {crypto_result['error']}")
-            
-            # Also try some additional common formats for crypto
-            if ticker.upper() in ['BITCOIN', 'BTC.X']:
-                crypto_result = get_crypto_price('BTC-USD')
-                if crypto_result['success']:
-                    return crypto_result
-            elif ticker.upper() in ['ETHEREUM', 'ETH.X']:
-                crypto_result = get_crypto_price('ETH-USD')
-                if crypto_result['success']:
-                    return crypto_result
-        
+        # If we still have no price, try direct download method
+        if price is None and currency is not None:
+            try:
+                import datetime
+                end_date = datetime.datetime.now()
+                start_date = end_date - datetime.timedelta(days=7)
+                
+                # Format the dates as strings for the download call
+                end_str = end_date.strftime('%Y-%m-%d')
+                start_str = start_date.strftime('%Y-%m-%d')
+                
+                logger.info(f"Trying direct download with date range: {start_str} to {end_str}")
+                data = yf.download(ticker, start=start_str, end=end_str, progress=False)
+                if not data.empty and 'Close' in data.columns:
+                    last_close = data['Close'].iloc[-1]
+                    if isinstance(last_close, (int, float)) and last_close > 0:
+                        return {
+                            "price": float(last_close),
+                            "currency": currency,
+                            "error": None,
+                            "success": True
+                        }
+            except Exception as e:
+                error_msg = f"Error with direct download: {str(e)}"
+                logger.warning(error_msg)
+                error_messages.append(error_msg)
+                
+        # If we get here, we couldn't get both valid price and currency
         return {
-            "price": None, 
-            "currency": currency, 
-            "error": f"Failed to retrieve price data: {all_errors}", 
+            "price": price,
+            "currency": currency,
+            "error": f"Failed to retrieve complete data: {' | '.join(error_messages)}",
             "success": False
         }
+        
     except Exception as e:
         logger.error(f"Error getting price data for {ticker}: {str(e)}")
         return {"price": None, "currency": None, "error": str(e), "success": False}
@@ -3940,8 +3931,11 @@ def get_crypto_price(crypto_ticker: str) -> Dict[str, Any]:
     logger.info(f"Getting price for crypto ticker: {crypto_ticker}")
     
     try:
-        # Use a more direct approach for crypto tickers
-        ticker_obj = yf.Ticker(crypto_ticker)
+        # Create a fresh session for this request to prevent cookie errors
+        session = get_fresh_session()
+        
+        # Use a more direct approach for crypto tickers with our custom session
+        ticker_obj = yf.Ticker(crypto_ticker, session=session)
         
         # Try the info approach first with basic error handling
         try:
@@ -3983,7 +3977,7 @@ def get_crypto_price(crypto_ticker: str) -> Dict[str, Any]:
             end_str = end_date.strftime('%Y-%m-%d')
             start_str = start_date.strftime('%Y-%m-%d')
             
-            data = yf.download(crypto_ticker, start=start_str, end=end_str, progress=False)
+            data = yf.download(crypto_ticker, start=start_str, end=end_str, progress=False, session=session)
             if not data.empty and 'Close' in data.columns:
                 last_close = data['Close'].iloc[-1]
                 if isinstance(last_close, (int, float)) and last_close > 0:
@@ -4025,6 +4019,30 @@ def get_exchange_rate(from_currency: str, to_currency: str = 'EUR') -> float:
     if not from_currency or not to_currency:
         logger.warning(f"Missing currency code: from={from_currency}, to={to_currency}")
         return 1.0
+    
+    # Special handling for GBp (British pence)
+    # GBp needs to be converted to GBP first (divide by 100)
+    if from_currency == 'GBp':
+        logger.info(f"Converting from GBp (pence) to {to_currency}")
+        # First get GBP to target currency rate - use direct approach to avoid recursive call
+        try:
+            # Use yfinance to get the GBP to target currency exchange rate
+            ticker = f"GBP{to_currency}=X"
+            forex = yf.Ticker(ticker)
+            
+            # Try to get the latest price
+            data = forex.history(period="1d")
+            if not data.empty and 'Close' in data.columns:
+                gbp_rate = float(data['Close'].iloc[-1])
+                logger.info(f"GBp conversion: Exchange rate GBP to {to_currency}: {gbp_rate}")
+                # Apply 1/100 conversion from pence to pounds
+                final_rate = gbp_rate / 100.0
+                logger.info(f"GBp conversion: Final rate (with 1/100 factor): {final_rate}")
+                return final_rate
+        except Exception as e:
+            logger.warning(f"Error in GBp special handling: {str(e)}")
+            # Fallback: use 1/100 of the standard rate (approximation)
+            return 0.01  # Approximate GBp to EUR rate as fallback
     
     try:
         # Use yfinance to get the exchange rate
@@ -4153,21 +4171,46 @@ def get_isin_data(isin: str) -> Dict[str, Any]:
                 price_eur = price * exchange_rate
                 logger.info(f"Converted {price} {currency} to {price_eur} EUR (rate: {exchange_rate})")
                 
+                # Log additional information for GBp conversions
+                if currency == "GBp":
+                    logger.info(f"GBp conversion: {price} pence = {price/100.0} GBP, final EUR value: {price_eur}")
+                
         # Fetch additional data like country, sector, and industry if we have a ticker
         if ticker and success:
             try:
-                # Try to get additional information from yfinance
-                ticker_obj = yf.Ticker(ticker)
-                info = ticker_obj.info
-                
-                # Extract additional data
-                country = info.get('country')
-                sector = info.get('sector')
-                industry = info.get('industry')
-                
-                logger.info(f"Additional data for {ticker}: country={country}, sector={sector}, industry={industry}")
+                # Skip metadata fetch for cryptocurrencies (they don't have country, sector, industry)
+                if '-USD' in ticker or ticker.lower() in ['btc', 'eth', 'doge', 'atom', 'sol', 'ada', 'link', 'pepe', 'apu']:
+                    logger.info(f"Skipping metadata fetch for cryptocurrency {ticker}")
+                    country = None
+                    sector = None
+                    industry = None
+                else:
+                    # Try to get additional information from yfinance
+                    # Avoid the cookie clearing issue
+                    try:
+                        import importlib
+                        requests_module = importlib.import_module('requests')
+                        # Add a clear method to cookies if it doesn't exist
+                        if not hasattr(requests_module.cookies, 'clear'):
+                            requests_module.cookies.clear = lambda: None
+                    except Exception as e:
+                        logger.warning(f"Failed to patch requests.cookies: {str(e)}")
+                    
+                    ticker_obj = yf.Ticker(ticker)
+                    info = ticker_obj.info
+                    
+                    # Extract additional data
+                    country = info.get('country')
+                    sector = info.get('sector')
+                    industry = info.get('industry')
+                    
+                    logger.info(f"Additional data for {ticker}: country={country}, sector={sector}, industry={industry}")
             except Exception as e:
                 logger.warning(f"Error fetching additional data for {ticker}: {str(e)}")
+                # Continue with None values if we had an error
+                country = None
+                sector = None
+                industry = None
         
         # Prepare result
         result = {
@@ -5556,6 +5599,146 @@ option {
     top: 20px;
 }
 
+/* Portfolio Analysis Page Styles */
+/* Refined styling for a lighter, more elegant design */
+.content-panel {
+    background-color: #ffffff;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    margin-bottom: 1.5rem;
+}
+
+/* Analysis page table styling - extending existing table styles */
+.portfolio-analysis table th, 
+.portfolio-analysis table td {
+    padding: 0.65em 0.75em;
+    text-align: left;
+    border-bottom: 1px solid #f1f1f1;
+}
+
+.portfolio-analysis table th {
+    background-color: #f8f9fa;
+    font-weight: 500;
+    color: #343a40;
+}
+
+/* Sortable columns for analysis page */
+.portfolio-analysis th.is-sortable {
+    cursor: pointer;
+    position: relative;
+}
+
+.portfolio-analysis th.is-sortable:hover {
+    background-color: rgba(0, 0, 0, 0.03);
+}
+
+/* Hide sort icons by default */
+.portfolio-analysis .sort-icon {
+    display: none;
+}
+
+/* Improved chart containers for portfolio analysis */
+.chart-large-container {
+    position: relative;
+    width: 100%;
+    height: 500px; /* Increased height for global charts */
+    margin: 0 auto 2rem;
+}
+
+.chart-medium-container {
+    position: relative;
+    width: 100%;
+    height: 100%; /* Fill the parent container */
+    margin: 0 auto;
+}
+
+/* Ensure chart canvases fill their containers */
+.chart-large-container canvas,
+.chart-medium-container canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* Portfolio analysis section styling */
+.portfolio-analysis .portfolio-section {
+    margin-bottom: 2rem;
+    border-radius: 8px;
+    overflow: hidden;
+    background-color: #ffffff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.portfolio-analysis .portfolio-header {
+    padding: 1rem 1.5rem;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #f1f1f1;
+}
+
+.portfolio-analysis .portfolio-header-title {
+    font-size: 1.1rem;
+    font-weight: 500;
+    margin: 0;
+}
+
+.portfolio-analysis .portfolio-content {
+    padding: 1.5rem;
+}
+
+/* Analysis page column widths with more specific selectors */
+.portfolio-analysis table th.company-column,
+.portfolio-analysis table td:nth-child(1) {
+    width: 25%;
+}
+
+.portfolio-analysis table th.category-column,
+.portfolio-analysis table td:nth-child(2) {
+    width: 20%;
+}
+
+/* Updated percentage column styling */
+.portfolio-analysis table th.percentage-column,
+.portfolio-analysis table td:nth-child(3) {
+    width: auto; /* Auto width instead of fixed 8% */
+    min-width: 50px; /* Smaller minimum width */
+    max-width: 70px; /* Maximum width constraint */
+    text-align: right;
+    padding-right: 10px; /* Add some padding on the right */
+    white-space: nowrap; /* Prevent wrapping */
+}
+
+/* Make sure all cells in the percentage column are right-aligned */
+.portfolio-analysis td:nth-child(3) {
+    text-align: right !important;
+}
+
+.portfolio-analysis table th.value-column,
+.portfolio-analysis table td:nth-child(4),
+.portfolio-analysis table td:nth-child(5),
+.portfolio-analysis table td:nth-child(6) {
+    width: 15%;
+    min-width: 120px;
+    text-align: right;
+}
+
+/* Abbreviation adjustment */
+.portfolio-analysis table th.percentage-column {
+    white-space: nowrap;
+}
+
+/* Portfolio filter checkbox styling */
+.portfolio-analysis #portfolioFilters .checkbox {
+    margin-right: 1rem;
+    padding: 0.3rem 0.6rem;
+    border-radius: 4px;
+    background-color: #f8f9fa;
+    font-size: 0.9rem;
+}
+
+.portfolio-analysis #portfolioFilters .checkbox:hover {
+    background-color: #e9ecef;
+}
+
 /* Merton page styles */
 .parameter-card {
     height: 100%;
@@ -6560,6 +6743,9 @@ class PortfolioTableApp {
                     this.showUpdatePriceModal = false;
                     this.showDeleteModal = false;
                     this.selectedItem = {};
+                    
+                    // Reload data when modal is closed to ensure table has latest data
+                    this.loadData();
                 },
         
                 async updatePrice() {
@@ -6831,6 +7017,75 @@ class PortfolioTableApp {
                 debouncedSaveCategoryChange: _.debounce(function(item) {
                     this.saveCategoryChange(item);
                 }, 500),
+                
+                // Save shares changes to the database
+                async saveSharesChange(item) {
+                    if (!item || !item.id) {
+                        console.error('Invalid item for shares change');
+                        return;
+                    }
+                    
+                    try {
+                        // Ensure shares is a valid number
+                        const shares = parseFloat(item.shares);
+                        if (isNaN(shares)) {
+                            if (typeof showNotification === 'function') {
+                                showNotification('Shares must be a valid number', 'is-warning');
+                            }
+                            return;
+                        }
+                        
+                        console.log('Sending shares update request for item ID:', item.id, 'Shares:', shares);
+                        const response = await fetch(`/portfolio/api/update_portfolio/${item.id}`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                shares: shares
+                            })
+                        });
+                        
+                        const result = await response.json();
+                        console.log('Shares update response:', result);
+                        
+                        if (result.success) {
+                            // Show success notification using the global function if available
+                            if (typeof showNotification === 'function') {
+                                showNotification('Shares updated successfully', 'is-success', 3000);
+                            } else {
+                                console.log('Shares updated successfully');
+                            }
+                            
+                            // If the response includes the updated shares value, update the item
+                            if (result.data && result.data.shares !== undefined) {
+                                // Format the shares value to ensure it's displayed correctly
+                                item.shares = result.data.shares;
+                                console.log('Updated shares value from server:', item.shares);
+                            }
+                            
+                            // Update the total value display
+                            this.updateMetrics();
+                        } else {
+                            // Show error notification
+                            if (typeof showNotification === 'function') {
+                                showNotification(`Error updating shares: ${result.error}`, 'is-danger');
+                            } else {
+                                console.error(`Error updating shares: ${result.error}`);
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error updating shares:', error);
+                        if (typeof showNotification === 'function') {
+                            showNotification('Failed to update shares', 'is-danger');
+                        }
+                    }
+                },
+                
+                // Debounced version of saveSharesChange for input events
+                debouncedSaveSharesChange: _.debounce(function(item) {
+                    this.saveSharesChange(item);
+                }, 500),
         
                 formatCurrency(value) {
                     if (!value) return '€0.00';
@@ -6913,9 +7168,8 @@ class PortfolioTableApp {
                                 console.warn('No portfolio options found from server');
                             }
                             
-                            // Log whether Default portfolio is in the options
-                            const hasDefault = this.portfolioOptions.includes('Default');
-                            console.log('Has Default portfolio in options:', hasDefault);
+                            // Log the portfolio options from the API
+                            console.log('Portfolio options from API:', this.portfolioOptions);
                         } else {
                             console.warn('Invalid portfolio options format from server');
                             this.portfolioOptions = [];
@@ -6935,6 +7189,28 @@ class PortfolioTableApp {
                         // Load all data after portfolio options are handled
                         this.loadData();
                     });
+                    
+                // Add event listeners for the delete confirmation modal and update price modal
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape' && (this.showDeleteModal || this.showUpdatePriceModal)) {
+                        this.closeModal();
+                    }
+                });
+                
+                // Ensure the X button and background clicks close the modals properly
+                this.$nextTick(() => {
+                    // For Delete Modal
+                    const deleteModalCloseBtn = document.querySelector('.modal:has(.modal-card-title:contains("Delete Confirmation")) .delete');
+                    if (deleteModalCloseBtn) {
+                        deleteModalCloseBtn.addEventListener('click', this.closeModal.bind(this));
+                    }
+                    
+                    // For Update Price Modal
+                    const updatePriceModalCloseBtn = document.querySelector('.modal:has(.modal-card-title:contains("Update Price")) .delete');
+                    if (updatePriceModalCloseBtn) {
+                        updatePriceModalCloseBtn.addEventListener('click', this.closeModal.bind(this));
+                    }
+                });
             }
         });
         
@@ -6951,9 +7227,9 @@ class BulkEditApp {
             data() {
                 return {
                     companies: [],
-                    // Initialize directly with provided portfolios to avoid initial empty dropdown
-                    portfolioOptions: Array.isArray(portfolios) ? [...portfolios] : ['-', 'crypto', 'dividend', 'value'],
-                    staticPortfolios: Array.isArray(portfolios) ? [...portfolios] : [],
+                    // Initialize with empty arrays, will be populated from API
+                    portfolioOptions: [],
+                    staticPortfolios: [],
                     targetPortfolio: '',
                     portfolioAction: 'add',
                     activeTab: 'portfolio',
@@ -7053,7 +7329,7 @@ class BulkEditApp {
                         
                         // Make sure we have the default portfolio option
                         if (!newOptions.includes('-')) {
-                            newOptions.unshift('-'); // Add Default portfolio at the beginning
+                            newOptions = []; // Initialize with empty array if no options found
                         }
                         
                         // Log the new options
@@ -7078,9 +7354,9 @@ class BulkEditApp {
                         });
                     } catch (err) {
                         console.error('Error fetching portfolio options:', err);
-                        // Fall back to default option if API fails
-                        console.warn('Using fallback portfolio options due to error');
-                        this.portfolioOptions = ['-', 'crypto', 'dividend', 'value']; // Add some sensible defaults for testing
+                        // Fall back to empty array if API fails
+                        console.warn('API failed, using empty portfolio options');
+                        this.portfolioOptions = [];
                         this.$forceUpdate();
                     }
                 },
@@ -7155,7 +7431,11 @@ class BulkEditApp {
                         // Reload the portfolio data table to see the latest updates
                         if (window.portfolioTableApp && typeof window.portfolioTableApp.loadData === 'function') {
                             console.log('Reloading portfolio data table after closing bulk edit modal');
-                            window.portfolioTableApp.loadData();
+                            // Ensure we reload the data with a small delay to allow any backend operations to complete
+                            setTimeout(() => {
+                                window.portfolioTableApp.loadData();
+                                console.log('Portfolio data table reloaded after modal close');
+                            }, 100);
                         } else {
                             console.warn('Could not find portfolioTableApp to reload data');
                         }
@@ -7534,12 +7814,12 @@ class BulkEditApp {
                 // Make sure we have default portfolio in the initial options
                 if (Array.isArray(this.portfolioOptions) && this.portfolioOptions.length > 0) {
                     if (!this.portfolioOptions.includes('-')) {
-                        this.portfolioOptions.unshift('-'); // Add Default at beginning
-                        console.log('Added Default portfolio to initial options');
+                        this.portfolioOptions = [];
+                        console.log('Initialized empty portfolio options');
                     }
                 } else if (Array.isArray(this.portfolioOptions) && this.portfolioOptions.length === 0) {
-                    this.portfolioOptions = ['-']; // Initialize with Default
-                    console.log('Initialized empty portfolioOptions with Default');
+                    this.portfolioOptions = [];
+                    console.log('Initialized empty portfolioOptions');
                 }
                 
                 // Log the updated initial state
@@ -7560,6 +7840,17 @@ class BulkEditApp {
                 const saveButton = document.getElementById('bulk-edit-save');
                 if (saveButton) {
                     saveButton.addEventListener('click', this.closeModal.bind(this));
+                }
+                
+                // Connect the X button and background click in the modal
+                const modalCloseButton = document.querySelector('#bulk-edit-modal .delete');
+                if (modalCloseButton) {
+                    modalCloseButton.addEventListener('click', this.closeModal.bind(this));
+                }
+                
+                const modalBackground = document.querySelector('#bulk-edit-modal .modal-background');
+                if (modalBackground) {
+                    modalBackground.addEventListener('click', this.closeModal.bind(this));
                 }
             }
         });
@@ -9039,7 +9330,7 @@ document.addEventListener('DOMContentLoaded', () => {
 {% block title %}Portfolio Analysis{% endblock %}
 
 {% block content %}
-<div class="container">
+<div class="container portfolio-analysis">
     <h1 class="title">Portfolio Analysis</h1>
     
     <!-- Loading indicator -->
@@ -9049,49 +9340,46 @@ document.addEventListener('DOMContentLoaded', () => {
     </div>
     
     <div id="analysisContent" style="display: none;">
-        <!-- Global Overview Section -->
-        <div class="card">
-            <div class="card-header">
-                <p class="card-header-title">Global Overview</p>
-                <div class="card-header-icon">
-                    <div id="portfolioFilters" class="is-flex is-flex-wrap-wrap">
-                        <!-- Portfolio checkboxes will be added here dynamically -->
+        <!-- Global Overview Section - Simplified without boxed cards -->
+        <section class="mb-6">
+            <div class="is-flex is-justify-content-space-between is-align-items-center mb-4">
+                <h2 class="subtitle is-4 mb-0">Global Overview</h2>
+                <div id="portfolioFilters" class="is-flex is-flex-wrap-wrap">
+                    <!-- Portfolio checkboxes will be added here dynamically - empty portfolios will be filtered out -->
+                </div>
+            </div>
+            
+            <div class="columns">
+                <div class="column is-half">
+                    <h3 class="subtitle is-5 has-text-centered mb-4">Portfolio Allocations</h3>
+                    <div class="chart-large-container">
+                        <canvas id="portfolioAllocationsChart"></canvas>
+                    </div>
+                </div>
+                <div class="column is-half">
+                    <h3 class="subtitle is-5 has-text-centered mb-4">Company Allocations (All Portfolios)</h3>
+                    <div class="chart-large-container">
+                        <canvas id="companyAllocationsChart"></canvas>
                     </div>
                 </div>
             </div>
-            <div class="card-content">
-                <div class="columns">
-                    <div class="column is-half">
-                        <h3 class="subtitle">Portfolio Allocations</h3>
-                        <div class="chart-container" style="height: 350px;">
-                            <canvas id="portfolioAllocationsChart"></canvas>
-                        </div>
-                    </div>
-                    <div class="column is-half">
-                        <h3 class="subtitle">Company Allocations (All Portfolios)</h3>
-                        <div class="chart-container" style="height: 350px;">
-                            <canvas id="companyAllocationsChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        </section>
         
         <!-- Portfolio Overview Section -->
-        <h2 class="title is-4 mt-5">Portfolio Overview</h2>
-        <div id="portfolioSections">
-            <!-- Portfolio sections will be added here dynamically -->
-        </div>
+        <section class="mb-6">
+            <h2 class="subtitle is-4 mb-4">Portfolio Overview</h2>
+            <div id="portfolioSections">
+                <!-- Portfolio sections will be added here dynamically -->
+            </div>
+        </section>
         
         <!-- Detailed Overview Section -->
-        <h2 class="title is-4 mt-5">Detailed Overview</h2>
-        <div class="card mt-4">
-            <div class="card-content">
-                <div id="detailedOverview">
-                    <!-- Detailed metrics will be added here dynamically -->
-                </div>
+        <section>
+            <h2 class="subtitle is-4 mb-4">Detailed Overview</h2>
+            <div id="detailedOverview" class="content-panel">
+                <!-- Detailed metrics will be added here dynamically -->
             </div>
-        </div>
+        </section>
     </div>
 </div>
 
@@ -9099,6 +9387,10 @@ document.addEventListener('DOMContentLoaded', () => {
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <!-- Include Chart.js DataLabels plugin -->
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+<!-- Include Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+<!-- CSS has been moved to custom.css -->
 
 <!-- JavaScript for interactivity -->
 <script>
@@ -9120,6 +9412,14 @@ document.addEventListener('DOMContentLoaded', () => {
             return {
                 responsive: true,
                 maintainAspectRatio: false,
+                layout: {
+                    padding: {
+                        top: 40,
+                        right: 40,
+                        bottom: 40,
+                        left: 40
+                    }
+                },
                 plugins: {
                     legend: {
                         display: false
@@ -9130,59 +9430,43 @@ document.addEventListener('DOMContentLoaded', () => {
                                 const value = context.raw;
                                 const total = context.dataset.data.reduce((a, b) => a + b, 0);
                                 const percentage = ((value / total) * 100).toFixed(1);
-                                return ` ${context.label}: ${formatCurrency(value)} (${percentage}%)`;
+                                // Use the full original label for tooltips
+                                const label = context.chart.data.originalLabels ? 
+                                    context.chart.data.originalLabels[context.dataIndex] : 
+                                    context.label;
+                                return ` ${label}: ${formatCurrency(value)} (${percentage}%)`;
                             }
                         }
                     },
                     datalabels: {
                         font: {
                             weight: 'bold',
-                            size: 11
+                            size: 11 /* Slightly reduced font size to accommodate percentage text */
                         },
                         formatter: function(value, context) {
                             const total = context.dataset.data.reduce((a, b) => a + b, 0);
                             const percentage = ((value / total) * 100).toFixed(1);
-                            if (percentage < 3) return ''; // Hide labels for very small segments
-                            return `${context.chart.data.labels[context.dataIndex]}\n${percentage}%`;
+                            // Only show labels for segments above threshold
+                            if (percentage < 4) return ''; // Further increased threshold to prevent overcrowding with percentage labels
+                            
+                            // Show company names with percentages
+                            // Truncate long names to prevent overlap
+                            const label = context.chart.data.labels[context.dataIndex];
+                            let displayLabel = label;
+                            if (label.length > 12) {
+                                displayLabel = label.substring(0, 9) + '...';
+                            }
+                            return `${displayLabel}\n${percentage}%`;
                         },
-                        color: function(context) {
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = ((context.dataset.data[context.dataIndex] / total) * 100);
-                            // Use white for larger segments (inside) and dark for smaller segments (outside)
-                            return percentage >= 8 ? '#fff' : '#333';
-                        },
+                        color: '#fff', // Always use white text for labels inside the chart
+                        // Add text outline for better visibility
+                        textStrokeColor: 'rgba(0,0,0,0.5)',
+                        textStrokeWidth: 1,
                         textAlign: 'center',
-                        anchor: function(context) {
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = ((context.dataset.data[context.dataIndex] / total) * 100);
-                            // Use center for larger segments, end (outside) for smaller segments
-                            return percentage >= 8 ? 'center' : 'end';
-                        },
-                        align: function(context) {
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = ((context.dataset.data[context.dataIndex] / total) * 100);
-                            // Use center for larger segments, outside for smaller segments
-                            return percentage >= 8 ? 'center' : 'end';
-                        },
-                        offset: function(context) {
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = ((context.dataset.data[context.dataIndex] / total) * 100);
-                            // Add offset for outside labels
-                            return percentage >= 8 ? 0 : 10;
-                        },
-                        backgroundColor: function(context) {
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = ((context.dataset.data[context.dataIndex] / total) * 100);
-                            // Add semi-transparent background for outside labels
-                            return percentage >= 8 ? null : 'rgba(255, 255, 255, 0.7)';
-                        },
-                        borderRadius: 4,
-                        padding: function(context) {
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = ((context.dataset.data[context.dataIndex] / total) * 100);
-                            // Add padding for outside labels
-                            return percentage >= 8 ? 0 : 3;
-                        }
+                        anchor: 'center', // Always center the labels
+                        align: 'center', // Always align to center
+                        offset: 0, // No offset needed since all labels are inside the chart
+                        padding: 4
                     }
                 }
             };
@@ -9198,6 +9482,64 @@ document.addEventListener('DOMContentLoaded', () => {
         
         function formatPercentage(value) {
             return value.toFixed(1) + '%';
+        }
+        
+        // Table sorting functionality
+        let currentSortColumn = '';
+        let currentSortDirection = 'asc';
+        
+        function initTableSorting() {
+            document.querySelectorAll('th.is-sortable').forEach(header => {
+                // Add sort icon span if it doesn't exist but keep it hidden
+                if (!header.querySelector('.sort-icon')) {
+                    const iconSpan = document.createElement('span');
+                    iconSpan.className = 'sort-icon icon is-small ml-1';
+                    iconSpan.style.display = 'none'; // Keep hidden
+                    iconSpan.innerHTML = '<i class="fas fa-sort"></i>';
+                    header.appendChild(iconSpan);
+                }
+                
+                header.addEventListener('click', function() {
+                    const table = this.closest('table');
+                    const tbody = table.querySelector('tbody');
+                    const rows = Array.from(tbody.querySelectorAll('tr'));
+                    const index = Array.from(this.parentNode.children).indexOf(this);
+                    const sortType = this.dataset.sort;
+                    // Extract column name without the sort icon text
+                    const columnName = this.childNodes[0].textContent.trim();
+                    
+                    // Determine sort direction
+                    let isAsc = true;
+                    if (currentSortColumn === columnName) {
+                        isAsc = currentSortDirection === 'desc'; // Toggle direction
+                    }
+                    
+                    // Update global sort state
+                    currentSortColumn = columnName;
+                    currentSortDirection = isAsc ? 'asc' : 'desc';
+                    
+                    // Sort rows
+                    rows.sort((a, b) => {
+                        const cellA = a.querySelectorAll('td')[index].textContent.trim();
+                        const cellB = b.querySelectorAll('td')[index].textContent.trim();
+                        
+                        if (sortType === 'number') {
+                            // Extract numeric value from formatted strings (remove currency symbols, commas, % signs)
+                            const numA = parseFloat(cellA.replace(/[€%,]/g, ''));
+                            const numB = parseFloat(cellB.replace(/[€%,]/g, ''));
+                            return isAsc ? numA - numB : numB - numA;
+                        } else {
+                            // String comparison
+                            return isAsc ? 
+                                cellA.localeCompare(cellB) : 
+                                cellB.localeCompare(cellA);
+                        }
+                    });
+                    
+                    // Reinsert rows in sorted order
+                    rows.forEach(row => tbody.appendChild(row));
+                });
+            });
         }
         
         // Load data and initialize
@@ -9217,6 +9559,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // Hide loading indicator and show content
             document.getElementById('loadingIndicator').style.display = 'none';
             document.getElementById('analysisContent').style.display = 'block';
+            
+            // Initialize table sorting
+            initTableSorting();
         }).catch(error => {
             console.error('Error loading data:', error);
             document.getElementById('loadingIndicator').innerHTML = `
@@ -9315,11 +9660,17 @@ document.addEventListener('DOMContentLoaded', () => {
             selectedPortfolioIds = portfolios.map(p => p.id);
         }
         
-        // Initialize portfolio filter checkboxes
+        // Initialize portfolio filter checkboxes - only for non-empty portfolios
         function initializePortfolioFilters() {
             const filterContainer = document.getElementById('portfolioFilters');
             
-            portfolios.forEach(portfolio => {
+            // Filter out empty portfolios
+            const nonEmptyPortfolios = portfolios.filter(portfolio => {
+                const portfolioInfo = portfolioData.find(p => p.name === portfolio.name);
+                return portfolioInfo && portfolioInfo.companies && portfolioInfo.companies.length > 0;
+            });
+            
+            nonEmptyPortfolios.forEach(portfolio => {
                 const checkboxDiv = document.createElement('div');
                 checkboxDiv.className = 'control mx-1';
                 
@@ -9391,6 +9742,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Prepare chart data
             const filteredPortfolios = portfolioData.filter(p => selectedPortfolioIds.includes(p.id));
             const labels = filteredPortfolios.map(p => p.name);
+            const originalLabels = [...labels]; // Store original labels for tooltips
             const values = filteredPortfolios.map(p => p.totalValue);
             const colors = generateColors(labels.length);
             
@@ -9399,6 +9751,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 type: 'doughnut',
                 data: {
                     labels: labels,
+                    originalLabels: originalLabels, // Store original labels for tooltips
                     datasets: [{
                         data: values,
                         backgroundColor: colors,
@@ -9416,11 +9769,13 @@ document.addEventListener('DOMContentLoaded', () => {
             // Prepare chart data
             const filteredPortfolios = portfolioData.filter(p => selectedPortfolioIds.includes(p.id));
             const labels = filteredPortfolios.map(p => p.name);
+            const originalLabels = [...labels]; // Store original labels for tooltips
             const values = filteredPortfolios.map(p => p.totalValue);
             const colors = generateColors(labels.length);
             
             // Update chart
             portfolioAllocationsChart.data.labels = labels;
+            portfolioAllocationsChart.data.originalLabels = originalLabels; // Update original labels
             portfolioAllocationsChart.data.datasets[0].data = values;
             portfolioAllocationsChart.data.datasets[0].backgroundColor = colors;
             portfolioAllocationsChart.update();
@@ -9437,7 +9792,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const companyGroups = groupCompaniesByName(allCompanies);
             
             // Sort and prepare chart data
-            const { labels, values } = prepareChartData(companyGroups);
+            const { labels, values, originalLabels } = prepareChartData(companyGroups);
             const colors = generateColors(labels.length);
             
             // Create chart
@@ -9445,6 +9800,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 type: 'doughnut',
                 data: {
                     labels: labels,
+                    originalLabels: originalLabels, // Store original labels for tooltips
                     datasets: [{
                         data: values,
                         backgroundColor: colors,
@@ -9466,11 +9822,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const companyGroups = groupCompaniesByName(allCompanies);
             
             // Sort and prepare chart data
-            const { labels, values } = prepareChartData(companyGroups);
+            const { labels, values, originalLabels } = prepareChartData(companyGroups);
             const colors = generateColors(labels.length);
             
             // Update chart
             companyAllocationsChart.data.labels = labels;
+            companyAllocationsChart.data.originalLabels = originalLabels; // Update original labels
             companyAllocationsChart.data.datasets[0].data = values;
             companyAllocationsChart.data.datasets[0].backgroundColor = colors;
             companyAllocationsChart.update();
@@ -9512,27 +9869,32 @@ document.addEventListener('DOMContentLoaded', () => {
             
             let labels = [];
             let values = [];
+            let originalLabels = []; // Store original full names for tooltips
             
             if (sortedCompanies.length > 10) {
                 // Take top 10 companies
                 const top10 = sortedCompanies.slice(0, 10);
                 const others = sortedCompanies.slice(10);
                 
-                labels = top10.map(c => c.name);
+                // Store original names and values
+                originalLabels = top10.map(c => c.name);
+                labels = originalLabels;
                 values = top10.map(c => c.currentValue);
                 
                 // Add "Others" category
                 const othersValue = others.reduce((sum, c) => sum + c.currentValue, 0);
                 if (othersValue > 0) {
                     labels.push('Others');
+                    originalLabels.push('Others');
                     values.push(othersValue);
                 }
             } else {
-                labels = sortedCompanies.map(c => c.name);
+                originalLabels = sortedCompanies.map(c => c.name);
+                labels = originalLabels;
                 values = sortedCompanies.map(c => c.currentValue);
             }
             
-            return { labels, values };
+            return { labels, values, originalLabels };
         }
         
         // Generate colors for chart segments
@@ -9553,33 +9915,39 @@ document.addEventListener('DOMContentLoaded', () => {
             const sortedPortfolios = [...portfolioData].sort((a, b) => a.name.localeCompare(b.name));
             
             sortedPortfolios.forEach(portfolio => {
+                // Skip portfolios with no companies
+                if (!portfolio.companies || portfolio.companies.length === 0) {
+                    return;
+                }
+                
                 const section = document.createElement('div');
-                section.className = 'card mt-4 portfolio-section';
+                section.className = 'portfolio-section';
                 section.dataset.portfolioId = portfolio.id;
                 
                 const header = document.createElement('div');
-                header.className = 'card-header';
-                header.innerHTML = `<p class="card-header-title">${portfolio.name}</p>`;
+                header.className = 'portfolio-header';
+                header.innerHTML = `<h4 class="portfolio-header-title">${portfolio.name}</h4>`;
                 
                 const content = document.createElement('div');
-                content.className = 'card-content';
+                content.className = 'portfolio-content';
                 
                 const columns = document.createElement('div');
                 columns.className = 'columns';
+                columns.style.minHeight = '450px'; /* Set minimum height for the columns container */
                 
                 // Table column
                 const tableColumn = document.createElement('div');
-                tableColumn.className = 'column is-7';
+                tableColumn.className = 'column is-6'; /* Reduced from is-7 to give more space to chart */
                 tableColumn.innerHTML = `
-                    <div class="table-container">
+                    <div class="table-container" style="height: 100%; display: flex; flex-direction: column;">
                         <table class="table is-fullwidth is-striped is-hoverable">
                             <thead>
                                 <tr>
-                                    <th>Company</th>
-                                    <th>Category</th>
-                                    <th>% of Portfolio</th>
-                                    <th>Current Value</th>
-                                    <th>Total Invested</th>
+                                    <th class="is-sortable company-column" data-sort="string">Company</th>
+                                    <th class="is-sortable category-column" data-sort="string">Category</th>
+                                    <th class="is-sortable percentage-column" data-sort="number">%</th>
+                                    <th class="is-sortable value-column" data-sort="number">Current Value</th>
+                                    <th class="is-sortable value-column" data-sort="number">Total Invested</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -9591,11 +9959,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Chart column
                 const chartColumn = document.createElement('div');
-                chartColumn.className = 'column is-5';
+                chartColumn.className = 'column is-6'; /* Increased from is-5 to make chart larger */
+                chartColumn.style.display = 'flex';
+                chartColumn.style.alignItems = 'center';
                 
                 const chartContainer = document.createElement('div');
-                chartContainer.className = 'chart-container';
-                chartContainer.style.height = '350px';
+                chartContainer.className = 'chart-medium-container';
+                chartContainer.style.display = 'flex';
+                chartContainer.style.alignItems = 'center';
+                chartContainer.style.justifyContent = 'center';
+                chartContainer.style.height = '100%';
                 
                 const canvas = document.createElement('canvas');
                 canvas.id = `portfolioChart${portfolio.id}`;
@@ -9640,7 +10013,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const ctx = document.getElementById(`portfolioChart${portfolio.id}`).getContext('2d');
             
             // Prepare chart data for portfolio companies
-            let { labels, values } = prepareChartData(portfolio.companies);
+            let { labels, values, originalLabels } = prepareChartData(portfolio.companies);
             const colors = generateColors(labels.length);
             
             // Create chart
@@ -9648,6 +10021,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 type: 'doughnut',
                 data: {
                     labels: labels,
+                    originalLabels: originalLabels, // Store original labels for tooltips
                     datasets: [{
                         data: values,
                         backgroundColor: colors,
@@ -9731,12 +10105,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     <table class="table is-fullwidth is-striped is-hoverable">
                         <thead>
                             <tr>
-                                <th>Category</th>
-                                <th>Companies</th>
-                                <th>Current Value</th>
-                                <th>% of Portfolio</th>
-                                <th>Total Invested</th>
-                                <th>Profit/Loss</th>
+                                <th class="is-sortable company-column" data-sort="string">Category</th>
+                                <th class="is-sortable" data-sort="number">Companies</th>
+                                <th class="is-sortable value-column" data-sort="number">Current Value</th>
+                                <th class="is-sortable percentage-column" data-sort="number">%</th>
+                                <th class="is-sortable value-column" data-sort="number">Total Invested</th>
+                                <th class="is-sortable value-column" data-sort="number">Profit/Loss</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -10226,6 +10600,18 @@ document.addEventListener('DOMContentLoaded', () => {
             margin-bottom: 0.75rem;
         }
         
+        /* Centralized styling for portfolio, category, and shares inputs */
+        .portfolio-table .input-column {
+            width: 110px; /* 40% narrower than 150px */
+        }
+        
+        .portfolio-table .input-column .select,
+        .portfolio-table .input-column .select select,
+        .portfolio-table .input-column .input {
+            width: 100%;
+            max-width: 90px;
+        }
+        
         /* Responsive adjustments */
         @media screen and (max-width: 768px) {
             .columns .column .card {
@@ -10565,11 +10951,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                     <div class="select">
                                         <select id="filter-portfolio" v-model="selectedPortfolio">
                                             <option value="">All Portfolios</option>
-                                            <option value="-">Default</option>
                                             {% for portfolio in portfolios %}
-                                                {% if portfolio != 'Default' %}
-                                                    <option value="{{ portfolio }}">{{ portfolio }}</option>
-                                                {% endif %}
+                                                <option value="{{ portfolio }}">{{ portfolio }}</option>
                                             {% endfor %}
                                         </select>
                                     </div>
@@ -10642,7 +11025,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                         
                         <div v-else class="table-container">
-                            <table class="table is-striped is-hoverable is-fullwidth">
+                            <table class="table is-striped is-hoverable is-fullwidth portfolio-table">
                                 <thead>
                                     <tr>
                                         <th>Update</th>
@@ -10729,28 +11112,28 @@ document.addEventListener('DOMContentLoaded', () => {
                                         <td>
                                             <span v-text="item.company"></span>
                                         </td>
-                                        <td>
+                                        <td class="input-column">
                                             <div class="select is-small">
                                                 <select v-model="item.portfolio" 
                                                         @change="debouncedSavePortfolioChange(item)">
                                                     <!-- Special handling for the default portfolio value '-' -->
-                                                    <option value="-">Default</option>
                                                     {% for portfolio in portfolios %}
-                                                        {% if portfolio != 'Default' %}
-                                                            <option value="{{ portfolio }}">{{ portfolio }}</option>
-                                                        {% endif %}
+                                                        <option value="{{ portfolio }}">{{ portfolio }}</option>
                                                     {% endfor %}
                                                 </select>
                                             </div>
                                         </td>
-                                        <td>
+                                        <td class="input-column">
                                             <input class="input is-small" type="text"
                                                    v-model="item.category"
                                                    @input="debouncedSaveCategoryChange(item)"
                                                    @change="saveCategoryChange(item)">
                                         </td>
-                                        <td>
-                                            <span v-text="formatNumber(item.shares)"></span>
+                                        <td class="input-column">
+                                            <input class="input is-small" type="text"
+                                                   :value="formatNumber(item.shares)"
+                                                   @input="(e) => { item.shares = parseFloat(e.target.value); debouncedSaveSharesChange(item); }"
+                                                   @change="saveSharesChange(item)">
                                         </td>
                                         <td :class="{'has-text-danger': !item.price_eur}">
                                             <span v-text="item.price_eur ? formatCurrency(item.price_eur) : 'No price'"></span>
@@ -10853,20 +11236,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     /* Enhanced fix for dropdown text visibility */
                     #bulk-edit-modal select,
                     #bulk-edit-modal select option,
-                    .select select,
-                    .select select option {
+                    #bulk-edit-modal .select select,
+                    #bulk-edit-modal .select select option {
                         color: #333 !important;
                         background-color: #fff !important;
                     }
                     
                     /* Fix for dropdown display issues */
-                    .select,
-                    .select select {
+                    #bulk-edit-modal .select,
+                    #bulk-edit-modal .select select {
                         width: 100%;
                     }
                     
                     /* Ensure dropdown options are visible */
-                    select option {
+                    #bulk-edit-modal select option {
                         color: #333 !important;
                         background-color: #fff !important;
                         text-shadow: none !important;
@@ -10971,8 +11354,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                     <label class="label">Target Portfolio</label>
                                     <div class="control">
                                         <div class="select is-fullwidth">
-                                            <select v-model="targetPortfolio" style="color: #333 !important; background-color: #fff !important;">
-                                                <option value="" style="color: #333 !important; background-color: #fff !important;">Select portfolio</option>
+                                            <select v-model="targetPortfolio">
+                                                <option value="">Select portfolio</option>
                                                 <!-- Debug info to help troubleshoot -->
                                                 <option v-if="portfolioOptions.length === 0" value="debug-empty" disabled style="color: red !important;">No options loaded</option>
                                                 <!-- Explicit loop through portfolio options -->
@@ -10980,17 +11363,12 @@ document.addEventListener('DOMContentLoaded', () => {
                                                     v-for="(portfolio, index) in portfolioOptions" 
                                                     :key="index" 
                                                     :value="portfolio" 
-                                                    style="color: #333 !important; background-color: #fff !important;">
+                                                    >
                                                     {% raw %}{{ portfolio }}{% endraw %}
                                                 </option>
                                             </select>
                                         </div>
-                                        <!-- Debug display to see portfolio options -->
-                                        <div v-if="portfolioOptions.length > 0" class="is-size-7 my-1 has-text-grey">
-                                            Available options: {% raw %}{{ portfolioOptions.length }}{% endraw %}
-                                        </div>
                                     </div>
-                                    <p class="help">Choose the portfolio where selected companies will be moved</p>
                                 </div>
                                 
                                 <div class="field mt-4">
@@ -11069,9 +11447,9 @@ document.addEventListener('DOMContentLoaded', () => {
                                     <label class="label">Select Portfolio</label>
                                     <div class="control">
                                         <div class="select is-fullwidth">
-                                            <select v-model="oldPortfolioName" style="color: #333 !important; background-color: #fff !important;">
-                                                <option value="" style="color: #333 !important; background-color: #fff !important;">Select portfolio</option>
-                                                <option v-for="(portfolio, index) in portfolioOptions" :key="index" :value="portfolio" style="color: #333 !important; background-color: #fff !important;">{% raw %}{{ portfolio }}{% endraw %}</option>
+                                            <select v-model="oldPortfolioName">
+                                                <option value="">Select portfolio</option>
+                                                <option v-for="(portfolio, index) in portfolioOptions" :key="index" :value="portfolio">{% raw %}{{ portfolio }}{% endraw %}</option>
                                             </select>
                                         </div>
                                     </div>
@@ -11101,9 +11479,9 @@ document.addEventListener('DOMContentLoaded', () => {
                                     <label class="label">Select Portfolio to Delete</label>
                                     <div class="control">
                                         <div class="select is-fullwidth">
-                                            <select v-model="deletePortfolioName" style="color: #333 !important; background-color: #fff !important;">
-                                                <option value="" style="color: #333 !important; background-color: #fff !important;">Select portfolio</option>
-                                                <option v-for="(portfolio, index) in portfolioOptions" :key="index" :value="portfolio" style="color: #333 !important; background-color: #fff !important;">{% raw %}{{ portfolio }}{% endraw %}</option>
+                                            <select v-model="deletePortfolioName">
+                                                <option value="">Select portfolio</option>
+                                                <option v-for="(portfolio, index) in portfolioOptions" :key="index" :value="portfolio">{% raw %}{{ portfolio }}{% endraw %}</option>
                                             </select>
                                         </div>
                                     </div>

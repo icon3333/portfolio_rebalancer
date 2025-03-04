@@ -329,13 +329,14 @@
                     
                     <!-- Button section with fixed position at bottom -->
                     <div class="field" style="position: absolute; bottom: 20px; width: calc(100% - 30px);">
-                        <div class="control">
-                            <button type="submit" class="button is-info" id="portfolio-action-btn" disabled>
+                        <div class="control is-flex">
+                            <button type="submit" class="button is-info mr-2" id="portfolio-action-btn" disabled>
                                 <span class="icon">
                                     <i class="fas fa-check"></i>
                                 </span>
                                 <span>Apply</span>
                             </button>
+                            <!-- Update all data button moved to header -->
                         </div>
                     </div>
                 </form>
@@ -356,6 +357,44 @@
                 <span>Portfolio Data</span>
             </span>
         </p>
+        <div class="card-header-controls is-flex is-align-items-center" style="flex-grow: 1; justify-content: flex-end; gap: 10px; padding-right: 10px;">
+            <!-- Portfolio Filter -->
+            <div class="control" id="portfolio-dropdown-container">
+                <div class="select is-small">
+                    <select id="filter-portfolio">
+                        <option value="">All Portfolios</option>
+                        {% for portfolio in portfolios %}
+                            <option value="{{ portfolio }}">{{ portfolio }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <!-- No Price Checkbox -->
+            <div class="control" id="no-price-checkbox-container">
+                <label class="checkbox" style="display: flex; align-items: center;">
+                    <input type="checkbox" id="show-only-missing-prices">
+                    <span style="margin-left: 0.5em;">No price</span>
+                </label>
+            </div>
+            <!-- Bulk Edit Button -->
+            <div class="control">
+                <button class="button is-small is-info is-light" id="open-bulk-edit-btn">
+                    <span class="icon is-small">
+                        <i class="fas fa-edit"></i>
+                    </span>
+                    <span>Bulk Edit</span>
+                </button>
+            </div>
+            <!-- Update All Data Button -->
+            <div class="control">
+                <button class="button is-small is-primary" id="update-all-data-btn">
+                    <span class="icon is-small">
+                        <i class="fas fa-sync-alt"></i>
+                    </span>
+                    <span>Update all data</span>
+                </button>
+            </div>
+        </div>
         <button class="card-header-icon" aria-label="more options">
             <span class="icon">
                 <i class="fas fa-angle-down" aria-hidden="true"></i>
@@ -371,29 +410,10 @@
                         <div class="controls-and-metrics-row">
                             <!-- Controls -->
                             <div class="controls-group">
-                                <div class="control">
-                                    <div class="select">
-                                        <select id="filter-portfolio" v-model="selectedPortfolio">
-                                            <option value="">All Portfolios</option>
-                                            {% for portfolio in portfolios %}
-                                                <option value="{{ portfolio }}">{{ portfolio }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="control">
-                                    <label class="checkbox" style="display: flex; align-items: center; height: 2.5em; padding: 0 0.5em;">
-                                        <input type="checkbox" v-model="showOnlyMissingPrices">
-                                        <span style="margin-left: 0.5em;">No price</span>
-                                    </label>
-                                </div>
-                                <div class="control">
-                                    <button class="button is-info is-light" @click="bulkEditApp.openModal()">
-                                        <span class="icon">
-                                            <i class="fas fa-edit"></i>
-                                        </span>
-                                        <span>Bulk Edit</span>
-                                    </button>
+                                <!-- Hidden controls for Vue binding -->
+                                <div class="is-hidden">
+                                    <select v-model="selectedPortfolio" id="vue-portfolio-select"></select>
+                                    <input type="checkbox" v-model="showOnlyMissingPrices" id="vue-missing-prices-checkbox">
                                 </div>
                             </div>
                             

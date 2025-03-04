@@ -402,6 +402,146 @@ option {
     top: 20px;
 }
 
+/* Portfolio Analysis Page Styles */
+/* Refined styling for a lighter, more elegant design */
+.content-panel {
+    background-color: #ffffff;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    margin-bottom: 1.5rem;
+}
+
+/* Analysis page table styling - extending existing table styles */
+.portfolio-analysis table th, 
+.portfolio-analysis table td {
+    padding: 0.65em 0.75em;
+    text-align: left;
+    border-bottom: 1px solid #f1f1f1;
+}
+
+.portfolio-analysis table th {
+    background-color: #f8f9fa;
+    font-weight: 500;
+    color: #343a40;
+}
+
+/* Sortable columns for analysis page */
+.portfolio-analysis th.is-sortable {
+    cursor: pointer;
+    position: relative;
+}
+
+.portfolio-analysis th.is-sortable:hover {
+    background-color: rgba(0, 0, 0, 0.03);
+}
+
+/* Hide sort icons by default */
+.portfolio-analysis .sort-icon {
+    display: none;
+}
+
+/* Improved chart containers for portfolio analysis */
+.chart-large-container {
+    position: relative;
+    width: 100%;
+    height: 500px; /* Increased height for global charts */
+    margin: 0 auto 2rem;
+}
+
+.chart-medium-container {
+    position: relative;
+    width: 100%;
+    height: 100%; /* Fill the parent container */
+    margin: 0 auto;
+}
+
+/* Ensure chart canvases fill their containers */
+.chart-large-container canvas,
+.chart-medium-container canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* Portfolio analysis section styling */
+.portfolio-analysis .portfolio-section {
+    margin-bottom: 2rem;
+    border-radius: 8px;
+    overflow: hidden;
+    background-color: #ffffff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.portfolio-analysis .portfolio-header {
+    padding: 1rem 1.5rem;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #f1f1f1;
+}
+
+.portfolio-analysis .portfolio-header-title {
+    font-size: 1.1rem;
+    font-weight: 500;
+    margin: 0;
+}
+
+.portfolio-analysis .portfolio-content {
+    padding: 1.5rem;
+}
+
+/* Analysis page column widths with more specific selectors */
+.portfolio-analysis table th.company-column,
+.portfolio-analysis table td:nth-child(1) {
+    width: 25%;
+}
+
+.portfolio-analysis table th.category-column,
+.portfolio-analysis table td:nth-child(2) {
+    width: 20%;
+}
+
+/* Updated percentage column styling */
+.portfolio-analysis table th.percentage-column,
+.portfolio-analysis table td:nth-child(3) {
+    width: auto; /* Auto width instead of fixed 8% */
+    min-width: 50px; /* Smaller minimum width */
+    max-width: 70px; /* Maximum width constraint */
+    text-align: right;
+    padding-right: 10px; /* Add some padding on the right */
+    white-space: nowrap; /* Prevent wrapping */
+}
+
+/* Make sure all cells in the percentage column are right-aligned */
+.portfolio-analysis td:nth-child(3) {
+    text-align: right !important;
+}
+
+.portfolio-analysis table th.value-column,
+.portfolio-analysis table td:nth-child(4),
+.portfolio-analysis table td:nth-child(5),
+.portfolio-analysis table td:nth-child(6) {
+    width: 15%;
+    min-width: 120px;
+    text-align: right;
+}
+
+/* Abbreviation adjustment */
+.portfolio-analysis table th.percentage-column {
+    white-space: nowrap;
+}
+
+/* Portfolio filter checkbox styling */
+.portfolio-analysis #portfolioFilters .checkbox {
+    margin-right: 1rem;
+    padding: 0.3rem 0.6rem;
+    border-radius: 4px;
+    background-color: #f8f9fa;
+    font-size: 0.9rem;
+}
+
+.portfolio-analysis #portfolioFilters .checkbox:hover {
+    background-color: #e9ecef;
+}
+
 /* Merton page styles */
 .parameter-card {
     height: 100%;

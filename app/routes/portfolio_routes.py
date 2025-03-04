@@ -17,6 +17,7 @@ import logging
 from datetime import datetime
 import os
 import time
+import uuid
 from flask import g, Response
 import traceback
 
@@ -878,17 +879,36 @@ def update_all_prices_api():
         price_fetch_progress['total'] = len(companies)
         price_fetch_progress['start_time'] = datetime.now().isoformat()
         
-        # Create a job to update prices
-        job_id = start_batch_process(
-            update_prices, 
-            [companies, account_id],
-            callback=update_prices_in_db
-        )
+        # Instead of running all updates now, just return success
+        # Updates will be processed in the background through AJAX polling
+        job_id = str(uuid.uuid4())
+        
+        # Run the first update immediately to get things started
+        if companies:
+            try:
+                company = companies[0]
+                isin = company['identifier']
+                result = get_isin_data(isin)
+                if result.get('success') and result.get('price') is not None:
+                    update_price_in_db(
+                        isin, 
+                        result.get('price'), 
+                        result.get('currency', 'USD'),
+                        result.get('price_eur', result.get('price')),
+                        result.get('country'),
+                        result.get('sector'),
+                        result.get('industry')
+                    )
+                price_fetch_progress['current'] = 1
+            except Exception as e:
+                logger.error(f"Error processing first company {isin}: {str(e)}")
+                price_fetch_progress['current'] = 1
         
         return jsonify({
             'success': True,
             'message': f'Started updating prices for {len(companies)} companies',
-            'job_id': job_id
+            'job_id': job_id,
+            'total_companies': len(companies)
         })
         
     except Exception as e:
@@ -937,13 +957,51 @@ def update_prices(companies, account_id):
 @portfolio_bp.route('/api/price_update_status/<job_id>', methods=['GET'])
 def get_price_update_status(job_id):
     """Get status of price update job."""
+    global price_fetch_progress
     try:
-        # Get job status
+        # First try the traditional job status
         status = get_job_status(job_id)
         
+        # If job not found in traditional tracking, use our progress tracking
         if status['status'] == 'not_found':
-            return jsonify({'error': 'Job not found'}), 404
             
+            # For now, we just use the global price_fetch_progress tracking
+            current = price_fetch_progress['current']
+            total = price_fetch_progress['total']
+            
+            # Ensure current never exceeds total
+            if current > total and total > 0:
+                current = total
+            
+            # Calculate percentage - handle division by zero
+            percentage = 0
+            if total > 0:
+                percentage = min(100, round((current / total) * 100))  # Cap at 100%
+            
+            # Check if processing is complete
+            is_complete = (current >= total and total > 0)
+            status = {
+                'job_id': job_id,
+                'status': 'completed' if is_complete else 'processing',
+                'progress': {
+                    'current': current,
+                    'total': total,
+                    'percentage': percentage
+                },
+                'is_complete': is_complete
+            }
+            
+            # If complete, also include a price_update field to match expected format
+            if is_complete:
+                status['price_update'] = {
+                    'success': True,
+                    'total': total,
+                    'success_count': current
+                }
+            
+            return jsonify(status)
+            
+        # Handle completed jobs with results
         if status['status'] == 'completed' and status.get('results'):
             # Process results if completed
             results = status.get('results')
@@ -977,6 +1035,22 @@ def get_price_update_status(job_id):
                     'success': False,
                     'error': 'Invalid results format'
                 }
+        
+        # Add progress information if not already present
+        if 'progress' not in status:
+            current = price_fetch_progress['current']
+            total = price_fetch_progress['total']
+            
+            if total > 0:
+                percentage = min(100, round((current / total) * 100))
+            else:
+                percentage = 0
+                
+            status['progress'] = {
+                'current': current,
+                'total': total,
+                'percentage': percentage
+            }
         
         return jsonify(status)
     
@@ -1057,24 +1131,87 @@ def get_price_fetch_progress():
     """Get the current progress of price fetching"""
     global price_fetch_progress
     
+    # Process one company if there's an active update
+    if price_fetch_progress['current'] < price_fetch_progress['total'] and price_fetch_progress['current'] > 0:
+        try:
+            # Get all companies for this account
+            if 'account_id' in session:
+                account_id = session['account_id']
+                companies = query_db('''
+                    SELECT id, name, identifier 
+                    FROM companies 
+                    WHERE account_id = ?
+                ''', [account_id])
+                
+                # Make sure we have companies and don't exceed the companies list length
+                total_companies = len(companies) if companies else 0
+                
+                # Update the total if it doesn't match the actual count
+                if total_companies != price_fetch_progress['total']:
+                    logger.warning(f"Correcting total companies from {price_fetch_progress['total']} to {total_companies}")
+                    price_fetch_progress['total'] = total_companies
+                
+                # Ensure we don't exceed array bounds
+                if companies and price_fetch_progress['current'] < total_companies:
+                    # Process the next company
+                    company = companies[price_fetch_progress['current']]
+                    isin = company['identifier']
+                    try:
+                        logger.info(f"Processing company {price_fetch_progress['current']+1}/{total_companies}: {isin}")
+                        result = get_isin_data(isin)
+                        if result.get('success') and result.get('price') is not None:
+                            update_price_in_db(
+                                isin, 
+                                result.get('price'), 
+                                result.get('currency', 'USD'),
+                                result.get('price_eur', result.get('price')),
+                                result.get('country'),
+                                result.get('sector'),
+                                result.get('industry')
+                            )
+                    except Exception as e:
+                        logger.error(f"Error processing company {isin}: {str(e)}")
+                    
+                    # Increment the counter, but ensure it doesn't exceed the total
+                    price_fetch_progress['current'] += 1
+                    if price_fetch_progress['current'] > price_fetch_progress['total']:
+                        logger.warning(f"Correcting current count to not exceed total")
+                        price_fetch_progress['current'] = price_fetch_progress['total']
+        except Exception as e:
+            logger.error(f"Error in background processing: {str(e)}")
+    
     current = price_fetch_progress['current']
     total = price_fetch_progress['total']
     start_time = price_fetch_progress['start_time']
     
+    # Ensure current never exceeds total
+    if current > total and total > 0:
+        logger.warning(f"Correcting current ({current}) to not exceed total ({total})")
+        current = total
+        price_fetch_progress['current'] = total
+    
     # Calculate percentage - handle division by zero
     percentage = 0
     if total > 0:
-        percentage = round((current / total) * 100)
+        percentage = min(100, round((current / total) * 100))  # Cap at 100%
+    
+    # Check if processing is complete
+    is_complete = (current >= total and total > 0)
+    status = 'completed' if is_complete else 'processing'
     
     # Log for debugging
-    logger.debug(f"Progress: {current}/{total} ({percentage}%)")
+    logger.debug(f"Progress: {current}/{total} ({percentage}%) - Status: {status}")
     
     return jsonify({
         'current': current,
         'total': total,
         'start_time': start_time,
-        'percentage': percentage
+        'percentage': percentage,
+        'status': status,
+        'is_complete': is_complete
     })
+
+
 
 def get_portfolio_data(account_id):
     """Get portfolio data from the database"""

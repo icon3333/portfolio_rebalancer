@@ -3,7 +3,7 @@
 {% block title %}Portfolio Analysis{% endblock %}
 
 {% block content %}
-<div class="container">
+<div class="container portfolio-analysis">
     <h1 class="title">Portfolio Analysis</h1>
     
     <!-- Loading indicator -->
@@ -13,49 +13,46 @@
     </div>
     
     <div id="analysisContent" style="display: none;">
-        <!-- Global Overview Section -->
-        <div class="card">
-            <div class="card-header">
-                <p class="card-header-title">Global Overview</p>
-                <div class="card-header-icon">
-                    <div id="portfolioFilters" class="is-flex is-flex-wrap-wrap">
-                        <!-- Portfolio checkboxes will be added here dynamically -->
+        <!-- Global Overview Section - Simplified without boxed cards -->
+        <section class="mb-6">
+            <div class="is-flex is-justify-content-space-between is-align-items-center mb-4">
+                <h2 class="subtitle is-4 mb-0">Global Overview</h2>
+                <div id="portfolioFilters" class="is-flex is-flex-wrap-wrap">
+                    <!-- Portfolio checkboxes will be added here dynamically - empty portfolios will be filtered out -->
+                </div>
+            </div>
+            
+            <div class="columns">
+                <div class="column is-half">
+                    <h3 class="subtitle is-5 has-text-centered mb-4">Portfolio Allocations</h3>
+                    <div class="chart-large-container">
+                        <canvas id="portfolioAllocationsChart"></canvas>
+                    </div>
+                </div>
+                <div class="column is-half">
+                    <h3 class="subtitle is-5 has-text-centered mb-4">Company Allocations (All Portfolios)</h3>
+                    <div class="chart-large-container">
+                        <canvas id="companyAllocationsChart"></canvas>
                     </div>
                 </div>
             </div>
-            <div class="card-content">
-                <div class="columns">
-                    <div class="column is-half">
-                        <h3 class="subtitle">Portfolio Allocations</h3>
-                        <div class="chart-container" style="height: 350px;">
-                            <canvas id="portfolioAllocationsChart"></canvas>
-                        </div>
-                    </div>
-                    <div class="column is-half">
-                        <h3 class="subtitle">Company Allocations (All Portfolios)</h3>
-                        <div class="chart-container" style="height: 350px;">
-                            <canvas id="companyAllocationsChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        </section>
         
         <!-- Portfolio Overview Section -->
-        <h2 class="title is-4 mt-5">Portfolio Overview</h2>
-        <div id="portfolioSections">
-            <!-- Portfolio sections will be added here dynamically -->
-        </div>
+        <section class="mb-6">
+            <h2 class="subtitle is-4 mb-4">Portfolio Overview</h2>
+            <div id="portfolioSections">
+                <!-- Portfolio sections will be added here dynamically -->
+            </div>
+        </section>
         
         <!-- Detailed Overview Section -->
-        <h2 class="title is-4 mt-5">Detailed Overview</h2>
-        <div class="card mt-4">
-            <div class="card-content">
-                <div id="detailedOverview">
-                    <!-- Detailed metrics will be added here dynamically -->
-                </div>
+        <section>
+            <h2 class="subtitle is-4 mb-4">Detailed Overview</h2>
+            <div id="detailedOverview" class="content-panel">
+                <!-- Detailed metrics will be added here dynamically -->
             </div>
-        </div>
+        </section>
     </div>
 </div>
 
@@ -63,667 +60,1244 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <!-- Include Chart.js DataLabels plugin -->
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+<!-- Include Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+<!-- CSS has been moved to custom.css -->
 
 <!-- JavaScript for interactivity -->
 <script>
-    // Register the DataLabels plugin with Chart.js
-    Chart.register(ChartDataLabels);
-    document.addEventListener('DOMContentLoaded', function() {
-        // Store data
-        let portfolios = [];
-        let portfolioData = [];
-        let selectedPortfolioIds = [];
-        let portfolioCharts = {};
-        
-        // Charts
-        let portfolioAllocationsChart = null;
-        let companyAllocationsChart = null;
-        
-        // Centralized chart configuration
-        function getPieChartOptions() {
-            return {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                const value = context.raw;
-                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                const percentage = ((value / total) * 100).toFixed(1);
-                                return ` ${context.label}: ${formatCurrency(value)} (${percentage}%)`;
-                            }
-                        }
-                    },
-                    datalabels: {
-                        font: {
-                            weight: 'bold',
-                            size: 11
-                        },
-                        formatter: function(value, context) {
+/**
+ * Enhanced Portfolio Analysis with Tabbed Interface
+ * 
+ * This script adds company-centric and category-centric views to each portfolio section.
+ * Features include:
+ * - Toggle between Companies and Categories tabs
+ * - Category breakdown with percentages relative to portfolio
+ * - Expandable company rows within each category 
+ * - Company percentages relative to their category
+ * - Sortable tables in both views
+ * - Responsive charts for both views
+ */
+// Register the DataLabels plugin with Chart.js
+Chart.register(ChartDataLabels);
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Store data
+    let portfolios = [];
+    let portfolioData = [];
+    let selectedPortfolioIds = [];
+    let portfolioCharts = {};
+    
+    // Charts
+    let portfolioAllocationsChart = null;
+    let companyAllocationsChart = null;
+    
+    // Centralized chart configuration
+    function getPieChartOptions() {
+        return {
+            responsive: true,
+            maintainAspectRatio: false,
+            layout: {
+                padding: {
+                    top: 20,
+                    right: 20,
+                    bottom: 20,
+                    left: 20
+                }
+            },
+            cutout: '50%', // Reduce the cutout to provide more space for labels
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const value = context.raw;
                             const total = context.dataset.data.reduce((a, b) => a + b, 0);
                             const percentage = ((value / total) * 100).toFixed(1);
-                            if (percentage < 3) return ''; // Hide labels for very small segments
-                            return `${context.chart.data.labels[context.dataIndex]}\n${percentage}%`;
-                        },
-                        color: function(context) {
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = ((context.dataset.data[context.dataIndex] / total) * 100);
-                            // Use white for larger segments (inside) and dark for smaller segments (outside)
-                            return percentage >= 8 ? '#fff' : '#333';
-                        },
-                        textAlign: 'center',
-                        anchor: function(context) {
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = ((context.dataset.data[context.dataIndex] / total) * 100);
-                            // Use center for larger segments, end (outside) for smaller segments
-                            return percentage >= 8 ? 'center' : 'end';
-                        },
-                        align: function(context) {
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = ((context.dataset.data[context.dataIndex] / total) * 100);
-                            // Use center for larger segments, outside for smaller segments
-                            return percentage >= 8 ? 'center' : 'end';
-                        },
-                        offset: function(context) {
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = ((context.dataset.data[context.dataIndex] / total) * 100);
-                            // Add offset for outside labels
-                            return percentage >= 8 ? 0 : 10;
-                        },
-                        backgroundColor: function(context) {
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = ((context.dataset.data[context.dataIndex] / total) * 100);
-                            // Add semi-transparent background for outside labels
-                            return percentage >= 8 ? null : 'rgba(255, 255, 255, 0.7)';
-                        },
-                        borderRadius: 4,
-                        padding: function(context) {
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = ((context.dataset.data[context.dataIndex] / total) * 100);
-                            // Add padding for outside labels
-                            return percentage >= 8 ? 0 : 3;
+                            // Use the full original label for tooltips
+                            const label = context.chart.data.originalLabels ? 
+                                context.chart.data.originalLabels[context.dataIndex] : 
+                                context.label;
+                            return ` ${label}: ${formatCurrency(value)} (${percentage}%)`;
                         }
                     }
+                },
+                datalabels: {
+                    font: {
+                        weight: 'bold',
+                        size: 11
+                    },
+                    formatter: function(value, context) {
+                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                        const percentage = ((value / total) * 100).toFixed(1);
+                        
+                        // Show labels for all segments that have enough space
+                        // Segments with less than 2% are too small for any text
+                        if (percentage < 2) return '';
+                        
+                        const label = context.chart.data.labels[context.dataIndex];
+                        let displayLabel = label;
+                        
+                        // Adaptive label display based on segment size
+                        if (percentage < 4) {
+                            // For smaller segments (2-4%), only show percentage
+                            return `${percentage}%`;
+                        } else if (percentage < 8) {
+                            // For medium segments (4-8%), show abbreviated label
+                            if (label.length > 6) {
+                                displayLabel = label.substring(0, 4) + '...';
+                            }
+                            return `${displayLabel}\n${percentage}%`;
+                        } else {
+                            // For larger segments (>8%), show more complete label
+                            if (label.length > 15) {
+                                displayLabel = label.substring(0, 12) + '...';
+                            }
+                            return `${displayLabel}\n${percentage}%`;
+                        }
+                    },
+                    color: '#fff',
+                    textStrokeColor: 'rgba(0,0,0,0.5)',
+                    textStrokeWidth: 1,
+                    textAlign: 'center',
+                    anchor: 'center',
+                    align: 'center',
+                    offset: 0,
+                    padding: 4
                 }
-            };
-        }
-        
-        // Format functions
-        function formatCurrency(value) {
-            return '€' + value.toLocaleString('de-DE', {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 2
-            });
-        }
-        
-        function formatPercentage(value) {
-            return value.toFixed(1) + '%';
-        }
-        
-        // Load data and initialize
-        Promise.all([
-            fetchPortfolios(),
-            fetchPortfolioData()
-        ]).then(([portfoliosList, data]) => {
-            // Process the data
-            processData(portfoliosList, data);
-            
-            // Initialize the UI
-            initializePortfolioFilters();
-            initializeCharts();
-            renderPortfolioSections();
-            renderDetailedOverview();
-            
-            // Hide loading indicator and show content
-            document.getElementById('loadingIndicator').style.display = 'none';
-            document.getElementById('analysisContent').style.display = 'block';
-        }).catch(error => {
-            console.error('Error loading data:', error);
-            document.getElementById('loadingIndicator').innerHTML = `
-                <p class="has-text-danger">Error loading data: ${error.message}</p>
-                <button class="button is-info mt-3" onclick="location.reload()">Try Again</button>
-            `;
+            }
+        };
+    }
+    
+    // Format functions
+    function formatCurrency(value) {
+        return '€' + value.toLocaleString('de-DE', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 2
         });
-        
-        // Fetch list of portfolios
-        async function fetchPortfolios() {
-            const response = await fetch('/portfolio/api/portfolios');
-            if (!response.ok) {
-                throw new Error('Failed to fetch portfolios');
+    }
+    
+    function formatPercentage(value) {
+        return value.toFixed(1) + '%';
+    }
+    
+    // Table sorting functionality
+    let currentSortColumn = '';
+    let currentSortDirection = 'asc';
+    
+    function initTableSorting() {
+        document.querySelectorAll('th.is-sortable').forEach(header => {
+            // Add sort icon span if it doesn't exist but keep it hidden
+            if (!header.querySelector('.sort-icon')) {
+                const iconSpan = document.createElement('span');
+                iconSpan.className = 'sort-icon icon is-small ml-1';
+                iconSpan.style.display = 'none';
+                iconSpan.innerHTML = '<i class="fas fa-sort"></i>';
+                header.appendChild(iconSpan);
             }
-            return await response.json();
-        }
-        
-        // Fetch portfolio data
-        async function fetchPortfolioData() {
-            const response = await fetch('/portfolio/api/portfolio_data');
-            if (!response.ok) {
-                throw new Error('Failed to fetch portfolio data');
-            }
-            return await response.json();
-        }
-        
-        // Process the data
-        function processData(portfoliosList, data) {
-            // Create portfolio structure
-            portfolios = portfoliosList.map((name, index) => ({
-                id: index + 1,
-                name: name
-            }));
             
-            // Group data by portfolio
-            const portfolioMap = {};
-            
-            data.forEach(item => {
-                const portfolioName = item.portfolio;
+            header.addEventListener('click', function() {
+                const table = this.closest('table');
+                const tbody = table.querySelector('tbody');
+                const rows = Array.from(tbody.querySelectorAll('tr:not(.category-companies)'));
+                const index = Array.from(this.parentNode.children).indexOf(this);
+                const sortType = this.dataset.sort;
+                const columnName = this.childNodes[0].textContent.trim();
                 
-                if (!portfolioMap[portfolioName]) {
-                    const portfolio = portfolios.find(p => p.name === portfolioName);
-                    if (portfolio) {
-                        portfolioMap[portfolioName] = {
-                            id: portfolio.id,
-                            name: portfolioName,
-                            companies: [],
-                            totalValue: 0,
-                            totalInvested: 0
-                        };
+                // Determine sort direction
+                let isAsc = true;
+                if (currentSortColumn === columnName) {
+                    isAsc = currentSortDirection === 'desc'; // Toggle direction
+                }
+                
+                // Update global sort state
+                currentSortColumn = columnName;
+                currentSortDirection = isAsc ? 'asc' : 'desc';
+                
+                // Sort rows
+                rows.sort((a, b) => {
+                    const cellA = a.querySelectorAll('td')[index].textContent.trim();
+                    const cellB = b.querySelectorAll('td')[index].textContent.trim();
+                    
+                    if (sortType === 'number') {
+                        // Extract numeric value from formatted strings (remove currency symbols, commas, % signs)
+                        const numA = parseFloat(cellA.replace(/[€%,]/g, ''));
+                        const numB = parseFloat(cellB.replace(/[€%,]/g, ''));
+                        return isAsc ? numA - numB : numB - numA;
+                    } else {
+                        // String comparison
+                        return isAsc ? 
+                            cellA.localeCompare(cellB) : 
+                            cellB.localeCompare(cellA);
                     }
-                }
+                });
                 
-                if (portfolioMap[portfolioName]) {
-                    // Calculate current value
-                    const price = item.price_eur || 0;
-                    const shares = item.shares || 0;
-                    const currentValue = price * shares;
-                    const totalInvested = item.total_invested || 0;
-                    
-                    // Add company to portfolio
-                    portfolioMap[portfolioName].companies.push({
-                        id: item.id,
-                        name: item.company,
-                        category: item.category || 'Uncategorized',
-                        shares: shares,
-                        priceEur: price,
-                        currentValue: currentValue,
-                        totalInvested: totalInvested,
-                        portfolioId: portfolioMap[portfolioName].id,
-                        portfolioName: portfolioName
-                    });
-                    
-                    // Update portfolio totals
-                    portfolioMap[portfolioName].totalValue += currentValue;
-                    portfolioMap[portfolioName].totalInvested += totalInvested;
-                }
+                // Reinsert rows in sorted order
+                rows.forEach(row => tbody.appendChild(row));
             });
-            
-            // Convert map to array
-            portfolioData = Object.values(portfolioMap);
-            
-            // Calculate percentages for each company within its portfolio
-            portfolioData.forEach(portfolio => {
-                if (portfolio.totalValue > 0) {
-                    portfolio.companies.forEach(company => {
-                        company.percentage = (company.currentValue / portfolio.totalValue) * 100;
-                    });
-                }
-                
-                // Sort companies by value (descending)
-                portfolio.companies.sort((a, b) => b.currentValue - a.currentValue);
-            });
-            
-            // All portfolios are selected by default
-            selectedPortfolioIds = portfolios.map(p => p.id);
-        }
+        });
+    }
+    
+    // Load data and initialize
+    Promise.all([
+        fetchPortfolios(),
+        fetchPortfolioData()
+    ]).then(([portfoliosList, data]) => {
+        // Process the data
+        processData(portfoliosList, data);
         
-        // Initialize portfolio filter checkboxes
-        function initializePortfolioFilters() {
-            const filterContainer = document.getElementById('portfolioFilters');
-            
-            portfolios.forEach(portfolio => {
-                const checkboxDiv = document.createElement('div');
-                checkboxDiv.className = 'control mx-1';
-                
-                const label = document.createElement('label');
-                label.className = 'checkbox';
-                
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.value = portfolio.id;
-                checkbox.checked = true; // All checked by default
-                checkbox.dataset.portfolioName = portfolio.name;
-                
-                // Add change event listener
-                checkbox.addEventListener('change', handlePortfolioFilterChange);
-                
-                label.appendChild(checkbox);
-                label.appendChild(document.createTextNode(' ' + portfolio.name));
-                
-                checkboxDiv.appendChild(label);
-                filterContainer.appendChild(checkboxDiv);
-            });
-        }
+        // Initialize the UI
+        initializePortfolioFilters();
+        initializeCharts();
+        renderPortfolioSections();
+        renderDetailedOverview();
         
-        // Handle portfolio filter change
-        function handlePortfolioFilterChange(event) {
-            const checkbox = event.target;
-            const portfolioId = parseInt(checkbox.value);
-            
-            if (checkbox.checked) {
-                if (!selectedPortfolioIds.includes(portfolioId)) {
-                    selectedPortfolioIds.push(portfolioId);
-                }
-            } else {
-                selectedPortfolioIds = selectedPortfolioIds.filter(id => id !== portfolioId);
-            }
-            
-            // Update everything based on new selection
-            updateCharts();
-            updatePortfolioSectionVisibility();
-            renderDetailedOverview();
-        }
+        // Hide loading indicator and show content
+        document.getElementById('loadingIndicator').style.display = 'none';
+        document.getElementById('analysisContent').style.display = 'block';
         
-        // Update visibility of portfolio sections
-        function updatePortfolioSectionVisibility() {
-            const portfolioSections = document.querySelectorAll('.portfolio-section');
-            
-            portfolioSections.forEach(section => {
-                const portfolioId = parseInt(section.dataset.portfolioId);
-                section.style.display = selectedPortfolioIds.includes(portfolioId) ? 'block' : 'none';
-            });
-        }
+        // Initialize table sorting
+        initTableSorting();
         
-        // Initialize charts
-        function initializeCharts() {
-            initializePortfolioAllocationsChart();
-            initializeCompanyAllocationsChart();
+        // Initialize portfolio tabs
+        initializePortfolioTabs();
+    }).catch(error => {
+        console.error('Error loading data:', error);
+        document.getElementById('loadingIndicator').innerHTML = `
+            <p class="has-text-danger">Error loading data: ${error.message}</p>
+            <button class="button is-info mt-3" onclick="location.reload()">Try Again</button>
+        `;
+    });
+    
+    // Fetch list of portfolios
+    async function fetchPortfolios() {
+        const response = await fetch('/portfolio/api/portfolios');
+        if (!response.ok) {
+            throw new Error('Failed to fetch portfolios');
         }
-        
-        // Update charts based on selected portfolios
-        function updateCharts() {
-            updatePortfolioAllocationsChart();
-            updateCompanyAllocationsChart();
+        return await response.json();
+    }
+    
+    // Fetch portfolio data
+    async function fetchPortfolioData() {
+        const response = await fetch('/portfolio/api/portfolio_data');
+        if (!response.ok) {
+            throw new Error('Failed to fetch portfolio data');
         }
+        return await response.json();
+    }
+    
+    // Process the data
+    function processData(portfoliosList, data) {
+        // Create portfolio structure
+        portfolios = portfoliosList.map((name, index) => ({
+            id: index + 1,
+            name: name
+        }));
         
-        // Initialize portfolio allocations chart
-        function initializePortfolioAllocationsChart() {
-            const ctx = document.getElementById('portfolioAllocationsChart').getContext('2d');
-            
-            // Prepare chart data
-            const filteredPortfolios = portfolioData.filter(p => selectedPortfolioIds.includes(p.id));
-            const labels = filteredPortfolios.map(p => p.name);
-            const values = filteredPortfolios.map(p => p.totalValue);
-            const colors = generateColors(labels.length);
-            
-            // Create chart
-            portfolioAllocationsChart = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        data: values,
-                        backgroundColor: colors,
-                        borderWidth: 1
-                    }]
-                },
-                options: getPieChartOptions()
-            });
-        }
+        // Group data by portfolio
+        const portfolioMap = {};
         
-        // Update portfolio allocations chart
-        function updatePortfolioAllocationsChart() {
-            if (!portfolioAllocationsChart) return;
+        data.forEach(item => {
+            const portfolioName = item.portfolio;
             
-            // Prepare chart data
-            const filteredPortfolios = portfolioData.filter(p => selectedPortfolioIds.includes(p.id));
-            const labels = filteredPortfolios.map(p => p.name);
-            const values = filteredPortfolios.map(p => p.totalValue);
-            const colors = generateColors(labels.length);
-            
-            // Update chart
-            portfolioAllocationsChart.data.labels = labels;
-            portfolioAllocationsChart.data.datasets[0].data = values;
-            portfolioAllocationsChart.data.datasets[0].backgroundColor = colors;
-            portfolioAllocationsChart.update();
-        }
-        
-        // Initialize company allocations chart
-        function initializeCompanyAllocationsChart() {
-            const ctx = document.getElementById('companyAllocationsChart').getContext('2d');
-            
-            // Get all companies from selected portfolios
-            const allCompanies = getAllCompaniesFromSelectedPortfolios();
-            
-            // Group companies by name and sum values
-            const companyGroups = groupCompaniesByName(allCompanies);
-            
-            // Sort and prepare chart data
-            const { labels, values } = prepareChartData(companyGroups);
-            const colors = generateColors(labels.length);
-            
-            // Create chart
-            companyAllocationsChart = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        data: values,
-                        backgroundColor: colors,
-                        borderWidth: 1
-                    }]
-                },
-                options: getPieChartOptions()
-            });
-        }
-        
-        // Update company allocations chart
-        function updateCompanyAllocationsChart() {
-            if (!companyAllocationsChart) return;
-            
-            // Get all companies from selected portfolios
-            const allCompanies = getAllCompaniesFromSelectedPortfolios();
-            
-            // Group companies by name and sum values
-            const companyGroups = groupCompaniesByName(allCompanies);
-            
-            // Sort and prepare chart data
-            const { labels, values } = prepareChartData(companyGroups);
-            const colors = generateColors(labels.length);
-            
-            // Update chart
-            companyAllocationsChart.data.labels = labels;
-            companyAllocationsChart.data.datasets[0].data = values;
-            companyAllocationsChart.data.datasets[0].backgroundColor = colors;
-            companyAllocationsChart.update();
-        }
-        
-        // Get all companies from selected portfolios
-        function getAllCompaniesFromSelectedPortfolios() {
-            return portfolioData
-                .filter(p => selectedPortfolioIds.includes(p.id))
-                .flatMap(p => p.companies);
-        }
-        
-        // Group companies by name and sum values
-        function groupCompaniesByName(companies) {
-            const groups = {};
-            
-            companies.forEach(company => {
-                const name = company.name;
-                
-                if (!groups[name]) {
-                    groups[name] = {
-                        name: name,
-                        currentValue: 0,
+            if (!portfolioMap[portfolioName]) {
+                const portfolio = portfolios.find(p => p.name === portfolioName);
+                if (portfolio) {
+                    portfolioMap[portfolioName] = {
+                        id: portfolio.id,
+                        name: portfolioName,
+                        companies: [],
+                        totalValue: 0,
                         totalInvested: 0
                     };
                 }
-                
-                groups[name].currentValue += company.currentValue;
-                groups[name].totalInvested += company.totalInvested;
-            });
+            }
             
-            return Object.values(groups);
-        }
+            if (portfolioMap[portfolioName]) {
+                // Calculate current value
+                const price = item.price_eur || 0;
+                const shares = item.shares || 0;
+                const currentValue = price * shares;
+                const totalInvested = item.total_invested || 0;
+                
+                // Add company to portfolio
+                portfolioMap[portfolioName].companies.push({
+                    id: item.id,
+                    name: item.company,
+                    category: item.category || 'Uncategorized',
+                    shares: shares,
+                    priceEur: price,
+                    currentValue: currentValue,
+                    totalInvested: totalInvested,
+                    portfolioId: portfolioMap[portfolioName].id,
+                    portfolioName: portfolioName
+                });
+                
+                // Update portfolio totals
+                portfolioMap[portfolioName].totalValue += currentValue;
+                portfolioMap[portfolioName].totalInvested += totalInvested;
+            }
+        });
         
-        // Prepare chart data (labels and values)
-        function prepareChartData(companies) {
-            // Sort by value
-            const sortedCompanies = [...companies].sort((a, b) => b.currentValue - a.currentValue);
+        // Convert map to array
+        portfolioData = Object.values(portfolioMap);
+        
+        // Calculate percentages for each company within its portfolio
+        portfolioData.forEach(portfolio => {
+            if (portfolio.totalValue > 0) {
+                portfolio.companies.forEach(company => {
+                    company.percentage = (company.currentValue / portfolio.totalValue) * 100;
+                });
+            }
             
-            let labels = [];
-            let values = [];
+            // Sort companies by value (descending)
+            portfolio.companies.sort((a, b) => b.currentValue - a.currentValue);
             
-            if (sortedCompanies.length > 10) {
-                // Take top 10 companies
-                const top10 = sortedCompanies.slice(0, 10);
-                const others = sortedCompanies.slice(10);
+            // Group companies by category
+            portfolio.categories = groupCompaniesByCategory(portfolio.companies, portfolio.totalValue);
+        });
+        
+        // All portfolios are selected by default
+        selectedPortfolioIds = portfolios.map(p => p.id);
+    }
+    
+    /**
+     * Group companies by category and calculate various metrics
+     * 
+     * @param {Array} companies - List of company objects
+     * @param {number} portfolioTotalValue - Total portfolio value for percentage calculations
+     * @returns {Array} Sorted array of category objects with nested company data
+     */
+    function groupCompaniesByCategory(companies, portfolioTotalValue) {
+        const categories = {};
+        
+        // First pass: group companies and calculate category totals
+        companies.forEach(company => {
+            // Default to "Uncategorized" if no category is specified
+            const categoryName = company.category || "Uncategorized";
+            
+            if (!categories[categoryName]) {
+                categories[categoryName] = {
+                    name: categoryName,
+                    companies: [],
+                    currentValue: 0,
+                    totalInvested: 0,
+                    percentage: 0,
+                    profitLoss: 0
+                };
+            }
+            
+            categories[categoryName].companies.push(company);
+            categories[categoryName].currentValue += company.currentValue;
+            categories[categoryName].totalInvested += company.totalInvested;
+            
+            // Check for zero division issues
+            if (company.totalInvested > 0) {
+                categories[categoryName].profitLoss = 
+                    categories[categoryName].currentValue - categories[categoryName].totalInvested;
+            }
+        });
+        
+        // Second pass: calculate percentages and additional metrics
+        Object.values(categories).forEach(category => {
+            // Calculate category percentage of portfolio
+            category.percentage = portfolioTotalValue > 0 ? 
+                (category.currentValue / portfolioTotalValue) * 100 : 0;
                 
-                labels = top10.map(c => c.name);
-                values = top10.map(c => c.currentValue);
-                
-                // Add "Others" category
-                const othersValue = others.reduce((sum, c) => sum + c.currentValue, 0);
-                if (othersValue > 0) {
-                    labels.push('Others');
-                    values.push(othersValue);
-                }
+            // Calculate performance metrics
+            if (category.totalInvested > 0) {
+                category.performancePercentage = 
+                    ((category.currentValue - category.totalInvested) / category.totalInvested) * 100;
             } else {
-                labels = sortedCompanies.map(c => c.name);
-                values = sortedCompanies.map(c => c.currentValue);
+                category.performancePercentage = 0;
             }
-            
-            return { labels, values };
-        }
-        
-        // Generate colors for chart segments
-        function generateColors(count) {
-            const colors = [];
-            for (let i = 0; i < count; i++) {
-                const hue = i * (360 / count);
-                colors.push(`hsl(${hue}, 70%, 65%)`);
-            }
-            return colors;
-        }
-        
-        // Render portfolio sections
-        function renderPortfolioSections() {
-            const container = document.getElementById('portfolioSections');
-            
-            // Sort portfolios by name
-            const sortedPortfolios = [...portfolioData].sort((a, b) => a.name.localeCompare(b.name));
-            
-            sortedPortfolios.forEach(portfolio => {
-                const section = document.createElement('div');
-                section.className = 'card mt-4 portfolio-section';
-                section.dataset.portfolioId = portfolio.id;
                 
-                const header = document.createElement('div');
-                header.className = 'card-header';
-                header.innerHTML = `<p class="card-header-title">${portfolio.name}</p>`;
-                
-                const content = document.createElement('div');
-                content.className = 'card-content';
-                
-                const columns = document.createElement('div');
-                columns.className = 'columns';
-                
-                // Table column
-                const tableColumn = document.createElement('div');
-                tableColumn.className = 'column is-7';
-                tableColumn.innerHTML = `
-                    <div class="table-container">
-                        <table class="table is-fullwidth is-striped is-hoverable">
-                            <thead>
-                                <tr>
-                                    <th>Company</th>
-                                    <th>Category</th>
-                                    <th>% of Portfolio</th>
-                                    <th>Current Value</th>
-                                    <th>Total Invested</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${renderCompanyRows(portfolio)}
-                            </tbody>
-                        </table>
-                    </div>
-                `;
-                
-                // Chart column
-                const chartColumn = document.createElement('div');
-                chartColumn.className = 'column is-5';
-                
-                const chartContainer = document.createElement('div');
-                chartContainer.className = 'chart-container';
-                chartContainer.style.height = '350px';
-                
-                const canvas = document.createElement('canvas');
-                canvas.id = `portfolioChart${portfolio.id}`;
-                
-                chartContainer.appendChild(canvas);
-                chartColumn.appendChild(chartContainer);
-                
-                columns.appendChild(tableColumn);
-                columns.appendChild(chartColumn);
-                
-                content.appendChild(columns);
-                
-                section.appendChild(header);
-                section.appendChild(content);
-                
-                container.appendChild(section);
-                
-                // Initialize chart for this portfolio
-                initializePortfolioChart(portfolio);
-            });
-        }
-        
-        // Render company rows for a portfolio
-        function renderCompanyRows(portfolio) {
-            if (portfolio.companies.length === 0) {
-                return `<tr><td colspan="5" class="has-text-centered">No companies in this portfolio</td></tr>`;
-            }
-            
-            return portfolio.companies.map(company => `
-                <tr>
-                    <td>${company.name}</td>
-                    <td>${company.category}</td>
-                    <td>${company.percentage ? formatPercentage(company.percentage) : '-'}</td>
-                    <td>${formatCurrency(company.currentValue)}</td>
-                    <td>${formatCurrency(company.totalInvested)}</td>
-                </tr>
-            `).join('');
-        }
-        
-        // Initialize chart for a specific portfolio
-        function initializePortfolioChart(portfolio) {
-            const ctx = document.getElementById(`portfolioChart${portfolio.id}`).getContext('2d');
-            
-            // Prepare chart data for portfolio companies
-            let { labels, values } = prepareChartData(portfolio.companies);
-            const colors = generateColors(labels.length);
-            
-            // Create chart
-            portfolioCharts[portfolio.id] = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        data: values,
-                        backgroundColor: colors,
-                        borderWidth: 1
-                    }]
-                },
-                options: getPieChartOptions()
-            });
-        }
-        
-        // Render detailed overview section
-        function renderDetailedOverview() {
-            const container = document.getElementById('detailedOverview');
-            
-            // Calculate totals across all selected portfolios
-            const selectedPortfolios = portfolioData.filter(p => selectedPortfolioIds.includes(p.id));
-            const totalValue = selectedPortfolios.reduce((sum, p) => sum + p.totalValue, 0);
-            const totalInvested = selectedPortfolios.reduce((sum, p) => sum + p.totalInvested, 0);
-            const profitLoss = totalValue - totalInvested;
-            const profitLossPercentage = totalInvested > 0 ? (profitLoss / totalInvested) * 100 : 0;
-            
-            // Get all companies from selected portfolios
-            const allCompanies = getAllCompaniesFromSelectedPortfolios();
-            const uniqueCompanies = new Set(allCompanies.map(c => c.name)).size;
-            
-            // Group by category
-            const categoryGroups = {};
-            allCompanies.forEach(company => {
-                const category = company.category;
-                
-                if (!categoryGroups[category]) {
-                    categoryGroups[category] = {
-                        name: category,
-                        currentValue: 0,
-                        totalInvested: 0,
-                        count: 0
-                    };
+            // Calculate company percentages within category
+            category.companies.forEach(company => {
+                company.categoryPercentage = category.currentValue > 0 ? 
+                    (company.currentValue / category.currentValue) * 100 : 0;
+                    
+                // Ensure company has both percentages available
+                if (typeof company.percentage !== 'number') {
+                    company.percentage = portfolioTotalValue > 0 ? 
+                        (company.currentValue / portfolioTotalValue) * 100 : 0;
                 }
-                
-                categoryGroups[category].currentValue += company.currentValue;
-                categoryGroups[category].totalInvested += company.totalInvested;
-                categoryGroups[category].count += 1;
             });
             
-            // Sort categories by value
-            const sortedCategories = Object.values(categoryGroups).sort((a, b) => b.currentValue - a.currentValue);
+            // Sort companies within category by value (descending)
+            category.companies.sort((a, b) => b.currentValue - a.currentValue);
+        });
+        
+        // Convert to array and sort by value (descending)
+        return Object.values(categories).sort((a, b) => b.currentValue - a.currentValue);
+    }
+    
+    // Initialize portfolio filter checkboxes
+    function initializePortfolioFilters() {
+        const filterContainer = document.getElementById('portfolioFilters');
+        
+        // Filter out empty portfolios
+        const nonEmptyPortfolios = portfolios.filter(portfolio => {
+            const portfolioInfo = portfolioData.find(p => p.name === portfolio.name);
+            return portfolioInfo && portfolioInfo.companies && portfolioInfo.companies.length > 0;
+        });
+        
+        nonEmptyPortfolios.forEach(portfolio => {
+            const checkboxDiv = document.createElement('div');
+            checkboxDiv.className = 'control mx-1';
             
-            // Render HTML
-            container.innerHTML = `
-                <div class="columns">
-                    <div class="column is-3">
-                        <div class="box has-text-centered">
-                            <p class="heading">Total Value</p>
-                            <p class="title is-4">${formatCurrency(totalValue)}</p>
-                        </div>
-                    </div>
-                    <div class="column is-3">
-                        <div class="box has-text-centered">
-                            <p class="heading">Total Invested</p>
-                            <p class="title is-4">${formatCurrency(totalInvested)}</p>
-                        </div>
-                    </div>
-                    <div class="column is-3">
-                        <div class="box has-text-centered">
-                            <p class="heading">Profit/Loss</p>
-                            <p class="title is-4 ${profitLoss >= 0 ? 'has-text-success' : 'has-text-danger'}">
-                                ${formatCurrency(profitLoss)} (${profitLossPercentage.toFixed(1)}%)
-                            </p>
-                        </div>
-                    </div>
-                    <div class="column is-3">
-                        <div class="box has-text-centered">
-                            <p class="heading">Unique Companies</p>
-                            <p class="title is-4">${uniqueCompanies}</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <h3 class="title is-5 mt-4">Category Breakdown</h3>
-                <div class="table-container">
+            const label = document.createElement('label');
+            label.className = 'checkbox';
+            
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.value = portfolio.id;
+            checkbox.checked = true; // All checked by default
+            checkbox.dataset.portfolioName = portfolio.name;
+            
+            // Add change event listener
+            checkbox.addEventListener('change', handlePortfolioFilterChange);
+            
+            label.appendChild(checkbox);
+            label.appendChild(document.createTextNode(' ' + portfolio.name));
+            
+            checkboxDiv.appendChild(label);
+            filterContainer.appendChild(checkboxDiv);
+        });
+    }
+    
+    // Handle portfolio filter change
+    function handlePortfolioFilterChange(event) {
+        const checkbox = event.target;
+        const portfolioId = parseInt(checkbox.value);
+        
+        if (checkbox.checked) {
+            if (!selectedPortfolioIds.includes(portfolioId)) {
+                selectedPortfolioIds.push(portfolioId);
+            }
+        } else {
+            selectedPortfolioIds = selectedPortfolioIds.filter(id => id !== portfolioId);
+        }
+        
+        // Update everything based on new selection
+        updateCharts();
+        updatePortfolioSectionVisibility();
+        renderDetailedOverview();
+    }
+    
+    // Update visibility of portfolio sections
+    function updatePortfolioSectionVisibility() {
+        const portfolioSections = document.querySelectorAll('.portfolio-section');
+        
+        portfolioSections.forEach(section => {
+            const portfolioId = parseInt(section.dataset.portfolioId);
+            section.style.display = selectedPortfolioIds.includes(portfolioId) ? 'block' : 'none';
+        });
+    }
+    
+    // Initialize charts
+    function initializeCharts() {
+        initializePortfolioAllocationsChart();
+        initializeCompanyAllocationsChart();
+    }
+    
+    // Update charts based on selected portfolios
+    function updateCharts() {
+        updatePortfolioAllocationsChart();
+        updateCompanyAllocationsChart();
+    }
+    
+    // Initialize portfolio allocations chart
+    function initializePortfolioAllocationsChart() {
+        const ctx = document.getElementById('portfolioAllocationsChart').getContext('2d');
+        
+        // Prepare chart data
+        const filteredPortfolios = portfolioData.filter(p => selectedPortfolioIds.includes(p.id));
+        const labels = filteredPortfolios.map(p => p.name);
+        const originalLabels = [...labels]; // Store original labels for tooltips
+        const values = filteredPortfolios.map(p => p.totalValue);
+        const colors = generateColors(labels.length);
+        
+        // Create chart
+        portfolioAllocationsChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                originalLabels: originalLabels, // Store original labels for tooltips
+                datasets: [{
+                    data: values,
+                    backgroundColor: colors,
+                    borderWidth: 1
+                }]
+            },
+            options: getPieChartOptions()
+        });
+    }
+    
+    // Update portfolio allocations chart
+    function updatePortfolioAllocationsChart() {
+        if (!portfolioAllocationsChart) return;
+        
+        // Prepare chart data
+        const filteredPortfolios = portfolioData.filter(p => selectedPortfolioIds.includes(p.id));
+        const labels = filteredPortfolios.map(p => p.name);
+        const originalLabels = [...labels]; // Store original labels for tooltips
+        const values = filteredPortfolios.map(p => p.totalValue);
+        const colors = generateColors(labels.length);
+        
+        // Update chart
+        portfolioAllocationsChart.data.labels = labels;
+        portfolioAllocationsChart.data.originalLabels = originalLabels; // Update original labels
+        portfolioAllocationsChart.data.datasets[0].data = values;
+        portfolioAllocationsChart.data.datasets[0].backgroundColor = colors;
+        portfolioAllocationsChart.update();
+    }
+    
+    // Initialize company allocations chart
+    function initializeCompanyAllocationsChart() {
+        const ctx = document.getElementById('companyAllocationsChart').getContext('2d');
+        
+        // Get all companies from selected portfolios
+        const allCompanies = getAllCompaniesFromSelectedPortfolios();
+        
+        // Group companies by name and sum values
+        const companyGroups = groupCompaniesByName(allCompanies);
+        
+        // Sort and prepare chart data
+        const { labels, values, originalLabels } = prepareChartData(companyGroups);
+        const colors = generateColors(labels.length);
+        
+        // Create chart
+        companyAllocationsChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                originalLabels: originalLabels, // Store original labels for tooltips
+                datasets: [{
+                    data: values,
+                    backgroundColor: colors,
+                    borderWidth: 1
+                }]
+            },
+            options: getPieChartOptions()
+        });
+    }
+    
+    // Update company allocations chart
+    function updateCompanyAllocationsChart() {
+        if (!companyAllocationsChart) return;
+        
+        // Get all companies from selected portfolios
+        const allCompanies = getAllCompaniesFromSelectedPortfolios();
+        
+        // Group companies by name and sum values
+        const companyGroups = groupCompaniesByName(allCompanies);
+        
+        // Sort and prepare chart data
+        const { labels, values, originalLabels } = prepareChartData(companyGroups);
+        const colors = generateColors(labels.length);
+        
+        // Update chart
+        companyAllocationsChart.data.labels = labels;
+        companyAllocationsChart.data.originalLabels = originalLabels; // Update original labels
+        companyAllocationsChart.data.datasets[0].data = values;
+        companyAllocationsChart.data.datasets[0].backgroundColor = colors;
+        companyAllocationsChart.update();
+    }
+    
+    // Get all companies from selected portfolios
+    function getAllCompaniesFromSelectedPortfolios() {
+        return portfolioData
+            .filter(p => selectedPortfolioIds.includes(p.id))
+            .flatMap(p => p.companies);
+    }
+    
+    // Group companies by name and sum values
+    function groupCompaniesByName(companies) {
+        const groups = {};
+        
+        companies.forEach(company => {
+            const name = company.name;
+            
+            if (!groups[name]) {
+                groups[name] = {
+                    name: name,
+                    currentValue: 0,
+                    totalInvested: 0
+                };
+            }
+            
+            groups[name].currentValue += company.currentValue;
+            groups[name].totalInvested += company.totalInvested;
+        });
+        
+        return Object.values(groups);
+    }
+    
+    // Prepare chart data (labels and values)
+    function prepareChartData(companies) {
+        // Sort by value
+        const sortedCompanies = [...companies].sort((a, b) => b.currentValue - a.currentValue);
+        
+        let labels = [];
+        let values = [];
+        let originalLabels = []; // Store original full names for tooltips
+        
+        if (sortedCompanies.length > 10) {
+            // Take top 10 companies
+            const top10 = sortedCompanies.slice(0, 10);
+            const others = sortedCompanies.slice(10);
+            
+            // Store original names and values
+            originalLabels = top10.map(c => c.name);
+            labels = originalLabels;
+            values = top10.map(c => c.currentValue);
+            
+            // Add "Others" category
+            const othersValue = others.reduce((sum, c) => sum + c.currentValue, 0);
+            if (othersValue > 0) {
+                labels.push('Others');
+                originalLabels.push('Others');
+                values.push(othersValue);
+            }
+        } else {
+            originalLabels = sortedCompanies.map(c => c.name);
+            labels = originalLabels;
+            values = sortedCompanies.map(c => c.currentValue);
+        }
+        
+        return { labels, values, originalLabels };
+    }
+    
+    // Generate colors for chart segments
+    function generateColors(count) {
+        const colors = [];
+        for (let i = 0; i < count; i++) {
+            const hue = i * (360 / count);
+            colors.push(`hsl(${hue}, 70%, 65%)`);
+        }
+        return colors;
+    }
+    
+    // Render portfolio sections
+    function renderPortfolioSections() {
+        const container = document.getElementById('portfolioSections');
+        
+        // Sort portfolios by name
+        const sortedPortfolios = [...portfolioData].sort((a, b) => a.name.localeCompare(b.name));
+        
+        sortedPortfolios.forEach(portfolio => {
+            // Skip portfolios with no companies
+            if (!portfolio.companies || portfolio.companies.length === 0) {
+                return;
+            }
+            
+            const section = document.createElement('div');
+            section.className = 'portfolio-section';
+            section.dataset.portfolioId = portfolio.id;
+            
+            const header = document.createElement('div');
+            header.className = 'portfolio-header';
+            header.innerHTML = `<h4 class="portfolio-header-title">${portfolio.name}</h4>`;
+            
+            const content = document.createElement('div');
+            content.className = 'portfolio-content';
+            
+            // Add tabs for company vs category view
+            const tabs = document.createElement('div');
+            tabs.className = 'tabs is-boxed mb-0';
+            tabs.innerHTML = `
+                <ul>
+                    <li class="is-active" data-tab="companies-${portfolio.id}">
+                        <a>
+                            <span class="icon is-small"><i class="fas fa-building"></i></span>
+                            <span>Companies</span>
+                        </a>
+                    </li>
+                    <li data-tab="categories-${portfolio.id}">
+                        <a>
+                            <span class="icon is-small"><i class="fas fa-tags"></i></span>
+                            <span>Categories</span>
+                        </a>
+                    </li>
+                </ul>
+            `;
+            
+            // Create tab content container
+            const tabContent = document.createElement('div');
+            tabContent.className = 'tab-content';
+            
+            // Companies tab content
+            const companiesTab = document.createElement('div');
+            companiesTab.id = `companies-${portfolio.id}`;
+            companiesTab.className = 'tab-pane is-active';
+            
+            // Categories tab content
+            const categoriesTab = document.createElement('div');
+            categoriesTab.id = `categories-${portfolio.id}`;
+            categoriesTab.className = 'tab-pane';
+            categoriesTab.style.display = 'none';
+            
+            // Create the columns layout for both tabs
+            const companiesColumns = document.createElement('div');
+            companiesColumns.className = 'columns';
+            companiesColumns.style.minHeight = '450px';
+            
+            const categoriesColumns = document.createElement('div');
+            categoriesColumns.className = 'columns';
+            categoriesColumns.style.minHeight = '450px';
+            
+            // Company table column
+            const companyTableColumn = document.createElement('div');
+            companyTableColumn.className = 'column is-6';
+            companyTableColumn.innerHTML = `
+                <div class="table-container" style="height: 100%; display: flex; flex-direction: column;">
                     <table class="table is-fullwidth is-striped is-hoverable">
                         <thead>
                             <tr>
-                                <th>Category</th>
-                                <th>Companies</th>
-                                <th>Current Value</th>
-                                <th>% of Portfolio</th>
-                                <th>Total Invested</th>
-                                <th>Profit/Loss</th>
+                                <th class="is-sortable company-column" data-sort="string">Company</th>
+                                <th class="is-sortable category-column" data-sort="string">Category</th>
+                                <th class="is-sortable percentage-column" data-sort="number">%</th>
+                                <th class="is-sortable value-column" data-sort="number">Current Value</th>
+                                <th class="is-sortable value-column" data-sort="number">Total Invested</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${sortedCategories.map(category => {
-                                const catProfitLoss = category.currentValue - category.totalInvested;
-                                const catPercentage = totalValue > 0 ? (category.currentValue / totalValue) * 100 : 0;
-                                
-                                return `<tr>
-                                    <td>${category.name}</td>
-                                    <td>${category.count}</td>
-                                    <td>${formatCurrency(category.currentValue)}</td>
-                                    <td>${formatPercentage(catPercentage)}</td>
-                                    <td>${formatCurrency(category.totalInvested)}</td>
-                                    <td class="${catProfitLoss >= 0 ? 'has-text-success' : 'has-text-danger'}">
-                                        ${formatCurrency(catProfitLoss)}
-                                    </td>
-                                </tr>`;
-                            }).join('')}
+                            ${renderCompanyRows(portfolio)}
                         </tbody>
                     </table>
                 </div>
             `;
+            
+            // Category table column with info banner
+            const categoryTableColumn = document.createElement('div');
+            categoryTableColumn.className = 'column is-6';
+            categoryTableColumn.innerHTML = `
+                <div class="notification is-info is-light mb-2 py-2 px-3">
+                    <p class="is-size-7">
+                        <span class="icon is-small mr-1"><i class="fas fa-info-circle"></i></span>
+                        Click on a category row to see companies within that category. Percentages show both category and portfolio allocation.
+                    </p>
+                </div>
+                <div class="table-container" style="height: calc(100% - 40px); display: flex; flex-direction: column;">
+                    <table class="table is-fullwidth is-striped is-hoverable">
+                        <thead>
+                            <tr>
+                                <th class="is-sortable company-column" data-sort="string">Category</th>
+                                <th class="is-sortable percentage-column" data-sort="number">% of Portfolio</th>
+                                <th class="is-sortable value-column" data-sort="number">Current Value</th>
+                                <th class="is-sortable value-column" data-sort="number">Total Invested</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${renderCategoryRows(portfolio)}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            // Chart column for companies view
+            const companyChartColumn = document.createElement('div');
+            companyChartColumn.className = 'column is-6';
+            companyChartColumn.style.display = 'flex';
+            companyChartColumn.style.alignItems = 'center';
+            
+            const companyChartContainer = document.createElement('div');
+            companyChartContainer.className = 'chart-medium-container';
+            companyChartContainer.style.display = 'flex';
+            companyChartContainer.style.alignItems = 'center';
+            companyChartContainer.style.justifyContent = 'center';
+            companyChartContainer.style.height = '100%';
+            
+            const companyCanvas = document.createElement('canvas');
+            companyCanvas.id = `portfolioChart${portfolio.id}`;
+            
+            companyChartContainer.appendChild(companyCanvas);
+            companyChartColumn.appendChild(companyChartContainer);
+            
+            // Chart column for categories view
+            const categoryChartColumn = document.createElement('div');
+            categoryChartColumn.className = 'column is-6';
+            categoryChartColumn.style.display = 'flex';
+            categoryChartColumn.style.alignItems = 'center';
+            
+            const categoryChartContainer = document.createElement('div');
+            categoryChartContainer.className = 'chart-medium-container';
+            categoryChartContainer.style.display = 'flex';
+            categoryChartContainer.style.alignItems = 'center';
+            categoryChartContainer.style.justifyContent = 'center';
+            categoryChartContainer.style.height = '100%';
+            
+            const categoryCanvas = document.createElement('canvas');
+            categoryCanvas.id = `categoryChart${portfolio.id}`;
+            
+            categoryChartContainer.appendChild(categoryCanvas);
+            categoryChartColumn.appendChild(categoryChartContainer);
+            
+            // Assemble the columns for both tabs
+            companiesColumns.appendChild(companyTableColumn);
+            companiesColumns.appendChild(companyChartColumn);
+            
+            categoriesColumns.appendChild(categoryTableColumn);
+            categoriesColumns.appendChild(categoryChartColumn);
+            
+            // Add columns to tab content
+            companiesTab.appendChild(companiesColumns);
+            categoriesTab.appendChild(categoriesColumns);
+            
+            // Add tab content to container
+            tabContent.appendChild(companiesTab);
+            tabContent.appendChild(categoriesTab);
+            
+            // Assemble the content
+            content.appendChild(tabs);
+            content.appendChild(tabContent);
+            
+            // Add header and content to section
+            section.appendChild(header);
+            section.appendChild(content);
+            
+            // Add section to container
+            container.appendChild(section);
+            
+            // Initialize charts
+            initializePortfolioChart(portfolio);
+            initializeCategoryChart(portfolio);
+        });
+    }
+    
+    /**
+     * Initialize tab navigation for portfolio sections
+     * Sets up click handlers and ensures charts render correctly when tabs change
+     */
+    function initializePortfolioTabs() {
+        document.querySelectorAll('.portfolio-section .tabs li').forEach(tab => {
+            tab.addEventListener('click', function() {
+                // Get the parent portfolio section
+                const portfolioSection = this.closest('.portfolio-section');
+                
+                // Get the target tab ID
+                const targetId = this.getAttribute('data-tab');
+                
+                // Get the portfolio ID to update the right charts
+                const portfolioId = portfolioSection.dataset.portfolioId;
+                
+                // Update active tab
+                portfolioSection.querySelectorAll('.tabs li').forEach(t => {
+                    t.classList.remove('is-active');
+                });
+                this.classList.add('is-active');
+                
+                // Show the selected tab content with fade effect
+                portfolioSection.querySelectorAll('.tab-pane').forEach(pane => {
+                    if (pane.id === targetId) {
+                        // Fade in the target pane
+                        pane.style.opacity = '0';
+                        pane.classList.add('is-active');
+                        pane.style.display = 'block';
+                        
+                        // Force reflow
+                        void pane.offsetHeight;
+                        
+                        // Fade in
+                        pane.style.transition = 'opacity 0.3s ease';
+                        pane.style.opacity = '1';
+                    } else {
+                        // Hide other panes
+                        pane.classList.remove('is-active');
+                        pane.style.display = 'none';
+                    }
+                });
+                
+                // Save the active tab preference to localStorage
+                try {
+                    localStorage.setItem(`portfolio_tab_${portfolioId}`, targetId);
+                } catch (e) {
+                    console.warn('Could not save tab preference to localStorage', e);
+                }
+                
+                // Trigger resize event to fix chart display issues
+                setTimeout(() => {
+                    window.dispatchEvent(new Event('resize'));
+                    
+                    // If switching to the category tab, make sure the category chart is properly sized
+                    if (targetId.includes('categories')) {
+                        const categoryChart = document.getElementById(`categoryChart${portfolioId}`);
+                        if (categoryChart && categoryChart.chart) {
+                            categoryChart.chart.resize();
+                        }
+                    }
+                }, 50);
+            });
+        });
+        
+        // Restore previous tab selections from localStorage if available
+        try {
+            document.querySelectorAll('.portfolio-section').forEach(section => {
+                const portfolioId = section.dataset.portfolioId;
+                const savedTabId = localStorage.getItem(`portfolio_tab_${portfolioId}`);
+                
+                if (savedTabId) {
+                    const tabToActivate = section.querySelector(`[data-tab="${savedTabId}"]`);
+                    if (tabToActivate) {
+                        tabToActivate.click();
+                    }
+                }
+            });
+        } catch (e) {
+            console.warn('Could not restore tab preferences from localStorage', e);
         }
+    }
+    
+    // Render company rows for a portfolio
+    function renderCompanyRows(portfolio) {
+        if (portfolio.companies.length === 0) {
+            return `<tr><td colspan="5" class="has-text-centered">No companies in this portfolio</td></tr>`;
+        }
+        
+        return portfolio.companies.map(company => `
+            <tr>
+                <td>${company.name}</td>
+                <td>${company.category}</td>
+                <td>${company.percentage ? formatPercentage(company.percentage) : '-'}</td>
+                <td>${formatCurrency(company.currentValue)}</td>
+                <td>${formatCurrency(company.totalInvested)}</td>
+            </tr>
+        `).join('');
+    }
+    
+    // Render category rows for a portfolio
+    function renderCategoryRows(portfolio) {
+        if (!portfolio.categories || portfolio.categories.length === 0) {
+            return `<tr><td colspan="4" class="has-text-centered">No categories in this portfolio</td></tr>`;
+        }
+        
+        let html = '';
+        
+        portfolio.categories.forEach(category => {
+            // Main category row
+            html += `
+                <tr class="category-row" data-category="${category.name}" data-portfolio-id="${portfolio.id}">
+                    <td>
+                        <span class="icon-text">
+                            <span class="icon toggle-companies" data-category="${category.name}" data-portfolio-id="${portfolio.id}">
+                                <i class="fas fa-plus-circle"></i>
+                            </span>
+                            <span>${category.name}</span>
+                        </span>
+                    </td>
+                    <td>${formatPercentage(category.percentage)}</td>
+                    <td>${formatCurrency(category.currentValue)}</td>
+                    <td>${formatCurrency(category.totalInvested)}</td>
+                </tr>
+            `;
+            
+            // Company rows (initially hidden)
+            category.companies.forEach(company => {
+                // Calculate dual percentage representation:
+                // - What percentage of the category this company represents
+                // - What percentage of the portfolio this company represents
+                const portfolioPercentageText = formatPercentage(company.percentage);
+                const categoryPercentageText = formatPercentage(company.categoryPercentage);
+                
+                html += `
+                    <tr class="category-companies is-hidden" data-parent-category="${category.name}" data-portfolio-id="${portfolio.id}">
+                        <td class="pl-5">
+                            <span class="is-size-7">${company.name}</span>
+                        </td>
+                        <td>
+                            <span class="is-size-7" title="Category: ${categoryPercentageText} | Portfolio: ${portfolioPercentageText}">
+                                ${categoryPercentageText}
+                                <span class="has-text-grey-light">(${portfolioPercentageText} of portfolio)</span>
+                            </span>
+                        </td>
+                        <td><span class="is-size-7">${formatCurrency(company.currentValue)}</span></td>
+                        <td><span class="is-size-7">${formatCurrency(company.totalInvested)}</span></td>
+                    </tr>
+                `;
+            });
+        });
+        
+        return html;
+    }
+    
+    // Initialize chart for a specific portfolio
+    function initializePortfolioChart(portfolio) {
+        const ctx = document.getElementById(`portfolioChart${portfolio.id}`).getContext('2d');
+        
+        // Prepare chart data for portfolio companies
+        let { labels, values, originalLabels } = prepareChartData(portfolio.companies);
+        const colors = generateColors(labels.length);
+        
+        // Create chart
+        portfolioCharts[portfolio.id] = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                originalLabels: originalLabels, // Store original labels for tooltips
+                datasets: [{
+                    data: values,
+                    backgroundColor: colors,
+                    borderWidth: 1
+                }]
+            },
+            options: getPieChartOptions()
+        });
+    }
+    
+    // Initialize category chart for a specific portfolio
+    function initializeCategoryChart(portfolio) {
+        const ctx = document.getElementById(`categoryChart${portfolio.id}`).getContext('2d');
+        
+        // Prepare chart data
+        const labels = portfolio.categories.map(c => c.name);
+        const values = portfolio.categories.map(c => c.currentValue);
+        const colors = generateColors(labels.length);
+        
+        // Create chart
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: colors,
+                    borderWidth: 1
+                }]
+            },
+            options: getPieChartOptions()
+        });
+    }
+    
+    // Render detailed overview section
+    function renderDetailedOverview() {
+        const container = document.getElementById('detailedOverview');
+        
+        // Calculate totals across all selected portfolios
+        const selectedPortfolios = portfolioData.filter(p => selectedPortfolioIds.includes(p.id));
+        const totalValue = selectedPortfolios.reduce((sum, p) => sum + p.totalValue, 0);
+        const totalInvested = selectedPortfolios.reduce((sum, p) => sum + p.totalInvested, 0);
+        const profitLoss = totalValue - totalInvested;
+        const profitLossPercentage = totalInvested > 0 ? (profitLoss / totalInvested) * 100 : 0;
+        
+        // Get all companies from selected portfolios
+        const allCompanies = getAllCompaniesFromSelectedPortfolios();
+        const uniqueCompanies = new Set(allCompanies.map(c => c.name)).size;
+        
+        // Group by category
+        const categoryGroups = {};
+        allCompanies.forEach(company => {
+            const category = company.category;
+            
+            if (!categoryGroups[category]) {
+                categoryGroups[category] = {
+                    name: category,
+                    currentValue: 0,
+                    totalInvested: 0,
+                    count: 0
+                };
+            }
+            
+            categoryGroups[category].currentValue += company.currentValue;
+            categoryGroups[category].totalInvested += company.totalInvested;
+            categoryGroups[category].count += 1;
+        });
+        
+        // Sort categories by value
+        const sortedCategories = Object.values(categoryGroups).sort((a, b) => b.currentValue - a.currentValue);
+        
+        // Render HTML
+        container.innerHTML = `
+            <div class="columns">
+                <div class="column is-3">
+                    <div class="box has-text-centered">
+                        <p class="heading">Total Value</p>
+                        <p class="title is-4">${formatCurrency(totalValue)}</p>
+                    </div>
+                </div>
+                <div class="column is-3">
+                    <div class="box has-text-centered">
+                        <p class="heading">Total Invested</p>
+                        <p class="title is-4">${formatCurrency(totalInvested)}</p>
+                    </div>
+                </div>
+                <div class="column is-3">
+                    <div class="box has-text-centered">
+                        <p class="heading">Profit/Loss</p>
+                        <p class="title is-4 ${profitLoss >= 0 ? 'has-text-success' : 'has-text-danger'}">
+                            ${formatCurrency(profitLoss)} (${profitLossPercentage.toFixed(1)}%)
+                        </p>
+                    </div>
+                </div>
+                <div class="column is-3">
+                    <div class="box has-text-centered">
+                        <p class="heading">Unique Companies</p>
+                        <p class="title is-4">${uniqueCompanies}</p>
+                    </div>
+                </div>
+            </div>
+            
+            <h3 class="title is-5 mt-4">Category Breakdown</h3>
+            <div class="table-container">
+                <table class="table is-fullwidth is-striped is-hoverable">
+                    <thead>
+                        <tr>
+                            <th class="is-sortable company-column" data-sort="string">Category</th>
+                            <th class="is-sortable" data-sort="number">Companies</th>
+                            <th class="is-sortable value-column" data-sort="number">Current Value</th>
+                            <th class="is-sortable percentage-column" data-sort="number">%</th>
+                            <th class="is-sortable value-column" data-sort="number">Total Invested</th>
+                            <th class="is-sortable value-column" data-sort="number">Profit/Loss</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${sortedCategories.map(category => {
+                            const catProfitLoss = category.currentValue - category.totalInvested;
+                            const catPercentage = totalValue > 0 ? (category.currentValue / totalValue) * 100 : 0;
+                            
+                            return `<tr>
+                                <td>${category.name}</td>
+                                <td>${category.count}</td>
+                                <td>${formatCurrency(category.currentValue)}</td>
+                                <td>${formatPercentage(catPercentage)}</td>
+                                <td>${formatCurrency(category.totalInvested)}</td>
+                                <td class="${catProfitLoss >= 0 ? 'has-text-success' : 'has-text-danger'}">
+                                    ${formatCurrency(catProfitLoss)}
+                                </td>
+                            </tr>`;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+    
+    // Add event listeners to toggle category companies
+    document.addEventListener('click', function(e) {
+        // Check if click was on or inside a toggle-companies element
+        const toggleIcon = e.target.closest('.toggle-companies');
+        if (!toggleIcon) return;
+        
+        const categoryName = toggleIcon.dataset.category;
+        const portfolioId = toggleIcon.dataset.portfolioId;
+        
+        // Find the category row
+        const categoryRow = toggleIcon.closest('.category-row');
+        
+        // Toggle icon
+        const icon = toggleIcon.querySelector('i');
+        const isExpanding = icon.classList.contains('fa-plus-circle');
+        
+        if (isExpanding) {
+            icon.classList.remove('fa-plus-circle');
+            icon.classList.add('fa-minus-circle');
+            
+            // Highlight the row when expanded
+            categoryRow.classList.add('is-selected');
+        } else {
+            icon.classList.remove('fa-minus-circle');
+            icon.classList.add('fa-plus-circle');
+            
+            // Remove highlight when collapsed
+            categoryRow.classList.remove('is-selected');
+        }
+        
+        // Toggle company rows with animation
+        const companyRows = document.querySelectorAll(
+            `.category-companies[data-parent-category="${categoryName}"][data-portfolio-id="${portfolioId}"]`
+        );
+        
+        companyRows.forEach(row => {
+            if (isExpanding) {
+                // First make it visible but with 0 height
+                row.classList.remove('is-hidden');
+                row.style.maxHeight = '0';
+                row.style.opacity = '0';
+                
+                // Force a reflow
+                void row.offsetHeight;
+                
+                // Then animate to full height
+                row.style.transition = 'max-height 0.3s ease, opacity 0.3s ease';
+                row.style.maxHeight = '100px';
+                row.style.opacity = '1';
+            } else {
+                // Animate to 0 height
+                row.style.transition = 'max-height 0.3s ease, opacity 0.3s ease';
+                row.style.maxHeight = '0';
+                row.style.opacity = '0';
+                
+                // After animation, hide it
+                setTimeout(() => {
+                    row.classList.add('is-hidden');
+                    row.style.maxHeight = '';
+                    row.style.opacity = '';
+                }, 300);
+            }
+        });
     });
+});
+
+// Add CSS for portfolio tabs and category rows
+document.addEventListener('DOMContentLoaded', function() {
+    // Create style element
+    const style = document.createElement('style');
+    style.innerHTML = `
+        /* Tab styling */
+        .portfolio-section .tabs {
+            margin-bottom: 0;
+        }
+        
+        .tab-pane {
+            padding-top: 1rem;
+        }
+        
+        /* Category row styling */
+        .category-row {
+            background-color: rgba(0, 0, 0, 0.03);
+            font-weight: 500;
+            transition: background-color 0.2s ease;
+        }
+        
+        .category-row.is-selected {
+            background-color: rgba(50, 115, 220, 0.08);
+        }
+        
+        .toggle-companies {
+            cursor: pointer;
+            color: #3273dc;
+            transition: transform 0.2s ease;
+        }
+        
+        .toggle-companies:hover {
+            transform: scale(1.2);
+        }
+        
+        tr.category-companies {
+            background-color: rgba(0, 0, 0, 0.02);
+            overflow: hidden;
+        }
+        
+        tr.category-companies td {
+            border-top: none;
+            padding-top: 0.4em;
+            padding-bottom: 0.4em;
+        }
+        
+        /* Helper classes for the dual percentage display */
+        .has-text-grey-light {
+            color: #8c9b9d !important;
+            font-size: 0.9em;
+            margin-left: 0.3em;
+        }
+    `;
+    
+    // Add to head
+    document.head.appendChild(style);
+});
 </script>
 {% endblock %}
