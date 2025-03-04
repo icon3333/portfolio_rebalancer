@@ -241,6 +241,52 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    // Initialize expandable portfolio sections
+    function initializeExpandablePortfolios() {
+        // Add a collapse/expand all button at the top of the page
+        const portfolioSectionsHeader = document.querySelector('.portfolio-analysis .subtitle.is-4');
+        if (portfolioSectionsHeader) {
+            const expandCollapseAllBtn = document.createElement('button');
+            expandCollapseAllBtn.className = 'button is-small is-outlined ml-4';
+            expandCollapseAllBtn.innerHTML = '<span class="icon"><i class="fas fa-compress-alt"></i></span><span>Collapse All</span>';
+            expandCollapseAllBtn.id = 'toggleAllPortfolios';
+            
+            // Insert the button next to the header
+            portfolioSectionsHeader.parentNode.insertBefore(expandCollapseAllBtn, portfolioSectionsHeader.nextSibling);
+            
+            // Add click handler for the button
+            expandCollapseAllBtn.addEventListener('click', function() {
+                const allSections = document.querySelectorAll('.portfolio-section');
+                const isCollapsing = this.querySelector('span:not(.icon)').textContent === 'Collapse All';
+                
+                allSections.forEach(section => {
+                    const content = section.querySelector('.portfolio-content');
+                    const icon = section.querySelector('.toggle-portfolio i');
+                    
+                    if (isCollapsing) {
+                        content.style.display = 'none';
+                        icon.classList.remove('fa-chevron-up');
+                        icon.classList.add('fa-chevron-down');
+                    } else {
+                        content.style.display = 'block';
+                        icon.classList.remove('fa-chevron-down');
+                        icon.classList.add('fa-chevron-up');
+                    }
+                });
+                
+                // Update button text and icon
+                if (isCollapsing) {
+                    this.innerHTML = '<span class="icon"><i class="fas fa-expand-alt"></i></span><span>Expand All</span>';
+                } else {
+                    this.innerHTML = '<span class="icon"><i class="fas fa-compress-alt"></i></span><span>Collapse All</span>';
+                }
+                
+                // Ensure charts render correctly
+                window.dispatchEvent(new Event('resize'));
+            });
+        }
+    }
+    
     // Load data and initialize
     Promise.all([
         fetchPortfolios(),
@@ -253,6 +299,7 @@ document.addEventListener('DOMContentLoaded', function() {
         initializePortfolioFilters();
         initializeCharts();
         renderPortfolioSections();
+        initializeExpandablePortfolios();
         renderDetailedOverview();
         
         // Hide loading indicator and show content
@@ -702,7 +749,15 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const header = document.createElement('div');
             header.className = 'portfolio-header';
-            header.innerHTML = `<h4 class="portfolio-header-title">${portfolio.name}</h4>`;
+            header.innerHTML = `
+                <div class="is-flex is-justify-content-space-between is-align-items-center">
+                    <h4 class="portfolio-header-title">${portfolio.name}</h4>
+                    <span class="icon toggle-portfolio">
+                        <i class="fas fa-chevron-up"></i>
+                    </span>
+                </div>
+            `;
+            header.style.cursor = 'pointer';
             
             const content = document.createElement('div');
             content.className = 'portfolio-content';
@@ -867,6 +922,25 @@ document.addEventListener('DOMContentLoaded', function() {
             // Initialize charts
             initializePortfolioChart(portfolio);
             initializeCategoryChart(portfolio);
+            
+            // Add click handler to toggle portfolio content visibility
+            const toggleIcon = section.querySelector('.toggle-portfolio');
+            header.addEventListener('click', function() {
+                const content = section.querySelector('.portfolio-content');
+                const icon = toggleIcon.querySelector('i');
+                
+                if (content.style.display === 'none') {
+                    content.style.display = 'block';
+                    icon.classList.remove('fa-chevron-down');
+                    icon.classList.add('fa-chevron-up');
+                    // Ensure charts render correctly when expanding
+                    window.dispatchEvent(new Event('resize'));
+                } else {
+                    content.style.display = 'none';
+                    icon.classList.remove('fa-chevron-up');
+                    icon.classList.add('fa-chevron-down');
+                }
+            });
         });
     }
     

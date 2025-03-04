@@ -512,6 +512,7 @@ class PortfolioTableApp {
                     },
                     selectedPortfolio: defaultPortfolio,
                     showOnlyMissingPrices: false,
+                    companySearchQuery: '',
                     sortColumn: '',
                     sortDirection: 'asc'
                 };
@@ -529,7 +530,7 @@ class PortfolioTableApp {
                     return 'is-danger';
                 },
                 filteredPortfolioItems() {
-                    console.log(`Computing filtered items with portfolio=${this.selectedPortfolio}, showMissing=${this.showOnlyMissingPrices}`);
+                    console.log(`Computing filtered items with portfolio=${this.selectedPortfolio}, showMissing=${this.showOnlyMissingPrices}, companySearch=${this.companySearchQuery}`);
                     
                     // First filter by selected portfolio
                     let filtered = this.selectedPortfolio 
@@ -542,6 +543,15 @@ class PortfolioTableApp {
                     if (this.showOnlyMissingPrices) {
                         filtered = filtered.filter(item => !item.price_eur || item.price_eur === 0 || item.price_eur === null);
                         console.log(`After missing prices filter: ${filtered.length} items`);
+                    }
+                    
+                    // Filter by company name if search query is provided
+                    if (this.companySearchQuery && this.companySearchQuery.trim() !== '') {
+                        const query = this.companySearchQuery.toLowerCase().trim();
+                        filtered = filtered.filter(item => {
+                            return item.company && item.company.toLowerCase().includes(query);
+                        });
+                        console.log(`After company search filter: ${filtered.length} items`);
                     }
                     
                     // Apply sorting if a sort column is specified
@@ -596,6 +606,11 @@ class PortfolioTableApp {
                     // Update metrics when portfolio selection changes
                     console.log('selectedPortfolio changed:', this.selectedPortfolio);
                     this.updateFilteredMetrics();
+                },
+                companySearchQuery() {
+                    // Update metrics when search query changes
+                    console.log('companySearchQuery changed:', this.companySearchQuery);
+                    this.updateFilteredMetrics();
                 }
             },
             methods: {
@@ -649,6 +664,41 @@ class PortfolioTableApp {
                             });
                         } else {
                             console.warn('Missing prices checkbox element not found with ID: show-only-missing-prices');
+                        }
+                        
+                        // Setup two-way binding with company search input
+                        const companySearchInput = document.getElementById('company-search');
+                        const clearSearchButton = document.getElementById('clear-company-search');
+                        
+                        if (companySearchInput) {
+                            console.log('Found company search input element');
+                            // Initial value from Vue to DOM
+                            companySearchInput.value = this.companySearchQuery;
+                            
+                            // DOM to Vue binding
+                            companySearchInput.addEventListener('input', () => {
+                                console.log('Company search input changed to:', companySearchInput.value);
+                                this.companySearchQuery = companySearchInput.value;
+                                // Force update filtered list
+                                this.updateFilteredMetrics();
+                            });
+                            
+                            // Vue to DOM binding
+                            this.$watch('companySearchQuery', (newVal) => {
+                                console.log('companySearchQuery changed in Vue:', newVal);
+                                companySearchInput.value = newVal;
+                            });
+                            
+                            // Setup clear button
+                            if (clearSearchButton) {
+                                clearSearchButton.addEventListener('click', () => {
+                                    this.companySearchQuery = '';
+                                    companySearchInput.value = '';
+                                    companySearchInput.focus();
+                                });
+                            }
+                        } else {
+                            console.warn('Company search input element not found with ID: company-search');
                         }
                     }, 500); // 500ms delay to ensure DOM is fully loaded
                 },

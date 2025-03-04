@@ -476,6 +476,11 @@ option {
     padding: 1rem 1.5rem;
     background-color: #f8f9fa;
     border-bottom: 1px solid #f1f1f1;
+    transition: background-color 0.2s ease;
+}
+
+.portfolio-analysis .portfolio-header:hover {
+    background-color: #eaeaea;
 }
 
 .portfolio-analysis .portfolio-header-title {
@@ -486,6 +491,21 @@ option {
 
 .portfolio-analysis .portfolio-content {
     padding: 1.5rem;
+    transition: all 0.3s ease;
+}
+
+.portfolio-analysis .toggle-portfolio {
+    color: #2196f3;
+    transition: transform 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+}
+
+.portfolio-analysis .toggle-portfolio .fa-chevron-down {
+    transform: rotate(180deg);
 }
 
 /* Analysis page column widths with more specific selectors */

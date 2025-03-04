@@ -153,6 +153,20 @@
         #price-fetch-progress .icon {
             margin-right: 0.3rem;
         }
+        
+        /* Company search filter styling */
+        #company-search-container .field.has-addons {
+            margin-bottom: 0;
+        }
+        
+        #company-search-container .input.is-small {
+            width: 150px;
+            transition: width 0.3s ease;
+        }
+        
+        #company-search-container .input.is-small:focus {
+            width: 180px;
+        }
     </style>
 {% endmacro %}
 
@@ -367,6 +381,21 @@
                             <option value="{{ portfolio }}">{{ portfolio }}</option>
                         {% endfor %}
                     </select>
+                </div>
+            </div>
+            <!-- Company Search Filter -->
+            <div class="control" id="company-search-container">
+                <div class="field has-addons">
+                    <div class="control">
+                        <input type="text" class="input is-small" id="company-search" placeholder="Search company...">
+                    </div>
+                    <div class="control">
+                        <button class="button is-small" id="clear-company-search">
+                            <span class="icon is-small">
+                                <i class="fas fa-times"></i>
+                            </span>
+                        </button>
+                    </div>
                 </div>
             </div>
             <!-- No Price Checkbox -->
