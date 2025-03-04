@@ -375,11 +375,8 @@
                                     <div class="select">
                                         <select id="filter-portfolio" v-model="selectedPortfolio">
                                             <option value="">All Portfolios</option>
-                                            <option value="-">Default</option>
                                             {% for portfolio in portfolios %}
-                                                {% if portfolio != 'Default' %}
-                                                    <option value="{{ portfolio }}">{{ portfolio }}</option>
-                                                {% endif %}
+                                                <option value="{{ portfolio }}">{{ portfolio }}</option>
                                             {% endfor %}
                                         </select>
                                     </div>
@@ -544,11 +541,8 @@
                                                 <select v-model="item.portfolio" 
                                                         @change="debouncedSavePortfolioChange(item)">
                                                     <!-- Special handling for the default portfolio value '-' -->
-                                                    <option value="-">Default</option>
                                                     {% for portfolio in portfolios %}
-                                                        {% if portfolio != 'Default' %}
-                                                            <option value="{{ portfolio }}">{{ portfolio }}</option>
-                                                        {% endif %}
+                                                        <option value="{{ portfolio }}">{{ portfolio }}</option>
                                                     {% endfor %}
                                                 </select>
                                             </div>
@@ -666,20 +660,20 @@
                     /* Enhanced fix for dropdown text visibility */
                     #bulk-edit-modal select,
                     #bulk-edit-modal select option,
-                    .select select,
-                    .select select option {
+                    #bulk-edit-modal .select select,
+                    #bulk-edit-modal .select select option {
                         color: #333 !important;
                         background-color: #fff !important;
                     }
                     
                     /* Fix for dropdown display issues */
-                    .select,
-                    .select select {
+                    #bulk-edit-modal .select,
+                    #bulk-edit-modal .select select {
                         width: 100%;
                     }
                     
                     /* Ensure dropdown options are visible */
-                    select option {
+                    #bulk-edit-modal select option {
                         color: #333 !important;
                         background-color: #fff !important;
                         text-shadow: none !important;
@@ -784,8 +778,8 @@
                                     <label class="label">Target Portfolio</label>
                                     <div class="control">
                                         <div class="select is-fullwidth">
-                                            <select v-model="targetPortfolio" style="color: #333 !important; background-color: #fff !important;">
-                                                <option value="" style="color: #333 !important; background-color: #fff !important;">Select portfolio</option>
+                                            <select v-model="targetPortfolio">
+                                                <option value="">Select portfolio</option>
                                                 <!-- Debug info to help troubleshoot -->
                                                 <option v-if="portfolioOptions.length === 0" value="debug-empty" disabled style="color: red !important;">No options loaded</option>
                                                 <!-- Explicit loop through portfolio options -->
@@ -793,17 +787,12 @@
                                                     v-for="(portfolio, index) in portfolioOptions" 
                                                     :key="index" 
                                                     :value="portfolio" 
-                                                    style="color: #333 !important; background-color: #fff !important;">
+                                                    >
                                                     {% raw %}{{ portfolio }}{% endraw %}
                                                 </option>
                                             </select>
                                         </div>
-                                        <!-- Debug display to see portfolio options -->
-                                        <div v-if="portfolioOptions.length > 0" class="is-size-7 my-1 has-text-grey">
-                                            Available options: {% raw %}{{ portfolioOptions.length }}{% endraw %}
-                                        </div>
                                     </div>
-                                    <p class="help">Choose the portfolio where selected companies will be moved</p>
                                 </div>
                                 
                                 <div class="field mt-4">
@@ -882,9 +871,9 @@
                                     <label class="label">Select Portfolio</label>
                                     <div class="control">
                                         <div class="select is-fullwidth">
-                                            <select v-model="oldPortfolioName" style="color: #333 !important; background-color: #fff !important;">
-                                                <option value="" style="color: #333 !important; background-color: #fff !important;">Select portfolio</option>
-                                                <option v-for="(portfolio, index) in portfolioOptions" :key="index" :value="portfolio" style="color: #333 !important; background-color: #fff !important;">{% raw %}{{ portfolio }}{% endraw %}</option>
+                                            <select v-model="oldPortfolioName">
+                                                <option value="">Select portfolio</option>
+                                                <option v-for="(portfolio, index) in portfolioOptions" :key="index" :value="portfolio">{% raw %}{{ portfolio }}{% endraw %}</option>
                                             </select>
                                         </div>
                                     </div>
@@ -914,9 +903,9 @@
                                     <label class="label">Select Portfolio to Delete</label>
                                     <div class="control">
                                         <div class="select is-fullwidth">
-                                            <select v-model="deletePortfolioName" style="color: #333 !important; background-color: #fff !important;">
-                                                <option value="" style="color: #333 !important; background-color: #fff !important;">Select portfolio</option>
-                                                <option v-for="(portfolio, index) in portfolioOptions" :key="index" :value="portfolio" style="color: #333 !important; background-color: #fff !important;">{% raw %}{{ portfolio }}{% endraw %}</option>
+                                            <select v-model="deletePortfolioName">
+                                                <option value="">Select portfolio</option>
+                                                <option v-for="(portfolio, index) in portfolioOptions" :key="index" :value="portfolio">{% raw %}{{ portfolio }}{% endraw %}</option>
                                             </select>
                                         </div>
                                     </div>

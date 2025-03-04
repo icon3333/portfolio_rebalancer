@@ -858,9 +858,8 @@ class PortfolioTableApp {
                                 console.warn('No portfolio options found from server');
                             }
                             
-                            // Log whether Default portfolio is in the options
-                            const hasDefault = this.portfolioOptions.includes('Default');
-                            console.log('Has Default portfolio in options:', hasDefault);
+                            // Log the portfolio options from the API
+                            console.log('Portfolio options from API:', this.portfolioOptions);
                         } else {
                             console.warn('Invalid portfolio options format from server');
                             this.portfolioOptions = [];
@@ -896,9 +895,9 @@ class BulkEditApp {
             data() {
                 return {
                     companies: [],
-                    // Initialize directly with provided portfolios to avoid initial empty dropdown
-                    portfolioOptions: Array.isArray(portfolios) ? [...portfolios] : ['-', 'crypto', 'dividend', 'value'],
-                    staticPortfolios: Array.isArray(portfolios) ? [...portfolios] : [],
+                    // Initialize with empty arrays, will be populated from API
+                    portfolioOptions: [],
+                    staticPortfolios: [],
                     targetPortfolio: '',
                     portfolioAction: 'add',
                     activeTab: 'portfolio',
@@ -998,7 +997,7 @@ class BulkEditApp {
                         
                         // Make sure we have the default portfolio option
                         if (!newOptions.includes('-')) {
-                            newOptions.unshift('-'); // Add Default portfolio at the beginning
+                            newOptions = []; // Initialize with empty array if no options found
                         }
                         
                         // Log the new options
@@ -1023,9 +1022,9 @@ class BulkEditApp {
                         });
                     } catch (err) {
                         console.error('Error fetching portfolio options:', err);
-                        // Fall back to default option if API fails
-                        console.warn('Using fallback portfolio options due to error');
-                        this.portfolioOptions = ['-', 'crypto', 'dividend', 'value']; // Add some sensible defaults for testing
+                        // Fall back to empty array if API fails
+                        console.warn('API failed, using empty portfolio options');
+                        this.portfolioOptions = [];
                         this.$forceUpdate();
                     }
                 },
@@ -1479,12 +1478,12 @@ class BulkEditApp {
                 // Make sure we have default portfolio in the initial options
                 if (Array.isArray(this.portfolioOptions) && this.portfolioOptions.length > 0) {
                     if (!this.portfolioOptions.includes('-')) {
-                        this.portfolioOptions.unshift('-'); // Add Default at beginning
-                        console.log('Added Default portfolio to initial options');
+                        this.portfolioOptions = [];
+                        console.log('Initialized empty portfolio options');
                     }
                 } else if (Array.isArray(this.portfolioOptions) && this.portfolioOptions.length === 0) {
-                    this.portfolioOptions = ['-']; // Initialize with Default
-                    console.log('Initialized empty portfolioOptions with Default');
+                    this.portfolioOptions = [];
+                    console.log('Initialized empty portfolioOptions');
                 }
                 
                 // Log the updated initial state

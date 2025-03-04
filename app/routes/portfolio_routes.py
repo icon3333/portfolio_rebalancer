@@ -68,37 +68,17 @@ def enrich():
     portfolio_data = get_portfolio_data(account_id)
     logger.info(f"Retrieved {len(portfolio_data)} portfolio items")
     
-    # Get portfolios for dropdown (including valid portfolio names)
-    with get_db() as db:
-        # Get portfolio names from portfolios table - include all valid portfolios
-        portfolios_from_table = query_db('''
-            SELECT name FROM portfolios 
-            WHERE account_id = ? AND name IS NOT NULL
-            ORDER BY name
-        ''', [account_id])
-        logger.info(f"Retrieved {len(portfolios_from_table)} portfolios from portfolios table")
-        
-        # Get all portfolios directly from the portfolios table
-        portfolios_from_companies = query_db('''
-            SELECT DISTINCT p.name as name
-            FROM portfolios p
-            WHERE p.account_id = ? AND p.name IS NOT NULL
-        ''', [account_id])
-        logger.info(f"Retrieved {len(portfolios_from_companies)} portfolios from portfolios table")
-        
-        # Combine both sources and remove duplicates
-        portfolio_names = set()
-        for p in portfolios_from_table:
-            if p['name'] and p['name'].strip():
-                portfolio_names.add(p['name'])
-        
-        for p in portfolios_from_companies:
-            if p['name'] and p['name'].strip():
-                portfolio_names.add(p['name'])
-        
-        # Convert set to list and sort alphabetically
-        portfolios = [{'name': name} for name in sorted(portfolio_names)]
-        logger.info(f"Combined unique portfolios: {[p['name'] for p in portfolios]}")
+    # Get portfolios from the portfolios table
+    portfolios_from_table = query_db('''
+        SELECT name FROM portfolios 
+        WHERE account_id = ? AND name IS NOT NULL
+        ORDER BY name
+    ''', [account_id])
+    
+    # Extract portfolio names
+    portfolios = [{'name': p['name']} for p in portfolios_from_table if p['name'] and p['name'].strip()]
+    
+    logger.info(f"Retrieved {len(portfolios)} portfolios from the portfolios table: {[p['name'] for p in portfolios]}")
     
     # Log template variables for debugging
     logger.debug(f"Template variables:")
@@ -187,7 +167,6 @@ def get_portfolios_api():
         account_id = session['account_id']
         logger.info(f"Getting portfolios for account_id: {account_id}")
         
-        # Get portfolios using the same approach as in the enrich function
         # Get portfolio names from portfolios table
         portfolios_from_table = query_db('''
             SELECT name FROM portfolios 
@@ -195,32 +174,10 @@ def get_portfolios_api():
             ORDER BY name
         ''', [account_id])
         
-        # Get all portfolios directly from the portfolios table
-        portfolios_from_companies = query_db('''
-            SELECT DISTINCT p.name as name
-            FROM portfolios p
-            WHERE p.account_id = ? AND p.name IS NOT NULL
-        ''', [account_id])
+        # Extract names from the query results
+        names = [p['name'] for p in portfolios_from_table if p['name'] and p['name'].strip()]
         
-        # Combine both sources and remove duplicates
-        portfolio_names = set()
-        for p in portfolios_from_table:
-            if p['name'] and p['name'].strip():
-                portfolio_names.add(p['name'])
-        
-        for p in portfolios_from_companies:
-            if p['name'] and p['name'].strip():
-                portfolio_names.add(p['name'])
-        
-        # Convert set to list and sort alphabetically
-        names = sorted(portfolio_names)
-        
-        # Ensure the default portfolio '-' is always available
-        if '-' not in names:
-            names.insert(0, '-')  # Add Default portfolio at the beginning
-            logger.info("Added default portfolio '-' to the results")
-        
-        logger.info(f"Combined portfolio names with Default: {names}")
+        logger.info(f"Retrieved {len(names)} portfolio names from portfolios table: {names}")
         
         # Debug the JSON serialization
         json_response = jsonify(names)
