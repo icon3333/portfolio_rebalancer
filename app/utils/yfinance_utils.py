@@ -1,7 +1,12 @@
 import logging
 import yfinance as yf
+import requests
 from datetime import datetime
 from typing import Dict, Any
+import warnings
+
+# Suppress specific yfinance warnings that might clutter the logs
+warnings.filterwarnings("ignore", message="^[Tt]he 'period'")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -78,6 +83,19 @@ def find_ticker_for_isin(isin: str) -> str:
         return isin
 
 # Changes for get_price_for_ticker() function
+# Create a session creation function that we can reset when needed
+def get_fresh_session():
+    """Create a fresh requests session with appropriate headers to avoid Yahoo Finance blocking"""
+    session = requests.Session()
+    session.headers.update({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Connection': 'keep-alive',
+    })
+    return session
+
+
 def get_price_for_ticker(ticker: str) -> Dict[str, Any]:
     """
     Get the current price and currency for a ticker symbol.
@@ -98,8 +116,12 @@ def get_price_for_ticker(ticker: str) -> Dict[str, Any]:
     currency = None
     error_messages = []
     
+    # Create a fresh session for this request
+    session = get_fresh_session()
+    
     try:
-        ticker_obj = yf.Ticker(ticker)
+        # Use our custom session to avoid the 'cookies.update' error
+        ticker_obj = yf.Ticker(ticker, session=session)
         
         # Method 1: Use info approach - most reliable for getting both price and currency
         try:
@@ -285,8 +307,11 @@ def get_crypto_price(crypto_ticker: str) -> Dict[str, Any]:
     logger.info(f"Getting price for crypto ticker: {crypto_ticker}")
     
     try:
-        # Use a more direct approach for crypto tickers
-        ticker_obj = yf.Ticker(crypto_ticker)
+        # Create a fresh session for this request to prevent cookie errors
+        session = get_fresh_session()
+        
+        # Use a more direct approach for crypto tickers with our custom session
+        ticker_obj = yf.Ticker(crypto_ticker, session=session)
         
         # Try the info approach first with basic error handling
         try:
@@ -328,7 +353,7 @@ def get_crypto_price(crypto_ticker: str) -> Dict[str, Any]:
             end_str = end_date.strftime('%Y-%m-%d')
             start_str = start_date.strftime('%Y-%m-%d')
             
-            data = yf.download(crypto_ticker, start=start_str, end=end_str, progress=False)
+            data = yf.download(crypto_ticker, start=start_str, end=end_str, progress=False, session=session)
             if not data.empty and 'Close' in data.columns:
                 last_close = data['Close'].iloc[-1]
                 if isinstance(last_close, (int, float)) and last_close > 0:
