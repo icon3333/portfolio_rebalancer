@@ -529,14 +529,19 @@ class PortfolioTableApp {
                     return 'is-danger';
                 },
                 filteredPortfolioItems() {
+                    console.log(`Computing filtered items with portfolio=${this.selectedPortfolio}, showMissing=${this.showOnlyMissingPrices}`);
+                    
                     // First filter by selected portfolio
                     let filtered = this.selectedPortfolio 
                         ? this.portfolioItems.filter(item => item.portfolio === this.selectedPortfolio)
                         : this.portfolioItems;
                     
+                    console.log(`After portfolio filter: ${filtered.length} items`);
+                    
                     // Then filter by missing prices if checkbox is checked
                     if (this.showOnlyMissingPrices) {
-                        filtered = filtered.filter(item => !item.price_eur);
+                        filtered = filtered.filter(item => !item.price_eur || item.price_eur === 0 || item.price_eur === null);
+                        console.log(`After missing prices filter: ${filtered.length} items`);
                     }
                     
                     // Apply sorting if a sort column is specified
@@ -584,51 +589,71 @@ class PortfolioTableApp {
             watch: {
                 showOnlyMissingPrices() {
                     // Update metrics only if we're showing filtered data
+                    console.log('showOnlyMissingPrices changed:', this.showOnlyMissingPrices);
                     this.updateFilteredMetrics();
                 },
                 selectedPortfolio() {
                     // Update metrics when portfolio selection changes
+                    console.log('selectedPortfolio changed:', this.selectedPortfolio);
                     this.updateFilteredMetrics();
                 }
             },
             methods: {
                 // Sync UI controls with Vue model for two-way binding
                 syncUIWithVueModel() {
-                    // Setup two-way binding with portfolio dropdown
-                    const portfolioDropdown = document.getElementById('filter-portfolio');
-                    if (portfolioDropdown) {
-                        // Initial value from Vue to DOM
-                        portfolioDropdown.value = this.selectedPortfolio;
+                    // Use a more robust approach with a setTimeout to ensure DOM is fully loaded
+                    setTimeout(() => {
+                        // Setup two-way binding with portfolio dropdown
+                        const portfolioDropdown = document.getElementById('filter-portfolio');
+                        if (portfolioDropdown) {
+                            console.log('Found portfolio dropdown element');
+                            // Initial value from Vue to DOM
+                            portfolioDropdown.value = this.selectedPortfolio;
+                            
+                            // DOM to Vue binding
+                            portfolioDropdown.addEventListener('change', () => {
+                                console.log('Portfolio dropdown changed to:', portfolioDropdown.value);
+                                this.selectedPortfolio = portfolioDropdown.value;
+                                // Force update filtered list
+                                this.updateFilteredMetrics();
+                            });
+                            
+                            // Vue to DOM binding
+                            this.$watch('selectedPortfolio', (newVal) => {
+                                console.log('selectedPortfolio changed in Vue:', newVal);
+                                portfolioDropdown.value = newVal;
+                            });
+                        } else {
+                            console.warn('Portfolio dropdown element not found with ID: filter-portfolio');
+                        }
                         
-                        // DOM to Vue binding
-                        portfolioDropdown.addEventListener('change', () => {
-                            this.selectedPortfolio = portfolioDropdown.value;
-                        });
-                        
-                        // Vue to DOM binding
-                        this.$watch('selectedPortfolio', (newVal) => {
-                            portfolioDropdown.value = newVal;
-                        });
-                    }
-                    
-                    // Setup two-way binding with missing prices checkbox
-                    const missingPricesCheckbox = document.getElementById('show-only-missing-prices');
-                    if (missingPricesCheckbox) {
-                        // Initial value from Vue to DOM
-                        missingPricesCheckbox.checked = this.showOnlyMissingPrices;
-                        
-                        // DOM to Vue binding
-                        missingPricesCheckbox.addEventListener('change', () => {
-                            this.showOnlyMissingPrices = missingPricesCheckbox.checked;
-                        });
-                        
-                        // Vue to DOM binding
-                        this.$watch('showOnlyMissingPrices', (newVal) => {
-                            missingPricesCheckbox.checked = newVal;
-                        });
-                    }
+                        // Setup two-way binding with missing prices checkbox
+                        const missingPricesCheckbox = document.getElementById('show-only-missing-prices');
+                        if (missingPricesCheckbox) {
+                            console.log('Found missing prices checkbox element');
+                            // Initial value from Vue to DOM
+                            missingPricesCheckbox.checked = this.showOnlyMissingPrices;
+                            
+                            // DOM to Vue binding
+                            missingPricesCheckbox.addEventListener('change', () => {
+                                console.log('Missing prices checkbox changed to:', missingPricesCheckbox.checked);
+                                this.showOnlyMissingPrices = missingPricesCheckbox.checked;
+                                // Force update filtered list
+                                this.updateFilteredMetrics();
+                            });
+                            
+                            // Vue to DOM binding
+                            this.$watch('showOnlyMissingPrices', (newVal) => {
+                                console.log('showOnlyMissingPrices changed in Vue:', newVal);
+                                missingPricesCheckbox.checked = newVal;
+                            });
+                        } else {
+                            console.warn('Missing prices checkbox element not found with ID: show-only-missing-prices');
+                        }
+                    }, 500); // 500ms delay to ensure DOM is fully loaded
                 },
                 
+                // This function will update the dropdown to only show portfolios that are actually used
                 async loadData() {
                     this.loading = true;
                     try {
@@ -637,21 +662,63 @@ class PortfolioTableApp {
                         const data = await response.json();
                         this.portfolioItems = data;
                         console.log('Loaded portfolio items:', this.portfolioItems);
-                        this.updateMetrics();
-                        this.updateFilteredMetrics();
                         
-                        // Also refresh the portfolio options at the same time
+                        // Extract unique portfolios from the data that are actually in use
+                        const usedPortfolios = [...new Set(this.portfolioItems.map(item => item.portfolio))].filter(Boolean);
+                        console.log('Used portfolios:', usedPortfolios);
+                        
+                        // Also refresh the portfolio options from the server but only keep those that are in use
                         try {
                             const portfoliosResponse = await fetch('/portfolio/api/portfolios');
                             const portfoliosData = await portfoliosResponse.json();
+                            
                             if (Array.isArray(portfoliosData) && portfoliosData.length > 0) {
-                                this.portfolioOptions = portfoliosData;
-                                console.log('Updated portfolio options:', this.portfolioOptions);
+                                // Filter to only show portfolios that are actually in use
+                                const filteredPortfolios = portfoliosData.filter(portfolio => 
+                                    usedPortfolios.includes(portfolio));
+                                
+                                this.portfolioOptions = filteredPortfolios;
+                                console.log('Updated portfolio options (filtered):', this.portfolioOptions);
+                                
+                                // Update the DOM dropdown as well
+                                const portfolioDropdown = document.getElementById('filter-portfolio');
+                                if (portfolioDropdown) {
+                                    // Save current selection
+                                    const currentSelection = portfolioDropdown.value;
+                                    
+                                    // Clear existing options except the "All Portfolios" option
+                                    while (portfolioDropdown.options.length > 1) {
+                                        portfolioDropdown.remove(1);
+                                    }
+                                    
+                                    // Add filtered options
+                                    filteredPortfolios.forEach(portfolio => {
+                                        const option = document.createElement('option');
+                                        option.value = portfolio;
+                                        option.text = portfolio;
+                                        portfolioDropdown.add(option);
+                                    });
+                                    
+                                    // Restore selection if it still exists, otherwise reset to "All Portfolios"
+                                    if (filteredPortfolios.includes(currentSelection)) {
+                                        portfolioDropdown.value = currentSelection;
+                                    } else {
+                                        portfolioDropdown.value = '';
+                                        this.selectedPortfolio = '';
+                                    }
+                                }
                             } else {
                                 console.warn('No portfolio options received or empty array');
                             }
                         } catch (portfolioError) {
                             console.error('Error refreshing portfolio options:', portfolioError);
+                        }
+                        
+                        // Update metrics based on whether we're filtering
+                        if (this.showOnlyMissingPrices || this.selectedPortfolio) {
+                            this.updateFilteredMetrics();
+                        } else {
+                            this.updateMetrics();
                         }
                     } catch (error) {
                         console.error('Error loading portfolio data:', error);
@@ -662,24 +729,34 @@ class PortfolioTableApp {
                 
                 updateMetrics() {
                     const items = this.portfolioItems;
+                    const missingPriceItems = items.filter(i => !i.price_eur || i.price_eur === 0 || i.price_eur === null);
                     this.metrics = {
                         total: items.length,
-                        health: items.length ? Math.round(((items.length - items.filter(i => !i.price_eur).length) / items.length) * 100) : 100,
-                        missing: items.filter(i => !i.price_eur).length,
+                        health: items.length ? Math.round(((items.length - missingPriceItems.length) / items.length) * 100) : 100,
+                        missing: missingPriceItems.length,
                         totalValue: items.reduce((sum, item) => sum + ((item.price_eur || 0) * (item.shares || 0)), 0),
                         lastUpdate: items.reduce((latest, item) => !latest || (item.last_updated && item.last_updated > latest) ? item.last_updated : latest, null)
                     };
                 },
         
                 updateFilteredMetrics() {
+                    // Get filtered data
                     const filteredItems = this.filteredPortfolioItems;
+                    const missingPriceItems = filteredItems.filter(i => !i.price_eur || i.price_eur === 0 || i.price_eur === null);
+                    
+                    // Update metrics
                     this.metrics = {
                         total: filteredItems.length,
-                        health: filteredItems.length ? Math.round(((filteredItems.length - filteredItems.filter(i => !i.price_eur).length) / filteredItems.length) * 100) : 100,
-                        missing: filteredItems.filter(i => !i.price_eur).length,
+                        health: filteredItems.length ? Math.round(((filteredItems.length - missingPriceItems.length) / filteredItems.length) * 100) : 100,
+                        missing: missingPriceItems.length,
                         totalValue: filteredItems.reduce((sum, item) => sum + ((item.price_eur || 0) * (item.shares || 0)), 0),
                         lastUpdate: filteredItems.reduce((latest, item) => !latest || (item.last_updated && item.last_updated > latest) ? item.last_updated : latest, null)
                     };
+                    
+                    // Force Vue to re-render the filtered list
+                    this.$forceUpdate();
+                    console.log(`Updated metrics: ${this.metrics.total} items, ${this.metrics.missing} missing prices`);
+                    console.log(`Filtering conditions: portfolio=${this.selectedPortfolio}, show missing only=${this.showOnlyMissingPrices}`);
                 },
         
                 confirmPriceUpdate(item) {
@@ -1142,8 +1219,13 @@ class PortfolioTableApp {
                     .finally(() => {
                         // Load all data after portfolio options are handled
                         this.loadData();
+                        
+                        // Re-run syncUIWithVueModel after data is loaded
+                        setTimeout(() => {
+                            this.syncUIWithVueModel();
+                        }, 1000);
                     });
-                    
+                
                 // Add event listeners for the delete confirmation modal and update price modal
                 document.addEventListener('keydown', (e) => {
                     if (e.key === 'Escape' && (this.showDeleteModal || this.showUpdatePriceModal)) {
