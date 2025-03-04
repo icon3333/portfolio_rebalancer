@@ -694,8 +694,42 @@ def update_single_portfolio_api(company_id):
                 update_fields.append('identifier = ?')
                 update_values.append(data['identifier'])
             
-            # If no fields to update, return success
-            if not update_fields:
+            # Handle shares update separately since it's in a different table
+            shares_updated = False
+            if 'shares' in data:
+                try:
+                    # Convert to float to ensure it's a valid number
+                    shares_value = float(data['shares'])
+                    
+                    # Check if there's an existing record in company_shares
+                    shares_record = query_db(
+                        'SELECT * FROM company_shares WHERE company_id = ?',
+                        [company_id],
+                        one=True
+                    )
+                    
+                    if shares_record:
+                        # Update existing record
+                        cursor.execute(
+                            'UPDATE company_shares SET shares = ? WHERE company_id = ?',
+                            [shares_value, company_id]
+                        )
+                    else:
+                        # Insert new record
+                        cursor.execute(
+                            'INSERT INTO company_shares (company_id, shares) VALUES (?, ?)',
+                            [company_id, shares_value]
+                        )
+                    
+                    shares_updated = True
+                except (ValueError, TypeError) as e:
+                    return jsonify({
+                        'success': False,
+                        'error': f'Invalid shares value: {str(e)}'
+                    }), 400
+            
+            # If no fields to update and shares not updated, return success
+            if not update_fields and not shares_updated:
                 return jsonify({
                     'success': True,
                     'message': 'No fields to update'
@@ -712,11 +746,12 @@ def update_single_portfolio_api(company_id):
             cursor.execute(update_query, update_values)
             db.commit()
             
-            # Get updated company data
+            # Get updated company data with shares information
             updated_company = query_db('''
-                SELECT c.*, p.name as portfolio_name 
+                SELECT c.*, p.name as portfolio_name, cs.shares
                 FROM companies c
                 LEFT JOIN portfolios p ON c.portfolio_id = p.id
+                LEFT JOIN company_shares cs ON c.id = cs.company_id
                 WHERE c.id = ?
             ''', [company_id], one=True)
             
@@ -726,7 +761,8 @@ def update_single_portfolio_api(company_id):
                     'id': updated_company['id'],
                     'portfolio': updated_company['portfolio_name'],
                     'category': updated_company['category'],
-                    'identifier': updated_company['identifier']
+                    'identifier': updated_company['identifier'],
+                    'shares': updated_company['shares'] if 'shares' in updated_company else None
                 }
             })
             

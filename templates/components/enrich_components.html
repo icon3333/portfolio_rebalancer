@@ -24,6 +24,18 @@
             margin-bottom: 0.75rem;
         }
         
+        /* Centralized styling for portfolio, category, and shares inputs */
+        .portfolio-table .input-column {
+            width: 110px; /* 40% narrower than 150px */
+        }
+        
+        .portfolio-table .input-column .select,
+        .portfolio-table .input-column .select select,
+        .portfolio-table .input-column .input {
+            width: 100%;
+            max-width: 90px;
+        }
+        
         /* Responsive adjustments */
         @media screen and (max-width: 768px) {
             .columns .column .card {
@@ -440,7 +452,7 @@
                         </div>
                         
                         <div v-else class="table-container">
-                            <table class="table is-striped is-hoverable is-fullwidth">
+                            <table class="table is-striped is-hoverable is-fullwidth portfolio-table">
                                 <thead>
                                     <tr>
                                         <th>Update</th>
@@ -527,7 +539,7 @@
                                         <td>
                                             <span v-text="item.company"></span>
                                         </td>
-                                        <td>
+                                        <td class="input-column">
                                             <div class="select is-small">
                                                 <select v-model="item.portfolio" 
                                                         @change="debouncedSavePortfolioChange(item)">
@@ -541,14 +553,17 @@
                                                 </select>
                                             </div>
                                         </td>
-                                        <td>
+                                        <td class="input-column">
                                             <input class="input is-small" type="text"
                                                    v-model="item.category"
                                                    @input="debouncedSaveCategoryChange(item)"
                                                    @change="saveCategoryChange(item)">
                                         </td>
-                                        <td>
-                                            <span v-text="formatNumber(item.shares)"></span>
+                                        <td class="input-column">
+                                            <input class="input is-small" type="text"
+                                                   :value="formatNumber(item.shares)"
+                                                   @input="(e) => { item.shares = parseFloat(e.target.value); debouncedSaveSharesChange(item); }"
+                                                   @change="saveSharesChange(item)">
                                         </td>
                                         <td :class="{'has-text-danger': !item.price_eur}">
                                             <span v-text="item.price_eur ? formatCurrency(item.price_eur) : 'No price'"></span>

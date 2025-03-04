@@ -707,6 +707,75 @@ class PortfolioTableApp {
                 debouncedSaveCategoryChange: _.debounce(function(item) {
                     this.saveCategoryChange(item);
                 }, 500),
+                
+                // Save shares changes to the database
+                async saveSharesChange(item) {
+                    if (!item || !item.id) {
+                        console.error('Invalid item for shares change');
+                        return;
+                    }
+                    
+                    try {
+                        // Ensure shares is a valid number
+                        const shares = parseFloat(item.shares);
+                        if (isNaN(shares)) {
+                            if (typeof showNotification === 'function') {
+                                showNotification('Shares must be a valid number', 'is-warning');
+                            }
+                            return;
+                        }
+                        
+                        console.log('Sending shares update request for item ID:', item.id, 'Shares:', shares);
+                        const response = await fetch(`/portfolio/api/update_portfolio/${item.id}`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                shares: shares
+                            })
+                        });
+                        
+                        const result = await response.json();
+                        console.log('Shares update response:', result);
+                        
+                        if (result.success) {
+                            // Show success notification using the global function if available
+                            if (typeof showNotification === 'function') {
+                                showNotification('Shares updated successfully', 'is-success', 3000);
+                            } else {
+                                console.log('Shares updated successfully');
+                            }
+                            
+                            // If the response includes the updated shares value, update the item
+                            if (result.data && result.data.shares !== undefined) {
+                                // Format the shares value to ensure it's displayed correctly
+                                item.shares = result.data.shares;
+                                console.log('Updated shares value from server:', item.shares);
+                            }
+                            
+                            // Update the total value display
+                            this.updateMetrics();
+                        } else {
+                            // Show error notification
+                            if (typeof showNotification === 'function') {
+                                showNotification(`Error updating shares: ${result.error}`, 'is-danger');
+                            } else {
+                                console.error(`Error updating shares: ${result.error}`);
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error updating shares:', error);
+                        if (typeof showNotification === 'function') {
+                            showNotification('Failed to update shares', 'is-danger');
+                        }
+                    }
+                },
+                
+                // Debounced version of saveSharesChange for input events
+                debouncedSaveSharesChange: _.debounce(function(item) {
+                    this.saveSharesChange(item);
+                }, 500),
         
                 formatCurrency(value) {
                     if (!value) return '€0.00';
