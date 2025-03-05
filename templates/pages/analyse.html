@@ -40,7 +40,19 @@
         
         <!-- Portfolio Overview Section -->
         <section class="mb-6">
-            <h2 class="subtitle is-4 mb-4">Portfolio Overview</h2>
+            <div class="is-flex is-justify-content-space-between is-align-items-center mb-4">
+                <h2 class="subtitle is-4 mb-0">Portfolio Breakdown</h2>
+                <div class="buttons">
+                    <button id="expandAllPortfolios" class="button is-small is-outlined">
+                        <span class="icon"><i class="fas fa-expand-alt"></i></span>
+                        <span>Expand All</span>
+                    </button>
+                    <button id="collapseAllPortfolios" class="button is-small is-outlined">
+                        <span class="icon"><i class="fas fa-compress-alt"></i></span>
+                        <span>Collapse All</span>
+                    </button>
+                </div>
+            </div>
             <div id="portfolioSections">
                 <!-- Portfolio sections will be added here dynamically -->
             </div>
@@ -98,6 +110,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return {
             responsive: true,
             maintainAspectRatio: false,
+            animation: false, // Completely disable chart animations
             layout: {
                 padding: {
                     top: 20,
@@ -243,46 +256,40 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize expandable portfolio sections
     function initializeExpandablePortfolios() {
-        // Add a collapse/expand all button at the top of the page
-        const portfolioSectionsHeader = document.querySelector('.portfolio-analysis .subtitle.is-4');
-        if (portfolioSectionsHeader) {
-            const expandCollapseAllBtn = document.createElement('button');
-            expandCollapseAllBtn.className = 'button is-small is-outlined ml-4';
-            expandCollapseAllBtn.innerHTML = '<span class="icon"><i class="fas fa-compress-alt"></i></span><span>Collapse All</span>';
-            expandCollapseAllBtn.id = 'toggleAllPortfolios';
-            
-            // Insert the button next to the header
-            portfolioSectionsHeader.parentNode.insertBefore(expandCollapseAllBtn, portfolioSectionsHeader.nextSibling);
-            
-            // Add click handler for the button
-            expandCollapseAllBtn.addEventListener('click', function() {
+        // Add click handlers for the expand/collapse all buttons
+        const expandAllBtn = document.getElementById('expandAllPortfolios');
+        const collapseAllBtn = document.getElementById('collapseAllPortfolios');
+        
+        if (expandAllBtn && collapseAllBtn) {
+            // Add click handler for expand all button
+            expandAllBtn.addEventListener('click', function() {
                 const allSections = document.querySelectorAll('.portfolio-section');
-                const isCollapsing = this.querySelector('span:not(.icon)').textContent === 'Collapse All';
                 
                 allSections.forEach(section => {
                     const content = section.querySelector('.portfolio-content');
                     const icon = section.querySelector('.toggle-portfolio i');
                     
-                    if (isCollapsing) {
-                        content.style.display = 'none';
-                        icon.classList.remove('fa-chevron-up');
-                        icon.classList.add('fa-chevron-down');
-                    } else {
-                        content.style.display = 'block';
-                        icon.classList.remove('fa-chevron-down');
-                        icon.classList.add('fa-chevron-up');
-                    }
+                    content.style.display = 'block';
+                    icon.classList.remove('fa-chevron-down');
+                    icon.classList.add('fa-chevron-up');
                 });
-                
-                // Update button text and icon
-                if (isCollapsing) {
-                    this.innerHTML = '<span class="icon"><i class="fas fa-expand-alt"></i></span><span>Expand All</span>';
-                } else {
-                    this.innerHTML = '<span class="icon"><i class="fas fa-compress-alt"></i></span><span>Collapse All</span>';
-                }
                 
                 // Ensure charts render correctly
                 window.dispatchEvent(new Event('resize'));
+            });
+            
+            // Add click handler for collapse all button
+            collapseAllBtn.addEventListener('click', function() {
+                const allSections = document.querySelectorAll('.portfolio-section');
+                
+                allSections.forEach(section => {
+                    const content = section.querySelector('.portfolio-content');
+                    const icon = section.querySelector('.toggle-portfolio i');
+                    
+                    content.style.display = 'none';
+                    icon.classList.remove('fa-chevron-up');
+                    icon.classList.add('fa-chevron-down');
+                });
             });
         }
     }
@@ -753,7 +760,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="is-flex is-justify-content-space-between is-align-items-center">
                     <h4 class="portfolio-header-title">${portfolio.name}</h4>
                     <span class="icon toggle-portfolio">
-                        <i class="fas fa-chevron-up"></i>
+                        <i class="fas fa-chevron-down"></i>
                     </span>
                 </div>
             `;
@@ -915,6 +922,9 @@ document.addEventListener('DOMContentLoaded', function() {
             // Add header and content to section
             section.appendChild(header);
             section.appendChild(content);
+            
+            // Set initial state to collapsed
+            content.style.display = 'none';
             
             // Add section to container
             container.appendChild(section);
