@@ -302,6 +302,37 @@ option {
     height: 400px;
     width: 100%;
     margin: 1rem 0;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    visibility: visible !important;
+    opacity: 1 !important;
+    min-height: 350px;
+}
+
+.chart-medium-container {
+    height: 450px;
+    width: 100%;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    visibility: visible !important;
+    opacity: 1 !important;
+    min-height: 400px;
+}
+
+/* Ensure sunburst charts are always visible */
+[id^="categoryChart"] {
+    width: 100% !important;
+    height: 450px !important;
+    min-height: 400px !important;
+    min-width: 300px !important;
+    position: relative !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    z-index: 1 !important;
 }
 
 /* Data tables */
@@ -458,9 +489,42 @@ option {
 
 /* Ensure chart canvases fill their containers */
 .chart-large-container canvas,
-.chart-medium-container canvas {
+.chart-medium-container canvas,
+.chart-large-container .main-svg,
+.chart-medium-container .main-svg {
     width: 100% !important;
     height: 100% !important;
+}
+
+/* Ensure Plotly charts are visible */
+.js-plotly-plot, .plot-container {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* Fix for category charts in tabs */
+.tab-pane .chart-medium-container {
+    display: block !important;
+    min-height: 450px;
+}
+
+/* Specific fix for category charts */
+#categories-\* .column,
+[id^="categories-"] .column,
+[id^="categoryChart"] {
+    display: block !important;
+    visibility: visible !important;
+    min-height: 450px;
+    position: relative;
+}
+
+/* Ensure Plotly charts are visible in categories tab */
+[id^="categoryChart"] .js-plotly-plot,
+[id^="categoryChart"] .plot-container,
+[id^="categoryChart"] .main-svg {
+    display: block !important;
+    visibility: visible !important;
+    position: relative !important;
 }
 
 /* Portfolio analysis section styling */
