@@ -176,7 +176,7 @@ def save_merton_parameters(account_id, parameters):
         ''', [account_id, 'merton', 'parameters', 'dict', variable_value])
 
 def get_merton_results(account_id):
-    """Get saved Merton calculation results"""
+    """Get saved Merton calculation results, checking cache validity (24-hour expiry)"""
     result = query_db('''
         SELECT variable_value
         FROM expanded_state
@@ -185,14 +185,34 @@ def get_merton_results(account_id):
     
     if result:
         try:
-            return json.loads(result['variable_value'])
-        except:
-            pass
+            data = json.loads(result['variable_value'])
+            
+            # Check if cache is still valid
+            if 'cache_expiry' in data:
+                try:
+                    expiry_time = datetime.fromisoformat(data['cache_expiry'])
+                    if datetime.now() < expiry_time:
+                        # Cache is still valid
+                        logger.info(f"Using cached Merton results (expires {data['cache_expiry']})")
+                        return data
+                    else:
+                        # Cache expired
+                        logger.info("Merton results cache expired")
+                except Exception as e:
+                    logger.error(f"Error parsing cache expiry: {e}")
+            
+            # Return data even if cache expired (client will decide what to do)
+            return data
+        except Exception as e:
+            logger.error(f"Error loading Merton results: {e}")
     
     return {}
 
 def save_merton_results(account_id, results):
-    """Save Merton calculation results to the database"""
+    """Save Merton calculation results to the database with timestamp and 24-hour expiry"""
+    # Add timestamp and cache expiration (24 hours)
+    results['timestamp'] = datetime.now().isoformat()
+    results['cache_expiry'] = (datetime.now() + timedelta(hours=24)).isoformat()
     variable_value = json.dumps(results)
     
     # Check if results exist
