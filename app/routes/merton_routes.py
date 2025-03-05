@@ -340,10 +340,7 @@ def interpret_buffett_indicator(indicator: float) -> str:
 
 def perform_merton_calculations(account_id, params):
     """
-    Perform Merton share calculations.
-    
-    This implements a simplified Merton model for portfolio optimization
-    based on historical returns and user-defined parameters.
+    Perform Merton share calculations with portfolio and company level allocations.
     """
     start_time = datetime.now()
     
@@ -371,6 +368,7 @@ def perform_merton_calculations(account_id, params):
     if not portfolio_data:
         return {
             'allocations': {},
+            'company_allocations': {},
             'portfolios': [],
             'warning_message': "No data available for this account.",
             'excluded_identifiers': [],
@@ -387,6 +385,7 @@ def perform_merton_calculations(account_id, params):
     if len(valid_portfolios) == 0:
         return {
             'allocations': {},
+            'company_allocations': {},
             'portfolios': [],
             'warning_message': "No valid portfolios found.",
             'excluded_identifiers': [],
@@ -399,6 +398,8 @@ def perform_merton_calculations(account_id, params):
     
     # Calculate portfolio returns
     portfolio_returns = {}
+    all_company_returns = {}  # Store returns for all companies for later company-level allocation
+    company_identifiers = {}  # Map from identifiers to company names
     
     for portfolio in valid_portfolios:
         try:
@@ -418,6 +419,11 @@ def perform_merton_calculations(account_id, params):
             if not valid_identifiers:
                 warnings.append(f"No valid identifiers found for portfolio {portfolio}")
                 continue
+            
+            # Create mapping from identifier to company name for this portfolio
+            for _, row in portfolio_df.iterrows():
+                if row['identifier'] and isinstance(row['identifier'], str):
+                    company_identifiers[row['identifier']] = row['company']
             
             # Get historical data
             historical_data = get_historical_data(valid_identifiers, years)
@@ -439,11 +445,14 @@ def perform_merton_calculations(account_id, params):
                 warnings.append(f"No valid price data for portfolio {portfolio}")
                 continue
             
-            # Calculate weekly returns
+            # Calculate weekly returns for both portfolio and company level
             returns = historical_data.pct_change().dropna()
             if returns.empty:
                 warnings.append(f"No valid returns for portfolio {portfolio}")
                 continue
+            
+            # Store company returns for this portfolio
+            all_company_returns[portfolio] = returns
             
             # Calculate portfolio return (equal weighted)
             weights = np.ones(len(returns.columns)) / len(returns.columns)
@@ -462,6 +471,7 @@ def perform_merton_calculations(account_id, params):
         warning_message = "No valid portfolios to process"
         return {
             'allocations': {},
+            'company_allocations': {},
             'portfolios': [],
             'warning_message': warning_message,
             'excluded_identifiers': excluded_identifiers,
@@ -470,18 +480,71 @@ def perform_merton_calculations(account_id, params):
         }
     
     try:
-        # Calculate metrics for each portfolio
-        allocations = {}
-        for portfolio, returns in portfolio_returns.items():
-            metrics = calculate_portfolio_metrics(returns, risk_free_rate, processed_target_returns)
-            allocations[portfolio] = metrics
+        # PORTFOLIO LEVEL ALLOCATIONS
+        # Combine portfolio returns into a DataFrame for cross-portfolio analysis
+        combined_portfolio_returns = pd.DataFrame({portfolio: returns for portfolio, returns in portfolio_returns.items()})
+        
+        # Calculate expected returns and covariance across portfolios
+        portfolio_expected_returns = combined_portfolio_returns.mean() * 52  # Annualize
+        portfolio_covariance = combined_portfolio_returns.cov() * 52  # Annualize
+        
+        # Blend with target returns
+        for portfolio in combined_portfolio_returns.columns:
+            if portfolio in processed_target_returns:
+                hist_ret = portfolio_expected_returns[portfolio]
+                target_ret = processed_target_returns[portfolio] / 100  # Convert percentage
+                portfolio_expected_returns[portfolio] = 0.5 * hist_ret + 0.5 * target_ret
+        
+        # Calculate Merton allocation weights across portfolios
+        portfolio_merton_shares = calculate_merton_shares(
+            portfolio_expected_returns.values,
+            portfolio_covariance.values,
+            risk_free_rate,
+            risk_aversion
+        )
+        
+        # Format portfolio allocations
+        portfolio_allocations = {
+            portfolio: float(share) 
+            for portfolio, share in zip(combined_portfolio_returns.columns, portfolio_merton_shares)
+        }
+        
+        # COMPANY LEVEL ALLOCATIONS
+        company_allocations = {}
+        
+        # For each portfolio, calculate company-level Merton allocations
+        for portfolio, company_returns in all_company_returns.items():
+            if company_returns.empty:
+                continue
+                
+            # Calculate expected returns and covariance for companies
+            company_expected_returns = company_returns.mean() * 52  # Annualize
+            company_covariance = company_returns.cov() * 52  # Annualize
+            
+            # Calculate Merton allocation weights for companies within this portfolio
+            company_merton_shares = calculate_merton_shares(
+                company_expected_returns.values,
+                company_covariance.values,
+                risk_free_rate,
+                risk_aversion
+            )
+            
+            # Map identifiers to company names for clearer display
+            company_allocation_dict = {}
+            for i, identifier in enumerate(company_returns.columns):
+                # Get company name if available, otherwise use identifier
+                company_name = company_identifiers.get(identifier, identifier)
+                company_allocation_dict[company_name] = float(company_merton_shares[i])
+            
+            company_allocations[portfolio] = company_allocation_dict
         
         # Format warnings
         if warnings:
             warning_message = "\n".join(warnings)
         
         return {
-            'allocations': allocations,
+            'allocations': portfolio_allocations,
+            'company_allocations': company_allocations,
             'portfolios': list(portfolio_returns.keys()),
             'warning_message': warning_message,
             'excluded_identifiers': excluded_identifiers,
@@ -493,6 +556,7 @@ def perform_merton_calculations(account_id, params):
         logger.error(f"Error in Merton calculations: {str(e)}")
         return {
             'allocations': {},
+            'company_allocations': {},
             'portfolios': [],
             'warning_message': f"Error in calculations: {str(e)}",
             'excluded_identifiers': excluded_identifiers,
@@ -521,18 +585,58 @@ def get_historical_data(identifiers, years=5):
     
     for identifier in identifiers:
         try:
-            # Get historical data from yfinance
+            logger.info(f"Fetching historical prices for {identifier}...")
+            
+            # Try the primary approach with explicit parameters
             data = yf.download(
                 identifier,
                 start=start_date,
                 end=end_date,
-                progress=False,
-                show_errors=False
+                auto_adjust=True,  # Explicitly set auto_adjust=True
+                progress=False
             )
             
-            if not data.empty:
-                # Use adjusted close price
-                historical_data[identifier] = data['Adj Close']
+            if not data.empty and 'Close' in data.columns:
+                # With auto_adjust=True, use Close
+                historical_data[identifier] = data['Close']
+                logger.info(f"Successfully fetched {len(data)} data points for {identifier}")
+            else:
+                # Try backup approach with different interval
+                logger.warning(f"Initial attempt failed for {identifier}, trying daily data...")
+                backup_data = yf.download(
+                    identifier,
+                    start=start_date,
+                    end=end_date,
+                    interval='1d',  # Try daily data
+                    auto_adjust=True,
+                    progress=False
+                )
+                
+                if not backup_data.empty and 'Close' in backup_data.columns:
+                    # Resample daily data if needed
+                    historical_data[identifier] = backup_data['Close']
+                    logger.info(f"Successfully fetched data using daily fallback for {identifier}")
+                else:
+                    # Special handling for crypto tickers
+                    if '-' not in identifier and identifier.upper() in ['BTC', 'ETH', 'LRC', 'ATOM', 'SOL', 'DOGE', 'PEPE', 'IOTA', 'TRX', 'LINK']:
+                        # Try with -USD suffix
+                        crypto_id = f"{identifier.upper()}-USD"
+                        logger.info(f"Trying crypto fallback: {crypto_id}")
+                        crypto_data = yf.download(
+                            crypto_id,
+                            start=start_date,
+                            end=end_date,
+                            auto_adjust=True,
+                            progress=False
+                        )
+                        
+                        if not crypto_data.empty and 'Close' in crypto_data.columns:
+                            historical_data[identifier] = crypto_data['Close']
+                            logger.info(f"Successfully fetched crypto data for {identifier} using {crypto_id}")
+                        else:
+                            logger.warning(f"No price data found for {identifier} or {crypto_id}")
+                    else:
+                        logger.warning(f"No price data found for {identifier}")
                 
         except Exception as e:
             logger.error(f"Error fetching data for {identifier}: {str(e)}")

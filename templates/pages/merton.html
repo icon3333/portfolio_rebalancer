@@ -37,46 +37,40 @@
                         <div class="field">
                             <label class="label">Risk-Free Rate (%)</label>
                             <div class="control">
-                                <input class="input" type="number" name="risk_free_rate" step="0.1" value="1.5">
+                                <input class="input" type="number" name="risk_free_rate" step="0.1" value="{{ params.risk_free_rate|default(1.5) }}">
                             </div>
                         </div>
                         <div class="field">
                             <label class="label">Risk Aversion</label>
                             <div class="control">
-                                <input class="input" type="number" name="risk_aversion" step="0.1" value="2.0">
+                                <input class="input" type="number" name="risk_aversion" step="0.1" value="{{ params.risk_aversion|default(2.0) }}">
                             </div>
                         </div>
                         <div class="field">
                             <label class="label">Historical Lookback (Years)</label>
                             <div class="control">
-                                <input class="input" type="number" name="years" value="5">
+                                <input class="input" type="number" name="years" value="{{ params.years|default(5) }}">
                             </div>
                         </div>
                         <div class="field">
                             <label class="label">Projection Horizon (Years)</label>
                             <div class="control">
-                                <input class="input" type="number" name="projected_years" value="5">
+                                <input class="input" type="number" name="projected_years" value="{{ params.projected_years|default(5) }}">
                             </div>
                         </div>
                         <hr>
-                        <!-- Example target growth rates section (for multiple portfolios) -->
+                        <!-- Dynamic target growth rates section for all portfolios -->
                         <label class="label">Target Growth Rates (Yearly %)</label>
+                        {% for portfolio in portfolios %}
                         <div class="field has-addons">
                             <p class="control is-expanded">
-                                <input class="input" type="text" name="growth_portfolio_name" value="Growth Portfolio" disabled>
+                                <input class="input" type="text" name="{{ portfolio.name }}_portfolio_name" value="{{ portfolio.name }}" readonly>
                             </p>
                             <p class="control">
-                                <input class="input" type="number" name="growth_rate" step="0.1" value="7.0">
+                                <input class="input" type="number" name="{{ portfolio.name }}_rate" step="0.1" value="{{ params.target_growth_rates.get(portfolio.name, {}).get('rate', 7.0) }}">
                             </p>
                         </div>
-                        <div class="field has-addons">
-                            <p class="control is-expanded">
-                                <input class="input" type="text" name="income_portfolio_name" value="Income Portfolio" disabled>
-                            </p>
-                            <p class="control">
-                                <input class="input" type="number" name="income_rate" step="0.1" value="5.0">
-                            </p>
-                        </div>
+                        {% endfor %}
 
                         <div class="field mt-4">
                             <div class="control">
@@ -115,39 +109,100 @@
         </div>
     </div>
 </div>
+
+<!-- Visualization Charts -->
+<div class="columns is-multiline mt-4">
+    <!-- Portfolio Allocation Chart -->
+    <div class="column is-6">
+        <div class="card">
+            <header class="card-header">
+                <p class="card-header-title">
+                    <span class="icon-text">
+                        <span class="icon">
+                            <i class="fas fa-chart-pie"></i>
+                        </span>
+                        <span>Portfolio Allocation</span>
+                    </span>
+                </p>
+            </header>
+            <div class="card-content">
+                <div class="chart-container" style="position: relative; height:300px; width:100%">
+                    <canvas id="portfolioAllocationChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Company Allocation Chart -->
+    <div class="column is-6">
+        <div class="card">
+            <header class="card-header">
+                <p class="card-header-title">
+                    <span class="icon-text">
+                        <span class="icon">
+                            <i class="fas fa-chart-bar"></i>
+                        </span>
+                        <span>Company Allocation</span>
+                    </span>
+                </p>
+                <div class="card-header-icon">
+                    <div class="select">
+                        <select id="portfolioSelector">
+                            <option value="">Select Portfolio</option>
+                        </select>
+                    </div>
+                </div>
+            </header>
+            <div class="card-content">
+                <div class="chart-container" style="position: relative; height:300px; width:100%">
+                    <canvas id="companyAllocationChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const mertonForm = document.getElementById('merton-params-form');
     const resultsDiv = document.getElementById('merton-results-content');
-
-    // No longer needed as we removed the dismissible notifications
+    let portfolioChart = null;
+    let companyChart = null;
     
-
     if(mertonForm) {
         mertonForm.addEventListener('submit', (e) => {
             e.preventDefault();
 
             // Gather form data
             const formData = new FormData(mertonForm);
+            
+            // Get all portfolios from the form
+            const targetGrowthRates = {};
+            
+            // Loop through form elements to find portfolio inputs
+            for(const [name, value] of formData.entries()) {
+                if(name.endsWith('_portfolio_name')) {
+                    const portfolioName = value;
+                    const rateInputName = name.replace('_portfolio_name', '_rate');
+                    const rate = parseFloat(formData.get(rateInputName)) || 7.0;
+                    
+                    targetGrowthRates[portfolioName] = {
+                        rate: rate,
+                        type: "yearly"
+                    };
+                }
+            }
+
             // Construct a JSON object
             const body = {
                 risk_free_rate: parseFloat(formData.get('risk_free_rate')) || 1.5,
                 risk_aversion: parseFloat(formData.get('risk_aversion')) || 2.0,
                 years: parseInt(formData.get('years'), 10) || 5,
                 projected_years: parseInt(formData.get('projected_years'), 10) || 5,
-                target_growth_rates: {
-                    "Growth Portfolio": {
-                        rate: parseFloat(formData.get('growth_rate')) || 7.0,
-                        type: "yearly"
-                    },
-                    "Income Portfolio": {
-                        rate: parseFloat(formData.get('income_rate')) || 5.0,
-                        type: "yearly"
-                    }
-                }
+                target_growth_rates: targetGrowthRates
             };
 
             const overlay = portfolioManager.createLoadingOverlay();
@@ -163,7 +218,20 @@ document.addEventListener('DOMContentLoaded', () => {
                             let htmlOutput = `<p><strong>Warning Message:</strong> ${
                                 data.warning_message || 'None'
                             }</p>`;
-                            htmlOutput += '<hr><h4 class="title is-5">Allocations</h4><ul>';
+                            htmlOutput += '<hr><h4 class="title is-5">Portfolio Allocations</h4><ul>';
+                            
+                            // Define chart colors
+                            const chartColors = [
+                                '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+                                '#FF9F40', '#8BC34A', '#F44336', '#9E9E9E', '#3F51B5'
+                            ];
+                            
+                            // Prepare data for portfolio chart
+                            const portfolioLabels = [];
+                            const portfolioData = [];
+                            const portfolioColors = [];
+                            
+                            let colorIndex = 0;
                             for(const [portfolio, share] of Object.entries(data.allocations)) {
                                 htmlOutput += `
                                     <li>
@@ -171,17 +239,141 @@ document.addEventListener('DOMContentLoaded', () => {
                                         ${(share * 100).toFixed(2)}%
                                     </li>
                                 `;
+                                
+                                // Add to chart data
+                                portfolioLabels.push(portfolio);
+                                portfolioData.push((share * 100).toFixed(2));
+                                portfolioColors.push(chartColors[colorIndex % chartColors.length]);
+                                colorIndex++;
                             }
+                            
                             htmlOutput += '</ul>';
-
-                            htmlOutput += '<hr><p><strong>Excluded Tickers:</strong> ' 
-                                          + (data.excluded_tickers && data.excluded_tickers.length 
-                                              ? data.excluded_tickers.join(', ') 
-                                              : 'None')
-                                          + '</p>';
+                            
+                            // Show excluded identifiers and calculation time
+                            htmlOutput += '<hr><p><strong>Excluded Companies:</strong> ' 
+                                        + (data.excluded_identifiers && data.excluded_identifiers.length 
+                                            ? data.excluded_identifiers.join(', ') 
+                                            : 'None')
+                                        + '</p>';
                             htmlOutput += `<p><strong>Calculation Time:</strong> ${data.calculation_time || 0}s</p>`;
-
+                            
                             resultsDiv.innerHTML = htmlOutput;
+                            
+                            // Render the portfolio allocation chart
+                            const portfolioCtx = document.getElementById('portfolioAllocationChart').getContext('2d');
+                            
+                            // Destroy existing chart if it exists
+                            if(portfolioChart) {
+                                portfolioChart.destroy();
+                            }
+                            
+                            portfolioChart = new Chart(portfolioCtx, {
+                                type: 'pie',
+                                data: {
+                                    labels: portfolioLabels,
+                                    datasets: [{
+                                        data: portfolioData,
+                                        backgroundColor: portfolioColors,
+                                        borderWidth: 1
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: {
+                                        title: {
+                                            display: true,
+                                            text: 'Merton Portfolio Allocation'
+                                        },
+                                        legend: {
+                                            position: 'right'
+                                        },
+                                        tooltip: {
+                                            callbacks: {
+                                                label: function(context) {
+                                                    return `${context.label}: ${context.raw}%`;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+                            
+                            // Setup company allocation chart
+                            const portfolioSelector = document.getElementById('portfolioSelector');
+                            portfolioSelector.innerHTML = '<option value="">Select Portfolio</option>';
+                            
+                            // Populate portfolio selector
+                            for(const portfolio of portfolioLabels) {
+                                const option = document.createElement('option');
+                                option.value = portfolio;
+                                option.textContent = portfolio;
+                                portfolioSelector.appendChild(option);
+                            }
+                            
+                            // Add event listener to portfolio selector
+                            portfolioSelector.addEventListener('change', () => {
+                                const selectedPortfolio = portfolioSelector.value;
+                                if(selectedPortfolio && data.company_allocations && data.company_allocations[selectedPortfolio]) {
+                                    const companyAllocations = data.company_allocations[selectedPortfolio];
+                                    
+                                    // Prepare data for company chart
+                                    const companyLabels = [];
+                                    const companyData = [];
+                                    const companyColors = [];
+                                    
+                                    let i = 0;
+                                    for(const [company, share] of Object.entries(companyAllocations)) {
+                                        companyLabels.push(company);
+                                        companyData.push((share * 100).toFixed(2));
+                                        companyColors.push(chartColors[i % chartColors.length]);
+                                        i++;
+                                    }
+                                    
+                                    // Render company allocation chart
+                                    const companyCtx = document.getElementById('companyAllocationChart').getContext('2d');
+                                    
+                                    // Destroy existing chart if it exists
+                                    if(companyChart) {
+                                        companyChart.destroy();
+                                    }
+                                    
+                                    companyChart = new Chart(companyCtx, {
+                                        type: 'bar',
+                                        data: {
+                                            labels: companyLabels,
+                                            datasets: [{
+                                                label: `${selectedPortfolio} Company Allocation (%)`,
+                                                data: companyData,
+                                                backgroundColor: companyColors,
+                                                borderWidth: 1
+                                            }]
+                                        },
+                                        options: {
+                                            responsive: true,
+                                            maintainAspectRatio: false,
+                                            indexAxis: 'y',
+                                            plugins: {
+                                                title: {
+                                                    display: true,
+                                                    text: `Company Allocation for ${selectedPortfolio}`
+                                                },
+                                                legend: {
+                                                    display: false
+                                                },
+                                                tooltip: {
+                                                    callbacks: {
+                                                        label: function(context) {
+                                                            return `${context.raw}%`;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    });
+                                }
+                            });
+                            
                         } else if(data.error) {
                             resultsDiv.innerHTML = `<p class="has-text-danger">${data.error}</p>`;
                         } else {
