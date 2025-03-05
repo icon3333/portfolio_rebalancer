@@ -117,12 +117,16 @@ def load_portfolio_data(account_id=None, portfolio_id=None):
     try:
         params = []
         query = '''
-            SELECT c.*, cs.shares, cs.override_share, mp.price, mp.currency, mp.price_eur, mp.last_updated,
-                   mp.country, mp.sector, mp.industry, p.name as portfolio_name
+            SELECT 
+                c.id, c.name, c.identifier, c.category, c.total_invested,
+                cs.shares, cs.override_share,
+                p.name as portfolio_name, p.id as portfolio_id,
+                mp.price, mp.currency, mp.price_eur, mp.last_updated,
+                mp.country, mp.sector, mp.industry
             FROM companies c
             LEFT JOIN company_shares cs ON c.id = cs.company_id
-            LEFT JOIN market_prices mp ON c.identifier = mp.identifier
             LEFT JOIN portfolios p ON c.portfolio_id = p.id
+            LEFT JOIN market_prices mp ON c.identifier = mp.identifier
             WHERE 1=1
         '''
         

@@ -1,5 +1,5 @@
 This file is a merged representation of the entire codebase, combining all repository files into a single document.
-Generated on: 2025-03-04T23:34:47.568228
+Generated on: 2025-03-05T18:57:53.849533
 
 ================================================================
 Purpose:
@@ -63,10 +63,6 @@ static/
         pages/
             merton.js
             enrich.js
-        components/
-            data_table.js
-            portfolio_editor.js
-            charts.js
 .git/
 templates/
     base.html
@@ -709,9 +705,8 @@ def get_accounts():
 ###START_FILE_PATH: app/routes/portfolio_routes.py###
 from flask import (
     Blueprint, render_template, redirect, url_for, 
-    request, flash, session, jsonify, current_app, Response
+    request, flash, session, jsonify, current_app
 )
-import json
 from app.database.db_manager import query_db, execute_db, backup_database, get_db
 from app.utils.db_utils import (
     load_portfolio_data, process_portfolio_dataframe,
@@ -832,22 +827,9 @@ def get_portfolio_data_api():
         # Get data from database without triggering any yfinance updates
         portfolio_data = get_portfolio_data(account_id)
         if not portfolio_data:
-            # Return with no-cache headers
-            response = Response(json.dumps([]), mimetype='application/json')
-            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-            response.headers['Pragma'] = 'no-cache'
-            response.headers['Expires'] = '0'
-            return response
+            return jsonify([])
 
-        # Create a response with no-cache headers
-        json_data = json.dumps(portfolio_data)
-        response = Response(json_data, mimetype='application/json')
-        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-        response.headers['Pragma'] = 'no-cache'
-        response.headers['Expires'] = '0'
-        
-        logger.info(f"Returning portfolio data with no-cache headers")
-        return response
+        return jsonify(portfolio_data)
     except Exception as e:
         logger.error(f"Error getting portfolio data: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
@@ -907,12 +889,7 @@ def get_portfolios_api():
         json_response = jsonify(names)
         logger.debug(f"JSON response to be sent: {json_response.data}")
         
-        # Set no-cache headers to prevent browser caching
-        response = Response(json_response.data, mimetype='application/json')
-        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-        response.headers['Pragma'] = 'no-cache'
-        response.headers['Expires'] = '0'
-        return response
+        return json_response
         
     except Exception as e:
         logger.error(f"Error getting portfolios: {str(e)}", exc_info=True)
@@ -5746,6 +5723,37 @@ option {
     height: 400px;
     width: 100%;
     margin: 1rem 0;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    visibility: visible !important;
+    opacity: 1 !important;
+    min-height: 350px;
+}
+
+.chart-medium-container {
+    height: 450px;
+    width: 100%;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    visibility: visible !important;
+    opacity: 1 !important;
+    min-height: 400px;
+}
+
+/* Ensure sunburst charts are always visible */
+[id^="categoryChart"] {
+    width: 100% !important;
+    height: 450px !important;
+    min-height: 400px !important;
+    min-width: 300px !important;
+    position: relative !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    z-index: 1 !important;
 }
 
 /* Data tables */
@@ -5902,9 +5910,42 @@ option {
 
 /* Ensure chart canvases fill their containers */
 .chart-large-container canvas,
-.chart-medium-container canvas {
+.chart-medium-container canvas,
+.chart-large-container .main-svg,
+.chart-medium-container .main-svg {
     width: 100% !important;
     height: 100% !important;
+}
+
+/* Ensure Plotly charts are visible */
+.js-plotly-plot, .plot-container {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* Fix for category charts in tabs */
+.tab-pane .chart-medium-container {
+    display: block !important;
+    min-height: 450px;
+}
+
+/* Specific fix for category charts */
+#categories-\* .column,
+[id^="categories-"] .column,
+[id^="categoryChart"] {
+    display: block !important;
+    visibility: visible !important;
+    min-height: 450px;
+    position: relative;
+}
+
+/* Ensure Plotly charts are visible in categories tab */
+[id^="categoryChart"] .js-plotly-plot,
+[id^="categoryChart"] .plot-container,
+[id^="categoryChart"] .main-svg {
+    display: block !important;
+    visibility: visible !important;
+    position: relative !important;
 }
 
 /* Portfolio analysis section styling */
@@ -5920,6 +5961,11 @@ option {
     padding: 1rem 1.5rem;
     background-color: #f8f9fa;
     border-bottom: 1px solid #f1f1f1;
+    transition: background-color 0.2s ease;
+}
+
+.portfolio-analysis .portfolio-header:hover {
+    background-color: #eaeaea;
 }
 
 .portfolio-analysis .portfolio-header-title {
@@ -5930,6 +5976,21 @@ option {
 
 .portfolio-analysis .portfolio-content {
     padding: 1.5rem;
+    transition: all 0.3s ease;
+}
+
+.portfolio-analysis .toggle-portfolio {
+    color: #2196f3;
+    transition: transform 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+}
+
+.portfolio-analysis .toggle-portfolio .fa-chevron-down {
+    transform: rotate(180deg);
 }
 
 /* Analysis page column widths with more specific selectors */
@@ -7066,6 +7127,7 @@ class PortfolioTableApp {
                     },
                     selectedPortfolio: defaultPortfolio,
                     showOnlyMissingPrices: false,
+                    companySearchQuery: '',
                     sortColumn: '',
                     sortDirection: 'asc'
                 };
@@ -7073,30 +7135,6 @@ class PortfolioTableApp {
             mounted() {
                 // Link DOM elements to Vue model for two-way binding
                 this.syncUIWithVueModel();
-                
-                // Add event listener for portfolio data changes
-                document.addEventListener('portfolioDataChanged', (event) => {
-                    console.log('PortfolioTableApp received portfolioDataChanged event:', event);
-                    
-                    // Check if this is a high-priority refresh with details
-                    if (event.detail && event.detail.forceRefresh) {
-                        console.log('Force refreshing table data due to:', event.detail.action);
-                        
-                        // For rename operations, we need special handling
-                        if (event.detail.action === 'rename') {
-                            console.log(`Portfolio renamed from "${event.detail.oldName}" to "${event.detail.newName}"`);
-                            
-                            // Check if the currently selected portfolio was renamed
-                            if (this.selectedPortfolio === event.detail.oldName) {
-                                console.log('Updating selected portfolio to new name');
-                                this.selectedPortfolio = event.detail.newName;
-                            }
-                        }
-                    }
-                    
-                    // Reload the data with no-cache option to ensure fresh data
-                    this.loadData(true);
-                });
             },
             computed: {
                 healthColorClass() {
@@ -7107,7 +7145,7 @@ class PortfolioTableApp {
                     return 'is-danger';
                 },
                 filteredPortfolioItems() {
-                    console.log(`Computing filtered items with portfolio=${this.selectedPortfolio}, showMissing=${this.showOnlyMissingPrices}`);
+                    console.log(`Computing filtered items with portfolio=${this.selectedPortfolio}, showMissing=${this.showOnlyMissingPrices}, companySearch=${this.companySearchQuery}`);
                     
                     // First filter by selected portfolio
                     let filtered = this.selectedPortfolio 
@@ -7120,6 +7158,15 @@ class PortfolioTableApp {
                     if (this.showOnlyMissingPrices) {
                         filtered = filtered.filter(item => !item.price_eur || item.price_eur === 0 || item.price_eur === null);
                         console.log(`After missing prices filter: ${filtered.length} items`);
+                    }
+                    
+                    // Filter by company name if search query is provided
+                    if (this.companySearchQuery && this.companySearchQuery.trim() !== '') {
+                        const query = this.companySearchQuery.toLowerCase().trim();
+                        filtered = filtered.filter(item => {
+                            return item.company && item.company.toLowerCase().includes(query);
+                        });
+                        console.log(`After company search filter: ${filtered.length} items`);
                     }
                     
                     // Apply sorting if a sort column is specified
@@ -7173,6 +7220,11 @@ class PortfolioTableApp {
                 selectedPortfolio() {
                     // Update metrics when portfolio selection changes
                     console.log('selectedPortfolio changed:', this.selectedPortfolio);
+                    this.updateFilteredMetrics();
+                },
+                companySearchQuery() {
+                    // Update metrics when search query changes
+                    console.log('companySearchQuery changed:', this.companySearchQuery);
                     this.updateFilteredMetrics();
                 }
             },
@@ -7228,32 +7280,50 @@ class PortfolioTableApp {
                         } else {
                             console.warn('Missing prices checkbox element not found with ID: show-only-missing-prices');
                         }
+                        
+                        // Setup two-way binding with company search input
+                        const companySearchInput = document.getElementById('company-search');
+                        const clearSearchButton = document.getElementById('clear-company-search');
+                        
+                        if (companySearchInput) {
+                            console.log('Found company search input element');
+                            // Initial value from Vue to DOM
+                            companySearchInput.value = this.companySearchQuery;
+                            
+                            // DOM to Vue binding
+                            companySearchInput.addEventListener('input', () => {
+                                console.log('Company search input changed to:', companySearchInput.value);
+                                this.companySearchQuery = companySearchInput.value;
+                                // Force update filtered list
+                                this.updateFilteredMetrics();
+                            });
+                            
+                            // Vue to DOM binding
+                            this.$watch('companySearchQuery', (newVal) => {
+                                console.log('companySearchQuery changed in Vue:', newVal);
+                                companySearchInput.value = newVal;
+                            });
+                            
+                            // Setup clear button
+                            if (clearSearchButton) {
+                                clearSearchButton.addEventListener('click', () => {
+                                    this.companySearchQuery = '';
+                                    companySearchInput.value = '';
+                                    companySearchInput.focus();
+                                });
+                            }
+                        } else {
+                            console.warn('Company search input element not found with ID: company-search');
+                        }
                     }, 500); // 500ms delay to ensure DOM is fully loaded
                 },
                 
                 // This function will update the dropdown to only show portfolios that are actually used
-                async loadData(noCache = false) {
+                async loadData() {
                     this.loading = true;
                     try {
-                        console.log(`Loading data with ${noCache ? 'no-cache' : 'default'} option`);
-                        
-                        // Configure fetch options to prevent caching if requested
-                        const fetchOptions = noCache ? {
-                            cache: 'no-store',
-                            headers: {
-                                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                                'Pragma': 'no-cache'
-                            }
-                        } : {};
-                        
-                        // Add cache-busting parameter if noCache is true
-                        const dataUrl = noCache ? 
-                            `/portfolio/api/portfolio_data?_nocache=${new Date().getTime()}` : 
-                            '/portfolio/api/portfolio_data';
-                        
                         // Load portfolio items
-                        console.log(`Fetching from ${dataUrl}`);
-                        const response = await fetch(dataUrl, fetchOptions);
+                        const response = await fetch('/portfolio/api/portfolio_data');
                         const data = await response.json();
                         this.portfolioItems = data;
                         console.log('Loaded portfolio items:', this.portfolioItems);
@@ -7264,12 +7334,7 @@ class PortfolioTableApp {
                         
                         // Also refresh the portfolio options from the server but only keep those that are in use
                         try {
-                            const portfoliosUrl = noCache ? 
-                                `/portfolio/api/portfolios?_nocache=${new Date().getTime()}` : 
-                                '/portfolio/api/portfolios';
-                                
-                            console.log(`Fetching from ${portfoliosUrl}`);
-                            const portfoliosResponse = await fetch(portfoliosUrl, fetchOptions);
+                            const portfoliosResponse = await fetch('/portfolio/api/portfolios');
                             const portfoliosData = await portfoliosResponse.json();
                             
                             if (Array.isArray(portfoliosData) && portfoliosData.length > 0) {
@@ -7921,27 +7986,13 @@ class BulkEditApp {
                 }
             },
             methods: {
-                async loadPortfolioOptions(noCache = false) {
+                async loadPortfolioOptions() {
                     try {
                         console.log('Fetching up-to-date portfolio options from server...');
                         console.log('Current portfolioOptions before fetch:', JSON.stringify(this.portfolioOptions));
                         
                         console.log('Starting API call to fetch portfolios...');
-                        // Configure fetch options to prevent caching if requested
-                        const fetchOptions = noCache ? {
-                            cache: 'no-store',
-                            headers: {
-                                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                                'Pragma': 'no-cache'
-                            }
-                        } : {};
-                        
-                        // Add cache-busting parameter if noCache is true
-                        const url = noCache ? 
-                            `/portfolio/api/portfolios?_nocache=${new Date().getTime()}` : 
-                            '/portfolio/api/portfolios';
-                            
-                        const response = await fetch(url, fetchOptions);
+                        const response = await fetch('/portfolio/api/portfolios');
                         console.log('Portfolio API response status:', response.status);
                         
                         if (!response.ok) {
@@ -8011,28 +8062,12 @@ class BulkEditApp {
                     }
                 },
                 
-                async loadCompanies(noCache = false) {
+                async loadCompanies() {
                     console.log('Starting to load companies');
                     this.loading = true;
                     try {
                         console.log('Fetching from /portfolio/api/portfolio_data');
-                        
-                        // Configure fetch options to prevent caching if requested
-                        const fetchOptions = noCache ? {
-                            cache: 'no-store',
-                            headers: {
-                                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                                'Pragma': 'no-cache'
-                            }
-                        } : {};
-                        
-                        // Add cache-busting parameter if noCache is true
-                        const url = noCache ? 
-                            `/portfolio/api/portfolio_data?_nocache=${new Date().getTime()}` : 
-                            '/portfolio/api/portfolio_data';
-                            
-                        console.log(`Fetching from ${url} with ${noCache ? 'no-cache' : 'default'} options`);
-                        const response = await fetch(url, fetchOptions);
+                        const response = await fetch('/portfolio/api/portfolio_data');
                         console.log('Response received:', response);
                         if (!response.ok) {
                             throw new Error(`Failed to load companies: ${response.status} ${response.statusText}`);
@@ -8094,10 +8129,17 @@ class BulkEditApp {
                         modal.classList.remove('is-active');
                         document.documentElement.classList.remove('is-clipped');
                         
-                        // Dispatch a custom event that the table can listen for
-                        console.log('Dispatching portfolioDataChanged event');
-                        const event = new CustomEvent('portfolioDataChanged');
-                        document.dispatchEvent(event);
+                        // Reload the portfolio data table to see the latest updates
+                        if (window.portfolioTableApp && typeof window.portfolioTableApp.loadData === 'function') {
+                            console.log('Reloading portfolio data table after closing bulk edit modal');
+                            // Ensure we reload the data with a small delay to allow any backend operations to complete
+                            setTimeout(() => {
+                                window.portfolioTableApp.loadData();
+                                console.log('Portfolio data table reloaded after modal close');
+                            }, 100);
+                        } else {
+                            console.warn('Could not find portfolioTableApp to reload data');
+                        }
                     }
                 },
                 
@@ -8162,10 +8204,6 @@ class BulkEditApp {
                             
                             // Refresh the companies
                             await this.loadCompanies();
-                            
-                            // Dispatch event to notify table data changed
-                            const event = new CustomEvent('portfolioDataChanged');
-                            document.dispatchEvent(event);
                         } else {
                             throw new Error(result.error || 'Failed to update companies');
                         }
@@ -8234,10 +8272,6 @@ class BulkEditApp {
                             
                             // Refresh the companies
                             await this.loadCompanies();
-                            
-                            // Dispatch event to notify table data changed
-                            const event = new CustomEvent('portfolioDataChanged');
-                            document.dispatchEvent(event);
                         } else {
                             throw new Error(result.error || 'Failed to update companies');
                         }
@@ -8305,10 +8339,6 @@ class BulkEditApp {
                         // Then refresh from server to ensure everything is in sync
                         await this.loadPortfolioOptions();
                         
-                        // Dispatch event to notify table data changed
-                        const event = new CustomEvent('portfolioDataChanged');
-                        document.dispatchEvent(event);
-                        
                     } catch (error) {
                         console.error('Error creating portfolio:', error);
                         if (typeof showNotification === 'function') {
@@ -8333,23 +8363,16 @@ class BulkEditApp {
                     
                     this.isPortfolioLoading = true;
                     try {
-                        console.log(`Renaming portfolio from "${this.oldPortfolioName}" to "${this.newPortfolioName}"`);
-                        
                         // Create form data to match the server endpoint
                         const formData = new FormData();
                         formData.append('action', 'rename');
                         formData.append('old_name', this.oldPortfolioName);
                         formData.append('new_name', this.newPortfolioName);
                         
-                        // Send request to rename portfolio with no-cache to prevent browser caching
+                        // Send request to rename portfolio
                         const response = await fetch('/portfolio/manage_portfolios', {
                             method: 'POST',
-                            body: formData,
-                            cache: 'no-store',
-                            headers: {
-                                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                                'Pragma': 'no-cache'
-                            }
+                            body: formData
                         });
                         
                         if (!response.ok) {
@@ -8386,29 +8409,9 @@ class BulkEditApp {
                         }
                         console.log('Updated portfolio options after rename:', this.portfolioOptions);
                         
-                        // Important: Wait a brief moment to ensure DB operations are complete
-                        await new Promise(resolve => setTimeout(resolve, 100));
-                        
-                        // First refresh portfolio options from server with no-cache
-                        console.log('Refreshing portfolio options from server');
-                        await this.loadPortfolioOptions(true);
-                        
-                        // Reload companies with the updated portfolio names
-                        console.log('Reloading companies data after portfolio rename');
-                        await this.loadCompanies(true);
-                        
-                        // Force a global refresh of the portfolio table by dispatching event
-                        console.log('Dispatching portfolioDataChanged event with forceRefresh flag');
-                        const event = new CustomEvent('portfolioDataChanged', {
-                            detail: { 
-                                action: 'rename', 
-                                oldName, 
-                                newName, 
-                                forceRefresh: true,
-                                timestamp: new Date().getTime() // Add timestamp to ensure unique events
-                            }
-                        });
-                        document.dispatchEvent(event);
+                        // Then refresh from server to ensure everything is in sync
+                        await this.loadPortfolioOptions();
+                        await this.loadCompanies(); // Reload companies to update portfolio names
                         
                     } catch (error) {
                         console.error('Error renaming portfolio:', error);
@@ -8484,10 +8487,6 @@ class BulkEditApp {
                         // Then refresh from server to ensure everything is in sync
                         await this.loadPortfolioOptions();
                         
-                        // Dispatch event to notify table data changed
-                        const event = new CustomEvent('portfolioDataChanged');
-                        document.dispatchEvent(event);
-                        
                     } catch (error) {
                         console.error('Error deleting portfolio:', error);
                         if (typeof showNotification === 'function') {
@@ -8512,21 +8511,6 @@ class BulkEditApp {
                 // Log initial state
                 console.log('Initial portfolioOptions:', JSON.stringify(this.portfolioOptions));
                 console.log('Initial staticPortfolios:', JSON.stringify(this.staticPortfolios));
-                
-                // Add event listener for Escape key to close the modal
-                document.addEventListener('keydown', (e) => {
-                    const modal = document.getElementById('bulk-edit-modal');
-                    if (e.key === 'Escape' && modal && modal.classList.contains('is-active')) {
-                        // Close the modal
-                        modal.classList.remove('is-active');
-                        document.documentElement.classList.remove('is-clipped');
-                        
-                        // Dispatch the custom event to refresh data
-                        console.log('Dispatching portfolioDataChanged event from Escape key handler');
-                        const event = new CustomEvent('portfolioDataChanged');
-                        document.dispatchEvent(event);
-                    }
-                });
                 
                 // Make sure we have default portfolio in the initial options
                 if (Array.isArray(this.portfolioOptions) && this.portfolioOptions.length > 0) {
@@ -8703,21 +8687,6 @@ document.addEventListener('DOMContentLoaded', function() {
 ###END_FILE###
 
 ================================================================
-###START_FILE_PATH: static/js/components/data_table.js###
-
-###END_FILE###
-
-================================================================
-###START_FILE_PATH: static/js/components/portfolio_editor.js###
-
-###END_FILE###
-
-================================================================
-###START_FILE_PATH: static/js/components/charts.js###
-
-###END_FILE###
-
-================================================================
 ###START_FILE_PATH: templates/base.html###
 <!DOCTYPE html>
 <html lang="en">
@@ -8743,8 +8712,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     <!-- Bulk Edit Styles -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/bulk-edit.css') }}?v={{ range(1, 10000) | random }}">
-    
-    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
     
     {% block head_extras %}{% endblock %}
 </head>
@@ -9597,11 +9564,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span>Merton Allocation</span>
             </span>
         </h1>
-        <p class="subtitle has-text-grey">
-            The Merton model helps you optimize your portfolio based on risk-free rates,
-            risk aversion, and target return expectations. Use the form below to update
-            parameters and calculate recommended allocations.
-        </p>
     </div>
 </div>
 
@@ -10070,55 +10032,95 @@ document.addEventListener('DOMContentLoaded', () => {
     </div>
     
     <div id="analysisContent" style="display: none;">
-        <!-- Global Overview Section - Simplified without boxed cards -->
+        <!-- Global Overview Section -->
         <section class="mb-6">
             <div class="is-flex is-justify-content-space-between is-align-items-center mb-4">
                 <h2 class="subtitle is-4 mb-0">Global Overview</h2>
                 <div id="portfolioFilters" class="is-flex is-flex-wrap-wrap">
-                    <!-- Portfolio checkboxes will be added here dynamically - empty portfolios will be filtered out -->
+                    <!-- Portfolio checkboxes will be added here dynamically -->
                 </div>
             </div>
             
             <div class="columns">
                 <div class="column is-half">
-                    <h3 class="subtitle is-5 has-text-centered mb-4">Portfolio Allocations</h3>
+                    <h3 class="subtitle is-5 has-text-centered mb-2">Portfolio Allocations</h3>
                     <div class="chart-large-container">
-                        <canvas id="portfolioAllocationsChart"></canvas>
+                        <div id="portfolioAllocationsChart"></div>
                     </div>
                 </div>
                 <div class="column is-half">
-                    <h3 class="subtitle is-5 has-text-centered mb-4">Company Allocations (All Portfolios)</h3>
+                    <h3 class="subtitle is-5 has-text-centered mb-2">Company Allocations (All Portfolios)</h3>
                     <div class="chart-large-container">
-                        <canvas id="companyAllocationsChart"></canvas>
+                        <div id="companyAllocationsChart"></div>
                     </div>
                 </div>
             </div>
         </section>
         
-        <!-- Portfolio Overview Section -->
+        <!-- Portfolio Breakdown Section -->
         <section class="mb-6">
-            <h2 class="subtitle is-4 mb-4">Portfolio Overview</h2>
+            <div class="is-flex is-justify-content-space-between is-align-items-center mb-4">
+                <h2 class="subtitle is-4 mb-0">Portfolio Breakdown</h2>
+                <div class="buttons">
+                    <button id="expandAllPortfolios" class="button is-small is-outlined">
+                        <span class="icon"><i class="fas fa-expand-alt"></i></span>
+                        <span>Expand All</span>
+                    </button>
+                    <button id="collapseAllPortfolios" class="button is-small is-outlined">
+                        <span class="icon"><i class="fas fa-compress-alt"></i></span>
+                        <span>Collapse All</span>
+                    </button>
+                </div>
+            </div>
             <div id="portfolioSections">
                 <!-- Portfolio sections will be added here dynamically -->
             </div>
         </section>
         
-        <!-- Detailed Overview Section -->
-        <section>
-            <h2 class="subtitle is-4 mb-4">Detailed Overview</h2>
-            <div id="detailedOverview" class="content-panel">
-                <!-- Detailed metrics will be added here dynamically -->
+        <!-- Risk Breakdown Section -->
+        <section class="mb-6">
+            <h2 class="subtitle is-4 mb-4">Risk Breakdown</h2>
+            <div class="field">
+                <div class="control">
+                    <div class="select">
+                        <select id="riskDimensionSelect">
+                            <option value="category">Category</option>
+                            <option value="sector">Sector</option>
+                            <option value="industry">Industry</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="columns">
+                <div class="column is-full">
+                    <div class="chart-large-container">
+                        <div id="riskHeatmap"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="columns">
+                <div class="column is-half">
+                    <h3 class="subtitle is-5 has-text-centered mb-2">Top Countries by Exposure</h3>
+                    <div class="chart-medium-container">
+                        <div id="countryExposureChart"></div>
+                    </div>
+                </div>
+                <div class="column is-half">
+                    <h3 class="subtitle is-5 has-text-centered mb-2">Top Sectors by Exposure</h3>
+                    <div class="chart-medium-container">
+                        <div id="sectorExposureChart"></div>
+                    </div>
+                </div>
             </div>
         </section>
     </div>
 </div>
 
-<!-- Include Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<!-- Include Chart.js DataLabels plugin -->
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
 <!-- Include Font Awesome -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+<!-- Include chart components -->
+{% include "components/analyse_components.html" %}
 
 <!-- CSS has been moved to custom.css -->
 
@@ -10135,10 +10137,8 @@ document.addEventListener('DOMContentLoaded', () => {
  * - Company percentages relative to their category
  * - Sortable tables in both views
  * - Responsive charts for both views
+ * - Sunburst visualization for category breakdown
  */
-// Register the DataLabels plugin with Chart.js
-Chart.register(ChartDataLabels);
-
 document.addEventListener('DOMContentLoaded', function() {
     // Store data
     let portfolios = [];
@@ -10146,88 +10146,12 @@ document.addEventListener('DOMContentLoaded', function() {
     let selectedPortfolioIds = [];
     let portfolioCharts = {};
     
+    // Enhance the tab initialization with chart handlers
+    initializePortfolioTabs = PortfolioCharts.setupTabChangeHandlers(initializePortfolioTabs);
+    
     // Charts
     let portfolioAllocationsChart = null;
     let companyAllocationsChart = null;
-    
-    // Centralized chart configuration
-    function getPieChartOptions() {
-        return {
-            responsive: true,
-            maintainAspectRatio: false,
-            layout: {
-                padding: {
-                    top: 20,
-                    right: 20,
-                    bottom: 20,
-                    left: 20
-                }
-            },
-            cutout: '50%', // Reduce the cutout to provide more space for labels
-            plugins: {
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const value = context.raw;
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = ((value / total) * 100).toFixed(1);
-                            // Use the full original label for tooltips
-                            const label = context.chart.data.originalLabels ? 
-                                context.chart.data.originalLabels[context.dataIndex] : 
-                                context.label;
-                            return ` ${label}: ${formatCurrency(value)} (${percentage}%)`;
-                        }
-                    }
-                },
-                datalabels: {
-                    font: {
-                        weight: 'bold',
-                        size: 11
-                    },
-                    formatter: function(value, context) {
-                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                        const percentage = ((value / total) * 100).toFixed(1);
-                        
-                        // Show labels for all segments that have enough space
-                        // Segments with less than 2% are too small for any text
-                        if (percentage < 2) return '';
-                        
-                        const label = context.chart.data.labels[context.dataIndex];
-                        let displayLabel = label;
-                        
-                        // Adaptive label display based on segment size
-                        if (percentage < 4) {
-                            // For smaller segments (2-4%), only show percentage
-                            return `${percentage}%`;
-                        } else if (percentage < 8) {
-                            // For medium segments (4-8%), show abbreviated label
-                            if (label.length > 6) {
-                                displayLabel = label.substring(0, 4) + '...';
-                            }
-                            return `${displayLabel}\n${percentage}%`;
-                        } else {
-                            // For larger segments (>8%), show more complete label
-                            if (label.length > 15) {
-                                displayLabel = label.substring(0, 12) + '...';
-                            }
-                            return `${displayLabel}\n${percentage}%`;
-                        }
-                    },
-                    color: '#fff',
-                    textStrokeColor: 'rgba(0,0,0,0.5)',
-                    textStrokeWidth: 1,
-                    textAlign: 'center',
-                    anchor: 'center',
-                    align: 'center',
-                    offset: 0,
-                    padding: 4
-                }
-            }
-        };
-    }
     
     // Format functions
     function formatCurrency(value) {
@@ -10298,6 +10222,46 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    // Initialize expandable portfolio sections
+    function initializeExpandablePortfolios() {
+        // Add click handlers for the expand/collapse all buttons
+        const expandAllBtn = document.getElementById('expandAllPortfolios');
+        const collapseAllBtn = document.getElementById('collapseAllPortfolios');
+        
+        if (expandAllBtn && collapseAllBtn) {
+            // Add click handler for expand all button
+            expandAllBtn.addEventListener('click', function() {
+                const allSections = document.querySelectorAll('.portfolio-section');
+                
+                allSections.forEach(section => {
+                    const content = section.querySelector('.portfolio-content');
+                    const icon = section.querySelector('.toggle-portfolio i');
+                    
+                    content.style.display = 'block';
+                    icon.classList.remove('fa-chevron-down');
+                    icon.classList.add('fa-chevron-up');
+                });
+                
+                // Ensure charts render correctly
+                window.dispatchEvent(new Event('resize'));
+            });
+            
+            // Add click handler for collapse all button
+            collapseAllBtn.addEventListener('click', function() {
+                const allSections = document.querySelectorAll('.portfolio-section');
+                
+                allSections.forEach(section => {
+                    const content = section.querySelector('.portfolio-content');
+                    const icon = section.querySelector('.toggle-portfolio i');
+                    
+                    content.style.display = 'none';
+                    icon.classList.remove('fa-chevron-up');
+                    icon.classList.add('fa-chevron-down');
+                });
+            });
+        }
+    }
+    
     // Load data and initialize
     Promise.all([
         fetchPortfolios(),
@@ -10310,7 +10274,7 @@ document.addEventListener('DOMContentLoaded', function() {
         initializePortfolioFilters();
         initializeCharts();
         renderPortfolioSections();
-        renderDetailedOverview();
+        initializeExpandablePortfolios();
         
         // Hide loading indicator and show content
         document.getElementById('loadingIndicator').style.display = 'none';
@@ -10319,8 +10283,15 @@ document.addEventListener('DOMContentLoaded', function() {
         // Initialize table sorting
         initTableSorting();
         
-        // Initialize portfolio tabs
+        // Initialize portfolio tabs with enhanced handlers
+        initializePortfolioTabs = PortfolioCharts.setupTabChangeHandlers(initializePortfolioTabs);
         initializePortfolioTabs();
+        
+        // Setup resize handlers for charts
+        PortfolioCharts.setupResizeHandlers();
+        
+        // Initialize Risk Breakdown
+        initializeRiskBreakdown();
     }).catch(error => {
         console.error('Error loading data:', error);
         document.getElementById('loadingIndicator').innerHTML = `
@@ -10349,21 +10320,36 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Process the data
     function processData(portfoliosList, data) {
+        console.log('Processing data:');
+        console.log('Portfolios list:', portfoliosList);
+        console.log('Portfolio data sample:', data.slice(0, 3)); // Log first 3 items for debugging
+        console.log('Portfolio data length:', data.length);
+        
         // Create portfolio structure
         portfolios = portfoliosList.map((name, index) => ({
             id: index + 1,
             name: name
         }));
+        console.log('Mapped portfolios:', portfolios);
         
         // Group data by portfolio
         const portfolioMap = {};
         
         data.forEach(item => {
-            const portfolioName = item.portfolio;
+            // Check for the correct property name for portfolio
+            const portfolioName = item.portfolio || item.portfolio_name;
+            
+            console.log(`Processing item: ${item.name || item.company || 'Unknown'}, Portfolio: ${portfolioName || 'Unknown'}`);
+            
+            if (!portfolioName) {
+                console.warn('Item has no portfolio name:', item);
+                return; // Skip items without portfolio name
+            }
             
             if (!portfolioMap[portfolioName]) {
                 const portfolio = portfolios.find(p => p.name === portfolioName);
                 if (portfolio) {
+                    console.log(`Creating new portfolio map entry for: ${portfolioName}`);
                     portfolioMap[portfolioName] = {
                         id: portfolio.id,
                         name: portfolioName,
@@ -10371,6 +10357,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         totalValue: 0,
                         totalInvested: 0
                     };
+                } else {
+                    console.warn(`Portfolio not found in portfolios list: ${portfolioName}`);
                 }
             }
             
@@ -10381,10 +10369,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 const currentValue = price * shares;
                 const totalInvested = item.total_invested || 0;
                 
+                // Get company name from the correct property
+                const companyName = item.company || item.name || 'Unknown';
+                
+                console.log(`Adding company to portfolio ${portfolioName}: ${companyName}, Price: ${price}, Shares: ${shares}, Value: ${currentValue}`);
+                
                 // Add company to portfolio
                 portfolioMap[portfolioName].companies.push({
                     id: item.id,
-                    name: item.company,
+                    name: companyName,
                     category: item.category || 'Uncategorized',
                     shares: shares,
                     priceEur: price,
@@ -10397,11 +10390,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Update portfolio totals
                 portfolioMap[portfolioName].totalValue += currentValue;
                 portfolioMap[portfolioName].totalInvested += totalInvested;
+            } else {
+                console.warn(`Portfolio map entry not found for ${portfolioName} when processing ${item.name || item.company || 'Unknown'}`);
             }
         });
         
         // Convert map to array
         portfolioData = Object.values(portfolioMap);
+        
+        console.log(`Created ${portfolioData.length} portfolios from data`);
+        portfolioData.forEach(p => {
+            console.log(`Portfolio ${p.name}: ${p.companies.length} companies, Total Value: ${p.totalValue}`);
+        });
         
         // Calculate percentages for each company within its portfolio
         portfolioData.forEach(portfolio => {
@@ -10409,6 +10409,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 portfolio.companies.forEach(company => {
                     company.percentage = (company.currentValue / portfolio.totalValue) * 100;
                 });
+            } else {
+                console.warn(`Portfolio ${portfolio.name} has zero total value`);
             }
             
             // Sort companies by value (descending)
@@ -10416,7 +10418,10 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Group companies by category
             portfolio.categories = groupCompaniesByCategory(portfolio.companies, portfolio.totalValue);
+            console.log(`Portfolio ${portfolio.name} has ${portfolio.categories.length} categories`);
         });
+        
+        console.log('Final portfolio data:', portfolioData);
         
         // All portfolios are selected by default
         selectedPortfolioIds = portfolios.map(p => p.id);
@@ -10543,7 +10548,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Update everything based on new selection
         updateCharts();
         updatePortfolioSectionVisibility();
-        renderDetailedOverview();
+        updateRiskBreakdown();
     }
     
     // Update visibility of portfolio sections
@@ -10560,6 +10565,9 @@ document.addEventListener('DOMContentLoaded', function() {
     function initializeCharts() {
         initializePortfolioAllocationsChart();
         initializeCompanyAllocationsChart();
+        
+        // Setup chart resize handlers
+        PortfolioCharts.setupResizeHandlers();
     }
     
     // Update charts based on selected portfolios
@@ -10570,100 +10578,80 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize portfolio allocations chart
     function initializePortfolioAllocationsChart() {
-        const ctx = document.getElementById('portfolioAllocationsChart').getContext('2d');
-        
-        // Prepare chart data
         const filteredPortfolios = portfolioData.filter(p => selectedPortfolioIds.includes(p.id));
         const labels = filteredPortfolios.map(p => p.name);
-        const originalLabels = [...labels]; // Store original labels for tooltips
         const values = filteredPortfolios.map(p => p.totalValue);
         const colors = generateColors(labels.length);
         
-        // Create chart
-        portfolioAllocationsChart = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: labels,
-                originalLabels: originalLabels, // Store original labels for tooltips
-                datasets: [{
-                    data: values,
-                    backgroundColor: colors,
-                    borderWidth: 1
-                }]
-            },
-            options: getPieChartOptions()
-        });
+        PortfolioCharts.createDoughnutChart(
+            'portfolioAllocationsChart',
+            labels,
+            values,
+            '',  // Empty title to avoid duplication
+            colors,
+            formatCurrency
+        );
+        
+        // Store reference for later updates
+        portfolioAllocationsChart = document.getElementById('portfolioAllocationsChart');
     }
     
     // Update portfolio allocations chart
     function updatePortfolioAllocationsChart() {
         if (!portfolioAllocationsChart) return;
         
-        // Prepare chart data
         const filteredPortfolios = portfolioData.filter(p => selectedPortfolioIds.includes(p.id));
         const labels = filteredPortfolios.map(p => p.name);
-        const originalLabels = [...labels]; // Store original labels for tooltips
         const values = filteredPortfolios.map(p => p.totalValue);
         const colors = generateColors(labels.length);
         
-        // Update chart
-        portfolioAllocationsChart.data.labels = labels;
-        portfolioAllocationsChart.data.originalLabels = originalLabels; // Update original labels
-        portfolioAllocationsChart.data.datasets[0].data = values;
-        portfolioAllocationsChart.data.datasets[0].backgroundColor = colors;
-        portfolioAllocationsChart.update();
+        PortfolioCharts.updateDoughnutChart(
+            'portfolioAllocationsChart',
+            labels,
+            values,
+            colors
+        );
     }
     
     // Initialize company allocations chart
     function initializeCompanyAllocationsChart() {
-        const ctx = document.getElementById('companyAllocationsChart').getContext('2d');
-        
-        // Get all companies from selected portfolios
         const allCompanies = getAllCompaniesFromSelectedPortfolios();
-        
-        // Group companies by name and sum values
         const companyGroups = groupCompaniesByName(allCompanies);
         
         // Sort and prepare chart data
-        const { labels, values, originalLabels } = prepareChartData(companyGroups);
+        const { labels, values } = prepareChartData(companyGroups);
         const colors = generateColors(labels.length);
         
-        // Create chart
-        companyAllocationsChart = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: labels,
-                originalLabels: originalLabels, // Store original labels for tooltips
-                datasets: [{
-                    data: values,
-                    backgroundColor: colors,
-                    borderWidth: 1
-                }]
-            },
-            options: getPieChartOptions()
-        });
+        PortfolioCharts.createDoughnutChart(
+            'companyAllocationsChart',
+            labels,
+            values,
+            '',  // Empty title to avoid duplication
+            colors,
+            formatCurrency
+        );
+        
+        // Store reference for later updates
+        companyAllocationsChart = document.getElementById('companyAllocationsChart');
     }
     
     // Update company allocations chart
     function updateCompanyAllocationsChart() {
         if (!companyAllocationsChart) return;
         
-        // Get all companies from selected portfolios
         const allCompanies = getAllCompaniesFromSelectedPortfolios();
-        
-        // Group companies by name and sum values
         const companyGroups = groupCompaniesByName(allCompanies);
         
         // Sort and prepare chart data
-        const { labels, values, originalLabels } = prepareChartData(companyGroups);
+        const { labels, values } = prepareChartData(companyGroups);
         const colors = generateColors(labels.length);
         
-        // Update chart
-        companyAllocationsChart.data.labels = labels;
-        companyAllocationsChart.data.originalLabels = originalLabels; // Update original labels
-        companyAllocationsChart.data.datasets[0].data = values;
-        companyAllocationsChart.data.datasets[0].backgroundColor = colors;
-        companyAllocationsChart.update();
+        PortfolioCharts.updateDoughnutChart(
+            'companyAllocationsChart',
+            labels,
+            values,
+            colors
+        );
     }
     
     // Get all companies from selected portfolios
@@ -10702,64 +10690,112 @@ document.addEventListener('DOMContentLoaded', function() {
         
         let labels = [];
         let values = [];
-        let originalLabels = []; // Store original full names for tooltips
         
         if (sortedCompanies.length > 10) {
             // Take top 10 companies
             const top10 = sortedCompanies.slice(0, 10);
             const others = sortedCompanies.slice(10);
             
-            // Store original names and values
-            originalLabels = top10.map(c => c.name);
-            labels = originalLabels;
+            labels = top10.map(c => c.name);
             values = top10.map(c => c.currentValue);
             
             // Add "Others" category
             const othersValue = others.reduce((sum, c) => sum + c.currentValue, 0);
             if (othersValue > 0) {
                 labels.push('Others');
-                originalLabels.push('Others');
                 values.push(othersValue);
             }
         } else {
-            originalLabels = sortedCompanies.map(c => c.name);
-            labels = originalLabels;
+            labels = sortedCompanies.map(c => c.name);
             values = sortedCompanies.map(c => c.currentValue);
         }
         
-        return { labels, values, originalLabels };
+        return { labels, values };
     }
     
     // Generate colors for chart segments
     function generateColors(count) {
+        function hslToHex(h, s, l) {
+            s /= 100;
+            l /= 100;
+            const c = (1 - Math.abs(2 * l - 1)) * s;
+            const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+            const m = l - c / 2;
+            let r, g, b;
+            if (h < 60) { r = c; g = x; b = 0; }
+            else if (h < 120) { r = x; g = c; b = 0; }
+            else if (h < 180) { r = 0; g = c; b = x; }
+            else if (h < 240) { r = 0; g = x; b = c; }
+            else if (h < 300) { r = x; g = 0; b = c; }
+            else { r = c; g = 0; b = x; }
+            r = Math.round((r + m) * 255);
+            g = Math.round((g + m) * 255);
+            b = Math.round((b + m) * 255);
+            return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+        }
+
         const colors = [];
         for (let i = 0; i < count; i++) {
             const hue = i * (360 / count);
-            colors.push(`hsl(${hue}, 70%, 65%)`);
+            colors.push(hslToHex(hue, 70, 65)); // Using saturation 70% and lightness 65%
         }
         return colors;
     }
     
+    // Expose generateColors as a global function so it can be accessed from analyse_components.html
+    window.generateColors = generateColors;
+
+    
     // Render portfolio sections
     function renderPortfolioSections() {
         const container = document.getElementById('portfolioSections');
+        if (!container) {
+            console.error('Portfolio sections container not found');
+            return;
+        }
+        
+        // Clear existing content
+        container.innerHTML = '';
         
         // Sort portfolios by name
         const sortedPortfolios = [...portfolioData].sort((a, b) => a.name.localeCompare(b.name));
         
+        console.log(`Rendering ${sortedPortfolios.length} portfolio sections`);
+        
+        // Skip rendering if no portfolios to display
+        if (sortedPortfolios.length === 0) {
+            container.innerHTML = '<div class="has-text-centered p-6">No portfolio data available</div>';
+            return;
+        }
+        
+        // Track portfolios that were successfully rendered
+        const renderedPortfolios = [];
+        
         sortedPortfolios.forEach(portfolio => {
             // Skip portfolios with no companies
             if (!portfolio.companies || portfolio.companies.length === 0) {
+                console.log(`Skipping portfolio ${portfolio.id} (${portfolio.name}) - no companies`);
                 return;
             }
             
+            console.log(`Creating section for portfolio ${portfolio.id} (${portfolio.name}) with ${portfolio.companies.length} companies`);
+            
             const section = document.createElement('div');
-            section.className = 'portfolio-section';
+            section.className = 'portfolio-section mb-5';
             section.dataset.portfolioId = portfolio.id;
+            section.setAttribute('data-portfolio-name', portfolio.name);
             
             const header = document.createElement('div');
             header.className = 'portfolio-header';
-            header.innerHTML = `<h4 class="portfolio-header-title">${portfolio.name}</h4>`;
+            header.innerHTML = `
+                <div class="is-flex is-justify-content-space-between is-align-items-center">
+                    <h4 class="portfolio-header-title">${portfolio.name}</h4>
+                    <span class="icon toggle-portfolio">
+                        <i class="fas fa-chevron-down"></i>
+                    </span>
+                </div>
+            `;
+            header.style.cursor = 'pointer';
             
             const content = document.createElement('div');
             content.className = 'portfolio-content';
@@ -10834,12 +10870,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const categoryTableColumn = document.createElement('div');
             categoryTableColumn.className = 'column is-6';
             categoryTableColumn.innerHTML = `
-                <div class="notification is-info is-light mb-2 py-2 px-3">
-                    <p class="is-size-7">
-                        <span class="icon is-small mr-1"><i class="fas fa-info-circle"></i></span>
-                        Click on a category row to see companies within that category. Percentages show both category and portfolio allocation.
-                    </p>
-                </div>
                 <div class="table-container" style="height: calc(100% - 40px); display: flex; flex-direction: column;">
                     <table class="table is-fullwidth is-striped is-hoverable">
                         <thead>
@@ -10870,10 +10900,12 @@ document.addEventListener('DOMContentLoaded', function() {
             companyChartContainer.style.justifyContent = 'center';
             companyChartContainer.style.height = '100%';
             
-            const companyCanvas = document.createElement('canvas');
-            companyCanvas.id = `portfolioChart${portfolio.id}`;
+            const companyDiv = document.createElement('div');
+            companyDiv.id = `portfolioChart${portfolio.id}`;
+            companyDiv.style.width = '100%';
+            companyDiv.style.height = '100%';
             
-            companyChartContainer.appendChild(companyCanvas);
+            companyChartContainer.appendChild(companyDiv);
             companyChartColumn.appendChild(companyChartContainer);
             
             // Chart column for categories view
@@ -10881,6 +10913,7 @@ document.addEventListener('DOMContentLoaded', function() {
             categoryChartColumn.className = 'column is-6';
             categoryChartColumn.style.display = 'flex';
             categoryChartColumn.style.alignItems = 'center';
+            categoryChartColumn.style.minHeight = '450px';
             
             const categoryChartContainer = document.createElement('div');
             categoryChartContainer.className = 'chart-medium-container';
@@ -10888,11 +10921,17 @@ document.addEventListener('DOMContentLoaded', function() {
             categoryChartContainer.style.alignItems = 'center';
             categoryChartContainer.style.justifyContent = 'center';
             categoryChartContainer.style.height = '100%';
+            categoryChartContainer.style.width = '100%';
+            categoryChartContainer.style.position = 'relative';
             
-            const categoryCanvas = document.createElement('canvas');
-            categoryCanvas.id = `categoryChart${portfolio.id}`;
+            const categoryDiv = document.createElement('div');
+            categoryDiv.id = `categoryChart${portfolio.id}`;
+            categoryDiv.style.width = '100%';
+            categoryDiv.style.height = '450px';
+            categoryDiv.style.position = 'relative';
+            categoryDiv.style.visibility = 'visible';
             
-            categoryChartContainer.appendChild(categoryCanvas);
+            categoryChartContainer.appendChild(categoryDiv);
             categoryChartColumn.appendChild(categoryChartContainer);
             
             // Assemble the columns for both tabs
@@ -10914,6 +10953,9 @@ document.addEventListener('DOMContentLoaded', function() {
             content.appendChild(tabs);
             content.appendChild(tabContent);
             
+            // Set initial state to collapsed
+            content.style.display = 'none';
+            
             // Add header and content to section
             section.appendChild(header);
             section.appendChild(content);
@@ -10921,17 +10963,69 @@ document.addEventListener('DOMContentLoaded', function() {
             // Add section to container
             container.appendChild(section);
             
-            // Initialize charts
-            initializePortfolioChart(portfolio);
-            initializeCategoryChart(portfolio);
+            // Store portfolio reference for later chart initialization
+            renderedPortfolios.push(portfolio);
+            
+            // Add click handler to toggle portfolio content visibility
+            const toggleIcon = section.querySelector('.toggle-portfolio');
+            header.addEventListener('click', function() {
+                const content = section.querySelector('.portfolio-content');
+                const icon = toggleIcon.querySelector('i');
+                
+                if (content.style.display === 'none') {
+                    content.style.display = 'block';
+                    icon.classList.remove('fa-chevron-down');
+                    icon.classList.add('fa-chevron-up');
+                    
+                    // Ensure charts render correctly when expanding
+                    window.dispatchEvent(new Event('resize'));
+                    
+                    // Find active tab to determine which chart to redraw
+                    const activeTab = section.querySelector('.tabs li.is-active');
+                    if (activeTab) {
+                        const tabId = activeTab.getAttribute('data-tab');
+                        
+                        // If the categories tab is active, force a click to redraw the chart
+                        if (tabId && tabId.includes('categories')) {
+                            // Simulate a click on the categories tab to redraw the chart
+                            setTimeout(() => activeTab.click(), 250);
+                        }
+                    }
+                } else {
+                    content.style.display = 'none';
+                    icon.classList.remove('fa-chevron-up');
+                    icon.classList.add('fa-chevron-down');
+                }
+            });
         });
+        
+        // Initialize all charts after DOM elements are created
+        console.log(`Initializing charts for ${renderedPortfolios.length} portfolios`);
+        
+        // Use setTimeout to ensure DOM is fully rendered
+        setTimeout(() => {
+            renderedPortfolios.forEach(portfolio => {
+                try {
+                    console.log(`Initializing portfolio chart for ${portfolio.name} (ID: ${portfolio.id})`);
+                    const chartResult = initializePortfolioChart(portfolio);
+                    if (chartResult) {
+                        console.log(`Successfully initialized chart for portfolio ${portfolio.id}`);
+                    } else {
+                        console.warn(`Failed to initialize chart for portfolio ${portfolio.id}`);
+                    }
+                } catch (error) {
+                    console.error(`Error initializing chart for portfolio ${portfolio.id}:`, error);
+                }
+            });
+        }, 100);
     }
+
     
     /**
      * Initialize tab navigation for portfolio sections
      * Sets up click handlers and ensures charts render correctly when tabs change
      */
-    function initializePortfolioTabs() {
+     function initializePortfolioTabs() {
         document.querySelectorAll('.portfolio-section .tabs li').forEach(tab => {
             tab.addEventListener('click', function() {
                 // Get the parent portfolio section
@@ -10952,42 +11046,60 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Show the selected tab content with fade effect
                 portfolioSection.querySelectorAll('.tab-pane').forEach(pane => {
                     if (pane.id === targetId) {
-                        // Fade in the target pane
                         pane.style.opacity = '0';
                         pane.classList.add('is-active');
                         pane.style.display = 'block';
-                        
-                        // Force reflow
                         void pane.offsetHeight;
-                        
-                        // Fade in
                         pane.style.transition = 'opacity 0.3s ease';
                         pane.style.opacity = '1';
                     } else {
-                        // Hide other panes
                         pane.classList.remove('is-active');
                         pane.style.display = 'none';
                     }
                 });
                 
-                // Save the active tab preference to localStorage
+                // Save active tab preference
                 try {
                     localStorage.setItem(`portfolio_tab_${portfolioId}`, targetId);
                 } catch (e) {
                     console.warn('Could not save tab preference to localStorage', e);
                 }
                 
-                // Trigger resize event to fix chart display issues
+                // Handle category chart when switching to categories tab
+                if (targetId.includes('categories')) {
+                    // Get the portfolio object
+                    const portfolioObj = portfolioData.find(p => p.id == portfolioId);
+                    if (!portfolioObj) {
+                        console.error(`Portfolio with ID ${portfolioId} not found`);
+                        return;
+                    }
+                    
+                    console.log(`Tab changed to Categories for portfolio ${portfolioId}`);
+                    
+                    // Check if we already have a chart for this portfolio's categories
+                    const hasCategoryChart = portfolioCharts.categories && portfolioCharts.categories[portfolioId];
+                    
+                    try {
+                        if (!hasCategoryChart) {
+                            console.log(`Initializing category chart for portfolio ${portfolioId}`);
+                            // Initialize the category chart since it doesn't exist yet
+                            initializeCategoryChart(portfolioObj);
+                        } else {
+                            console.log(`Resizing existing category chart for portfolio ${portfolioId}`);
+                            // Resize existing chart
+                            const categoryChart = document.getElementById(`categoryChart${portfolioId}`);
+                            if (categoryChart) {
+                                Plotly.Plots.resize(categoryChart);
+                            }
+                        }
+                    } catch (error) {
+                        console.error(`Error with category chart for portfolio ${portfolioId}:`, error);
+                    }
+                }
+                
+                // Trigger a resize event to fix chart display issues
                 setTimeout(() => {
                     window.dispatchEvent(new Event('resize'));
-                    
-                    // If switching to the category tab, make sure the category chart is properly sized
-                    if (targetId.includes('categories')) {
-                        const categoryChart = document.getElementById(`categoryChart${portfolioId}`);
-                        if (categoryChart && categoryChart.chart) {
-                            categoryChart.chart.resize();
-                        }
-                    }
                 }, 50);
             });
         });
@@ -10997,7 +11109,6 @@ document.addEventListener('DOMContentLoaded', function() {
             document.querySelectorAll('.portfolio-section').forEach(section => {
                 const portfolioId = section.dataset.portfolioId;
                 const savedTabId = localStorage.getItem(`portfolio_tab_${portfolioId}`);
-                
                 if (savedTabId) {
                     const tabToActivate = section.querySelector(`[data-tab="${savedTabId}"]`);
                     if (tabToActivate) {
@@ -11009,6 +11120,7 @@ document.addEventListener('DOMContentLoaded', function() {
             console.warn('Could not restore tab preferences from localStorage', e);
         }
     }
+
     
     // Render company rows for a portfolio
     function renderCompanyRows(portfolio) {
@@ -11084,51 +11196,170 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize chart for a specific portfolio
     function initializePortfolioChart(portfolio) {
-        const ctx = document.getElementById(`portfolioChart${portfolio.id}`).getContext('2d');
+        const elementId = `portfolioChart${portfolio.id}`;
+        
+        // Check if the element exists in the DOM
+        const chartElement = document.getElementById(elementId);
+        if (!chartElement) {
+            console.error(`Chart element not found: ${elementId}`);
+            return null;
+        }
+        
+        console.log(`Initializing portfolio chart for portfolio ${portfolio.id}`);
         
         // Prepare chart data for portfolio companies
-        let { labels, values, originalLabels } = prepareChartData(portfolio.companies);
+        let { labels, values } = prepareChartData(portfolio.companies);
+        
+        // Skip chart creation if there's no data
+        if (labels.length === 0 || values.length === 0) {
+            console.warn(`No data available for chart: ${elementId}`);
+            chartElement.innerHTML = '<div class="has-text-centered p-6">No data available</div>';
+            return null;
+        }
+        
         const colors = generateColors(labels.length);
         
-        // Create chart
-        portfolioCharts[portfolio.id] = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: labels,
-                originalLabels: originalLabels, // Store original labels for tooltips
-                datasets: [{
-                    data: values,
-                    backgroundColor: colors,
-                    borderWidth: 1
-                }]
-            },
-            options: getPieChartOptions()
-        });
+        try {
+            // Create chart
+            PortfolioCharts.createDoughnutChart(
+                elementId,
+                labels,
+                values,
+                'Companies',
+                colors,
+                formatCurrency
+            );
+            
+            // Store reference
+            portfolioCharts[portfolio.id] = chartElement;
+            return chartElement;
+        } catch (error) {
+            console.error(`Error creating chart for ${elementId}:`, error);
+            chartElement.innerHTML = '<div class="has-text-centered p-6 has-text-danger">Error creating chart</div>';
+            return null;
+        }
     }
     
-    // Initialize category chart for a specific portfolio
+    // Initialize category chart for a specific portfolio using sunburst
     function initializeCategoryChart(portfolio) {
-        const ctx = document.getElementById(`categoryChart${portfolio.id}`).getContext('2d');
+        const elementId = `categoryChart${portfolio.id}`;
+
+        console.log(`Initializing category chart for portfolio ${portfolio.id} (${portfolio.name})`);
+
+        // Ensure the element exists
+        const chartElement = document.getElementById(elementId);
+        if (!chartElement) {
+            console.error(`Chart element not found: ${elementId}`);
+            return null;
+        }
+
+        // Check if portfolio has categories data
+        if (!portfolio.categories || portfolio.categories.length === 0) {
+            console.warn(`No category data available for portfolio ${portfolio.id}`);
+            chartElement.innerHTML = '<div class="has-text-centered p-6">No category data available</div>';
+            return null;
+        }
+
+        // Ensure window.portfolioData is defined
+        if (typeof window.portfolioData === 'undefined') {
+            console.error('window.portfolioData is undefined, setting it now');
+            window.portfolioData = {};
+        }
         
-        // Prepare chart data
-        const labels = portfolio.categories.map(c => c.name);
-        const values = portfolio.categories.map(c => c.currentValue);
-        const colors = generateColors(labels.length);
+        // Make sure this portfolio is in window.portfolioData
+        // Store both as array element and as direct property
+        if (!Array.isArray(window.portfolioData)) {
+            window.portfolioData = [];
+        }
         
-        // Create chart
-        new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: labels,
-                datasets: [{
-                    data: values,
-                    backgroundColor: colors,
-                    borderWidth: 1
-                }]
-            },
-            options: getPieChartOptions()
-        });
+        // Add to array if not already present
+        if (!window.portfolioData.find(p => p.id == portfolio.id)) {
+            window.portfolioData.push(portfolio);
+        }
+        
+        // Also store by ID for direct access
+        window.portfolioData[portfolio.id] = portfolio;
+
+        // Clear any existing chart
+        chartElement.innerHTML = '';
+
+        try {
+            // Always set explicit dimensions with !important to override any conflicting styles
+            chartElement.style.setProperty('display', 'block', 'important');
+            chartElement.style.setProperty('height', '450px', 'important');
+            chartElement.style.setProperty('width', '100%', 'important');
+            chartElement.style.setProperty('position', 'relative', 'important');
+            chartElement.style.setProperty('visibility', 'visible', 'important');
+            chartElement.style.setProperty('opacity', '1', 'important');
+            chartElement.style.setProperty('min-height', '400px', 'important');
+            chartElement.style.setProperty('min-width', '300px', 'important');
+            
+            // Also ensure parent containers are visible
+            let parent = chartElement.parentElement;
+            while (parent) {
+                const computedStyle = window.getComputedStyle(parent);
+                if (computedStyle.display === 'none' || computedStyle.visibility === 'hidden' || computedStyle.opacity === '0') {
+                    parent.style.setProperty('display', 'block', 'important');
+                    parent.style.setProperty('visibility', 'visible', 'important');
+                    parent.style.setProperty('opacity', '1', 'important');
+                }
+                parent = parent.parentElement;
+            }
+            
+            // Force a reflow to ensure dimensions are applied
+            void chartElement.offsetHeight;
+            
+            console.log(`Creating sunburst chart for portfolio ${portfolio.id} with ${portfolio.categories.length} categories`);
+            portfolio.categories.forEach(cat => {
+                console.log(`  - ${cat.name}: ${cat.companies.length} companies, value: ${cat.currentValue}`);
+            });
+
+            // Create the chart with a small delay to ensure the container is ready
+            setTimeout(() => {
+                try {
+                    const chart = PortfolioCharts.createSunburstChart(
+                        elementId,
+                        portfolio,
+                        formatCurrency,
+                        formatPercentage,
+                        generateColors
+                    );
+
+                    // Store reference to the chart
+                    if (chart) {
+                        if (!portfolioCharts.categories) {
+                            portfolioCharts.categories = {};
+                        }
+                        portfolioCharts.categories[portfolio.id] = chart;
+                        console.log(`Successfully created sunburst chart for portfolio ${portfolio.id}`);
+                        
+                        // Add a delayed check to ensure the chart stays visible
+                        setTimeout(() => {
+                            if (chartElement.offsetWidth === 0 || chartElement.offsetHeight === 0 ||
+                                chartElement.style.visibility === 'hidden' || chartElement.style.opacity === '0') {
+                                console.log(`Chart ${elementId} has zero dimensions after creation, fixing...`);
+                                chartElement.style.setProperty('display', 'block', 'important');
+                                chartElement.style.setProperty('visibility', 'visible', 'important');
+                                chartElement.style.setProperty('opacity', '1', 'important');
+                                Plotly.Plots.resize(chartElement);
+                            }
+                        }, 500);
+                    } else {
+                        console.warn(`Failed to create sunburst chart for portfolio ${portfolio.id}`);
+                    }
+                } catch (innerError) {
+                    console.error(`Error in delayed chart creation for portfolio ${portfolio.id}:`, innerError);
+                }
+            }, 100);
+
+            return true; // Return success indicator
+        } catch (error) {
+            console.error(`Error creating sunburst chart for portfolio ${portfolio.id}:`, error);
+            chartElement.innerHTML = '<div class="has-text-centered p-6 has-text-danger">Error creating chart</div>';
+            return null;
+        }
     }
+
     
     // Render detailed overview section
     function renderDetailedOverview() {
@@ -11233,6 +11464,159 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
     }
     
+    // New Risk Breakdown Functions
+    function initializeRiskBreakdown() {
+        const dimension = document.getElementById('riskDimensionSelect').value;
+        const heatmapData = calculateExposureData(selectedPortfolioIds, dimension);
+        renderHeatmap(heatmapData);
+
+        const countryExposure = calculateExposureByDimension(selectedPortfolioIds, 'country');
+        const sectorExposure = calculateExposureByDimension(selectedPortfolioIds, 'sector');
+        const topCountries = countryExposure.slice(0, 5);
+        const topSectors = sectorExposure.slice(0, 5);
+        renderBarChart('countryExposureChart', topCountries, 'Top Countries by Exposure');
+        renderBarChart('sectorExposureChart', topSectors, 'Top Sectors by Exposure');
+
+        document.getElementById('riskDimensionSelect').addEventListener('change', function() {
+            const newDimension = this.value;
+            const newHeatmapData = calculateExposureData(selectedPortfolioIds, newDimension);
+            renderHeatmap(newHeatmapData);
+        });
+    }
+
+    function updateRiskBreakdown() {
+        const dimension = document.getElementById('riskDimensionSelect').value;
+        const heatmapData = calculateExposureData(selectedPortfolioIds, dimension);
+        renderHeatmap(heatmapData);
+
+        const countryExposure = calculateExposureByDimension(selectedPortfolioIds, 'country');
+        const sectorExposure = calculateExposureByDimension(selectedPortfolioIds, 'sector');
+        const topCountries = countryExposure.slice(0, 5);
+        const topSectors = sectorExposure.slice(0, 5);
+        renderBarChart('countryExposureChart', topCountries, 'Top Countries by Exposure');
+        renderBarChart('sectorExposureChart', topSectors, 'Top Sectors by Exposure');
+    }
+
+    function calculateExposureData(selectedPortfolioIds, dimension) {
+        const allCompanies = getAllCompaniesFromSelectedPortfolios(selectedPortfolioIds);
+        const totalValue = allCompanies.reduce((sum, c) => sum + c.currentValue, 0);
+        
+        const exposure = {};
+        
+        allCompanies.forEach(company => {
+            const country = company.country || 'Unknown';
+            const dimValue = company[dimension] || 'Unknown';
+            
+            if (!exposure[country]) {
+                exposure[country] = {};
+            }
+            if (!exposure[country][dimValue]) {
+                exposure[country][dimValue] = 0;
+            }
+            exposure[country][dimValue] += company.currentValue;
+        });
+        
+        for (const country in exposure) {
+            for (const dim in exposure[country]) {
+                exposure[country][dim] = (exposure[country][dim] / totalValue) * 100;
+            }
+        }
+        
+        const countries = Object.keys(exposure).sort();
+        const dims = [...new Set(Object.values(exposure).flatMap(obj => Object.keys(obj)))].sort();
+        
+        const z = countries.map(country => 
+            dims.map(dim => exposure[country][dim] || 0)
+        );
+        
+        return { countries, dims, z };
+    }
+
+    function renderHeatmap(data) {
+        if (data.countries.length === 0 || data.dims.length === 0) {
+            document.getElementById('riskHeatmap').innerHTML = '<p class="has-text-centered">No data available for heatmap</p>';
+            return;
+        }
+        
+        const trace = {
+            type: 'heatmap',
+            x: data.dims,
+            y: data.countries,
+            z: data.z,
+            colorscale: 'Viridis',
+            hovertemplate: '%{y} - %{x}: %{z:.2f}%<extra></extra>'
+        };
+        
+        const layout = {
+            title: 'Risk Exposure Heatmap',
+            xaxis: { title: 'Dimension' },
+            yaxis: { title: 'Country' },
+            height: 600,
+            margin: { l: 100, r: 100, t: 100, b: 100 }
+        };
+        
+        Plotly.newPlot('riskHeatmap', [trace], layout);
+    }
+
+    function calculateExposureByDimension(selectedPortfolioIds, dimension) {
+        const allCompanies = getAllCompaniesFromSelectedPortfolios(selectedPortfolioIds);
+        const totalValue = allCompanies.reduce((sum, c) => sum + c.currentValue, 0);
+        
+        const exposure = {};
+        
+        allCompanies.forEach(company => {
+            const dimValue = company[dimension] || 'Unknown';
+            if (!exposure[dimValue]) {
+                exposure[dimValue] = 0;
+            }
+            exposure[dimValue] += company.currentValue;
+        });
+        
+        const exposureArray = Object.entries(exposure).map(([key, value]) => ({
+            name: key,
+            percentage: (value / totalValue) * 100
+        }));
+        
+        exposureArray.sort((a, b) => b.percentage - a.percentage);
+        
+        return exposureArray;
+    }
+
+    function renderBarChart(elementId, data, title) {
+        if (data.length === 0) {
+            document.getElementById(elementId).innerHTML = '<p class="has-text-centered">No data available</p>';
+            return;
+        }
+        
+        const labels = data.map(d => d.name);
+        const values = data.map(d => d.percentage);
+        
+        const trace = {
+            x: values,
+            y: labels,
+            type: 'bar',
+            orientation: 'h',
+            marker: {
+                color: 'rgb(158,202,225)',
+                opacity: 0.6,
+                line: {
+                    color: 'rgb(8,48,107)',
+                    width: 1.5
+                }
+            }
+        };
+        
+        const layout = {
+            title: title,
+            xaxis: { title: 'Percentage (%)' },
+            yaxis: { title: '' },
+            height: 400,
+            margin: { l: 150, r: 50, t: 50, b: 50 }
+        };
+        
+        Plotly.newPlot(elementId, [trace], layout);
+    }
+
     // Add event listeners to toggle category companies
     document.addEventListener('click', function(e) {
         // Check if click was on or inside a toggle-companies element
@@ -11350,6 +11734,13 @@ document.addEventListener('DOMContentLoaded', function() {
             color: #8c9b9d !important;
             font-size: 0.9em;
             margin-left: 0.3em;
+        }
+        
+        /* Chart container sizing */
+        .chart-large-container, .chart-medium-container {
+            width: 100%;
+            height: 400px;
+            position: relative;
         }
     `;
     
@@ -11727,70 +12118,719 @@ document.addEventListener('DOMContentLoaded', () => {
 
 ================================================================
 ###START_FILE_PATH: templates/components/analyse_components.html###
-{% macro loading_indicator() %}
-<div class="has-text-centered my-6">
-    <span class="icon is-large">
-        <i class="fas fa-spinner fa-pulse fa-3x"></i>
-    </span>
-    <p class="mt-4">Loading data...</p>
-</div>
-{% endmacro %}
+<!-- analyse_components.html -->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Portfolio Analysis Chart Components</title>
+  <!-- Plotly.js is already included in base.html -->
+  <style>
+    .sunburst-legend {
+      max-height: 150px;
+      overflow-y: auto;
+    }
+    .legend-item.highlighted {
+      font-weight: bold;
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
 
-{% macro error_message(message) %}
-<div class="notification is-danger">
-    <button class="delete"></button>
-    <p>{{ message }}</p>
-</div>
-{% endmacro %}
+<script>
+/**
+ * NOTE:
+ * -------
+ * This version assumes that the following global variables
+ * are set from your main "analyse.html" script:
+ *
+ *   window.portfolioData
+ *   window.formatCurrency
+ *   window.formatPercentage
+ *   window.generateColors
+ *
+ * The "Companies" doughnut chart code already lives in "analyse.html"
+ * where these variables exist. For the "Categories" sunburst chart
+ * to work, the code below references them via window.* (or expects
+ * them to be in global scope).
+ *
+ * The key fix is that the "Categories" tab logic no longer tries
+ * to use a local 'portfolioData' that doesn't exist, and instead
+ * calls window.portfolioData. Also, we remove repeated references
+ * to format functions as parameters, and just read them from
+ * window.formatCurrency, etc.
+ */
 
-{% macro chart_container(id, title) %}
-<div class="column">
-    <h5 class="title is-6 has-text-centered">{{ title }}</h5>
-    <div class="chart-container" id="{{ id }}"></div>
-</div>
-{% endmacro %}
+const PortfolioCharts = (function() {
+    /**
+     * Creates a doughnut (pie) chart with a hole in the middle.
+     */
+    function createDoughnutChart(elementId, labels, values, title, colors) {
+        // Use the globally defined formatCurrency:
+        const formatCurrency = window.formatCurrency || (v => v);
 
-{% macro portfolio_filter(portfolios) %}
-<div class="field">
-    <label class="label">Filter Portfolios</label>
-    <div class="control">
-        {% for portfolio in portfolios %}
-        <label class="checkbox">
-            <input type="checkbox" value="{{ portfolio.name }}" checked>
-            <span>{{ portfolio.name }}</span>
-        </label>
-        <br>
-        {% endfor %}
-    </div>
-</div>
-{% endmacro %}
+        const total = values.reduce((a, b) => a + b, 0);
+        const formattedTotal = formatCurrency(total);
 
-{% macro metrics_card(title, icon, metrics) %}
-<div class="card">
-    <header class="card-header">
-        <p class="card-header-title">
-            <span class="icon-text">
-                <span class="icon">
-                    <i class="fas fa-{{ icon }}"></i>
-                </span>
-                <span>{{ title }}</span>
-            </span>
-        </p>
-    </header>
-    <div class="card-content">
-        <div class="columns is-multiline">
-            {% for metric in metrics %}
-            <div class="column is-3">
-                <div class="box">
-                    <p class="heading">{{ metric.label }}</p>
-                    <p class="title is-5">{{ metric.value }}</p>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-    </div>
-</div>
-{% endmacro %}
+        const data = [{
+            values: values,
+            labels: labels,
+            type: 'pie',
+            hole: 0.5,
+            hoverinfo: 'label+percent+value',
+            hovertemplate: '%{label}: ' + formatCurrency('%{value}') + ' (%{percent})<extra></extra>',
+            textinfo: 'label+percent',
+            textposition: 'inside',
+            insidetextorientation: 'radial',
+            marker: { colors: colors },
+            showlegend: false
+        }];
+
+        const layout = {
+            title: '',
+            height: 400,
+            margin: { l: 20, r: 20, t: 20, b: 20 },
+            annotations: [{
+                font: { size: 14 },
+                showarrow: false,
+                text: formattedTotal,
+                x: 0.5,
+                y: 0.5
+            }]
+        };
+
+        const config = { responsive: true, displayModeBar: false };
+        return Plotly.newPlot(elementId, data, layout, config);
+    }
+
+    /**
+     * Creates a sunburst chart for category breakdowns.
+     */
+    function createSunburstChart(elementId, portfolio, formatCurrencyParam, formatPercentageParam, generateColorsParam) {
+        // Use provided parameters or fall back to window globals
+        const formatCurrency    = formatCurrencyParam || window.formatCurrency    || (v => v);
+        const formatPercentage  = formatPercentageParam || window.formatPercentage  || (v => v);
+        const generateColors    = generateColorsParam || window.generateColors    || (count => []);
+
+        const categories = portfolio.categories || [];
+        console.log(`Creating sunburst chart for ${elementId} with ${categories.length} categories`);
+        
+        // Prepare the chart container
+        const chartContainer = prepareChartContainer(elementId);
+        if (!chartContainer) {
+            console.error(`Chart container element not found: ${elementId}`);
+            return null;
+        }
+        
+        if (categories.length === 0) {
+            chartContainer.innerHTML = '<div class="has-text-centered p-6">No category data available</div>';
+            return null;
+        }
+        
+        // Ensure the chart container is fully visible and sized
+        // This is critical for Plotly to render correctly
+        chartContainer.style.display = 'block';
+        chartContainer.style.height = '450px';
+        chartContainer.style.width = '100%';
+        chartContainer.style.position = 'relative';
+        chartContainer.style.visibility = 'visible';
+        chartContainer.style.opacity = '1';
+        chartContainer.style.minHeight = '400px';
+        chartContainer.style.minWidth = '300px';
+        
+        // Force a reflow to ensure dimensions are applied
+        void chartContainer.offsetHeight;
+        
+        // Build arrays with categories as top-level nodes
+        const labels = [];
+        const parents = [];
+        const values = [];
+        const colors = [];
+        const text = [];
+        const ids = [];
+        
+        // Get colors using window.generateColors or fallback to a local implementation
+        let categoryColors;
+        if (typeof window.generateColors === 'function') {
+            categoryColors = window.generateColors(categories.length);
+            console.log('Using global generateColors function');
+        } else {
+            console.warn('Global generateColors function not found, using fallback');
+            // Fallback color generation
+            categoryColors = [];
+            const defaultColors = [
+                '#3366CC', '#DC3912', '#FF9900', '#109618', '#990099', '#3B3EAC',
+                '#0099C6', '#DD4477', '#66AA00', '#B82E2E', '#316395', '#994499'
+            ];
+            
+            for (let i = 0; i < categories.length; i++) {
+                categoryColors.push(defaultColors[i % defaultColors.length]);
+            }
+        }
+        
+        console.log('Generated category colors:', categoryColors);
+        
+        // Top-level category nodes
+        categories.forEach((category, index) => {
+            // Add percentage to the label for top-level categories
+            labels.push(`${category.name} (${formatPercentage(category.percentage)})`);
+            parents.push(""); // top-level has no parent
+            values.push(category.currentValue);
+            ids.push(`category-${category.name}`);
+            text.push(
+                `<b>${formatPercentage(category.percentage)}</b><br>${formatCurrency(category.currentValue)}`
+            );
+            colors.push(categoryColors[index]);
+        });
+        
+        // Company (child) nodes
+        categories.forEach((category, index) => {
+            const categoryName = category.name;
+            const categoryColor = categoryColors[index];
+            category.companies.forEach(company => {
+                // Add percentage to the company label
+                labels.push(`${company.name} (${formatPercentage(company.percentage)})`);
+                parents.push(`category-${categoryName}`);
+                values.push(company.currentValue);
+                ids.push(`company-${company.name}`);
+                const companyText =
+                    `<b>${formatPercentage(company.percentage)}</b> of portfolio<br>` +
+                    `<b>${formatPercentage(company.categoryPercentage)}</b> of ${categoryName}<br>` +
+                    `${formatCurrency(company.currentValue)}`;
+                text.push(companyText);
+                
+                // Use a lighter color for sub-nodes
+                const lighterColor = adjustColorBrightness(categoryColor, 30);
+                colors.push(lighterColor);
+            });
+        });
+        
+        const data = [{
+            type: 'sunburst',
+            labels: labels,
+            parents: parents,
+            values: values,
+            ids: ids,
+            text: text,
+            textinfo: 'label',
+            insidetextorientation: 'radial',
+            hovertemplate: '<b>%{label}</b><br>%{text}<extra></extra>',
+            branchvalues: 'total',
+            marker: { colors: colors, line: { width: 1, color: 'white' } },
+            sort: false
+        }];
+        
+        const layout = {
+            margin: { l: 0, r: 0, t: 0, b: 0 },
+            height: 450,
+            width: chartContainer.offsetWidth || 500,
+            autosize: true
+        };
+        
+        console.log(`Creating sunburst with dimensions: ${layout.width}x${layout.height}`);
+        
+        const config = { responsive: true, displayModeBar: false };
+        
+        try {
+            // Create the plot
+            Plotly.newPlot(elementId, data, layout, config)
+                .then(() => {
+                    console.log(`Sunburst chart ${elementId} created successfully`);
+                    
+                    // Ensure the chart is still visible after a short delay
+                    setTimeout(() => {
+                        const element = document.getElementById(elementId);
+                        if (element) {
+                            element.style.visibility = 'visible';
+                            element.style.opacity = '1';
+                            Plotly.Plots.resize(element);
+                        }
+                    }, 200);
+                })
+                .catch(error => {
+                    console.error(`Error in Plotly.newPlot for ${elementId}:`, error);
+                });
+        } catch (plotlyError) {
+            console.error(`Exception in Plotly.newPlot for ${elementId}:`, plotlyError);
+        }
+        
+        return chartContainer;
+    }
+
+    /**
+     * Adds a clickable legend for the sunburst chart.
+     */
+    function addSunburstLegend(portfolio, categories, categoryColors, formatPercentage, chartElementId) {
+        const formatPct = window.formatPercentage || (v => v);
+
+        let legendContainer = document.getElementById(`categoryLegend${portfolio.id}`);
+        if (!legendContainer) {
+            const chartContainer = document.getElementById(chartElementId).parentNode;
+            legendContainer = document.createElement('div');
+            legendContainer.id = `categoryLegend${portfolio.id}`;
+            legendContainer.className = 'sunburst-legend mt-3';
+            chartContainer.after(legendContainer);
+        }
+        legendContainer.innerHTML = '';
+        
+        // Legend title removed as requested
+        
+        const legendGrid = document.createElement('div');
+        legendGrid.className = 'legend-grid is-flex is-flex-wrap-wrap is-justify-content-center';
+        
+        categories.forEach((category, index) => {
+            const color = categoryColors[index];
+            const legendItem = document.createElement('div');
+            legendItem.className = 'legend-item is-flex is-align-items-center mr-3 mb-2';
+            legendItem.style.cursor = 'pointer';
+            legendItem.innerHTML = `
+                <span class="color-box mr-1" style="background-color: ${color}; width: 12px; height: 12px; display: inline-block;"></span>
+                <span class="is-size-7">${category.name} (${formatPct(category.percentage)})</span>
+            `;
+            
+            legendItem.addEventListener('click', () => {
+                const chart = document.getElementById(chartElementId);
+                if (legendItem.classList.contains('highlighted')) {
+                    Plotly.restyle(chart, { 'level': [undefined], 'root': [null] });
+                    legendItem.classList.remove('highlighted');
+                } else {
+                    Plotly.restyle(chart, { 'level': [2] });
+                    setTimeout(() => {
+                        Plotly.restyle(chart, { 'root': [`category-${category.name}`] });
+                    }, 10);
+                    document.querySelectorAll(`#categoryLegend${portfolio.id} .legend-item`)
+                            .forEach(item => item.classList.remove('highlighted'));
+                    legendItem.classList.add('highlighted');
+                }
+            });
+            
+            legendGrid.appendChild(legendItem);
+        });
+        
+        legendContainer.appendChild(legendGrid);
+        
+        // Reset button
+        const resetButton = document.createElement('button');
+        resetButton.className = 'button is-small is-light mt-2';
+        resetButton.innerText = 'Reset View';
+        resetButton.addEventListener('click', () => {
+            const chart = document.getElementById(chartElementId);
+            Plotly.restyle(chart, { 'level': [undefined], 'root': [null] });
+            document.querySelectorAll(`#categoryLegend${portfolio.id} .legend-item`)
+                    .forEach(item => item.classList.remove('highlighted'));
+        });
+        
+        const buttonContainer = document.createElement('div');
+        buttonContainer.className = 'has-text-centered';
+        buttonContainer.appendChild(resetButton);
+        legendContainer.appendChild(buttonContainer);
+    }
+
+    /**
+     * Brighten or darken a given hex color by 'percent' (positive or negative).
+     * Includes error handling for undefined or invalid hex values.
+     */
+    function adjustColorBrightness(hex, percent) {
+        // Default color if hex is undefined or invalid
+        if (!hex || typeof hex !== 'string' || !hex.startsWith('#') || hex.length !== 7) {
+            console.warn(`Invalid hex color provided to adjustColorBrightness: ${hex}`);
+            return '#CCCCCC'; // Return a neutral gray as fallback
+        }
+        
+        try {
+            let r = parseInt(hex.substr(1, 2), 16);
+            let g = parseInt(hex.substr(3, 2), 16);
+            let b = parseInt(hex.substr(5, 2), 16);
+            
+            // Check if parsing was successful
+            if (isNaN(r) || isNaN(g) || isNaN(b)) {
+                console.warn(`Failed to parse hex color: ${hex}`);
+                return '#CCCCCC';
+            }
+            
+            r = Math.min(255, Math.max(0, r + percent));
+            g = Math.min(255, Math.max(0, g + percent));
+            b = Math.min(255, Math.max(0, b + percent));
+            return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+        } catch (error) {
+            console.error(`Error in adjustColorBrightness: ${error.message}`);
+            return '#CCCCCC';
+        }
+    }
+
+    /**
+     * Updates an existing doughnut chart with new data.
+     */
+    function updateDoughnutChart(elementId, labels, values, colors) {
+        const update = {
+            labels: [labels],
+            values: [values],
+            marker: [{ colors: colors }]
+        };
+        Plotly.update(elementId, update, {});
+    }
+
+    /**
+     * Resizes Plotly charts whenever the window is resized,
+     * specifically focusing on the active "Categories" tab charts.
+     */
+    function setupResizeHandlers() {
+        window.addEventListener('resize', () => {
+            // For each active categories tab, relayout
+            document.querySelectorAll('.tab-pane.is-active [id^="categoryChart"]').forEach(element => {
+                Plotly.Plots.resize(element);
+            });
+            // Also resize global charts if present
+            if (document.getElementById('portfolioAllocationsChart')) {
+                Plotly.Plots.resize(document.getElementById('portfolioAllocationsChart'));
+            }
+            if (document.getElementById('companyAllocationsChart')) {
+                Plotly.Plots.resize(document.getElementById('companyAllocationsChart'));
+            }
+        });
+    }
+
+    /**
+     * Enhances the existing tab initialization so that when a "Categories" tab
+     * is clicked, we attempt to create (or recreate) the sunburst chart.
+     */
+    function setupTabChangeHandlers(initializePortfolioTabs) {
+        const enhancedInitTabs = function() {
+            // Call the original tab init
+            initializePortfolioTabs();
+
+            // For each tab that references categories
+            document.querySelectorAll('.portfolio-section .tabs li[data-tab*="categories"]').forEach(tab => {
+                const originalHandler = tab.onclick;
+                tab.onclick = function(e) {
+                    // First run any existing click handler
+                    if (originalHandler) {
+                        originalHandler.call(this, e);
+                    }
+                    const tabId = this.getAttribute('data-tab');
+                    const portfolioId = tabId.split('-')[1];
+                    console.log(`Tab switched to categories for portfolio ${portfolioId}`);
+                    
+                    /**
+                     * Repeated attempts to create the sunburst chart, ensuring
+                     * the container is actually visible with a non-zero size.
+                     */
+                    function createCategoryChart(attempt = 1) {
+                        console.log(`Chart creation attempt ${attempt} for portfolio ${portfolioId}`);
+                        const elementId = `categoryChart${portfolioId}`;
+                        const chartElement = prepareChartContainer(elementId);
+                        if (!chartElement) {
+                            console.error(`Chart element not found: ${elementId}`);
+                            return;
+                        }
+                        
+                        // If container is not visible, retry up to 5 times
+                        const isVisible = chartElement.offsetParent !== null && chartElement.offsetWidth > 0;
+                        console.log(`Chart container visible: ${isVisible}, width: ${chartElement.offsetWidth}, height: ${chartElement.offsetHeight}`);
+                        
+                        if (!isVisible && attempt < 5) {
+                            const tabPane = chartElement.closest('.tab-pane');
+                            if (tabPane) {
+                                tabPane.style.display = 'block';
+                                tabPane.style.visibility = 'visible';
+                                tabPane.style.opacity = '1';
+                                tabPane.classList.add('is-active');
+                            }
+                            
+                            // Ensure the chart container itself is visible
+                            chartElement.style.display = 'block';
+                            chartElement.style.visibility = 'visible';
+                            chartElement.style.opacity = '1';
+                            chartElement.style.height = '450px';
+                            chartElement.style.width = '100%';
+                            chartElement.style.minHeight = '400px';
+                            chartElement.style.minWidth = '300px';
+                            
+                            // Force a reflow
+                            void chartElement.offsetHeight;
+                            
+                            setTimeout(() => createCategoryChart(attempt + 1), 100 * attempt);
+                            return;
+                        }
+                        
+                        // Now retrieve the correct portfolio from the global data
+                        let portfolio;
+                        
+                        // First try to find it in window.portfolioData array
+                        if (Array.isArray(window.portfolioData)) {
+                            portfolio = window.portfolioData.find(p => p.id == portfolioId);
+                        }
+                        // Then check if it's in window.portfolioData object by ID
+                        else if (window.portfolioData && window.portfolioData[portfolioId]) {
+                            portfolio = window.portfolioData[portfolioId];
+                        }
+                        
+                        if (!portfolio) {
+                            console.error(`Portfolio data not found for ID ${portfolioId}`);
+                            return;
+                        }
+                        
+                        try {
+                            // Create or re-create the sunburst with all parameters
+                            PortfolioCharts.createSunburstChart(
+                                elementId, 
+                                portfolio, 
+                                window.formatCurrency, 
+                                window.formatPercentage, 
+                                window.generateColors
+                            );
+                            
+                            // Check if the chart actually rendered and retry if needed
+                            setTimeout(() => {
+                                if (!chartElement.querySelector('.main-svg') && attempt < 5) {
+                                    console.log('Chart not rendered properly, trying again...');
+                                    createCategoryChart(attempt + 1);
+                                } else {
+                                    // Ensure the chart is properly sized
+                                    Plotly.Plots.resize(chartElement);
+                                    window.dispatchEvent(new Event('resize'));
+                                    
+                                    // Add another check after a delay to ensure it stays visible
+                                    setTimeout(() => {
+                                        if (chartElement.offsetWidth === 0 || chartElement.offsetHeight === 0 ||
+                                            chartElement.style.visibility === 'hidden' || chartElement.style.opacity === '0') {
+                                            console.log('Chart disappeared after rendering, restoring...');
+                                            chartElement.style.display = 'block';
+                                            chartElement.style.visibility = 'visible';
+                                            chartElement.style.opacity = '1';
+                                            Plotly.Plots.resize(chartElement);
+                                        }
+                                    }, 500);
+                                }
+                            }, 100);
+                        } catch (error) {
+                            console.error(`Error creating chart: ${error}`, error.stack);
+                            chartElement.innerHTML = `
+                                <div class="has-text-centered p-6">
+                                    <p class="has-text-danger">Error loading chart</p>
+                                    <button class="button is-small is-info mt-2" onclick="window.createCategoryChart(${portfolioId})">
+                                        Retry
+                                    </button>
+                                </div>
+                            `;
+                            // Expose a retry function on window
+                            window.createCategoryChart = function(id) {
+                                console.log(`Manual retry for chart ${id}`);
+                                const portfolioSection = document.querySelector(`.portfolio-section[data-portfolio-id="${id}"]`);
+                                if (portfolioSection) {
+                                    const categoriesTab = portfolioSection.querySelector('.tabs li[data-tab*="categories"]');
+                                    if (categoriesTab) {
+                                        categoriesTab.click();
+                                    }
+                                }
+                            };
+                        }
+                    }
+                    
+                    // Delay a bit to let the DOM update
+                    setTimeout(createCategoryChart, 300);
+                };
+            });
+        };
+        return enhancedInitTabs;
+    }
+
+    return {
+        createDoughnutChart: createDoughnutChart,
+        createSunburstChart: createSunburstChart,
+        updateDoughnutChart: updateDoughnutChart,
+        setupResizeHandlers: setupResizeHandlers,
+        setupTabChangeHandlers: setupTabChangeHandlers,
+        adjustColorBrightness: adjustColorBrightness
+    };
+})();
+
+/**
+ * Ensures the chart container is fully visible with
+ * consistent styling. Returns the container element
+ * or null if not found.
+ */
+function prepareChartContainer(elementId) {
+    const chartElement = document.getElementById(elementId);
+    if (!chartElement) {
+        console.error(`Chart element not found: ${elementId}`);
+        return null;
+    }
+    
+    // Force the parent column to be visible/flex
+    const chartColumn = chartElement.closest('.column');
+    if (chartColumn) {
+        chartColumn.style.display = 'flex';
+        chartColumn.style.visibility = 'visible';
+        chartColumn.style.opacity = '1';
+        // Ensure the column has minimum dimensions
+        chartColumn.style.minHeight = '450px';
+        chartColumn.style.minWidth = '300px';
+    }
+    
+    // Also ensure any parent containers are visible
+    const chartContainer = chartElement.closest('.chart-medium-container');
+    if (chartContainer) {
+        chartContainer.style.display = 'flex';
+        chartContainer.style.visibility = 'visible';
+        chartContainer.style.opacity = '1';
+        chartContainer.style.height = '100%';
+        chartContainer.style.width = '100%';
+    }
+    
+    // Clear any previous content
+    chartElement.innerHTML = '';
+    chartElement.style.display = 'block';
+    chartElement.style.height = '450px';
+    chartElement.style.width = '100%';
+    chartElement.style.position = 'relative';
+    chartElement.style.visibility = 'visible';
+    chartElement.style.opacity = '1';
+    chartElement.style.zIndex = '1';
+    
+    // Add explicit min dimensions to prevent zero-size issues
+    chartElement.style.minHeight = '400px';
+    chartElement.style.minWidth = '300px';
+    
+    // Force a reflow to ensure styles are applied
+    void chartElement.offsetHeight;
+    
+    // Log the final dimensions
+    console.log(`Chart container ${elementId} dimensions: ${chartElement.offsetWidth}x${chartElement.offsetHeight}`);
+    
+    return chartElement;
+}
+
+/**
+ * Enhances the existing sunburst creation so we can
+ * handle zero-width containers by forcibly giving them
+ * default dimensions before building the chart.
+ */
+function enhanceSunburstChart() {
+    const originalCreateSunburst = PortfolioCharts.createSunburstChart;
+    PortfolioCharts.createSunburstChart = function(elementId, portfolio, formatCurrency, formatPercentage, generateColors) {
+        const chartContainer = document.getElementById(elementId);
+        if (!chartContainer) {
+            console.error(`Chart container not found: ${elementId}`);
+            return null;
+        }
+        console.log(`Creating sunburst in container with dimensions: ${chartContainer.offsetWidth}x${chartContainer.offsetHeight}`);
+        if (chartContainer.offsetWidth === 0) {
+            console.warn('Chart container has zero width, setting default width');
+            chartContainer.style.width = '100%';
+            chartContainer.style.minWidth = '400px';
+        }
+        if (chartContainer.offsetHeight === 0) {
+            console.warn('Chart container has zero height, setting default height');
+            chartContainer.style.height = '450px';
+            chartContainer.style.minHeight = '400px';
+        }
+        // Force a reflow to ensure dimensions are applied
+        void chartContainer.offsetHeight;
+        // Pass all parameters to the original function
+        return originalCreateSunburst(elementId, portfolio, formatCurrency, formatPercentage, generateColors);
+    };
+    return PortfolioCharts;
+}
+
+/**
+ * Forces a chart redraw when a portfolio is toggled open
+ * and the "Categories" tab is already active.
+ */
+function enhancePortfolioToggle() {
+    document.querySelectorAll('.portfolio-section .portfolio-header').forEach(header => {
+        const originalHandler = header.onclick;
+        header.onclick = function(e) {
+            if (originalHandler) {
+                originalHandler.call(this, e);
+            }
+            const section = this.closest('.portfolio-section');
+            const content = section.querySelector('.portfolio-content');
+            if (content && content.style.display === 'block') {
+                const activeTab = section.querySelector('.tabs li.is-active');
+                if (activeTab && activeTab.getAttribute('data-tab').includes('categories')) {
+                    console.log('Portfolio expanded with categories tab active - triggering chart redraw');
+                    setTimeout(() => activeTab.click(), 300);
+                }
+            }
+        };
+    });
+}
+
+/**
+ * Ensures all sunburst charts remain visible by periodically checking
+ * and restoring their visibility if needed.
+ */
+function ensureChartsRemainVisible() {
+    // Check all category charts every 500ms
+    setInterval(() => {
+        document.querySelectorAll('[id^="categoryChart"]').forEach(chart => {
+            if (chart.offsetParent !== null) { // Only check visible charts
+                // If the chart is visible but has zero dimensions or is hidden
+                if (chart.offsetWidth === 0 || chart.offsetHeight === 0 || 
+                    chart.style.visibility === 'hidden' || chart.style.opacity === '0') {
+                    
+                    console.log(`Restoring visibility for chart ${chart.id}`);
+                    
+                    // Restore visibility and dimensions
+                    chart.style.display = 'block';
+                    chart.style.visibility = 'visible';
+                    chart.style.opacity = '1';
+                    chart.style.height = '450px';
+                    chart.style.width = '100%';
+                    chart.style.minHeight = '400px';
+                    chart.style.minWidth = '300px';
+                    
+                    // Force a reflow
+                    void chart.offsetHeight;
+                    
+                    // Resize the chart
+                    try {
+                        Plotly.Plots.resize(chart);
+                    } catch (e) {
+                        console.warn(`Error resizing chart ${chart.id}:`, e);
+                    }
+                }
+            }
+        });
+    }, 500);
+}
+
+/**
+ * When the DOM is ready, enhance the sunburst creation
+ * and set up toggles for portfolio expansions.
+ */
+document.addEventListener('DOMContentLoaded', function() {
+    // Patch the sunburst creation to handle zero-size containers
+    PortfolioCharts = enhanceSunburstChart();
+
+    // Re-run the categories chart if a portfolio is toggled open
+    setTimeout(enhancePortfolioToggle, 1000);
+
+    // Also attempt to redraw if the entire window is resized
+    window.addEventListener('resize', function() {
+        document.querySelectorAll('.portfolio-section').forEach(section => {
+            const content = section.querySelector('.portfolio-content');
+            if (content && content.style.display === 'block') {
+                const activeTab = section.querySelector('.tabs li.is-active');
+                if (activeTab && activeTab.getAttribute('data-tab').includes('categories')) {
+                    const portfolioId = section.dataset.portfolioId;
+                    console.log(`Resizing triggered redraw for portfolio ${portfolioId}`);
+                    setTimeout(() => activeTab.click(), 200);
+                }
+            }
+        });
+    });
+    
+    // Start the visibility check
+    ensureChartsRemainVisible();
+});
+</script>
+
+</body>
+</html>
+
 ###END_FILE###
 
 ================================================================
@@ -11949,6 +12989,20 @@ document.addEventListener('DOMContentLoaded', () => {
         
         #price-fetch-progress .icon {
             margin-right: 0.3rem;
+        }
+        
+        /* Company search filter styling */
+        #company-search-container .field.has-addons {
+            margin-bottom: 0;
+        }
+        
+        #company-search-container .input.is-small {
+            width: 150px;
+            transition: width 0.3s ease;
+        }
+        
+        #company-search-container .input.is-small:focus {
+            width: 180px;
         }
     </style>
 {% endmacro %}
@@ -12164,6 +13218,21 @@ document.addEventListener('DOMContentLoaded', () => {
                             <option value="{{ portfolio }}">{{ portfolio }}</option>
                         {% endfor %}
                     </select>
+                </div>
+            </div>
+            <!-- Company Search Filter -->
+            <div class="control" id="company-search-container">
+                <div class="field has-addons">
+                    <div class="control">
+                        <input type="text" class="input is-small" id="company-search" placeholder="Search company...">
+                    </div>
+                    <div class="control">
+                        <button class="button is-small" id="clear-company-search">
+                            <span class="icon is-small">
+                                <i class="fas fa-times"></i>
+                            </span>
+                        </button>
+                    </div>
                 </div>
             </div>
             <!-- No Price Checkbox -->

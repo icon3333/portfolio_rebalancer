@@ -13,12 +13,12 @@
     </div>
     
     <div id="analysisContent" style="display: none;">
-        <!-- Global Overview Section - Simplified without boxed cards -->
+        <!-- Global Overview Section -->
         <section class="mb-6">
             <div class="is-flex is-justify-content-space-between is-align-items-center mb-4">
                 <h2 class="subtitle is-4 mb-0">Global Overview</h2>
                 <div id="portfolioFilters" class="is-flex is-flex-wrap-wrap">
-                    <!-- Portfolio checkboxes will be added here dynamically - empty portfolios will be filtered out -->
+                    <!-- Portfolio checkboxes will be added here dynamically -->
                 </div>
             </div>
             
@@ -38,7 +38,7 @@
             </div>
         </section>
         
-        <!-- Portfolio Overview Section -->
+        <!-- Portfolio Breakdown Section -->
         <section class="mb-6">
             <div class="is-flex is-justify-content-space-between is-align-items-center mb-4">
                 <h2 class="subtitle is-4 mb-0">Portfolio Breakdown</h2>
@@ -58,11 +58,68 @@
             </div>
         </section>
         
-        <!-- Detailed Overview Section -->
-        <section>
-            <h2 class="subtitle is-4 mb-4">Detailed Overview</h2>
-            <div id="detailedOverview" class="content-panel">
-                <!-- Detailed metrics will be added here dynamically -->
+        <!-- Risk Breakdown Section -->
+        <section class="mb-6">
+            <h2 class="subtitle is-4 mb-4">Risk Breakdown</h2>
+            <div class="field">
+                <div class="control">
+                    <div class="select">
+                        <select id="riskDimensionSelect">
+                            <option value="category">Category</option>
+                            <option value="sector">Sector</option>
+                            <option value="industry">Industry</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Heatmap Section - Expandable (starts expanded) -->
+            <div class="portfolio-section mb-4">
+                <div class="portfolio-header">
+                    <div class="is-flex is-justify-content-space-between is-align-items-center">
+                        <h4 class="portfolio-header-title">Heatmap</h4>
+                        <span class="icon toggle-portfolio">
+                            <i class="fas fa-chevron-up"></i>
+                        </span>
+                    </div>
+                </div>
+                <div class="portfolio-content" style="display: block;">
+                    <div class="columns">
+                        <div class="column is-full">
+                            <div class="chart-large-container">
+                                <div id="riskHeatmap"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Details Section - Expandable -->
+            <div class="portfolio-section mb-4">
+                <div class="portfolio-header">
+                    <div class="is-flex is-justify-content-space-between is-align-items-center">
+                        <h4 class="portfolio-header-title">Details</h4>
+                        <span class="icon toggle-portfolio">
+                            <i class="fas fa-chevron-down"></i>
+                        </span>
+                    </div>
+                </div>
+                <div class="portfolio-content" style="display: none;">
+                    <div class="columns">
+                        <div class="column is-half">
+                            <h3 class="subtitle is-5 has-text-centered mb-2">Country Distribution</h3>
+                            <div class="chart-medium-container">
+                                <div id="countryDistributionChart"></div>
+                            </div>
+                        </div>
+                        <div class="column is-half">
+                            <h3 class="subtitle is-5 has-text-centered mb-2">Category Distribution</h3>
+                            <div class="chart-medium-container">
+                                <div id="categoryDistributionChart"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </section>
     </div>
@@ -227,7 +284,6 @@ document.addEventListener('DOMContentLoaded', function() {
         initializeCharts();
         renderPortfolioSections();
         initializeExpandablePortfolios();
-        renderDetailedOverview();
         
         // Hide loading indicator and show content
         document.getElementById('loadingIndicator').style.display = 'none';
@@ -242,6 +298,9 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Setup resize handlers for charts
         PortfolioCharts.setupResizeHandlers();
+        
+        // Initialize Risk Breakdown
+        initializeRiskBreakdown();
     }).catch(error => {
         console.error('Error loading data:', error);
         document.getElementById('loadingIndicator').innerHTML = `
@@ -324,17 +383,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 console.log(`Adding company to portfolio ${portfolioName}: ${companyName}, Price: ${price}, Shares: ${shares}, Value: ${currentValue}`);
                 
-                // Add company to portfolio
+                // Add company to portfolio with all needed fields
                 portfolioMap[portfolioName].companies.push({
                     id: item.id,
                     name: companyName,
                     category: item.category || 'Uncategorized',
                     shares: shares,
                     priceEur: price,
-                    currentValue: currentValue,
+                    price_eur: price, // Include both naming conventions
+                    currentValue: currentValue, // Explicitly set currentValue
                     totalInvested: totalInvested,
                     portfolioId: portfolioMap[portfolioName].id,
-                    portfolioName: portfolioName
+                    portfolioName: portfolioName,
+                    // Include risk analysis fields
+                    country: item.country || 'Unknown',
+                    sector: item.sector || 'Unknown',
+                    industry: item.industry || 'Unknown'
                 });
                 
                 // Update portfolio totals
@@ -498,7 +562,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Update everything based on new selection
         updateCharts();
         updatePortfolioSectionVisibility();
-        renderDetailedOverview();
+        updateRiskBreakdown();
     }
     
     // Update visibility of portfolio sections
@@ -604,33 +668,55 @@ document.addEventListener('DOMContentLoaded', function() {
         );
     }
     
-    // Get all companies from selected portfolios
+    // Get all companies from selected portfolios with additional metadata
     function getAllCompaniesFromSelectedPortfolios() {
-        return portfolioData
+        const companies = portfolioData
             .filter(p => selectedPortfolioIds.includes(p.id))
             .flatMap(p => p.companies);
+        
+        // Ensure companies have calculated currentValue and metadata fields
+        return companies.map(company => {
+            // Calculate currentValue if not already present
+            if (typeof company.currentValue === 'undefined') {
+                company.currentValue = (company.price_eur || 0) * (company.shares || 0);
+            }
+            
+            // Ensure metadata fields exist
+            company.country = company.country || 'Unknown';
+            company.sector = company.sector || 'Unknown';
+            company.industry = company.industry || 'Unknown';
+            
+            return company;
+        });
     }
     
     // Group companies by name and sum values
     function groupCompaniesByName(companies) {
-        const groups = {};
+        const companyMap = {};
         
         companies.forEach(company => {
             const name = company.name;
-            
-            if (!groups[name]) {
-                groups[name] = {
+            if (!companyMap[name]) {
+                companyMap[name] = {
                     name: name,
                     currentValue: 0,
-                    totalInvested: 0
+                    shares: 0,
+                    totalInvested: 0,
+                    // Preserve metadata from the first occurrence
+                    country: company.country || 'Unknown',
+                    sector: company.sector || 'Unknown',
+                    industry: company.industry || 'Unknown'
                 };
             }
             
-            groups[name].currentValue += company.currentValue;
-            groups[name].totalInvested += company.totalInvested;
+            // Sum up values
+            companyMap[name].currentValue += company.currentValue || 0;
+            companyMap[name].shares += company.shares || 0;
+            companyMap[name].totalInvested += company.totalInvested || 0;
         });
         
-        return Object.values(groups);
+        // Convert to array and sort by value
+        return Object.values(companyMap).sort((a, b) => b.currentValue - a.currentValue);
     }
     
     // Prepare chart data (labels and values)
@@ -1414,6 +1500,293 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
     }
     
+    // New Risk Breakdown Functions
+    function initializeRiskBreakdown() {
+        const dimension = document.getElementById('riskDimensionSelect').value;
+        const heatmapData = calculateExposureData(selectedPortfolioIds, dimension);
+        
+        // Ensure the heatmap container is visible before rendering
+        const heatmapContainer = document.querySelector('#riskHeatmap').closest('.portfolio-content');
+        if (heatmapContainer) {
+            heatmapContainer.style.display = 'block';
+        }
+        
+        // Render the heatmap with a slight delay to ensure container is fully visible
+        setTimeout(() => {
+            renderHeatmap(heatmapData, dimension);
+        }, 50);
+
+        // Calculate data for doughnut charts
+        const countryDistribution = calculateExposureByDimension(selectedPortfolioIds, 'country');
+        const categoryDistribution = calculateExposureByDimension(selectedPortfolioIds, 'category');
+        
+        // Render doughnut charts
+        renderDoughnutChart('countryDistributionChart', countryDistribution, 'Country Distribution');
+        renderDoughnutChart('categoryDistributionChart', categoryDistribution, 'Category Distribution');
+
+        // Set up dimension select change handler
+        document.getElementById('riskDimensionSelect').addEventListener('change', function() {
+            const newDimension = this.value;
+            const newHeatmapData = calculateExposureData(selectedPortfolioIds, newDimension);
+            renderHeatmap(newHeatmapData, newDimension);
+        });
+        
+        // Initialize expandable sections
+        initializeExpandableRiskSections();
+        
+        // Force a resize of all charts after a short delay
+        setTimeout(() => {
+            window.dispatchEvent(new Event('resize'));
+        }, 200);
+    }
+
+    function updateRiskBreakdown() {
+        const dimension = document.getElementById('riskDimensionSelect').value;
+        const heatmapData = calculateExposureData(selectedPortfolioIds, dimension);
+        renderHeatmap(heatmapData, dimension);
+
+        // Update doughnut charts
+        const countryDistribution = calculateExposureByDimension(selectedPortfolioIds, 'country');
+        const categoryDistribution = calculateExposureByDimension(selectedPortfolioIds, 'category');
+        
+        renderDoughnutChart('countryDistributionChart', countryDistribution, 'Country Distribution');
+        renderDoughnutChart('categoryDistributionChart', categoryDistribution, 'Category Distribution');
+    }
+
+    // Calculate exposure data for heatmap
+    function calculateExposureData(selectedPortfolioIds, dimension) {
+        const allCompanies = getAllCompaniesFromSelectedPortfolios();
+        const totalValue = allCompanies.reduce((sum, c) => sum + c.currentValue, 0);
+        
+        const exposure = {};
+        
+        allCompanies.forEach(company => {
+            const country = company.country || 'Unknown';
+            const dimValue = company[dimension] || 'Unknown';
+            
+            if (!exposure[country]) {
+                exposure[country] = {};
+            }
+            if (!exposure[country][dimValue]) {
+                exposure[country][dimValue] = 0;
+            }
+            exposure[country][dimValue] += company.currentValue;
+        });
+        
+        // Convert to percentages
+        for (const country in exposure) {
+            for (const dim in exposure[country]) {
+                exposure[country][dim] = totalValue > 0 ? 
+                    (exposure[country][dim] / totalValue) * 100 : 0;
+            }
+        }
+        
+        const countries = Object.keys(exposure).sort();
+        const dims = [...new Set(Object.values(exposure).flatMap(obj => Object.keys(obj)))].sort();
+        
+        const z = countries.map(country => 
+            dims.map(dim => exposure[country][dim] || 0)
+        );
+        
+        return { countries, dims, z };
+    }
+
+    function renderHeatmap(data, dimensionName) {
+        if (!data || !data.countries || !data.dims || 
+            data.countries.length === 0 || data.dims.length === 0) {
+            document.getElementById('riskHeatmap').innerHTML = 
+                '<p class="has-text-centered">No data available for heatmap</p>';
+            return;
+        }
+        
+        // Format dimension name for display
+        const formattedDimensionName = dimensionName.charAt(0).toUpperCase() + dimensionName.slice(1);
+        
+        const trace = {
+            type: 'heatmap',
+            x: data.dims,
+            y: data.countries,
+            z: data.z,
+            colorscale: 'Viridis',
+            hovertemplate: '%{y} - %{x}: %{z:.2f}%<extra></extra>'
+        };
+        
+        const layout = {
+            title: 'Risk Exposure Heatmap',
+            xaxis: { 
+                title: formattedDimensionName,
+                automargin: true,  // Ensure axis labels are fully visible
+                tickangle: -45     // Angle the labels for better readability
+            },
+            yaxis: { 
+                title: 'Country',
+                automargin: true   // Ensure axis labels are fully visible
+            },
+            height: 600,
+            margin: { l: 120, r: 50, t: 100, b: 120 }  // Increased bottom margin for x-axis labels
+        };
+        
+        Plotly.newPlot('riskHeatmap', [trace], layout);
+        
+        // Force a resize after a short delay to ensure proper rendering
+        setTimeout(() => {
+            if (document.getElementById('riskHeatmap')) {
+                Plotly.Plots.resize(document.getElementById('riskHeatmap'));
+            }
+        }, 100);
+    }
+
+    // Calculate exposure by a single dimension for bar charts
+    function calculateExposureByDimension(selectedPortfolioIds, dimension) {
+        const allCompanies = getAllCompaniesFromSelectedPortfolios();
+        const totalValue = allCompanies.reduce((sum, c) => sum + c.currentValue, 0);
+        
+        const exposure = {};
+        
+        allCompanies.forEach(company => {
+            const dimValue = company[dimension] || 'Unknown';
+            if (!exposure[dimValue]) {
+                exposure[dimValue] = 0;
+            }
+            exposure[dimValue] += company.currentValue;
+        });
+        
+        const exposureArray = Object.entries(exposure).map(([key, value]) => ({
+            name: key,
+            percentage: totalValue > 0 ? (value / totalValue) * 100 : 0
+        }));
+        
+        exposureArray.sort((a, b) => b.percentage - a.percentage);
+        
+        return exposureArray;
+    }
+
+    function renderBarChart(elementId, data, title) {
+        if (!data || data.length === 0) {
+            document.getElementById(elementId).innerHTML = 
+                '<p class="has-text-centered">No data available</p>';
+            return;
+        }
+        
+        const labels = data.map(d => d.name);
+        const values = data.map(d => d.percentage);
+        
+        const trace = {
+            x: values,
+            y: labels,
+            type: 'bar',
+            orientation: 'h',
+            marker: {
+                color: 'rgb(158,202,225)',
+                opacity: 0.6,
+                line: {
+                    color: 'rgb(8,48,107)',
+                    width: 1.5
+                }
+            }
+        };
+        
+        const layout = {
+            title: title,
+            xaxis: { title: 'Percentage (%)' },
+            yaxis: { title: '' },
+            height: 400,
+            margin: { l: 150, r: 50, t: 50, b: 50 }
+        };
+        
+        Plotly.newPlot(elementId, [trace], layout);
+    }
+
+    // New function to render doughnut charts
+    function renderDoughnutChart(elementId, data, title) {
+        if (!data || data.length === 0) {
+            document.getElementById(elementId).innerHTML = 
+                '<p class="has-text-centered">No data available</p>';
+            return;
+        }
+        
+        // Prepare data for doughnut chart - take top 10 and group the rest as "Others"
+        let labels = [];
+        let values = [];
+        
+        if (data.length > 10) {
+            // Take top 10 items
+            const top10 = data.slice(0, 10);
+            const others = data.slice(10);
+            
+            labels = top10.map(d => d.name);
+            values = top10.map(d => d.percentage);
+            
+            // Add "Others" category
+            const othersValue = others.reduce((sum, d) => sum + d.percentage, 0);
+            if (othersValue > 0) {
+                labels.push('Others');
+                values.push(othersValue);
+            }
+        } else {
+            labels = data.map(d => d.name);
+            values = data.map(d => d.percentage);
+        }
+        
+        const colors = generateColors(labels.length);
+        
+        // Create doughnut chart using PortfolioCharts utility
+        PortfolioCharts.createDoughnutChart(
+            elementId,
+            labels,
+            values,
+            '',  // Empty title, since we have a subtitle already
+            colors,
+            formatPercentage
+        );
+    }
+    
+    // Initialize expandable sections for the Risk Breakdown
+    function initializeExpandableRiskSections() {
+        document.querySelectorAll('.portfolio-section .portfolio-header').forEach(header => {
+            const section = header.closest('.portfolio-section');
+            const content = section.querySelector('.portfolio-content');
+            const icon = section.querySelector('.toggle-portfolio i');
+            
+            // Add click handler if not already present
+            if (!header.hasClickHandler) {
+                header.hasClickHandler = true;
+                
+                header.addEventListener('click', function() {
+                    if (content.style.display === 'none') {
+                        content.style.display = 'block';
+                        icon.classList.remove('fa-chevron-down');
+                        icon.classList.add('fa-chevron-up');
+                        
+                        // Ensure charts render correctly when expanding
+                        window.dispatchEvent(new Event('resize'));
+                        
+                        // If this is the details section, make sure to render the charts
+                        if (section.querySelector('#countryDistributionChart') || 
+                            section.querySelector('#categoryDistributionChart')) {
+                            const countryDistribution = calculateExposureByDimension(selectedPortfolioIds, 'country');
+                            const categoryDistribution = calculateExposureByDimension(selectedPortfolioIds, 'category');
+                            
+                            renderDoughnutChart('countryDistributionChart', countryDistribution, 'Country Distribution');
+                            renderDoughnutChart('categoryDistributionChart', categoryDistribution, 'Category Distribution');
+                        }
+                        
+                        // If this is the heatmap section, make sure to render/resize the heatmap
+                        if (section.querySelector('#riskHeatmap')) {
+                            const dimension = document.getElementById('riskDimensionSelect').value;
+                            const heatmapData = calculateExposureData(selectedPortfolioIds, dimension);
+                            renderHeatmap(heatmapData, dimension);
+                        }
+                    } else {
+                        content.style.display = 'none';
+                        icon.classList.remove('fa-chevron-up');
+                        icon.classList.add('fa-chevron-down');
+                    }
+                });
+            }
+        });
+    }
+
     // Add event listeners to toggle category companies
     document.addEventListener('click', function(e) {
         // Check if click was on or inside a toggle-companies element
