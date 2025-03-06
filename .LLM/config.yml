@@ -1,0 +1,9 @@
+# Focus
+app/routes/portfolio_routes.py
+templates/pages/analyse.html
+templates/components/analyse_components.html
+# Exclude
+_*/
+.git/
+.LLM/
+venv/
