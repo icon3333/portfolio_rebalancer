@@ -155,6 +155,9 @@ document.addEventListener('DOMContentLoaded', function() {
     let selectedPortfolioIds = [];
     let portfolioCharts = {};
     
+    // Make portfolioData available globally for the components
+    window.portfolioData = portfolioData;
+    
     // Enhance the tab initialization with chart handlers
     initializePortfolioTabs = PortfolioCharts.setupTabChangeHandlers(initializePortfolioTabs);
     
@@ -173,6 +176,10 @@ document.addEventListener('DOMContentLoaded', function() {
     function formatPercentage(value) {
         return value.toFixed(1) + '%';
     }
+    
+    // Make format functions available globally for components
+    window.formatCurrency = formatCurrency;
+    window.formatPercentage = formatPercentage;
     
     // Table sorting functionality
     let currentSortColumn = '';
@@ -278,6 +285,9 @@ document.addEventListener('DOMContentLoaded', function() {
     ]).then(([portfoliosList, data]) => {
         // Process the data
         processData(portfoliosList, data);
+        
+        // Update global portfolioData for components
+        window.portfolioData = portfolioData;
         
         // Initialize the UI
         initializePortfolioFilters();
@@ -602,8 +612,7 @@ document.addEventListener('DOMContentLoaded', function() {
             labels,
             values,
             '',  // Empty title to avoid duplication
-            colors,
-            formatCurrency
+            colors
         );
         
         // Store reference for later updates
@@ -641,8 +650,7 @@ document.addEventListener('DOMContentLoaded', function() {
             labels,
             values,
             '',  // Empty title to avoid duplication
-            colors,
-            formatCurrency
+            colors
         );
         
         // Store reference for later updates
@@ -1002,11 +1010,10 @@ document.addEventListener('DOMContentLoaded', function() {
             // Store portfolio reference for later chart initialization
             renderedPortfolios.push(portfolio);
             
-            // Add click handler to toggle portfolio content visibility
-            const toggleIcon = section.querySelector('.toggle-portfolio');
+            // FIX: Standardize portfolio header click handling using addEventListener instead of onclick
             header.addEventListener('click', function() {
                 const content = section.querySelector('.portfolio-content');
-                const icon = toggleIcon.querySelector('i');
+                const icon = section.querySelector('.toggle-portfolio i');
                 
                 if (content.style.display === 'none') {
                     content.style.display = 'block';
@@ -1262,8 +1269,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 labels,
                 values,
                 'Companies',
-                colors,
-                formatCurrency
+                colors
             );
             
             // Store reference
@@ -1299,7 +1305,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Ensure window.portfolioData is defined
         if (typeof window.portfolioData === 'undefined') {
             console.error('window.portfolioData is undefined, setting it now');
-            window.portfolioData = {};
+            window.portfolioData = [];
         }
         
         // Make sure this portfolio is in window.portfolioData
@@ -1531,7 +1537,7 @@ document.addEventListener('DOMContentLoaded', function() {
             renderHeatmap(newHeatmapData, newDimension);
         });
         
-        // Initialize expandable sections
+        // Initialize expandable sections with consistent event handling
         initializeExpandableRiskSections();
         
         // Force a resize of all charts after a short delay
@@ -1697,7 +1703,7 @@ document.addEventListener('DOMContentLoaded', function() {
         Plotly.newPlot(elementId, [trace], layout);
     }
 
-    // New function to render doughnut charts
+    // Render doughnut charts
     function renderDoughnutChart(elementId, data, title) {
         if (!data || data.length === 0) {
             document.getElementById(elementId).innerHTML = 
@@ -1736,54 +1742,55 @@ document.addEventListener('DOMContentLoaded', function() {
             labels,
             values,
             '',  // Empty title, since we have a subtitle already
-            colors,
-            formatPercentage
+            colors
         );
     }
     
-    // Initialize expandable sections for the Risk Breakdown
+    // FIX: Initialize expandable sections for the Risk Breakdown using consistent event handling
     function initializeExpandableRiskSections() {
         document.querySelectorAll('.portfolio-section .portfolio-header').forEach(header => {
-            const section = header.closest('.portfolio-section');
-            const content = section.querySelector('.portfolio-content');
-            const icon = section.querySelector('.toggle-portfolio i');
-            
-            // Add click handler if not already present
-            if (!header.hasClickHandler) {
-                header.hasClickHandler = true;
-                
-                header.addEventListener('click', function() {
-                    if (content.style.display === 'none') {
-                        content.style.display = 'block';
-                        icon.classList.remove('fa-chevron-down');
-                        icon.classList.add('fa-chevron-up');
-                        
-                        // Ensure charts render correctly when expanding
-                        window.dispatchEvent(new Event('resize'));
-                        
-                        // If this is the details section, make sure to render the charts
-                        if (section.querySelector('#countryDistributionChart') || 
-                            section.querySelector('#categoryDistributionChart')) {
-                            const countryDistribution = calculateExposureByDimension(selectedPortfolioIds, 'country');
-                            const categoryDistribution = calculateExposureByDimension(selectedPortfolioIds, 'category');
-                            
-                            renderDoughnutChart('countryDistributionChart', countryDistribution, 'Country Distribution');
-                            renderDoughnutChart('categoryDistributionChart', categoryDistribution, 'Category Distribution');
-                        }
-                        
-                        // If this is the heatmap section, make sure to render/resize the heatmap
-                        if (section.querySelector('#riskHeatmap')) {
-                            const dimension = document.getElementById('riskDimensionSelect').value;
-                            const heatmapData = calculateExposureData(selectedPortfolioIds, dimension);
-                            renderHeatmap(heatmapData, dimension);
-                        }
-                    } else {
-                        content.style.display = 'none';
-                        icon.classList.remove('fa-chevron-up');
-                        icon.classList.add('fa-chevron-down');
-                    }
-                });
+            // Skip if we've already processed this header in renderPortfolioSections
+            if (header.closest('.portfolio-section').dataset.portfolioId) {
+                return;
             }
+            
+            const section = header.closest('.portfolio-section');
+            
+            // Add click handler using addEventListener for consistency
+            header.addEventListener('click', function() {
+                const content = section.querySelector('.portfolio-content');
+                const icon = section.querySelector('.toggle-portfolio i');
+                
+                if (content.style.display === 'none') {
+                    content.style.display = 'block';
+                    icon.classList.remove('fa-chevron-down');
+                    icon.classList.add('fa-chevron-up');
+                    
+                    // Ensure charts render correctly when expanding
+                    window.dispatchEvent(new Event('resize'));
+                    
+                    // If this is the details section, make sure to render the charts
+                    if (section.querySelector('#countryDistributionChart') || 
+                        section.querySelector('#categoryDistributionChart')) {
+                        const countryDistribution = calculateExposureByDimension(selectedPortfolioIds, 'country');
+                        const categoryDistribution = calculateExposureByDimension(selectedPortfolioIds, 'category');
+                        
+                        renderDoughnutChart('countryDistributionChart', countryDistribution, 'Country Distribution');
+                        renderDoughnutChart('categoryDistributionChart', categoryDistribution, 'Category Distribution');
+                    }
+                    
+                    // If this is the heatmap section, make sure to render/resize the heatmap
+                    if (section.querySelector('#riskHeatmap')) {
+                        const dimension = document.getElementById('riskDimensionSelect').value;
+                        const heatmapData = calculateExposureData(selectedPortfolioIds, dimension);
+                        renderHeatmap(heatmapData, dimension);
+                    }
+                } else {
+                    content.style.display = 'none';
+                    icon.classList.remove('fa-chevron-up');
+                    icon.classList.add('fa-chevron-down');
+                }
+            });
         });
     }
 
