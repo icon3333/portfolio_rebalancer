@@ -1699,6 +1699,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const exposureArray = Object.entries(exposure).map(([key, value]) => ({
             name: key,
+            value: value, // Store actual monetary value
             percentage: totalValue > 0 ? (value / totalValue) * 100 : 0
         }));
         
@@ -1754,6 +1755,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Prepare data for doughnut chart - take top 10 and group the rest as "Others"
         let labels = [];
         let values = [];
+        let percentages = []; // For hover display
         
         if (data.length > 10) {
             // Take top 10 items
@@ -1761,17 +1763,21 @@ document.addEventListener('DOMContentLoaded', function() {
             const others = data.slice(10);
             
             labels = top10.map(d => d.name);
-            values = top10.map(d => d.percentage);
+            values = top10.map(d => d.value); // Use actual monetary values
+            percentages = top10.map(d => d.percentage);
             
             // Add "Others" category
-            const othersValue = others.reduce((sum, d) => sum + d.percentage, 0);
+            const othersValue = others.reduce((sum, d) => sum + d.value, 0);
+            const othersPercentage = others.reduce((sum, d) => sum + d.percentage, 0);
             if (othersValue > 0) {
                 labels.push('Others');
                 values.push(othersValue);
+                percentages.push(othersPercentage);
             }
         } else {
             labels = data.map(d => d.name);
-            values = data.map(d => d.percentage);
+            values = data.map(d => d.value); // Use actual monetary values
+            percentages = data.map(d => d.percentage);
         }
         
         const colors = generateColors(labels.length);
@@ -1782,7 +1788,8 @@ document.addEventListener('DOMContentLoaded', function() {
             labels,
             values,
             '',  // Empty title, since we have a subtitle already
-            colors
+            colors,
+            percentages // Pass percentages for display purposes
         );
     }
     

@@ -45,13 +45,32 @@
 const PortfolioCharts = (function() {
     /**
      * Creates a doughnut (pie) chart with a hole in the middle.
+     * @param {string} elementId - ID of the element to render chart in
+     * @param {Array<string>} labels - Array of labels
+     * @param {Array<number>} values - Array of actual monetary values
+     * @param {string} title - Chart title
+     * @param {Array<string>} colors - Array of colors
+     * @param {Array<number>} percentages - Optional array of percentages for display
      */
-    function createDoughnutChart(elementId, labels, values, title, colors) {
+    function createDoughnutChart(elementId, labels, values, title, colors, percentages) {
         // Use the globally defined formatCurrency:
         const formatCurrency = window.formatCurrency || (v => v);
 
         const total = values.reduce((a, b) => a + b, 0);
         const formattedTotal = formatCurrency(total);
+
+        // Default hover template uses calculated percentages
+        let hoverTemplate = '%{label}: €%{value:,.2f} (%{percent})<extra></extra>';
+        
+        // If percentages are explicitly provided, use custom hover template
+        if (percentages && percentages.length === values.length) {
+            // Create custom hover text array for each data point
+            const customText = labels.map((label, i) => {
+                return `${label}: ${formatCurrency(values[i])} (${percentages[i].toFixed(1)}%)`;
+            });
+
+            hoverTemplate = '%{text}<extra></extra>';
+        }
 
         const data = [{
             values: values,
@@ -59,7 +78,11 @@ const PortfolioCharts = (function() {
             type: 'pie',
             hole: 0.5,
             hoverinfo: 'label+percent+value',
-            hovertemplate: '%{label}: €%{value:,.2f} (%{percent})<extra></extra>',            textinfo: 'label+percent',
+            hovertemplate: hoverTemplate,
+            text: percentages ? labels.map((label, i) => {
+                return `${label}: ${formatCurrency(values[i])} (${percentages[i].toFixed(1)}%)`;
+            }) : undefined,
+            textinfo: 'label+percent',
             textposition: 'inside',
             insidetextorientation: 'radial',
             marker: { colors: colors },
