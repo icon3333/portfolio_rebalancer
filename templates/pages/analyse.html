@@ -61,17 +61,6 @@
         <!-- Risk Breakdown Section -->
         <section class="mb-6">
             <h2 class="subtitle is-4 mb-4">Risk Breakdown</h2>
-            <div class="field">
-                <div class="control">
-                    <div class="select">
-                        <select id="riskDimensionSelect">
-                            <option value="category">Category</option>
-                            <option value="sector">Sector</option>
-                            <option value="industry">Industry</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
             
             <!-- Heatmap Section - Expandable (starts expanded) -->
             <div class="portfolio-section mb-4">
@@ -84,6 +73,20 @@
                     </div>
                 </div>
                 <div class="portfolio-content" style="display: block;">
+                    <!-- Moved dimension select inside heatmap container -->
+                    <div class="field mb-3">
+                        <div class="control is-pulled-right">
+                            <div class="select is-small">
+                                <select id="riskDimensionSelect">
+                                    <option value="category">Category</option>
+                                    <option value="sector">Sector</option>
+                                    <option value="industry">Industry</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="is-clearfix"></div>
+                    </div>
+                    
                     <div class="columns">
                         <div class="column is-full">
                             <div class="chart-large-container">
@@ -123,7 +126,6 @@
             </div>
         </section>
     </div>
-</div>
 
 <!-- Include Font Awesome -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
@@ -603,7 +605,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Update visibility of portfolio sections
     function updatePortfolioSectionVisibility() {
-        const portfolioSections = document.querySelectorAll('.portfolio-section');
+        const portfolioSections = document.querySelectorAll('.portfolio-section[data-portfolio-id]');
         
         portfolioSections.forEach(section => {
             const portfolioId = parseInt(section.dataset.portfolioId);
@@ -704,6 +706,12 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Get all companies from selected portfolios with additional metadata
     function getAllCompaniesFromSelectedPortfolios() {
+        // Check if there are any selected portfolios
+        if (selectedPortfolioIds.length === 0) {
+            console.log('No portfolios selected, returning empty array');
+            return [];
+        }
+        
         const companies = portfolioData
             .filter(p => selectedPortfolioIds.includes(p.id))
             .flatMap(p => p.companies);
@@ -1588,38 +1596,130 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function updateRiskBreakdown() {
         const dimension = document.getElementById('riskDimensionSelect').value;
-        const heatmapData = calculateExposureData(selectedPortfolioIds, dimension);
-        renderHeatmap(heatmapData, dimension);
-
-        // Update doughnut charts
-        const countryDistribution = calculateExposureByDimension(selectedPortfolioIds, 'country');
-        const categoryDistribution = calculateExposureByDimension(selectedPortfolioIds, 'category');
         
-        renderDoughnutChart('countryDistributionChart', countryDistribution, 'Country Distribution');
-        renderDoughnutChart('categoryDistributionChart', categoryDistribution, 'Category Distribution');
+        // Check if any portfolios are selected
+        if (selectedPortfolioIds.length === 0) {
+            // Display a message in the heatmap container when no portfolios are selected
+            document.getElementById('riskHeatmap').innerHTML = 
+                '<div class="has-text-centered p-6">' +
+                '<p class="has-text-grey-light"><i class="fas fa-info-circle mr-2"></i>' +
+                'No portfolios selected. Please select at least one portfolio in the Global Overview section.</p>' +
+                '</div>';
+                
+            // Display empty charts for country and category distributions
+            document.getElementById('countryDistributionChart').innerHTML = 
+                '<div class="has-text-centered p-6"><p class="has-text-grey-light">No data available</p></div>';
+            document.getElementById('categoryDistributionChart').innerHTML = 
+                '<div class="has-text-centered p-6"><p class="has-text-grey-light">No data available</p></div>';
+                
+            return;
+        }
+        
+        try {
+            // Process data and update charts as normal when portfolios are selected
+            const heatmapData = calculateExposureData(selectedPortfolioIds, dimension);
+            
+            // Ensure we have valid data before rendering
+            if (heatmapData && heatmapData.countries && heatmapData.countries.length > 0) {
+                renderHeatmap(heatmapData, dimension);
+            } else {
+                // If no data available for the heatmap, show a message
+                document.getElementById('riskHeatmap').innerHTML = 
+                    '<div class="has-text-centered p-6">' +
+                    '<p class="has-text-grey-light"><i class="fas fa-info-circle mr-2"></i>' +
+                    'No data available for the selected portfolios and dimension.</p>' +
+                    '</div>';
+            }
+    
+            // Update doughnut charts
+            const countryDistribution = calculateExposureByDimension(selectedPortfolioIds, 'country');
+            const categoryDistribution = calculateExposureByDimension(selectedPortfolioIds, 'category');
+            
+            // Only render charts if we have data
+            if (countryDistribution && countryDistribution.labels && countryDistribution.labels.length > 0) {
+                renderDoughnutChart('countryDistributionChart', countryDistribution, 'Country Distribution');
+            } else {
+                document.getElementById('countryDistributionChart').innerHTML = 
+                    '<div class="has-text-centered p-6"><p class="has-text-grey-light">No country data available</p></div>';
+            }
+            
+            if (categoryDistribution && categoryDistribution.labels && categoryDistribution.labels.length > 0) {
+                renderDoughnutChart('categoryDistributionChart', categoryDistribution, 'Category Distribution');
+            } else {
+                document.getElementById('categoryDistributionChart').innerHTML = 
+                    '<div class="has-text-centered p-6"><p class="has-text-grey-light">No category data available</p></div>';
+            }
+        } catch (error) {
+            console.error('Error updating risk breakdown:', error);
+            // Show error message in the risk breakdown section
+            document.getElementById('riskHeatmap').innerHTML = 
+                '<div class="has-text-centered p-6">' +
+                '<p class="has-text-grey-light"><i class="fas fa-exclamation-circle mr-2"></i>' +
+                'An error occurred while updating the risk breakdown. Please try again.</p>' +
+                '</div>';
+        }
     }
 
-    // Calculate exposure data for heatmap
+    // Calculate exposure data for heatmap with intelligent filtering
     function calculateExposureData(selectedPortfolioIds, dimension) {
         const allCompanies = getAllCompaniesFromSelectedPortfolios();
+        
+        // Handle case where there are no companies (e.g., no portfolios selected)
+        if (!allCompanies || allCompanies.length === 0) {
+            console.log('No companies found for heat map calculation');
+            return { 
+                countries: [], 
+                dims: [], 
+                z: [],
+                metadata: {
+                    totalValue: 0,
+                    countryPercentages: {},
+                    dimensionPercentages: {}
+                }
+            };
+        }
+        
         const totalValue = allCompanies.reduce((sum, c) => sum + c.currentValue, 0);
         
         const exposure = {};
+        const countryTotals = {}; // Track total per country for filtering
+        const dimensionTotals = {}; // Track total per dimension for filtering
         
+        // First pass: Collect all data points
         allCompanies.forEach(company => {
-            const country = company.country || 'Unknown';
-            const dimValue = company[dimension] || 'Unknown';
+            // Handle unknown values gracefully
+            const country = (company.country || '').trim() || 'Unknown';
+            const dimValue = (company[dimension] || '').trim() || 'Unknown';
             
-            if (!exposure[country]) {
-                exposure[country] = {};
-            }
-            if (!exposure[country][dimValue]) {
-                exposure[country][dimValue] = 0;
-            }
-            exposure[country][dimValue] += company.currentValue;
+            // Initialize if needed
+            if (!exposure[country]) exposure[country] = {};
+            if (!exposure[country][dimValue]) exposure[country][dimValue] = 0;
+            if (!countryTotals[country]) countryTotals[country] = 0;
+            if (!dimensionTotals[dimValue]) dimensionTotals[dimValue] = 0;
+            
+            // Accumulate values
+            const value = company.currentValue || 0;
+            exposure[country][dimValue] += value;
+            countryTotals[country] += value;
+            dimensionTotals[dimValue] += value;
         });
         
-        // Convert to percentages
+        // Handle edge case: if no valid exposure data was collected
+        if (Object.keys(exposure).length === 0) {
+            console.log('No valid exposure data was collected');
+            return { 
+                countries: [], 
+                dims: [], 
+                z: [],
+                metadata: {
+                    totalValue: 0,
+                    countryPercentages: {},
+                    dimensionPercentages: {}
+                }
+            };
+        }
+        
+        // Convert raw values to percentages
         for (const country in exposure) {
             for (const dim in exposure[country]) {
                 exposure[country][dim] = totalValue > 0 ? 
@@ -1627,52 +1727,232 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
-        const countries = Object.keys(exposure).sort();
-        const dims = [...new Set(Object.values(exposure).flatMap(obj => Object.keys(obj)))].sort();
+        // Calculate percentage thresholds for filtering
+        const countryPercentages = {};
+        const dimensionPercentages = {};
         
-        const z = countries.map(country => 
-            dims.map(dim => exposure[country][dim] || 0)
+        for (const country in countryTotals) {
+            countryPercentages[country] = totalValue > 0 ? 
+                (countryTotals[country] / totalValue) * 100 : 0;
+        }
+        
+        for (const dim in dimensionTotals) {
+            dimensionPercentages[dim] = totalValue > 0 ? 
+                (dimensionTotals[dim] / totalValue) * 100 : 0;
+        }
+        
+        // Filter out insignificant countries and dimensions (< 1% of portfolio)
+        // but always keep at least the top 8 of each
+        const significanceThreshold = 1.0; // Min percentage to display by default
+        
+        // Sort countries and dimensions by percentage (descending)
+        let sortedCountries = Object.entries(countryPercentages)
+            .sort((a, b) => b[1] - a[1])
+            .map(entry => entry[0]);
+            
+        let sortedDimensions = Object.entries(dimensionPercentages)
+            .sort((a, b) => b[1] - a[1])
+            .map(entry => entry[0]);
+        
+        // Filter but keep at least top 8 countries (or all if fewer than 8)
+        const topCountryCount = Math.min(8, sortedCountries.length);
+        const topCountries = sortedCountries.slice(0, topCountryCount);
+        sortedCountries = sortedCountries.filter(country => 
+            topCountries.includes(country) || countryPercentages[country] >= significanceThreshold
         );
         
-        return { countries, dims, z };
+        // Filter but keep at least top 8 dimensions (or all if fewer than 8)
+        const topDimCount = Math.min(8, sortedDimensions.length);
+        const topDimensions = sortedDimensions.slice(0, topDimCount);
+        sortedDimensions = sortedDimensions.filter(dim => 
+            topDimensions.includes(dim) || dimensionPercentages[dim] >= significanceThreshold
+        );
+        
+        // Remap 'Unknown' to be last if present
+        const moveUnknownToEnd = arr => {
+            const idx = arr.indexOf('Unknown');
+            if (idx !== -1) {
+                arr.splice(idx, 1); 
+                arr.push('Unknown');
+            }
+            return arr;
+        };
+        
+        sortedCountries = moveUnknownToEnd(sortedCountries);
+        sortedDimensions = moveUnknownToEnd(sortedDimensions);
+        
+        // Create z matrix for heatmap
+        const z = sortedCountries.map(country => 
+            sortedDimensions.map(dim => exposure[country]?.[dim] || 0)
+        );
+        
+        // Return the optimized data for the heatmap
+        return { 
+            countries: sortedCountries, 
+            dims: sortedDimensions, 
+            z,
+            // Additional metadata for tooltips
+            metadata: {
+                totalValue,
+                countryPercentages,
+                dimensionPercentages
+            }
+        };
     }
 
     function renderHeatmap(data, dimensionName) {
+        // Enhanced error checking
         if (!data || !data.countries || !data.dims || 
             data.countries.length === 0 || data.dims.length === 0) {
+            console.log('No data available for risk heatmap:', data);
             document.getElementById('riskHeatmap').innerHTML = 
-                '<p class="has-text-centered">No data available for heatmap</p>';
+                '<div class="has-text-centered p-4">' +
+                '<p class="has-text-grey"><i class="fas fa-info-circle mr-2"></i>' +
+                'No data available for the selected portfolios and dimension.</p>' +
+                '</div>';
             return;
+        }
+        
+        // Clean up any previous plot to avoid errors
+        if (document.getElementById('riskHeatmap')) {
+            Plotly.purge('riskHeatmap');
         }
         
         // Format dimension name for display
         const formattedDimensionName = dimensionName.charAt(0).toUpperCase() + dimensionName.slice(1);
         
+        // Truncate long labels for better display
+        const truncateLabel = (label, maxLength = 15) => {
+            if (label.length <= maxLength) return label;
+            return label.substring(0, maxLength) + '...';
+        };
+        
+        // Create shortened labels for display, but keep originals for tooltips
+        const truncatedDims = data.dims.map(d => truncateLabel(d));
+        const truncatedCountries = data.countries.map(c => truncateLabel(c));
+        
+        // Prepare custom data for enhanced tooltips using metadata
+        const metadata = data.metadata || {};
+        const customdata = data.countries.map((country, i) => 
+            data.dims.map((dim, j) => ({
+                country: country,
+                dimension: dim,
+                value: data.z[i][j],
+                // Include overall allocations if available
+                countryAllocation: metadata.countryPercentages?.[country] || 0,
+                dimensionAllocation: metadata.dimensionPercentages?.[dim] || 0
+            }))
+        );
+        
+        // Generate a more visually appealing colorscale
+        const colorscale = [
+            [0, 'rgba(240, 240, 240, 0.6)'],    // Very light gray for 0 values
+            [0.05, 'rgba(220, 238, 242, 0.9)'], // Very light bluish for small values
+            [0.1, 'rgba(166, 216, 225, 1.0)'],  // Light blue
+            [0.25, 'rgba(89, 164, 192, 1.0)'],  // Medium blue
+            [0.5, 'rgba(33, 113, 181, 1.0)'],   // Dark blue
+            [0.75, 'rgba(8, 69, 148, 1.0)'],    // Very dark blue
+            [1.0, 'rgba(8, 48, 107, 1.0)']      // Deepest blue
+        ];
+        
         const trace = {
             type: 'heatmap',
-            x: data.dims,
-            y: data.countries,
+            x: truncatedDims,
+            y: truncatedCountries,
             z: data.z,
-            colorscale: 'Viridis',
-            hovertemplate: '%{y} - %{x}: %{z:.2f}%<extra></extra>'
+            colorscale: colorscale,
+            showscale: true,
+            hovertemplate: '<b>%{customdata.country}</b> × <b>%{customdata.dimension}</b><br>' +
+                          'Cell Allocation: <b>%{z:.2f}%</b><br>' +
+                          'Total Country Allocation: %{customdata.countryAllocation:.1f}%<br>' +
+                          'Total ' + formattedDimensionName + ' Allocation: %{customdata.dimensionAllocation:.1f}%' +
+                          '<extra></extra>',
+            customdata: customdata
         };
+        
+        // Get the container dimensions for responsive sizing
+        const container = document.getElementById('riskHeatmap');
+        const containerWidth = container.offsetWidth;
+        
+        // Calculate a better height based on number of rows
+        // More rows need more height to remain readable
+        const baseHeight = 350;
+        const rowCount = data.countries.length;
+        const colCount = data.dims.length;
+        let responsiveHeight;
+        
+        if (rowCount <= 5) {
+            responsiveHeight = baseHeight;
+        } else {
+            // Add 20px per additional row beyond 5, with a max
+            const additionalRows = Math.min(15, rowCount - 5); // Cap at 15 additional rows
+            responsiveHeight = baseHeight + (additionalRows * 20);
+        }
+        
+        // Calculate margins based on label lengths
+        const longestCountryLabel = Math.max(...data.countries.map(c => c.length));
+        const longestDimLabel = Math.max(...data.dims.map(d => d.length)); 
+        
+        // Adjust margins based on label length
+        const leftMargin = Math.min(150, 60 + (longestCountryLabel * 4)); // 4px per character with a max
+        const bottomMargin = Math.min(150, 50 + (longestDimLabel * 3)); // 3px per character with a max
         
         const layout = {
-            title: 'Risk Exposure Heatmap',
+            title: {
+                text: 'Portfolio Concentration: Country × ' + formattedDimensionName,
+                font: { size: 16, family: 'Arial, sans-serif' }
+            },
             xaxis: { 
-                title: formattedDimensionName,
-                automargin: true,  // Ensure axis labels are fully visible
-                tickangle: -45     // Angle the labels for better readability
+                title: { text: formattedDimensionName, standoff: 15 },
+                automargin: true,
+                tickangle: -45,
+                tickfont: { size: 10 }
             },
             yaxis: { 
-                title: 'Country',
-                automargin: true   // Ensure axis labels are fully visible
+                title: { text: 'Country', standoff: 10 },
+                automargin: true,
+                tickfont: { size: 10 }
             },
-            height: 600,
-            margin: { l: 120, r: 50, t: 100, b: 120 }  // Increased bottom margin for x-axis labels
+            height: responsiveHeight,
+            margin: { 
+                l: leftMargin, 
+                r: 30, 
+                t: 60, 
+                b: bottomMargin 
+            },
+            // Add annotations to show filtering info
+            annotations: [{
+                text: `Showing top allocations (at least 1% or top 8)`,
+                showarrow: false,
+                x: 0.5,
+                y: 1.07,
+                xref: 'paper',
+                yref: 'paper',
+                font: {
+                    size: 10,
+                    color: 'rgba(0,0,0,0.6)'
+                }
+            }],
+            coloraxis: {
+                colorbar: {
+                    title: {
+                        text: 'Allocation %',
+                        font: { size: 12 }
+                    },
+                    thickness: 15,
+                    len: 0.9,
+                    tickfont: { size: 10 }
+                }
+            }
         };
         
-        Plotly.newPlot('riskHeatmap', [trace], layout);
+        // Config to disable modebar (tooling) that takes unnecessary space
+        const config = {
+            displayModeBar: false, // Remove the plotly toolbar
+            responsive: true       // Make chart responsive to window resizing
+        };
+        
+        Plotly.newPlot('riskHeatmap', [trace], layout, config);
         
         // Force a resize after a short delay to ensure proper rendering
         setTimeout(() => {
@@ -1684,28 +1964,51 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Calculate exposure by a single dimension for bar charts
     function calculateExposureByDimension(selectedPortfolioIds, dimension) {
-        const allCompanies = getAllCompaniesFromSelectedPortfolios();
-        const totalValue = allCompanies.reduce((sum, c) => sum + c.currentValue, 0);
-        
-        const exposure = {};
-        
-        allCompanies.forEach(company => {
-            const dimValue = company[dimension] || 'Unknown';
-            if (!exposure[dimValue]) {
-                exposure[dimValue] = 0;
+        try {
+            const allCompanies = getAllCompaniesFromSelectedPortfolios();
+            
+            // Handle case when no portfolios are selected
+            if (!allCompanies || allCompanies.length === 0) {
+                console.log('No companies found for dimension exposure calculation');
+                return { labels: [], values: [], percentages: [] };
             }
-            exposure[dimValue] += company.currentValue;
-        });
-        
-        const exposureArray = Object.entries(exposure).map(([key, value]) => ({
-            name: key,
-            value: value, // Store actual monetary value
-            percentage: totalValue > 0 ? (value / totalValue) * 100 : 0
-        }));
-        
-        exposureArray.sort((a, b) => b.percentage - a.percentage);
-        
-        return exposureArray;
+            
+            const totalValue = allCompanies.reduce((sum, c) => sum + (c.currentValue || 0), 0);
+            
+            // If total value is zero, return empty data structure
+            if (totalValue <= 0) {
+                console.log('Zero total value for dimension exposure calculation');
+                return { labels: [], values: [], percentages: [] };
+            }
+            
+            const exposure = {};
+            
+            allCompanies.forEach(company => {
+                const dimValue = (company[dimension] || '').trim() || 'Unknown';
+                if (!exposure[dimValue]) {
+                    exposure[dimValue] = 0;
+                }
+                exposure[dimValue] += company.currentValue || 0;
+            });
+            
+            const exposureArray = Object.entries(exposure).map(([key, value]) => ({
+                name: key,
+                value: value, // Store actual monetary value
+                percentage: totalValue > 0 ? (value / totalValue) * 100 : 0
+            }));
+            
+            exposureArray.sort((a, b) => b.percentage - a.percentage);
+            
+            // Convert to format expected by renderDoughnutChart
+            const labels = exposureArray.map(item => item.name);
+            const values = exposureArray.map(item => item.value);
+            const percentages = exposureArray.map(item => item.percentage);
+            
+            return { labels, values, percentages };
+        } catch (error) {
+            console.error('Error calculating exposure by dimension:', error);
+            return { labels: [], values: [], percentages: [] };
+        }
     }
 
     function renderBarChart(elementId, data, title) {
@@ -1746,51 +2049,97 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Render doughnut charts
     function renderDoughnutChart(elementId, data, title) {
-        if (!data || data.length === 0) {
-            document.getElementById(elementId).innerHTML = 
-                '<p class="has-text-centered">No data available</p>';
-            return;
-        }
-        
-        // Prepare data for doughnut chart - take top 10 and group the rest as "Others"
-        let labels = [];
-        let values = [];
-        let percentages = []; // For hover display
-        
-        if (data.length > 10) {
-            // Take top 10 items
-            const top10 = data.slice(0, 10);
-            const others = data.slice(10);
-            
-            labels = top10.map(d => d.name);
-            values = top10.map(d => d.value); // Use actual monetary values
-            percentages = top10.map(d => d.percentage);
-            
-            // Add "Others" category
-            const othersValue = others.reduce((sum, d) => sum + d.value, 0);
-            const othersPercentage = others.reduce((sum, d) => sum + d.percentage, 0);
-            if (othersValue > 0) {
-                labels.push('Others');
-                values.push(othersValue);
-                percentages.push(othersPercentage);
+        try {
+            // Handle both array format and object format with arrays
+            if (!data) {
+                console.log(`Cannot render doughnut chart: Data is null or undefined for ${elementId}`);
+                document.getElementById(elementId).innerHTML = 
+                    '<div class="has-text-centered p-4"><p class="has-text-grey-light">No data available</p></div>';
+                return;
             }
-        } else {
-            labels = data.map(d => d.name);
-            values = data.map(d => d.value); // Use actual monetary values
-            percentages = data.map(d => d.percentage);
+            
+            // Clear any previous chart to avoid errors
+            if (document.getElementById(elementId)) {
+                Plotly.purge(elementId);
+            }
+            
+            // Check if data is in the new format (object with arrays)
+            if (data.labels && Array.isArray(data.labels)) {
+                // New format - directly use the arrays
+                if (data.labels.length === 0) {
+                    console.log(`Cannot render doughnut chart: Empty labels array for ${elementId}`);
+                    document.getElementById(elementId).innerHTML = 
+                        '<div class="has-text-centered p-4"><p class="has-text-grey-light">No data available</p></div>';
+                    return;
+                }
+                
+                const colors = generateColors(data.labels.length);
+                
+                // Create doughnut chart using PortfolioCharts utility
+                PortfolioCharts.createDoughnutChart(
+                    elementId,
+                    data.labels,
+                    data.values,
+                    '',  // Empty title, since we have a subtitle already
+                    colors,
+                    data.percentages // Pass percentages for display purposes
+                );
+                
+                return;
+            }
+            
+            // Handle the old format (array of objects)
+            if (!Array.isArray(data) || data.length === 0) {
+                console.log(`Cannot render doughnut chart: Invalid data format for ${elementId}`);
+                document.getElementById(elementId).innerHTML = 
+                    '<div class="has-text-centered p-4"><p class="has-text-grey-light">No data available</p></div>';
+                return;
+            }
+            
+            // Prepare data for doughnut chart - take top 10 and group the rest as "Others"
+            let labels = [];
+            let values = [];
+            let percentages = []; // For hover display
+            
+            if (data.length > 10) {
+                // Take top 10 items
+                const top10 = data.slice(0, 10);
+                const others = data.slice(10);
+                
+                labels = top10.map(d => d.name);
+                values = top10.map(d => d.value); // Use actual monetary values
+                percentages = top10.map(d => d.percentage);
+                
+                // Add "Others" category
+                const othersValue = others.reduce((sum, d) => sum + d.value, 0);
+                const othersPercentage = others.reduce((sum, d) => sum + d.percentage, 0);
+                if (othersValue > 0) {
+                    labels.push('Others');
+                    values.push(othersValue);
+                    percentages.push(othersPercentage);
+                }
+            } else {
+                labels = data.map(d => d.name);
+                values = data.map(d => d.value); // Use actual monetary values
+                percentages = data.map(d => d.percentage);
+            }
+            
+            const colors = generateColors(labels.length);
+            
+            // Create doughnut chart using PortfolioCharts utility
+            PortfolioCharts.createDoughnutChart(
+                elementId,
+                labels,
+                values,
+                '',  // Empty title, since we have a subtitle already
+                colors,
+                percentages // Pass percentages for display purposes
+            );
+        } catch (error) {
+            console.error(`Error in renderDoughnutChart for ${elementId}:`, error);
+            document.getElementById(elementId).innerHTML = 
+                '<div class="has-text-centered p-4"><p class="has-text-grey-light">Error rendering chart</p></div>';
         }
-        
-        const colors = generateColors(labels.length);
-        
-        // Create doughnut chart using PortfolioCharts utility
-        PortfolioCharts.createDoughnutChart(
-            elementId,
-            labels,
-            values,
-            '',  // Empty title, since we have a subtitle already
-            colors,
-            percentages // Pass percentages for display purposes
-        );
     }
     
     // FIX: Initialize expandable sections for the Risk Breakdown using consistent event handling
