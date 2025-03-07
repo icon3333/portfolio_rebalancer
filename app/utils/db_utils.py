@@ -112,9 +112,46 @@ def load_portfolio_data(account_id=None, portfolio_id=None):
         portfolio_id: Optional portfolio ID to filter by
         
     Returns:
-        List of portfolio items
+        List of portfolio items or empty list if error
     """
     try:
+        # Validate inputs
+        if account_id is None and portfolio_id is None:
+            logger.error("Both account_id and portfolio_id are None - at least one is required")
+            return []
+            
+        # Check for valid account_id
+        if account_id is not None:
+            account_check = query_db('SELECT id FROM accounts WHERE id = ?', [account_id], one=True)
+            if not account_check:
+                logger.error(f"Account with ID {account_id} does not exist in database")
+                return []
+        
+        # Check for valid portfolio_id
+        if portfolio_id is not None:
+            portfolio_check = query_db('SELECT id FROM portfolios WHERE id = ?', [portfolio_id], one=True)
+            if not portfolio_check:
+                logger.error(f"Portfolio with ID {portfolio_id} does not exist in database")
+                return []
+        
+        # Check for companies associated with this account/portfolio
+        company_check_query = 'SELECT COUNT(*) as count FROM companies WHERE 1=1'
+        company_check_params = []
+        
+        if account_id:
+            company_check_query += ' AND account_id = ?'
+            company_check_params.append(account_id)
+        if portfolio_id:
+            company_check_query += ' AND portfolio_id = ?'
+            company_check_params.append(portfolio_id)
+            
+        company_count = query_db(company_check_query, company_check_params, one=True)
+        if not company_count or company_count['count'] == 0:
+            logger.warning(f"No companies found for the specified filters (account_id={account_id}, portfolio_id={portfolio_id})")
+        else:
+            logger.info(f"Found {company_count['count']} companies for the specified filters")
+        
+        # Build main query
         params = []
         query = '''
             SELECT 
@@ -139,21 +176,32 @@ def load_portfolio_data(account_id=None, portfolio_id=None):
             params.append(portfolio_id)
         
         # Execute query and get results
+        logger.info(f"Executing portfolio data query with params: {params}")
         results = query_db(query, params)
         
-        # Add debugging to log sample results
-        if results and len(results) > 0:
+        # Add detailed logging about results
+        if not results:
+            logger.warning("Query returned no results")
+            return []
+            
+        if len(results) > 0:
             sample = results[0]
             logger.debug(f"Sample portfolio data keys: {list(sample.keys())}")
             if 'portfolio_name' in sample:
                 logger.debug(f"Sample portfolio_name value: '{sample['portfolio_name']}'")
             else:
-                logger.debug("portfolio_name key not found in results")
+                logger.warning("portfolio_name key not found in results - check portfolio_id references")
+            
+            # Log some metrics about the results
+            missing_portfolio_names = sum(1 for r in results if not r.get('portfolio_name'))
+            if missing_portfolio_names > 0:
+                logger.warning(f"{missing_portfolio_names} out of {len(results)} items have missing portfolio names")
                 
+        logger.info(f"Successfully loaded {len(results)} portfolio data items")
         return results
         
     except Exception as e:
-        logger.error(f"Error loading portfolio data: {str(e)}")
+        logger.error(f"Error loading portfolio data: {str(e)}", exc_info=True)
         return []
 
 def process_portfolio_dataframe(df, account_id=None, portfolio_id=None):

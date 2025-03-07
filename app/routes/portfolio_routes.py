@@ -115,19 +115,36 @@ def enrich():
 def get_portfolio_data_api():
     """Get portfolio data from the database"""
     try:
+        # Check if account_id exists in session
+        if 'account_id' not in session:
+            logger.error("No account_id in session when calling portfolio_data API")
+            return jsonify({'error': 'Not authenticated - account_id missing'}), 401
+            
         account_id = session['account_id']
         if not account_id:
-            return jsonify({'error': 'Not authenticated'}), 401
+            logger.error("Empty account_id in session when calling portfolio_data API")
+            return jsonify({'error': 'Not authenticated - empty account_id'}), 401
 
+        # Log the attempt to fetch data
+        logger.info(f"Fetching portfolio data for account_id: {account_id}")
+        
         # Get data from database without triggering any yfinance updates
         portfolio_data = get_portfolio_data(account_id)
+        
+        # Detailed logging of result
         if not portfolio_data:
-            return jsonify([])
+            logger.warning(f"No portfolio data found for account_id: {account_id}")
+            return jsonify({'error': 'Portfolio data could not be loaded. It may have been deleted or is missing from the database.'}), 404
+        else:
+            logger.info(f"Successfully retrieved {len(portfolio_data)} portfolio items")
 
         return jsonify(portfolio_data)
+    except KeyError as ke:
+        logger.error(f"KeyError accessing portfolio data: {str(ke)}", exc_info=True)
+        return jsonify({'error': f'Session key error: {str(ke)}'}), 401
     except Exception as e:
         logger.error(f"Error getting portfolio data: {str(e)}", exc_info=True)
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': f'Portfolio data could not be loaded: {str(e)}'}), 500
 
 @portfolio_bp.route('/analyse')
 def analyse():
@@ -166,24 +183,37 @@ def get_portfolios_api():
     
     try:
         account_id = session['account_id']
-        logger.info(f"Getting portfolios for account_id: {account_id}")
+        include_ids = request.args.get('include_ids', 'false').lower() == 'true'
+        logger.info(f"Getting portfolios for account_id: {account_id}, include_ids: {include_ids}")
         
-        # Get portfolio names from portfolios table
-        portfolios_from_table = query_db('''
-            SELECT name FROM portfolios 
-            WHERE account_id = ? AND name IS NOT NULL
-            ORDER BY name
-        ''', [account_id])
+        # Get portfolio data from portfolios table
+        if include_ids:
+            portfolios_from_table = query_db('''
+                SELECT id, name FROM portfolios 
+                WHERE account_id = ? AND name IS NOT NULL
+                ORDER BY name
+            ''', [account_id])
+            
+            # Convert to list of objects with id and name
+            portfolios = [{'id': p['id'], 'name': p['name']} for p in portfolios_from_table if p['name'] and p['name'].strip()]
+            logger.info(f"Retrieved {len(portfolios)} portfolios with IDs: {portfolios}")
+            
+            json_response = jsonify(portfolios)
+        else:
+            # Original behavior - just return names
+            portfolios_from_table = query_db('''
+                SELECT name FROM portfolios 
+                WHERE account_id = ? AND name IS NOT NULL
+                ORDER BY name
+            ''', [account_id])
+            
+            # Extract names from the query results
+            names = [p['name'] for p in portfolios_from_table if p['name'] and p['name'].strip()]
+            logger.info(f"Retrieved {len(names)} portfolio names from portfolios table: {names}")
+            
+            json_response = jsonify(names)
         
-        # Extract names from the query results
-        names = [p['name'] for p in portfolios_from_table if p['name'] and p['name'].strip()]
-        
-        logger.info(f"Retrieved {len(names)} portfolio names from portfolios table: {names}")
-        
-        # Debug the JSON serialization
-        json_response = jsonify(names)
         logger.debug(f"JSON response to be sent: {json_response.data}")
-        
         return json_response
         
     except Exception as e:
@@ -1216,14 +1246,32 @@ def get_price_fetch_progress():
 def get_portfolio_data(account_id):
     """Get portfolio data from the database"""
     try:
+        if not account_id:
+            logger.error("Invalid account_id provided to get_portfolio_data: empty or None")
+            return []
+            
         logger.info(f"Loading portfolio data for account_id: {account_id}")
+        
+        # First check if the account exists
+        account = query_db('SELECT * FROM accounts WHERE id = ?', [account_id], one=True)
+        if not account:
+            logger.error(f"Account with ID {account_id} not found in database")
+            return []
+            
+        # Then check if any portfolios exist for this account
+        portfolios = query_db('SELECT COUNT(*) as count FROM portfolios WHERE account_id = ?', [account_id], one=True)
+        if not portfolios or portfolios['count'] == 0:
+            logger.error(f"No portfolios found for account_id: {account_id}")
+            return []
+            
+        # Now load the actual portfolio data
         df = load_portfolio_data(account_id)
         
         if df is None:
-            logger.warning("load_portfolio_data returned None")
+            logger.error("load_portfolio_data returned None - database query failed")
             return []
         if not df:  # Check if list is empty
-            logger.info("No portfolio data found")
+            logger.warning(f"No portfolio data found for account_id: {account_id} - empty result set")
             return []
             
         import pandas as pd
@@ -1231,7 +1279,7 @@ def get_portfolio_data(account_id):
         df = pd.DataFrame(df)
         
         if df.empty:
-            logger.info("DataFrame is empty after conversion")
+            logger.warning("DataFrame is empty after conversion - result structure may be invalid")
             return []
             
         logger.info(f"Raw DataFrame columns: {df.columns.tolist()}")

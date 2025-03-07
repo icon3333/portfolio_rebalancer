@@ -158,37 +158,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Make portfolioData available globally for the components
     window.portfolioData = portfolioData;
     
-    // Store the enhanced tab initialization function
-    const enhancedInitializePortfolioTabs = PortfolioCharts.setupTabChangeHandlers(initializePortfolioTabs);
-    
-    // Replace the original function with the enhanced version
-    initializePortfolioTabs = enhancedInitializePortfolioTabs;
-    
-    // Function to clean up localStorage from invalid portfolio references
-    function cleanupLocalStorage() {
-        try {
-            // Remove any localStorage entries for portfolios that no longer exist
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key && key.startsWith('portfolio_tab_')) {
-                    const idStr = key.replace('portfolio_tab_', '');
-                    const id = parseInt(idStr, 10);
-                    
-                    // Skip if not a valid portfolio ID 
-                    if (isNaN(id)) continue;
-                    
-                    // Check if this portfolio exists in our data
-                    const exists = portfolioData.some(p => p.id === id);
-                    if (!exists) {
-                        console.log(`Removing localStorage entry for non-existent portfolio ID: ${id}`);
-                        localStorage.removeItem(key);
-                    }
-                }
-            }
-        } catch (e) {
-            console.warn('Error while cleaning up localStorage:', e);
-        }
-    }
+    // Enhance the tab initialization with chart handlers
+    initializePortfolioTabs = PortfolioCharts.setupTabChangeHandlers(initializePortfolioTabs);
     
     // Charts
     let portfolioAllocationsChart = null;
@@ -318,9 +289,6 @@ document.addEventListener('DOMContentLoaded', function() {
         // Update global portfolioData for components
         window.portfolioData = portfolioData;
         
-        // Clean up any invalid localStorage entries before proceeding
-        cleanupLocalStorage();
-        
         // Initialize the UI
         initializePortfolioFilters();
         initializeCharts();
@@ -335,7 +303,7 @@ document.addEventListener('DOMContentLoaded', function() {
         initTableSorting();
         
         // Initialize portfolio tabs with enhanced handlers
-        // PortfolioCharts.setupTabChangeHandlers already applied at initialization
+        initializePortfolioTabs = PortfolioCharts.setupTabChangeHandlers(initializePortfolioTabs);
         initializePortfolioTabs();
         
         // Setup resize handlers for charts
@@ -351,9 +319,9 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
     });
     
-    // Fetch list of portfolios
+    // Fetch list of portfolios with their IDs
     async function fetchPortfolios() {
-        const response = await fetch('/portfolio/api/portfolios');
+        const response = await fetch('/portfolio/api/portfolios?include_ids=true');
         if (!response.ok) {
             throw new Error('Failed to fetch portfolios');
         }
@@ -369,35 +337,6 @@ document.addEventListener('DOMContentLoaded', function() {
         return await response.json();
     }
     
-    // Function to clean up localStorage from invalid portfolio references
-    function cleanupLocalStorage() {
-        try {
-            // Get current portfolio IDs from our data
-            const validPortfolioIds = portfolioData.map(p => p.id);
-            console.log('Valid portfolio IDs:', validPortfolioIds);
-            
-            // Check and clean localStorage
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key && key.startsWith('portfolio_tab_')) {
-                    const idStr = key.replace('portfolio_tab_', '');
-                    const id = parseInt(idStr, 10);
-                    
-                    // Skip if not a valid portfolio ID 
-                    if (isNaN(id)) continue;
-                    
-                    // Remove entries for portfolios that no longer exist
-                    if (!validPortfolioIds.includes(id)) {
-                        console.log(`Removing localStorage entry for non-existent portfolio ID: ${id}`);
-                        localStorage.removeItem(key);
-                    }
-                }
-            }
-        } catch (e) {
-            console.warn('Error while cleaning up localStorage:', e);
-        }
-    }
-    
     // Process the data
     function processData(portfoliosList, data) {
         console.log('Processing data:');
@@ -406,10 +345,18 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('Portfolio data length:', data.length);
         
         // Create portfolio structure
-        portfolios = portfoliosList.map((name, index) => ({
-            id: index + 1,
-            name: name
-        }));
+        // Check if portfoliosList contains objects with id and name properties
+        if (portfoliosList.length > 0 && typeof portfoliosList[0] === 'object' && portfoliosList[0].id) {
+            // List already contains objects with IDs
+            portfolios = portfoliosList;
+        } else {
+            // List contains only names, create mapping with best-effort IDs
+            console.warn('Portfolio list does not contain IDs. Using index-based IDs which may not match database.');
+            portfolios = portfoliosList.map((name, index) => ({
+                id: index + 1,
+                name: name
+            }));
+        }
         console.log('Mapped portfolios:', portfolios);
         
         // Group data by portfolio
@@ -427,9 +374,16 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             if (!portfolioMap[portfolioName]) {
-                const portfolio = portfolios.find(p => p.name === portfolioName);
+                // First try to find portfolio by exact name match
+                let portfolio = portfolios.find(p => p.name === portfolioName);
+                
+                if (!portfolio) {
+                    // If not found by exact match, try case-insensitive match
+                    portfolio = portfolios.find(p => p.name.toLowerCase() === portfolioName.toLowerCase());
+                }
+                
                 if (portfolio) {
-                    console.log(`Creating new portfolio map entry for: ${portfolioName}`);
+                    console.log(`Creating new portfolio map entry for: ${portfolioName} with ID ${portfolio.id}`);
                     portfolioMap[portfolioName] = {
                         id: portfolio.id,
                         name: portfolioName,
@@ -439,6 +393,17 @@ document.addEventListener('DOMContentLoaded', function() {
                     };
                 } else {
                     console.warn(`Portfolio not found in portfolios list: ${portfolioName}`);
+                    // Create a fallback entry with a generated ID
+                    // Use a high number to avoid conflicts with database IDs
+                    const fallbackId = 1000 + Object.keys(portfolioMap).length;
+                    console.log(`Creating fallback portfolio entry with ID ${fallbackId}`);
+                    portfolioMap[portfolioName] = {
+                        id: fallbackId,
+                        name: portfolioName,
+                        companies: [],
+                        totalValue: 0,
+                        totalInvested: 0
+                    };
                 }
             }
             
@@ -510,9 +475,6 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // All portfolios are selected by default
         selectedPortfolioIds = portfolios.map(p => p.id);
-        
-        // Clean up localStorage from invalid references
-        cleanupLocalStorage();
     }
     
     /**
@@ -1174,16 +1136,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Handle category chart when switching to categories tab
                 if (targetId.includes('categories')) {
-                    // Get the portfolio object
-                    const portfolioObj = portfolioData.find(p => p.id == portfolioId);
+                    console.log(`Looking for portfolio: ID ${portfolioId}, Name '${tabs[2].textContent.trim()}'`);
+                    
+                    // Get the portfolio object by ID
+                    let portfolioObj = portfolioData.find(p => p.id == portfolioId);
+                    
+                    // If not found by ID, try finding by name (displayed in the tab)
                     if (!portfolioObj) {
-                        console.error(`Portfolio with ID ${portfolioId} not found`);
-                        // Clean up invalid localStorage reference
-                        try {
-                            localStorage.removeItem(`portfolio_tab_${portfolioId}`);
-                        } catch (e) {
-                            console.warn(`Could not clear invalid portfolio reference from localStorage`, e);
+                        const portfolioName = tabs[2].textContent.trim();
+                        portfolioObj = portfolioData.find(p => p.name === portfolioName);
+                        if (portfolioObj) {
+                            console.log(`Tried to find portfolio by name '${portfolioName}' instead of ID ${portfolioId}: Found ID ${portfolioObj.id}`);
+                        } else {
+                            console.log(`Tried to find portfolio by name '${portfolioName}' instead of ID ${portfolioId}: Not found`);
                         }
+                    }
+                    
+                    if (!portfolioObj) {
+                        console.error(`Portfolio with ID ${portfolioId} not found - portfolio data may be incomplete`);
                         return;
                     }
                     
@@ -1221,40 +1191,6 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             document.querySelectorAll('.portfolio-section').forEach(section => {
                 const portfolioId = section.dataset.portfolioId;
-                
-                // Verify this portfolio exists in our data first
-                const portfolioExists = portfolioData.some(p => p.id == portfolioId);
-                if (!portfolioExists) {
-                    // Remove invalid localStorage reference and any other references to this portfolio
-                    try {
-                        // Remove all localStorage entries that might reference this portfolio
-                        for (let i = 0; i < localStorage.length; i++) {
-                            const key = localStorage.key(i);
-                            if (key && key.includes(`_${portfolioId}`)) {
-                                console.log(`Removing localStorage entry for non-existent portfolio: ${key}`);
-                                localStorage.removeItem(key);
-                            }
-                        }
-                        
-                        // Add a warning message to the section if it exists
-                        if (section) {
-                            const contentDiv = section.querySelector('.portfolio-content');
-                            if (contentDiv) {
-                                contentDiv.innerHTML = '<div class="notification is-warning">Portfolio data could not be loaded. It may have been deleted or is missing from the database.</div>';
-                                
-                                // Hide tabs since they won't work
-                                const tabs = section.querySelector('.tabs');
-                                if (tabs) {
-                                    tabs.style.display = 'none';
-                                }
-                            }
-                        }
-                    } catch (e) {
-                        console.warn(`Could not clear invalid portfolio reference from localStorage`, e);
-                    }
-                    return; // Skip this section
-                }
-                
                 const savedTabId = localStorage.getItem(`portfolio_tab_${portfolioId}`);
                 if (savedTabId) {
                     const tabToActivate = section.querySelector(`[data-tab="${savedTabId}"]`);
@@ -1388,12 +1324,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize category chart for a specific portfolio using sunburst
     function initializeCategoryChart(portfolio) {
-        // Verify portfolio exists
-        if (!portfolio) {
-            console.error(`Cannot initialize category chart: portfolio is undefined`);
-            return null;
-        }
-        
         const elementId = `categoryChart${portfolio.id}`;
 
         console.log(`Initializing category chart for portfolio ${portfolio.id} (${portfolio.name})`);
@@ -1469,14 +1399,6 @@ document.addEventListener('DOMContentLoaded', function() {
             // Create the chart with a small delay to ensure the container is ready
             setTimeout(() => {
                 try {
-                    // Double check that portfolio still exists in our data
-                    const portfolioStillExists = portfolioData.some(p => p.id === portfolio.id);
-                    if (!portfolioStillExists) {
-                        console.error(`Portfolio ${portfolio.id} no longer exists in our data, cannot create chart`);
-                        chartElement.innerHTML = '<div class="notification is-warning">Portfolio data could not be loaded. It may have been deleted.</div>';
-                        return;
-                    }
-                    
                     const chart = PortfolioCharts.createSunburstChart(
                         elementId,
                         portfolio,

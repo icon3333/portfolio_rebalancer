@@ -107,6 +107,22 @@ const PortfolioCharts = (function() {
             return null;
         }
         
+        // Special handling for single category case (often just "Uncategorized")
+        if (categories.length === 1 && categories[0].name === "Uncategorized") {
+            console.log(`Portfolio ${portfolio.id} has only a single "Uncategorized" category with ${categories[0].companies.length} companies`);
+            
+            // If there are no companies in this category, show a message
+            if (categories[0].companies.length === 0) {
+                chartContainer.innerHTML = '<div class="has-text-centered p-6">No categorized data available</div>';
+                return null;
+            }
+            
+            // Log the companies for debugging
+            categories[0].companies.forEach(company => {
+                console.log(`  - ${company.name}: ${company.currentValue} (${company.percentage}%)`);
+            });
+        }
+        
         // Ensure the chart container is fully visible and sized
         // This is critical for Plotly to render correctly
         chartContainer.style.display = 'block';
@@ -184,6 +200,43 @@ const PortfolioCharts = (function() {
                 colors.push(lighterColor);
             });
         });
+        
+        // Log data for debugging
+        console.log(`Chart data prepared: ${labels.length} labels, ${parents.length} parents, ${values.length} values`);
+        
+        // Special handling for single category with "Uncategorized"
+        // Make sure we have enough data to create a meaningful chart
+        if (labels.length < 3) {
+            console.warn(`Not enough data points for a meaningful sunburst chart (${labels.length})`);
+            
+            // If it's just a single "Uncategorized" category, create a simpler pie chart instead
+            if (categories.length === 1 && categories[0].name === "Uncategorized" && categories[0].companies.length > 0) {
+                console.log("Creating pie chart for single Uncategorized category");
+                
+                // Create a simpler pie chart with just the companies
+                const companyLabels = categories[0].companies.map(c => `${c.name} (${formatPercentage(c.percentage)})`);
+                const companyValues = categories[0].companies.map(c => c.currentValue);
+                const companyColors = generateColors(companyLabels.length);
+                
+                const pieData = [{
+                    type: 'pie',
+                    labels: companyLabels,
+                    values: companyValues,
+                    textinfo: 'label+percent',
+                    hovertemplate: '<b>%{label}</b><br>%{value:,.2f} (%{percent})<extra></extra>',
+                    marker: { colors: companyColors }
+                }];
+                
+                const pieLayout = {
+                    title: 'Companies (Uncategorized)',
+                    height: 450,
+                    margin: { l: 20, r: 20, t: 50, b: 20 }
+                };
+                
+                const config = { responsive: true, displayModeBar: false };
+                return Plotly.newPlot(elementId, pieData, pieLayout, config);
+            }
+        }
         
         const data = [{
             type: 'sunburst',
@@ -435,18 +488,69 @@ const PortfolioCharts = (function() {
                         
                         // Now retrieve the correct portfolio from the global data
                         let portfolio;
+                        let portfolioName = null;
                         
-                        // First try to find it in window.portfolioData array
+                        // Get the portfolio name from the tab text
+                        const tabsContainer = tab.closest('.tabs');
+                        if (tabsContainer) {
+                            const portfolioHeader = tabsContainer.closest('.portfolio-section').querySelector('h2');
+                            if (portfolioHeader) {
+                                portfolioName = portfolioHeader.textContent.trim();
+                                console.log(`Tab for portfolio name: ${portfolioName}`);
+                            }
+                        }
+                        
+                        // First try to find it by ID in window.portfolioData array
                         if (Array.isArray(window.portfolioData)) {
                             portfolio = window.portfolioData.find(p => p.id == portfolioId);
+                            
+                            // If not found by ID, try by name as fallback
+                            if (!portfolio && portfolioName) {
+                                portfolio = window.portfolioData.find(p => p.name === portfolioName);
+                                console.log(`Found portfolio by name: ${portfolioName} instead of ID ${portfolioId}`);
+                                
+                                // If still not found, try case-insensitive match
+                                if (!portfolio) {
+                                    const lowerName = portfolioName.toLowerCase();
+                                    portfolio = window.portfolioData.find(p => p.name.toLowerCase() === lowerName);
+                                    if (portfolio) {
+                                        console.log(`Found portfolio by case-insensitive name: ${portfolioName}`);
+                                    }
+                                }
+                            }
                         }
                         // Then check if it's in window.portfolioData object by ID
                         else if (window.portfolioData && window.portfolioData[portfolioId]) {
                             portfolio = window.portfolioData[portfolioId];
                         }
+                        // If still not found but we have portfolio data and name, find by name
+                        else if (window.portfolioData && portfolioName) {
+                            // Check all portfolios in the object to find by name
+                            for (const key in window.portfolioData) {
+                                if (window.portfolioData[key].name === portfolioName) {
+                                    portfolio = window.portfolioData[key];
+                                    console.log(`Found portfolio in object by name: ${portfolioName}`);
+                                    break;
+                                }
+                            }
+                        }
                         
                         if (!portfolio) {
-                            console.error(`Portfolio data not found for ID ${portfolioId}`);
+                            console.error(`Portfolio data not found for ID ${portfolioId} or name ${portfolioName}`);
+                            console.log('Available portfolios:', window.portfolioData);
+                            
+                            // Add a message in the chart container
+                            const elementId = `categoryChart${portfolioId}`;
+                            const chartElement = document.getElementById(elementId);
+                            if (chartElement) {
+                                chartElement.innerHTML = `
+                                    <div class="has-text-centered p-6">
+                                        <p class="has-text-danger">Portfolio data not found</p>
+                                        <p>Unable to find portfolio with ID: ${portfolioId}</p>
+                                        <p>Please refresh the page or contact support if this issue persists.</p>
+                                    </div>
+                                `;
+                            }
                             return;
                         }
                         
