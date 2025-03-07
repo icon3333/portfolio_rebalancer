@@ -68,107 +68,235 @@ def should_exclude_path(path, base_dir, exclude_patterns):
     
     return False
 
-def find_focus_files(base_dir, focus_files, exclude_patterns):
+def find_files_with_wildcard(base_dir, pattern):
     """
-    Find and validate the specified focus files.
+    Find all files that match a pattern with wildcard.
+    Returns a list of relative paths for matching files.
+    """
+    matching_files = []
+    
+    # If no wildcard, just return the pattern itself if it exists
+    if '*' not in pattern:
+        full_path = os.path.join(base_dir, pattern)
+        if os.path.exists(full_path) and os.path.isfile(full_path):
+            return [pattern]
+        return []
+    
+    # Convert glob pattern to regex
+    pattern_parts = pattern.split('/')
+    dir_parts = pattern_parts[:-1]
+    file_pattern = pattern_parts[-1]
+    
+    # Build the base directory path for searching
+    search_dir = base_dir
+    if dir_parts:
+        if '*' in '/'.join(dir_parts):
+            # Complex case: directory part contains wildcards
+            print(f"WARNING: Directory wildcards are complex, doing basic matching for: {pattern}")
+            # Use simplified glob-like matching for these cases
+            for root, _, files in os.walk(base_dir):
+                rel_root = os.path.relpath(root, base_dir).replace('\\', '/')
+                for file in files:
+                    rel_path = os.path.join(rel_root, file).replace('\\', '/')
+                    # Convert glob pattern to regex for matching
+                    regex_pattern = pattern.replace('.', '\\.').replace('*', '.*')
+                    if re.match(f"^{regex_pattern}$", rel_path):
+                        matching_files.append(rel_path)
+            return matching_files
+        else:
+            # Simple case: only filename has wildcard
+            search_dir = os.path.join(base_dir, '/'.join(dir_parts))
+    
+    # If search directory doesn't exist, return empty list
+    if not os.path.exists(search_dir):
+        print(f"WARNING: Search directory not found: {search_dir}")
+        return []
+    
+    # Create regex pattern for filename matching
+    file_regex = '^' + file_pattern.replace('.', '\\.').replace('*', '.*') + '$'
+    
+    # Find all files in the directory that match the pattern
+    for file in os.listdir(search_dir):
+        file_path = os.path.join(search_dir, file)
+        if os.path.isfile(file_path) and re.match(file_regex, file):
+            # Calculate relative path
+            if dir_parts:
+                rel_path = '/'.join(dir_parts) + '/' + file
+            else:
+                rel_path = file
+            matching_files.append(rel_path)
+    
+    return matching_files
+
+def parse_config_file(config_path):
+    """
+    Parse the config.yml file to extract focus files and exclude patterns.
+    Returns a tuple of (focus_files, exclude_patterns).
+    """
+    focus_files = []
+    exclude_patterns = []
+    
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+        
+        mode = None
+        for line in lines:
+            # Strip whitespace
+            line = line.strip()
+            
+            # Skip empty lines
+            if not line:
+                continue
+            
+            # Check for section markers
+            if line == "# Focus":
+                mode = "focus"
+                continue
+            elif line == "# Exclude":
+                mode = "exclude"
+                continue
+            
+            # Skip comments
+            if line.startswith('#'):
+                continue
+            
+            # Add to appropriate list based on current mode
+            if mode == "focus":
+                focus_files.append(line)
+            elif mode == "exclude":
+                exclude_patterns.append(line)
+    
+    except Exception as e:
+        print(f"ERROR reading config file: {str(e)}")
+    
+    return focus_files, exclude_patterns
+
+def find_focus_files(base_dir, focus_paths, exclude_patterns):
+    """
+    Find and validate the specified focus files, including wildcard expansion.
     Returns a list of (full_path, relative_path) tuples for valid focus files.
     """
     valid_files = []
     
-    for focus_path in focus_files:
-        # Get full path
-        full_path = os.path.join(base_dir, focus_path)
-        rel_path = focus_path.replace('\\', '/')
-        
-        # Check if file exists
-        if not os.path.exists(full_path):
-            print(f"WARNING: Focus file not found: {focus_path}")
-            print(f"  Full path tried: {full_path}")
-            print(f"  Current directory: {os.getcwd()}")
-            continue
-        
-        # Check if file should be excluded
-        if should_exclude_path(full_path, base_dir, exclude_patterns):
-            print(f"WARNING: Focus file matches exclude pattern: {focus_path}")
-            continue
-        
-        # Check if file is a directory
-        if os.path.isdir(full_path):
-            print(f"WARNING: Focus path is a directory, not a file: {focus_path}")
-            continue
-        
-        # Check if file is binary
-        if is_binary_file(full_path):
-            print(f"WARNING: Focus file appears to be binary: {focus_path}")
-            continue
-        
-        # All checks passed, add file
-        valid_files.append((full_path, rel_path))
-        print(f"Including focus file: {rel_path}")
+    # Process each focus path, expanding wildcards
+    for focus_path in focus_paths:
+        # Check if path contains wildcards
+        if '*' in focus_path:
+            # Expand wildcard to find matching files
+            matching_paths = find_files_with_wildcard(base_dir, focus_path)
+            print(f"Wildcard pattern '{focus_path}' matched {len(matching_paths)} files")
+            
+            # Process each matching file
+            for match_path in matching_paths:
+                # Get full path
+                full_path = os.path.join(base_dir, match_path)
+                rel_path = match_path.replace('\\', '/')
+                
+                # Validate the file
+                if process_single_file(full_path, rel_path, base_dir, exclude_patterns):
+                    valid_files.append((full_path, rel_path))
+                    print(f"Including expanded focus file: {rel_path}")
+        else:
+            # Regular file path without wildcards
+            full_path = os.path.join(base_dir, focus_path)
+            rel_path = focus_path.replace('\\', '/')
+            
+            # Validate the file
+            if process_single_file(full_path, rel_path, base_dir, exclude_patterns):
+                valid_files.append((full_path, rel_path))
+                print(f"Including focus file: {rel_path}")
     
     return valid_files
+
+def process_single_file(full_path, rel_path, base_dir, exclude_patterns):
+    """
+    Process and validate a single file.
+    Returns True if the file is valid and should be included.
+    """
+    # Check if file exists
+    if not os.path.exists(full_path):
+        print(f"WARNING: Focus file not found: {rel_path}")
+        print(f"  Full path tried: {full_path}")
+        return False
+    
+    # Check if file should be excluded
+    if should_exclude_path(full_path, base_dir, exclude_patterns):
+        print(f"WARNING: Focus file matches exclude pattern: {rel_path}")
+        return False
+    
+    # Check if file is a directory
+    if os.path.isdir(full_path):
+        print(f"WARNING: Focus path is a directory, not a file: {rel_path}")
+        return False
+    
+    # Check if file is binary
+    if is_binary_file(full_path):
+        print(f"WARNING: Focus file appears to be binary: {rel_path}")
+        return False
+    
+    # All checks passed
+    return True
 
 def collect_directory_structure(files):
     """
     Generate a directory structure based on the included files.
     """
-    # Extract all unique directories from file paths
-    directories = set()
+    # Build a tree representation
+    tree = {}
     for _, rel_path in files:
-        # Add all parent directories
         parts = rel_path.split('/')
-        for i in range(len(parts)):
-            if i > 0:  # Skip the file itself
-                dir_path = '/'.join(parts[:i])
-                if dir_path:
-                    directories.add(dir_path)
+        current = tree
+        # Build directory structure
+        for i, part in enumerate(parts):
+            if i == len(parts) - 1:  # Last part is file
+                if '__files__' not in current:
+                    current['__files__'] = []
+                current['__files__'].append(part)
+            else:  # Directories
+                if part not in current:
+                    current[part] = {}
+                current = current[part]
     
-    # Sort directories for consistent output
-    sorted_dirs = sorted(directories)
-    
-    # Create a list to represent the directory structure
+    # Create lines for output
     structure_lines = ["./"]
     
-    # Add directories with proper indentation
-    for dir_path in sorted_dirs:
-        depth = dir_path.count('/') + 1
-        dir_name = os.path.basename(dir_path)
-        structure_lines.append("    " * depth + dir_name + "/")
+    # Recursive function to build structure lines
+    def build_structure(node, prefix, depth):
+        lines = []
+        
+        # Add directories first (sorted)
+        for name in sorted([k for k in node.keys() if k != '__files__']):
+            lines.append(prefix + name + "/")
+            sub_lines = build_structure(node[name], prefix + "    ", depth + 1)
+            lines.extend(sub_lines)
+        
+        # Add files (sorted)
+        if '__files__' in node:
+            for file in sorted(node['__files__']):
+                lines.append(prefix + file)
+        
+        return lines
     
-    # Add files with proper indentation
-    for _, rel_path in sorted(files, key=lambda x: x[1]):
-        dir_name = os.path.dirname(rel_path)
-        depth = dir_name.count('/') + 1 if dir_name else 1
-        file_name = os.path.basename(rel_path)
-        structure_lines.append("    " * depth + file_name)
+    # Build the structure lines
+    structure_lines.extend(build_structure(tree, "    ", 1))
     
     return "\n".join(structure_lines)
 
-def merge_files(base_dir, output_dir, output_prefix):
+def merge_files(base_dir, output_dir, output_prefix, config_path):
     """
-    Main function to merge files using hardcoded config
+    Main function to merge files using the config file
     """
-    # Use hardcoded config values
-    focus_files = [
-        "app/routes/portfolio_routes.py",
-        "templates/pages/analyse.html",
-        "templates/components/analyse_components.html"
-    ]
+    # Parse config file to get focus paths and exclude patterns
+    focus_paths, exclude_patterns = parse_config_file(config_path)
     
-    exclude_patterns = [
-        "_*/",
-        ".git/",
-        ".LLM/",
-        "venv/"
-    ]
-    
-    print("Using hardcoded configuration:")
-    print(f"Focus files: {focus_files}")
+    print("Configuration from file:")
+    print(f"Focus paths: {focus_paths}")
     print(f"Exclude patterns: {exclude_patterns}")
     
-    # Process focus files
-    print(f"\nFOCUS MODE: Will only include {len(focus_files)} specified files")
-    files_to_include = find_focus_files(base_dir, focus_files, exclude_patterns)
+    # Process focus files, expanding wildcards
+    print(f"\nFOCUS MODE: Will include files matching {len(focus_paths)} specified patterns")
+    files_to_include = find_focus_files(base_dir, focus_paths, exclude_patterns)
     
     # If no files to include, exit
     if not files_to_include:
@@ -252,8 +380,12 @@ if __name__ == "__main__":
             print("-" * 40)
             print(content)
             print("-" * 40)
+            
+            # Merge files using config file
+            merge_files(parent_dir, script_dir, output_prefix, config_path)
         except Exception as e:
             print(f"Error reading config.yml: {str(e)}")
-    
-    # Merge files using hardcoded config
-    merge_files(parent_dir, script_dir, output_prefix)
+            sys.exit(1)
+    else:
+        print(f"ERROR: Config file not found: {config_path}")
+        sys.exit(1)

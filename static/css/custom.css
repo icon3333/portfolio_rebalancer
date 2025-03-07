@@ -626,21 +626,6 @@ option {
     background-color: #e9ecef;
 }
 
-/* Merton page styles */
-.parameter-card {
-    height: 100%;
-}
-
-.parameter-card .card-content {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-}
-
-.parameter-input {
-    flex-grow: 1;
-}
-
 /* Help icon for tooltips */
 .has-tooltip-right i.fa-question-circle {
     color: #aaa;

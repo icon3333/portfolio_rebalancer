@@ -44,16 +44,6 @@
     </p>
     <ul class="menu-list">
         <li>
-            <a href="{{ url_for('merton.index') }}" class="{{ 'is-active' if request.endpoint == 'merton.index' }}">
-                <span class="icon-text">
-                    <span class="icon">
-                        <i class="fas fa-chart-pie"></i>
-                    </span>
-                    <span>Merton Share</span>
-                </span>
-            </a>
-        </li>
-        <li>
             <a href="{{ url_for('main.index') }}?page=build" class="{{ 'is-active' if request.args.get('page') == 'build' }}">
                 <span class="icon-text">
                     <span class="icon">
@@ -93,7 +83,7 @@
     <div class="mt-auto pt-6">
         <div class="has-text-centered is-size-7 has-text-grey">
             <p>Portfolio Manager v1.0</p>
-            <p>© {{ now.year }} Nico</p>
+            <p>&copy; {{ now.year }} Nico</p>
         </div>
     </div>
 </aside>

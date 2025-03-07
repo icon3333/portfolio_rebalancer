@@ -2,7 +2,7 @@ import logging
 import yfinance as yf
 import requests
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import warnings
 
 # Suppress specific yfinance warnings that might clutter the logs
@@ -18,26 +18,7 @@ def find_ticker_for_isin(isin: str) -> str:
     """
     logger.info(f"Finding ticker for ISIN: {isin}")
     
-    # Special case handling for common European ISINs that cause issues
-    # This is a fallback mapping for known problematic ISINs
-    isin_to_ticker_map = {
-        # Common European stocks that might cause issues
-        'NL00150001Q9': 'STLA', # Stellantis
-        'DE0007664005': 'VWAGY', # Volkswagen
-        # Crypto currencies
-        'BTC': 'BTC-USD',
-        'ETH': 'ETH-USD',
-        'LRC': 'LRC-USD',
-        'ATOM': 'ATOM-USD',
-        'SOL': 'SOL-USD',
-        'DOGE': 'DOGE-USD',
-        'PEPE': 'PEPE-USD',
-        'IOTA': 'IOTA-USD',
-        'TRX': 'TRX-USD',
-        'LINK': 'LINK-USD',
-        # Add more mappings as needed
-    }
-    
+   
     # Check if we have a direct mapping
     if isin in isin_to_ticker_map:
         ticker = isin_to_ticker_map[isin]
@@ -86,14 +67,17 @@ def find_ticker_for_isin(isin: str) -> str:
 # Create a session creation function that we can reset when needed
 def get_fresh_session():
     """Create a fresh requests session with appropriate headers to avoid Yahoo Finance blocking"""
-    session = requests.Session()
-    session.headers.update({
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Connection': 'keep-alive',
-    })
-    return session
+    try:
+        session = requests.Session()
+        # Add headers but don't use the update method to avoid the cookies.update error
+        session.headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        session.headers['Accept'] = 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8'
+        session.headers['Accept-Language'] = 'en-US,en;q=0.9'
+        session.headers['Connection'] = 'keep-alive'
+        return session
+    except Exception as e:
+        logger.warning(f"Error creating session: {str(e)}")
+        return None
 
 
 def get_price_for_ticker(ticker: str) -> Dict[str, Any]:
@@ -120,8 +104,16 @@ def get_price_for_ticker(ticker: str) -> Dict[str, Any]:
     session = get_fresh_session()
     
     try:
-        # Use our custom session to avoid the 'cookies.update' error
-        ticker_obj = yf.Ticker(ticker, session=session)
+        # Try to create ticker with custom session first, but fallback to default if session causes issues
+        try:
+            if session is not None:
+                ticker_obj = yf.Ticker(ticker, session=session)
+            else:
+                ticker_obj = yf.Ticker(ticker)
+        except Exception as session_error:
+            logger.warning(f"Error using custom session for {ticker}: {str(session_error)}")
+            # Fallback to creating ticker without custom session
+            ticker_obj = yf.Ticker(ticker)
         
         # Method 1: Use info approach - most reliable for getting both price and currency
         try:
@@ -266,7 +258,16 @@ def get_price_for_ticker(ticker: str) -> Dict[str, Any]:
                 start_str = start_date.strftime('%Y-%m-%d')
                 
                 logger.info(f"Trying direct download with date range: {start_str} to {end_str}")
-                data = yf.download(ticker, start=start_str, end=end_str, progress=False)
+                # Try with session first, then without if that fails
+                try:
+                    if session is not None:
+                        data = yf.download(ticker, start=start_str, end=end_str, progress=False, session=session)
+                    else:
+                        data = yf.download(ticker, start=start_str, end=end_str, progress=False)
+                except Exception as e:
+                    logger.warning(f"Error downloading with session for {ticker}: {str(e)}")
+                    # Fallback to download without session
+                    data = yf.download(ticker, start=start_str, end=end_str, progress=False)
                 if not data.empty and 'Close' in data.columns:
                     last_close = data['Close'].iloc[-1]
                     if isinstance(last_close, (int, float)) and last_close > 0:
@@ -311,7 +312,16 @@ def get_crypto_price(crypto_ticker: str) -> Dict[str, Any]:
         session = get_fresh_session()
         
         # Use a more direct approach for crypto tickers with our custom session
-        ticker_obj = yf.Ticker(crypto_ticker, session=session)
+        # Try to create ticker with custom session first, but fallback to default if session causes issues
+        try:
+            if session is not None:
+                ticker_obj = yf.Ticker(crypto_ticker, session=session)
+            else:
+                ticker_obj = yf.Ticker(crypto_ticker)
+        except Exception as session_error:
+            logger.warning(f"Error using custom session for {crypto_ticker}: {str(session_error)}")
+            # Fallback to creating ticker without custom session
+            ticker_obj = yf.Ticker(crypto_ticker)
         
         # Try the info approach first with basic error handling
         try:
@@ -353,7 +363,16 @@ def get_crypto_price(crypto_ticker: str) -> Dict[str, Any]:
             end_str = end_date.strftime('%Y-%m-%d')
             start_str = start_date.strftime('%Y-%m-%d')
             
-            data = yf.download(crypto_ticker, start=start_str, end=end_str, progress=False, session=session)
+            # Try with session first, then without if that fails
+            try:
+                if session is not None:
+                    data = yf.download(crypto_ticker, start=start_str, end=end_str, progress=False, session=session)
+                else:
+                    data = yf.download(crypto_ticker, start=start_str, end=end_str, progress=False)
+            except Exception as e:
+                logger.warning(f"Error downloading with session for {crypto_ticker}: {str(e)}")
+                # Fallback to download without session
+                data = yf.download(crypto_ticker, start=start_str, end=end_str, progress=False)
             if not data.empty and 'Close' in data.columns:
                 last_close = data['Close'].iloc[-1]
                 if isinstance(last_close, (int, float)) and last_close > 0:
@@ -757,3 +776,378 @@ def get_yfinance_info(identifier: str) -> Dict[str, Any]:
         response['modified_identifier'] = result['modified_identifier']
     
     return response
+
+
+def get_enhanced_historical_data(identifiers, years=5):
+    """
+    Fetch weekly historical prices for all identifiers in one shot,
+    allowing partial data if it's at least 50% of the requested timeframe.
+    """
+    if not identifiers:
+        return pd.DataFrame()  # No identifiers => empty DataFrame
+
+    # Figure out the date range
+    end_date = datetime.date.today()
+    start_date = end_date - datetime.timedelta(days=int(365 * years))
+
+    # Download all tickers at once (faster than one-by-one)
+    # Using `group_by="ticker"` so that the returned data is split per symbol easily
+    try:
+        logger.info(f"Requesting ~{years}y of data from {start_date} to {end_date} for {len(identifiers)} tickers.")
+        # Create a fresh session for this request
+        session = get_fresh_session()
+        
+        # Try with session first, then without if that fails
+        try:
+            if session is not None:
+                data = yf.download(
+                    tickers=list(set(identifiers)),  # unique them
+                    start=start_date,
+                    end=end_date,
+                    interval='1wk',       # weekly data
+                    group_by='ticker',    
+                    progress=False,       # turn off built-in progress bar
+                    threads=True,         # fetch in parallel
+                    auto_adjust=True,
+                    session=session
+                )
+            else:
+                data = yf.download(
+                    tickers=list(set(identifiers)),  # unique them
+                    start=start_date,
+                    end=end_date,
+                    interval='1wk',       # weekly data
+                    group_by='ticker',    
+                    progress=False,       # turn off built-in progress bar
+                    threads=True,         # fetch in parallel
+                    auto_adjust=True
+                )
+        except Exception as e:
+            logger.warning(f"Error downloading with session: {str(e)}")
+            # Fallback to download without session
+            data = yf.download(
+                tickers=list(set(identifiers)),  # unique them
+                start=start_date,
+                end=end_date,
+                interval='1wk',       # weekly data
+                group_by='ticker',    
+                progress=False,       # turn off built-in progress bar
+                threads=True,         # fetch in parallel
+                auto_adjust=True
+            )
+    except Exception as e:
+        logger.error(f"YFinance fetch failed for multiple tickers: {str(e)}")
+        return pd.DataFrame()
+
+    # If yfinance returns a DataFrame with multi-level columns, flatten it
+    # Typically data is something like data['BTC-USD']['Close']
+    # We'll unify them so that data['BTC-USD_Close'] is a single column.
+    if isinstance(data.columns, pd.MultiIndex):
+        # Each top-level key is a ticker, second-level keys are 'Open', 'High', 'Low', 'Close', etc.
+        # We'll keep only the "Close" columns for Merton calcs
+        close_frames = []
+        for ticker in data.columns.levels[0]:
+            if ('Close' in data[ticker].columns):
+                # rename "Close" => ticker
+                close_series = data[ticker]['Close'].rename(ticker)
+                close_frames.append(close_series)
+        if not close_frames:
+            logger.warning("No 'Close' columns found after multi-index flattening.")
+            return pd.DataFrame()
+        data = pd.concat(close_frames, axis=1)
+    else:
+        # If single-level, presumably columns are like: ('Close','BTC-USD'), etc.
+        # Or yfinance might put each ticker in columns named 'Close_ticker'? 
+        # You can adapt accordingly. The key is to get 1 column per ticker with close prices.
+        if 'Close' in data.columns:
+            data = data['Close']
+        else:
+            logger.warning("Data has no 'Close' column in single-level DataFrame.")
+            return pd.DataFrame()
+
+    # Remove all-NaN
+    data.dropna(how='all', axis=1, inplace=True)
+    if data.empty:
+        logger.warning("After dropping all-NaN columns, no valid data remains.")
+        return pd.DataFrame()
+
+    # For each column (ticker), check coverage vs. the total weeks in [start_date, end_date].
+    # If coverage < 50% of the expected number of weekly points => drop it
+    total_weeks = (end_date - start_date).days // 7
+    coverage_threshold = int(0.5 * total_weeks)  # 50% threshold
+
+    # Actual number of price points in the DataFrame might be less than total_weeks, 
+    # but we use coverage_threshold as a rough measure.
+    # Alternatively you could compare the length of each column’s actual non-NaN points to the max row count in `data`.
+
+    valid_tickers = []
+    for col in data.columns:
+        non_nan_count = data[col].dropna().shape[0]
+        if non_nan_count >= coverage_threshold:
+            valid_tickers.append(col)
+        else:
+            logger.info(f"Dropping {col} - insufficient coverage ({non_nan_count} points).")
+
+    data = data[valid_tickers]
+    if data.empty:
+        logger.warning("No columns passed the 50% coverage threshold.")
+        return pd.DataFrame()
+
+    # Sort by date ascending, drop any final NaNs
+    data.sort_index(inplace=True)
+    data.dropna(how='all', inplace=True)
+
+    # Done. This is your partial coverage DataFrame with weekly closes.
+    return data
+
+def get_historical_prices(identifiers, years=5):
+    """
+    Get historical price data for multiple identifiers with robust fallback options.
+    
+    This function attempts to fetch historical price data using various approaches:
+    1. Standard yfinance download with period parameter
+    2. Fallback to daily data with explicit date range
+    3. For crypto assets that don't have -USD suffix, attempt to add it
+    
+    Args:
+        identifiers (list): List of ticker symbols or ISINs
+        years (float): Number of years of historical data to fetch (can be decimal)
+        
+    Returns:
+        pd.DataFrame: DataFrame containing historical price data for all identifiers
+    """
+    import pandas as pd
+    from datetime import datetime, timedelta
+    
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=int(years*365))
+    
+    # Convert years to period string - handle potential floating point values
+    period_str = f"{int(years*52)}wk"
+    logger.info(f"Using lookback period of {years} years ({period_str})")
+    
+    # Initialize empty DataFrame for results
+    historical_data = pd.DataFrame()
+    
+    # Track crypto conversion attempts
+    crypto_conversions = {}
+    
+    for identifier in identifiers:
+        try:
+            logger.info(f"Fetching historical prices for {identifier}...")
+            
+            # Try the primary approach with period format
+            # Create a fresh session for this request
+            session = get_fresh_session()
+            
+            # Try with session first, fallback to standard download if that fails
+            try:
+                if session is not None:
+                    data = yf.download(
+                        identifier,
+                        period=period_str,  # Use weeks format instead of date range
+                        auto_adjust=True,
+                        progress=False,
+                        actions=False,  # Don't include dividends/splits for better compatibility
+                        session=session
+                    )
+                else:
+                    data = yf.download(
+                        identifier,
+                        period=period_str,  # Use weeks format instead of date range
+                        auto_adjust=True,
+                        progress=False,
+                        actions=False  # Don't include dividends/splits for better compatibility
+                    )
+            except Exception as e:
+                logger.warning(f"Error downloading with session for {identifier}: {str(e)}")
+                # Fallback to download without session
+                data = yf.download(
+                    identifier,
+                    period=period_str,  # Use weeks format instead of date range
+                    auto_adjust=True,
+                    progress=False,
+                    actions=False  # Don't include dividends/splits for better compatibility
+                )
+            
+            if not data.empty and 'Close' in data.columns:
+                historical_data[identifier] = data['Close']
+                logger.info(f"Successfully fetched {len(data)} data points for {identifier}")
+            else:
+                # Try backup approach with different interval
+                logger.warning(f"Initial attempt failed for {identifier}, trying daily data...")
+                # Create a fresh session for this request
+                session = get_fresh_session()
+                
+                # Try with session first, fallback to standard download if that fails
+                try:
+                    if session is not None:
+                        backup_data = yf.download(
+                            identifier,
+                            start=start_date,
+                            end=end_date,
+                            interval='1d',  # Try daily data
+                            auto_adjust=True,
+                            progress=False,
+                            actions=False,  # Don't include dividends/splits for better compatibility
+                            session=session
+                        )
+                    else:
+                        backup_data = yf.download(
+                            identifier,
+                            start=start_date,
+                            end=end_date,
+                            interval='1d',  # Try daily data
+                            auto_adjust=True,
+                            progress=False,
+                            actions=False  # Don't include dividends/splits for better compatibility
+                        )
+                except Exception as e:
+                    logger.warning(f"Error downloading with session for {identifier}: {str(e)}")
+                    # Fallback to download without session
+                    backup_data = yf.download(
+                        identifier,
+                        start=start_date,
+                        end=end_date,
+                        interval='1d',  # Try daily data
+                        auto_adjust=True,
+                        progress=False,
+                        actions=False  # Don't include dividends/splits for better compatibility
+                    )
+                
+                if not backup_data.empty and 'Close' in backup_data.columns:
+                    historical_data[identifier] = backup_data['Close']
+                    logger.info(f"Successfully fetched data using daily fallback for {identifier}")
+                elif '-' not in identifier:
+                    # Try with -USD suffix as final fallback for potential crypto symbols
+                    crypto_id = f"{identifier.upper()}-USD"
+                    logger.info(f"Trying crypto fallback: {crypto_id}")
+                    crypto_conversions[identifier] = crypto_id
+                    
+                    # Create a fresh session for this request
+                    session = get_fresh_session()
+                    
+                    # Try with session first, fallback to standard download if that fails
+                    try:
+                        if session is not None:
+                            crypto_data = yf.download(
+                                crypto_id,
+                                period=period_str,  # Use same period as original request
+                                auto_adjust=True,
+                                progress=False,
+                                actions=False,  # Don't include dividends/splits for better compatibility
+                                session=session
+                            )
+                        else:
+                            crypto_data = yf.download(
+                                crypto_id,
+                                period=period_str,  # Use same period as original request
+                                auto_adjust=True,
+                                progress=False,
+                                actions=False  # Don't include dividends/splits for better compatibility
+                            )
+                    except Exception as e:
+                        logger.warning(f"Error downloading with session for {crypto_id}: {str(e)}")
+                        # Fallback to download without session
+                        crypto_data = yf.download(
+                            crypto_id,
+                            period=period_str,  # Use same period as original request
+                            auto_adjust=True,
+                            progress=False,
+                            actions=False  # Don't include dividends/splits for better compatibility
+                        )
+                    
+                    if not crypto_data.empty and 'Close' in crypto_data.columns:
+                        historical_data[identifier] = crypto_data['Close']
+                        logger.info(f"Successfully fetched crypto data for {identifier} using {crypto_id}")
+                    else:
+                        # Try one more fallback with daily data for crypto
+                        logger.warning(f"Crypto fallback with period failed for {crypto_id}, trying daily data...")
+                        # Create a fresh session for this request
+                        session = get_fresh_session()
+                        
+                        # Try with session first, fallback to standard download if that fails
+                        try:
+                            if session is not None:
+                                daily_crypto_data = yf.download(
+                                    crypto_id,
+                                    start=start_date,
+                                    end=end_date,
+                                    interval='1d',
+                                    auto_adjust=True,
+                                    progress=False,
+                                    actions=False,
+                                    session=session
+                                )
+                            else:
+                                daily_crypto_data = yf.download(
+                                    crypto_id,
+                                    start=start_date,
+                                    end=end_date,
+                                    interval='1d',
+                                    auto_adjust=True,
+                                    progress=False,
+                                    actions=False
+                                )
+                        except Exception as e:
+                            logger.warning(f"Error downloading with session for {crypto_id}: {str(e)}")
+                            # Fallback to download without session
+                            daily_crypto_data = yf.download(
+                                crypto_id,
+                                start=start_date,
+                                end=end_date,
+                                interval='1d',
+                                auto_adjust=True,
+                                progress=False,
+                                actions=False
+                            )
+                        
+                        if not daily_crypto_data.empty and 'Close' in daily_crypto_data.columns:
+                            historical_data[identifier] = daily_crypto_data['Close']
+                            logger.info(f"Successfully fetched daily crypto data for {identifier} using {crypto_id}")
+                        else:
+                            logger.warning(f"No price data found for {identifier} or {crypto_id}")
+                else:
+                    logger.warning(f"No price data found for {identifier}")
+                
+        except Exception as e:
+            logger.error(f"Error fetching data for {identifier}: {str(e)}")
+            continue
+    
+    return historical_data
+
+
+def get_historical_returns(identifiers, years=5, freq='W'):
+    """
+    Get historical returns data for multiple identifiers.
+    
+    This function fetches historical price data and converts it to returns.
+    
+    Args:
+        identifiers (list): List of ticker symbols or ISINs
+        years (float): Number of years of historical data to fetch
+        freq (str): Frequency for returns calculation ('D' for daily, 'W' for weekly, 'M' for monthly)
+        
+    Returns:
+        pd.DataFrame: DataFrame containing historical returns data for all identifiers
+    """
+    import pandas as pd
+    
+    # Get historical prices
+    prices = get_historical_prices(identifiers, years)
+    
+    if prices.empty:
+        logger.warning("No historical price data found")
+        return pd.DataFrame()
+    
+    # Resample to desired frequency if specified
+    if freq:
+        prices = prices.resample(freq).last()
+    
+    # Calculate returns
+    returns = prices.pct_change().dropna()
+    
+    # Log summary statistics
+    logger.info(f"Calculated returns with shape {returns.shape}")
+    
+    return returns
