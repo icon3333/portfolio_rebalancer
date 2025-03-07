@@ -13,13 +13,17 @@
     </div>
     
     <div id="analysisContent" style="display: none;">
+        <!-- Portfolio Filters - Positioned at the top of the page -->
+        <div class="portfolio-filter-container has-text-centered mb-5 p-3">
+            <div id="portfolioFilters" class="is-flex is-flex-wrap-wrap is-justify-content-center">
+                <!-- Portfolio checkboxes will be added here dynamically -->
+            </div>
+        </div>
+        
         <!-- Global Overview Section -->
         <section class="mb-6">
             <div class="is-flex is-justify-content-space-between is-align-items-center mb-4">
                 <h2 class="subtitle is-4 mb-0">Global Overview</h2>
-                <div id="portfolioFilters" class="is-flex is-flex-wrap-wrap">
-                    <!-- Portfolio checkboxes will be added here dynamically -->
-                </div>
             </div>
             
             <div class="columns">
@@ -562,10 +566,10 @@ document.addEventListener('DOMContentLoaded', function() {
         
         nonEmptyPortfolios.forEach(portfolio => {
             const checkboxDiv = document.createElement('div');
-            checkboxDiv.className = 'control mx-1';
+            checkboxDiv.className = 'control mx-2 my-1';
             
             const label = document.createElement('label');
-            label.className = 'checkbox';
+            label.className = 'portfolio-filter-checkbox checkbox';
             
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
@@ -2261,6 +2265,41 @@ document.addEventListener('DOMContentLoaded', function() {
     // Create style element
     const style = document.createElement('style');
     style.innerHTML = `
+        /* Portfolio Filter Styling */
+        .portfolio-filter-container {
+            background-color: #f9f9fa;
+            position: relative;
+            padding-top: 0.5rem;
+        }
+        
+        .portfolio-filter-container::before {
+            content: '⚙️ Select Portfolios for Analysis';
+            display: block;
+            font-size: 0.85rem;
+            color: #666;
+            margin-bottom: 0.5rem;
+            letter-spacing: 0.5px;
+        }
+        
+        #portfolioFilters .control {
+            margin: 0.4rem 0.5rem;
+        }
+        
+        .portfolio-filter-checkbox {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.4rem 0.8rem;
+            transition: all 0.2s;
+        }
+        
+        .portfolio-filter-checkbox:hover {
+            color: #3273dc;
+        }
+        
+        .portfolio-filter-checkbox input[type='checkbox'] {
+            margin-right: 0.4rem;
+        }
+        
         /* Tab styling */
         .portfolio-section .tabs {
             margin-bottom: 0;
