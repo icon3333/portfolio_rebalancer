@@ -1,185 +1,301 @@
-{% extends "base.html" %}
-{% block title %}Build - Portfolio Manager{% endblock %}
+{% extends 'base.html' %}
+
+{% block title %}Allocation Builder{% endblock %}
 
 {% block content %}
-<div class="columns">
-    <div class="column is-12">
-        <h1 class="title">
-            <span class="icon-text">
-                <span class="icon">
-                    <i class="fas fa-hammer"></i>
-                </span>
-                <span>Portfolio Rule Builder</span>
-            </span>
-        </h1>
+<div id="allocation-builder" v-cloak>
+    <h1 class="title">Allocation Builder</h1>
+    <p class="subtitle">Plan and visualize your investment allocations</p>
 
-        <div class="notification is-info is-light">
-            <button class="delete"></button>
-            <p>This page allows you to establish custom portfolio rules, target weights, and
-               position-level constraints. Define your ideal portfolio structure here, then 
-               you can apply it later when allocating actual funds.</p>
+    <!-- Budget Management Section -->
+    <div class="card mb-4">
+        <header class="card-header">
+            <p class="card-header-title">Budget Management</p>
+        </header>
+        <div class="card-content">
+            <div class="columns is-multiline">
+                <div class="column is-half">
+                    <div class="field">
+                        <label class="label">Total Net Worth</label>
+                        <div class="control">
+                            <input class="input" type="number" id="netWorth" placeholder="Enter total net worth" {% raw %}v-model.number="budgetData.netWorth" @input="calculateAvailableToInvest"{% endraw %}>
+                        </div>
+                    </div>
+                </div>
+                <div class="column is-half">
+                    <div class="field">
+                        <label class="label">Already Invested</label>
+                        <div class="control">
+                            <input class="input" type="number" id="alreadyInvested" placeholder="Enter amount already invested" {% raw %}v-model.number="budgetData.alreadyInvested" @input="calculateAvailableToInvest"{% endraw %}>
+                        </div>
+                    </div>
+                </div>
+                <div class="column is-half">
+                    <div class="field">
+                        <label class="label">Emergency Fund</label>
+                        <div class="control">
+                            <input class="input" type="number" id="emergencyFund" placeholder="Enter emergency fund amount" {% raw %}v-model.number="budgetData.emergencyFund" @input="calculateAvailableToInvest"{% endraw %}>
+                        </div>
+                    </div>
+                </div>
+                <div class="column is-half">
+                    <div class="field">
+                        <label class="label">Available to Invest</label>
+                        <div class="control">
+                            <input class="input" type="number" id="availableToInvest" readonly {% raw %}v-model.number="budgetData.availableToInvest"{% endraw %}>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
-</div>
 
-<div class="columns is-multiline">
     <!-- Global Allocation Rules -->
-    <div class="column is-12">
-        <div class="card mb-5">
-            <header class="card-header">
-                <p class="card-header-title">
-                    <span class="icon-text">
-                        <span class="icon">
-                            <i class="fas fa-tools"></i>
-                        </span>
-                        <span>Global Portfolio Rules</span>
-                    </span>
-                </p>
-            </header>
-            <div class="card-content">
-                <div class="content">
-                    <form id="global-rules-form">
-                        <div class="columns is-multiline">
-                            <div class="column is-4">
-                                <div class="field">
-                                    <label class="label">Maximum Single Position (%)</label>
-                                    <div class="control">
-                                        <input 
-                                            class="input" 
-                                            type="number" 
-                                            name="max_single_position" 
-                                            step="1" 
-                                            min="1" 
-                                            max="100" 
-                                            value="10">
-                                    </div>
-                                    <p class="help">Limit for any single stock’s share of total portfolio.</p>
-                                </div>
-                            </div>
-                            <div class="column is-4">
-                                <div class="field">
-                                    <label class="label">Maximum Category Allocation (%)</label>
-                                    <div class="control">
-                                        <input 
-                                            class="input" 
-                                            type="number" 
-                                            name="max_category" 
-                                            step="1" 
-                                            min="1" 
-                                            max="100" 
-                                            value="40">
-                                    </div>
-                                    <p class="help">Ensures no single sector dominates the portfolio.</p>
-                                </div>
-                            </div>
-                            <div class="column is-4">
-                                <div class="field">
-                                    <label class="label">Minimum Number of Positions</label>
-                                    <div class="control">
-                                        <input 
-                                            class="input" 
-                                            type="number" 
-                                            name="min_positions" 
-                                            step="1" 
-                                            min="1" 
-                                            value="5">
-                                    </div>
-                                    <p class="help">Ensures diversification by holding at least N positions.</p>
-                                </div>
-                            </div>
+    <div class="card mb-4">
+        <header class="card-header">
+            <p class="card-header-title">Global Allocation Rules</p>
+        </header>
+        <div class="card-content">
+            <div class="columns">
+                <div class="column is-half">
+                    <div class="field">
+                        <label class="label">Maximum % per Stock</label>
+                        <div class="control">
+                            <input class="input" type="number" min="0" max="100" id="maxPerStock" placeholder="Maximum % per stock" {% raw %}v-model.number="rules.maxPerStock"{% endraw %}>
                         </div>
-                        <div class="field">
-                            <button class="button is-primary" id="save-global-rules">
-                                <span class="icon">
-                                    <i class="fas fa-save"></i>
-                                </span>
-                                <span>Save Rules</span>
-                            </button>
+                    </div>
+                </div>
+                <div class="column is-half">
+                    <div class="field">
+                        <label class="label">Maximum % per Category</label>
+                        <div class="control">
+                            <input class="input" type="number" min="0" max="100" id="maxPerCategory" placeholder="Maximum % per category" {% raw %}v-model.number="rules.maxPerCategory"{% endraw %}>
                         </div>
-                    </form>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Target Portfolio Weights -->
-    <div class="column is-12">
-        <div class="card">
-            <header class="card-header">
-                <p class="card-header-title">
-                    <span class="icon-text">
-                        <span class="icon">
-                            <i class="fas fa-clipboard-list"></i>
-                        </span>
-                        <span>Target Weights</span>
-                    </span>
-                </p>
-            </header>
-            <div class="card-content">
-                <div class="content">
-                    <p>Use this section to define specific target allocations for each portfolio. 
-                       The system will reference these targets when generating an ideal 
-                       distribution. For instance, “Growth Portfolio = 50%”, “Dividend Portfolio = 30%”, etc.</p>
-                    
-                    <form id="target-weights-form">
-                        <div id="weights-container">
-                            <!-- Example item. In actual usage, you might dynamically render or allow user additions. -->
-                            <div class="field is-grouped mb-2" data-portfolio-row>
-                                <div class="control is-expanded">
-                                    <input class="input" type="text" name="portfolio_name[]" value="Growth Portfolio">
-                                </div>
-                                <div class="control">
-                                    <input class="input" type="number" name="portfolio_weight[]" step="0.1" placeholder="e.g. 50">
-                                </div>
-                                <div class="control">
-                                    <button class="button is-danger remove-row">
-                                        <span class="icon">
-                                            <i class="fas fa-minus-circle"></i>
-                                        </span>
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="field is-grouped mb-2" data-portfolio-row>
-                                <div class="control is-expanded">
-                                    <input class="input" type="text" name="portfolio_name[]" value="Dividend Portfolio">
-                                </div>
-                                <div class="control">
-                                    <input class="input" type="number" name="portfolio_weight[]" step="0.1" placeholder="e.g. 30">
-                                </div>
-                                <div class="control">
-                                    <button class="button is-danger remove-row">
-                                        <span class="icon">
-                                            <i class="fas fa-minus-circle"></i>
-                                        </span>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="field">
-                            <button type="button" class="button is-info" id="add-portfolio-target">
-                                <span class="icon">
-                                    <i class="fas fa-plus"></i>
-                                </span>
-                                <span>Add Portfolio Target</span>
-                            </button>
-                            <button type="submit" class="button is-success ml-3" id="save-target-weights">
-                                <span class="icon">
-                                    <i class="fas fa-save"></i>
-                                </span>
-                                <span>Save Target Weights</span>
-                            </button>
-                        </div>
-                    </form>
-                    
-                    <hr>
-                    <button class="button is-warning" id="build-allocation-plan">
-                        <span class="icon">
-                            <i class="fas fa-play"></i>
-                        </span>
-                        <span>Generate Allocation Plan</span>
-                    </button>
+    <!-- Portfolio Allocation -->
+    <div class="card mb-4">
+        <header class="card-header">
+            <p class="card-header-title">Portfolio Allocation</p>
+        </header>
+        <div class="card-content">
+            <div class="field is-grouped is-grouped-multiline">
+                <div class="control">
+                    <button class="button is-info" {% raw %}@click="addPortfolio"{% endraw %}>Add Portfolio</button>
                 </div>
             </div>
+
+            <!-- Portfolio List -->
+            <div {% raw %}v-if="portfolios.length > 0"{% endraw %} class="mt-4">
+                <div {% raw %}v-for="(portfolio, index) in portfolios"{% endraw %} :key="index" class="box mb-3">
+                    <div class="columns is-vcentered">
+                        <div class="column is-4">
+                            <div class="field">
+                                <label class="label">Portfolio Name</label>
+                                <div class="control">
+                                    <div class="select is-fullwidth">
+                                        <select {% raw %}v-model="portfolio.id"{% endraw %} {% raw %}@change="loadPortfolioData(index)"{% endraw %}>
+                                            <option {% raw %}v-for="option in availablePortfolios"{% endraw %} :value="option.id">{% raw %}{{ option.name }}{% endraw %}</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="column is-3">
+                            <div class="field">
+                                <label class="label">Allocation %</label>
+                                <div class="control">
+                                    <input class="input" type="number" min="0" max="100" {% raw %}v-model.number="portfolio.allocation"{% endraw %} {% raw %}@input="updateAllocations"{% endraw %}>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="column is-3">
+                            <div class="field">
+                                <label class="label">Allocation Amount</label>
+                                <div class="control">
+                                    <input class="input" type="text" {% raw %}:value="formatCurrency(calculateAllocationAmount(portfolio.allocation))"{% endraw %} readonly>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="column is-2">
+                            <div class="field">
+                                <label class="label">&nbsp;</label>
+                                <div class="control">
+                                    <button class="button is-danger" {% raw %}@click="removePortfolio(index)"{% endraw %}>Remove</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Position Management -->
+                    <div class="mt-3">
+                        <h5 class="subtitle is-5">Position Management</h5>
+                        
+                        <div class="columns">
+                            <div class="column is-4">
+                                <div class="field">
+                                    <label class="label">Minimum Positions</label>
+                                    <div class="control">
+                                        <input class="input" type="number" min="1" {% raw %}v-model.number="portfolio.minPositions"{% endraw %}>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="column is-4">
+                                <div class="field">
+                                    <label class="label">Even Split</label>
+                                    <div class="control">
+                                        <label class="checkbox">
+                                            <input type="checkbox" {% raw %}v-model="portfolio.evenSplit"{% endraw %} {% raw %}@change="updatePositionAllocations(index)"{% endraw %}>
+                                            Distribute evenly across positions
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="column is-4">
+                                <div class="field">
+                                    <label class="label">&nbsp;</label>
+                                    <div class="control">
+                                        <button class="button is-info" {% raw %}@click="addPosition(index)"{% endraw %}>Add Position</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Position List -->
+                        <table class="table is-fullwidth is-hoverable">
+                            <thead>
+                                <tr>
+                                    <th>Company</th>
+                                    <th>Weight %</th>
+                                    <th>Allocation Amount</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr {% raw %}v-for="(position, pIndex) in portfolio.positions"{% endraw %} :key="pIndex">
+                                    <td>
+                                        <div class="select is-fullwidth">
+                                            <select {% raw %}v-model="position.companyId"{% endraw %} {% raw %}@change="updatePositionDetails(index, pIndex)"{% endraw %}>
+                                                <option {% raw %}v-for="company in portfolioCompanies[portfolio.id] || []"{% endraw %} :value="company.id">{% raw %}{{ company.name }}{% endraw %}</option>
+                                            </select>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <input class="input" type="number" min="0" max="100" {% raw %}v-model.number="position.weight"{% endraw %} {% raw %}:disabled="portfolio.evenSplit"{% endraw %} {% raw %}@input="updatePositionAllocations(index)"{% endraw %}>
+                                    </td>
+                                    <td>
+                                        <input class="input" type="text" {% raw %}:value="formatCurrency(calculatePositionAmount(index, pIndex))"{% endraw %} readonly>
+                                    </td>
+                                    <td>
+                                        <button class="button is-small is-danger" {% raw %}@click="removePosition(index, pIndex)"{% endraw %}>Remove</button>
+                                    </td>
+                                </tr>
+                                <tr {% raw %}v-if="portfolio.positions.length === 0"{% endraw %}>
+                                    <td colspan="4" class="has-text-centered">No positions added. Click "Add Position" to begin.</td>
+                                </tr>
+                            </tbody>
+                            <tfoot {% raw %}v-if="portfolio.positions.length > 0"{% endraw %}>
+                                <tr>
+                                    <th>Total</th>
+                                    <th>{% raw %}{{ calculateTotalWeight(index).toFixed(1) }}%{% endraw %}</th>
+                                    <th>{% raw %}{{ formatCurrency(calculateAllocationAmount(portfolio.allocation)) }}{% endraw %}</th>
+                                    <th></th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div {% raw %}v-else{% endraw %} class="notification is-info">
+                No portfolios added yet. Click "Add Portfolio" to begin.
+            </div>
+        </div>
+    </div>
+
+    <!-- Allocation Summary -->
+    <div class="card mb-4">
+        <header class="card-header">
+            <p class="card-header-title">Allocation Summary</p>
+        </header>
+        <div class="card-content">
+            <div class="columns is-multiline">
+                <div class="column is-3">
+                    <div class="box">
+                        <p class="heading">Total Allocation</p>
+                        <p class="title">{% raw %}{{ calculateTotalAllocation().toFixed(1) }}%{% endraw %}</p>
+                    </div>
+                </div>
+                <div class="column is-3">
+                    <div class="box">
+                        <p class="heading">Allocated Amount</p>
+                        <p class="title">{% raw %}{{ formatCurrency(calculateTotalAllocatedAmount()) }}{% endraw %}</p>
+                    </div>
+                </div>
+                <div class="column is-3">
+                    <div class="box">
+                        <p class="heading">Unallocated Amount</p>
+                        <p class="title">{% raw %}{{ formatCurrency(calculateUnallocatedAmount()) }}{% endraw %}</p>
+                    </div>
+                </div>
+                <div class="column is-3">
+                    <div class="box">
+                        <p class="heading">Total Positions</p>
+                        <p class="title">{% raw %}{{ calculateTotalPositions() }}{% endraw %}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Allocation Progress -->
+            <progress 
+                class="progress" 
+                {% raw %}:class="{'is-success': isAllocationValid, 'is-warning': isAllocationUnder, 'is-danger': isAllocationOver}"{% endraw %}
+                {% raw %}:value="calculateTotalAllocation()" {% endraw %}
+                max="100">
+                {% raw %}{{ calculateTotalAllocation() }}%{% endraw %}
+            </progress>
+
+            <!-- Summary Table -->
+            <table class="table is-fullwidth is-hoverable mt-4">
+                <thead>
+                    <tr>
+                        <th>Portfolio</th>
+                        <th>Allocation %</th>
+                        <th>Allocation Amount</th>
+                        <th>Positions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr {% raw %}v-for="(portfolio, index) in portfolios"{% endraw %}>
+                        <td>{% raw %}{{ getPortfolioName(portfolio.id) }}{% endraw %}</td>
+                        <td>{% raw %}{{ portfolio.allocation.toFixed(1) }}%{% endraw %}</td>
+                        <td>{% raw %}{{ formatCurrency(calculateAllocationAmount(portfolio.allocation)) }}{% endraw %}</td>
+                        <td>{% raw %}{{ portfolio.positions.length }}{% endraw %}</td>
+                    </tr>
+                    <tr {% raw %}v-if="portfolios.length === 0"{% endraw %}>
+                        <td colspan="4" class="has-text-centered">No portfolios added yet.</td>
+                    </tr>
+                </tbody>
+                <tfoot {% raw %}v-if="portfolios.length > 0"{% endraw %}>
+                    <tr>
+                        <th>Total</th>
+                        <th>{% raw %}{{ calculateTotalAllocation().toFixed(1) }}%{% endraw %}</th>
+                        <th>{% raw %}{{ formatCurrency(calculateTotalAllocatedAmount()) }}{% endraw %}</th>
+                        <th>{% raw %}{{ calculateTotalPositions() }}{% endraw %}</th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+
+    <!-- Save Button -->
+    <div class="field is-grouped is-grouped-right mb-5">
+        <div class="control">
+            <button class="button is-primary" {% raw %}@click="saveAllocation"{% endraw %} {% raw %}:class="{'is-loading': loadingState}"{% endraw %}>Save Allocation</button>
         </div>
     </div>
 </div>
@@ -187,86 +303,350 @@
 
 {% block scripts %}
 <script>
-document.addEventListener('DOMContentLoaded', () => {
-    // Dismiss notification
-    document.querySelectorAll('.notification .delete').forEach(delBtn => {
-        delBtn.addEventListener('click', () => {
-            delBtn.parentNode.remove();
+    // Allocation Builder Vue App
+    document.addEventListener('DOMContentLoaded', function() {
+        new Vue({
+            el: '#allocation-builder',
+            data: {
+                budgetData: {
+                    netWorth: 0,
+                    alreadyInvested: 0,
+                    emergencyFund: 0,
+                    availableToInvest: 0
+                },
+                rules: {
+                    maxPerStock: 5,
+                    maxPerCategory: 25
+                },
+                portfolios: [],
+                availablePortfolios: [],
+                portfolioCompanies: {},
+                loadingState: false
+            },
+            computed: {
+                isAllocationValid() {
+                    const total = this.calculateTotalAllocation();
+                    return total === 100;
+                },
+                isAllocationUnder() {
+                    const total = this.calculateTotalAllocation();
+                    return total < 100;
+                },
+                isAllocationOver() {
+                    const total = this.calculateTotalAllocation();
+                    return total > 100;
+                }
+            },
+            mounted() {
+                this.loadInitialData();
+            },
+            methods: {
+                // Initial data loading
+                async loadInitialData() {
+                    try {
+                        this.loadingState = true;
+                        
+                        // Load available portfolios
+                        await this.loadAvailablePortfolios();
+                        
+                        // Load saved state if available
+                        await this.loadSavedState();
+                        
+                        // Calculate available to invest
+                        this.calculateAvailableToInvest();
+                        
+                        this.loadingState = false;
+                    } catch (error) {
+                        console.error('Error loading initial data:', error);
+                        portfolioManager.showNotification('Failed to load initial data. Please refresh the page.', 'is-danger');
+                        this.loadingState = false;
+                    }
+                },
+                
+                // Load saved state from the server
+                async loadSavedState() {
+                    try {
+                        const response = await axios.get('/portfolio/api/state?page=build');
+                        
+                        if (response.data && response.data.budgetData) {
+                            this.budgetData = JSON.parse(response.data.budgetData);
+                        }
+                        
+                        if (response.data && response.data.rules) {
+                            this.rules = JSON.parse(response.data.rules);
+                        }
+                        
+                        if (response.data && response.data.portfolios) {
+                            this.portfolios = JSON.parse(response.data.portfolios);
+                            
+                            // Load companies for each portfolio
+                            for (const portfolio of this.portfolios) {
+                                if (portfolio.id) {
+                                    await this.loadPortfolioCompanies(portfolio.id);
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error loading saved state:', error);
+                        // If error loading saved state, start with default values
+                    }
+                },
+                
+                // Load available portfolios
+                async loadAvailablePortfolios() {
+                    try {
+                        const response = await axios.get('/portfolio/api/portfolios?include_ids=true');
+                        this.availablePortfolios = response.data;
+                    } catch (error) {
+                        console.error('Error loading portfolios:', error);
+                        portfolioManager.showNotification('Failed to load portfolios', 'is-danger');
+                    }
+                },
+                
+                // Load companies for a specific portfolio
+                async loadPortfolioCompanies(portfolioId) {
+                    try {
+                        const response = await axios.get(`/portfolio/api/portfolio_companies/${portfolioId}`);
+                        Vue.set(this.portfolioCompanies, portfolioId, response.data);
+                    } catch (error) {
+                        console.error(`Error loading companies for portfolio ${portfolioId}:`, error);
+                        portfolioManager.showNotification(`Failed to load companies for portfolio`, 'is-danger');
+                    }
+                },
+                
+                // Budget calculation
+                calculateAvailableToInvest() {
+                    const netWorth = parseFloat(this.budgetData.netWorth) || 0;
+                    const alreadyInvested = parseFloat(this.budgetData.alreadyInvested) || 0;
+                    const emergencyFund = parseFloat(this.budgetData.emergencyFund) || 0;
+                    
+                    this.budgetData.availableToInvest = Math.max(0, netWorth - alreadyInvested - emergencyFund);
+                },
+                
+                // Portfolio management
+                addPortfolio() {
+                    this.portfolios.push({
+                        id: null,
+                        allocation: 0,
+                        minPositions: 5,
+                        evenSplit: true,
+                        positions: []
+                    });
+                },
+                
+                removePortfolio(index) {
+                    this.portfolios.splice(index, 1);
+                    this.updateAllocations();
+                },
+                
+                // Load portfolio data when selected
+                async loadPortfolioData(portfolioIndex) {
+                    const portfolio = this.portfolios[portfolioIndex];
+                    if (!portfolio.id) return;
+                    
+                    try {
+                        // Load companies for this portfolio
+                        await this.loadPortfolioCompanies(portfolio.id);
+                        
+                        // Clear existing positions
+                        portfolio.positions = [];
+                        
+                        // Add initial positions if available
+                        const companies = this.portfolioCompanies[portfolio.id] || [];
+                        if (companies.length > 0) {
+                            const weightPerPosition = portfolio.evenSplit ? (100 / companies.length) : 0;
+                            
+                            companies.forEach(company => {
+                                portfolio.positions.push({
+                                    companyId: company.id,
+                                    companyName: company.name,
+                                    weight: weightPerPosition
+                                });
+                            });
+                        }
+                        
+                        this.updatePositionAllocations(portfolioIndex);
+                    } catch (error) {
+                        console.error('Error loading portfolio data:', error);
+                        portfolioManager.showNotification('Failed to load portfolio data', 'is-danger');
+                    }
+                },
+                
+                // Position management
+                addPosition(portfolioIndex) {
+                    const portfolio = this.portfolios[portfolioIndex];
+                    
+                    portfolio.positions.push({
+                        companyId: null,
+                        companyName: '',
+                        weight: portfolio.evenSplit ? (100 / (portfolio.positions.length + 1)) : 0
+                    });
+                    
+                    // If even split is enabled, recalculate all weights
+                    if (portfolio.evenSplit) {
+                        this.recalculateEvenWeights(portfolioIndex);
+                    }
+                },
+                
+                removePosition(portfolioIndex, positionIndex) {
+                    const portfolio = this.portfolios[portfolioIndex];
+                    portfolio.positions.splice(positionIndex, 1);
+                    
+                    // If even split is enabled, recalculate all weights
+                    if (portfolio.evenSplit) {
+                        this.recalculateEvenWeights(portfolioIndex);
+                    } else {
+                        this.updatePositionAllocations(portfolioIndex);
+                    }
+                },
+                
+                updatePositionDetails(portfolioIndex, positionIndex) {
+                    const portfolio = this.portfolios[portfolioIndex];
+                    const position = portfolio.positions[positionIndex];
+                    const companyId = position.companyId;
+                    
+                    if (companyId) {
+                        const company = this.portfolioCompanies[portfolio.id].find(c => c.id === companyId);
+                        if (company) {
+                            position.companyName = company.name;
+                        }
+                    }
+                },
+                
+                // Recalculate weights for even distribution
+                recalculateEvenWeights(portfolioIndex) {
+                    const portfolio = this.portfolios[portfolioIndex];
+                    const positionCount = portfolio.positions.length;
+                    
+                    if (positionCount > 0) {
+                        const weightPerPosition = 100 / positionCount;
+                        
+                        portfolio.positions.forEach(position => {
+                            position.weight = weightPerPosition;
+                        });
+                    }
+                    
+                    this.updatePositionAllocations(portfolioIndex);
+                },
+                
+                // Update position allocations when weights change
+                updatePositionAllocations(portfolioIndex) {
+                    const portfolio = this.portfolios[portfolioIndex];
+                    
+                    // If even split is enabled, recalculate weights
+                    if (portfolio.evenSplit && portfolio.positions.length > 0) {
+                        this.recalculateEvenWeights(portfolioIndex);
+                    }
+                    
+                    // Ensure total weight doesn't exceed 100%
+                    let totalWeight = this.calculateTotalWeight(portfolioIndex);
+                    if (totalWeight > 100) {
+                        const scaleFactor = 100 / totalWeight;
+                        
+                        portfolio.positions.forEach(position => {
+                            position.weight = position.weight * scaleFactor;
+                        });
+                    }
+                },
+                
+                // Update portfolio allocations
+                updateAllocations() {
+                    // Ensure total allocation doesn't exceed 100%
+                    let totalAllocation = this.calculateTotalAllocation();
+                    
+                    if (totalAllocation > 100) {
+                        const scaleFactor = 100 / totalAllocation;
+                        
+                        this.portfolios.forEach(portfolio => {
+                            portfolio.allocation = portfolio.allocation * scaleFactor;
+                        });
+                    }
+                },
+                
+                // Calculate total weight for a portfolio
+                calculateTotalWeight(portfolioIndex) {
+                    const portfolio = this.portfolios[portfolioIndex];
+                    return portfolio.positions.reduce((total, position) => total + parseFloat(position.weight || 0), 0);
+                },
+                
+                // Calculate total allocation percentage
+                calculateTotalAllocation() {
+                    return this.portfolios.reduce((total, portfolio) => total + parseFloat(portfolio.allocation || 0), 0);
+                },
+                
+                // Calculate allocation amount based on percentage
+                calculateAllocationAmount(allocationPercentage) {
+                    const availableToInvest = parseFloat(this.budgetData.availableToInvest) || 0;
+                    return availableToInvest * (parseFloat(allocationPercentage) / 100);
+                },
+                
+                // Calculate position amount
+                calculatePositionAmount(portfolioIndex, positionIndex) {
+                    const portfolio = this.portfolios[portfolioIndex];
+                    const position = portfolio.positions[positionIndex];
+                    const portfolioAmount = this.calculateAllocationAmount(portfolio.allocation);
+                    
+                    return portfolioAmount * (parseFloat(position.weight || 0) / 100);
+                },
+                
+                // Calculate total allocated amount
+                calculateTotalAllocatedAmount() {
+                    const availableToInvest = parseFloat(this.budgetData.availableToInvest) || 0;
+                    const totalAllocationPercentage = this.calculateTotalAllocation() / 100;
+                    
+                    return availableToInvest * totalAllocationPercentage;
+                },
+                
+                // Calculate unallocated amount
+                calculateUnallocatedAmount() {
+                    const availableToInvest = parseFloat(this.budgetData.availableToInvest) || 0;
+                    const allocatedAmount = this.calculateTotalAllocatedAmount();
+                    
+                    return availableToInvest - allocatedAmount;
+                },
+                
+                // Calculate total number of positions
+                calculateTotalPositions() {
+                    return this.portfolios.reduce((total, portfolio) => total + portfolio.positions.length, 0);
+                },
+                
+                // Get portfolio name by ID
+                getPortfolioName(portfolioId) {
+                    if (!portfolioId) return 'Unselected Portfolio';
+                    
+                    const portfolio = this.availablePortfolios.find(p => p.id === portfolioId);
+                    return portfolio ? portfolio.name : 'Unknown Portfolio';
+                },
+                
+                // Format currency using utility function
+                formatCurrency(amount) {
+                    return portfolioManager.formatCurrency(amount);
+                },
+                
+                // Save allocation state
+                async saveAllocation() {
+                    try {
+                        this.loadingState = true;
+                        
+                        const data = {
+                            page: 'build',
+                            budgetData: JSON.stringify(this.budgetData),
+                            rules: JSON.stringify(this.rules),
+                            portfolios: JSON.stringify(this.portfolios)
+                        };
+                        
+                        await axios.post('/portfolio/api/state', data);
+                        
+                        portfolioManager.showNotification('Allocation saved successfully', 'is-success');
+                        this.loadingState = false;
+                    } catch (error) {
+                        console.error('Error saving allocation:', error);
+                        portfolioManager.showNotification('Failed to save allocation', 'is-danger');
+                        this.loadingState = false;
+                    }
+                }
+            }
         });
     });
-
-    // 1. Save Global Rules
-    const saveGlobalRulesBtn = document.getElementById('save-global-rules');
-    if (saveGlobalRulesBtn) {
-        saveGlobalRulesBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            // Example: Send form data to /build/global_rules endpoint
-            // In real usage, gather data from the form and post via Axios or fetch.
-            portfolioManager.showNotification('Global rules saved successfully.', 'is-success');
-        });
-    }
-
-    // 2. Manage dynamic target weights
-    const addPortfolioBtn = document.getElementById('add-portfolio-target');
-    const weightsContainer = document.getElementById('weights-container');
-    if(addPortfolioBtn && weightsContainer){
-        addPortfolioBtn.addEventListener('click', () => {
-            const row = document.createElement('div');
-            row.className = 'field is-grouped mb-2';
-            row.setAttribute('data-portfolio-row', '');
-
-            row.innerHTML = `
-                <div class="control is-expanded">
-                    <input class="input" type="text" name="portfolio_name[]" placeholder="Portfolio Name">
-                </div>
-                <div class="control">
-                    <input class="input" type="number" name="portfolio_weight[]" step="0.1" placeholder="Target %">
-                </div>
-                <div class="control">
-                    <button class="button is-danger remove-row">
-                        <span class="icon">
-                            <i class="fas fa-minus-circle"></i>
-                        </span>
-                    </button>
-                </div>
-            `;
-            weightsContainer.appendChild(row);
-
-            // Add event to remove button
-            row.querySelector('.remove-row').addEventListener('click', function(e) {
-                e.preventDefault();
-                row.remove();
-            });
-        });
-    }
-
-    // Handle remove-row in existing items
-    document.querySelectorAll('.remove-row').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.preventDefault();
-            btn.closest('[data-portfolio-row]').remove();
-        });
-    });
-
-    // 3. Save target weights
-    const saveTargetWeightsBtn = document.getElementById('save-target-weights');
-    if(saveTargetWeightsBtn) {
-        saveTargetWeightsBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            // Example: gather and post data
-            portfolioManager.showNotification('Target weights saved successfully.', 'is-success');
-        });
-    }
-
-    // 4. Generate allocation plan
-    const buildAllocationBtn = document.getElementById('build-allocation-plan');
-    if(buildAllocationBtn) {
-        buildAllocationBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            // Example: call your build logic endpoint
-            portfolioManager.showNotification('Allocation plan generated. Check console for details.', 'is-warning');
-        });
-    }
-});
 </script>
 {% endblock %}

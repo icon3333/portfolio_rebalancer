@@ -4,22 +4,19 @@ from flask import (
 )
 from app.database.db_manager import query_db, execute_db, backup_database, get_db
 from app.utils.db_utils import (
-    load_portfolio_data, process_portfolio_dataframe,
-    update_prices, update_price_in_db, calculate_portfolio_composition,
-    get_portfolios, update_batch_prices_in_db
+        load_portfolio_data, process_portfolio_dataframe, update_price_in_db, update_batch_prices_in_db
 )
 from app.utils.data_processing import clear_data_caches
-from app.utils.yfinance_utils import get_isin_data, get_price_for_ticker, find_ticker_for_isin
+from app.utils.yfinance_utils import get_isin_data
 from app.utils.batch_processing import start_batch_process, get_job_status
 import pandas as pd
 import io
 import logging
 from datetime import datetime
-import os
 import time
 import uuid
+import json
 from flask import g, Response
-import traceback
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -111,6 +108,143 @@ def enrich():
                              'lastUpdate': max(last_updates) if last_updates else None
                          })
 
+# API endpoint to get and save state data
+@portfolio_bp.route('/api/state', methods=['GET', 'POST'])
+def manage_state():
+    """Get or save state data"""
+    if 'account_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    account_id = session['account_id']
+    
+    # GET request to retrieve state
+    if request.method == 'GET':
+        page_name = request.args.get('page', '')
+        
+        if not page_name:
+            return jsonify({'error': 'Page name is required'}), 400
+        
+        try:
+            # Get all state variables for this account and page
+            state_vars = query_db('''
+                SELECT variable_name, variable_type, variable_value
+                FROM expanded_state
+                WHERE account_id = ? AND page_name = ?
+            ''', [account_id, page_name])
+            
+            if not state_vars:
+                return jsonify({})
+            
+            # Convert to proper data structure
+            state_data = {}
+            for var in state_vars:
+                var_name = var['variable_name']
+                var_value = var['variable_value']
+                
+                # Add to state data without conversion (handled by front-end)
+                state_data[var_name] = var_value
+            
+            return jsonify(state_data)
+            
+        except Exception as e:
+            logger.error(f"Error retrieving state: {str(e)}")
+            return jsonify({'error': str(e)}), 500
+    
+    # POST request to save state
+    elif request.method == 'POST':
+        data = request.json
+        
+        if not data or 'page' not in data:
+            return jsonify({'error': 'Invalid data format'}), 400
+        
+        page_name = data['page']
+        
+        try:
+            # Create backup before making changes
+            backup_database()
+            
+            # Get database connection and cursor
+            db = get_db()
+            cursor = db.cursor()
+            
+            # Start transaction
+            cursor.execute('BEGIN TRANSACTION')
+            
+            # Delete existing state for this page (to avoid orphaned variables)
+            cursor.execute('''
+                DELETE FROM expanded_state
+                WHERE account_id = ? AND page_name = ?
+            ''', [account_id, page_name])
+            
+            # Insert new state variables
+            for key, value in data.items():
+                if key == 'page':
+                    continue  # Skip the page key
+                
+                # Determine variable type
+                if isinstance(value, str):
+                    if value.startswith('{') or value.startswith('['):
+                        var_type = 'object'
+                    else:
+                        var_type = 'string'
+                else:
+                    var_type = 'string'
+                
+                # Insert into database
+                cursor.execute('''
+                    INSERT INTO expanded_state
+                    (account_id, page_name, variable_name, variable_type, variable_value)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', [account_id, page_name, key, var_type, value])
+            
+            # Commit transaction
+            db.commit()
+            
+            logger.info(f"State saved successfully for account {account_id}, page {page_name}")
+            return jsonify({'success': True, 'message': 'State saved successfully'})
+            
+        except Exception as e:
+            if 'db' in locals() and db:
+                db.rollback()
+            logger.error(f"Error saving state: {str(e)}")
+            return jsonify({'error': str(e)}), 500
+
+# API endpoint to get companies for a specific portfolio
+@portfolio_bp.route('/api/portfolio_companies/<int:portfolio_id>')
+def get_portfolio_companies(portfolio_id):
+    """Get companies for a specific portfolio"""
+    if 'account_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    account_id = session['account_id']
+    
+    try:
+        # Verify portfolio belongs to account
+        portfolio = query_db(
+            'SELECT id FROM portfolios WHERE id = ? AND account_id = ?',
+            [portfolio_id, account_id],
+            one=True
+        )
+        
+        if not portfolio:
+            return jsonify({'error': 'Portfolio not found or access denied'}), 404
+        
+        # Get companies for this portfolio
+        companies = query_db('''
+            SELECT c.id, c.name, c.identifier, c.category, c.total_invested,
+                   COALESCE(cs.shares, 0) as shares
+            FROM companies c
+            LEFT JOIN company_shares cs ON c.id = cs.company_id
+            WHERE c.portfolio_id = ? AND c.account_id = ?
+            ORDER BY c.name
+        ''', [portfolio_id, account_id])
+        
+        return jsonify(companies)
+        
+    except Exception as e:
+        logger.error(f"Error getting portfolio companies: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 @portfolio_bp.route('/api/portfolio_data', methods=['GET'])
 def get_portfolio_data_api():
     """Get portfolio data from the database"""
@@ -171,6 +305,33 @@ def analyse():
     logger.info(f"Account found: {account['username']}")
     
     return render_template('pages/analyse.html')
+
+# Route to serve the build.html page
+@portfolio_bp.route('/build')
+def build():
+    """Portfolio Allocation Builder page"""
+    logger.info("Accessing allocation builder page")
+    
+    # Check if user is authenticated with an account
+    if 'account_id' not in session:
+        logger.warning("No account_id in session")
+        flash('Please select an account first', 'warning')
+        return redirect(url_for('main.index'))
+    
+    account_id = session['account_id']
+    logger.info(f"Loading allocation builder page for account_id: {account_id}")
+    
+    # Verify account exists
+    account = query_db('SELECT * FROM accounts WHERE id = ?', 
+                      [account_id], one=True)
+    if not account:
+        logger.warning(f"Account {account_id} not found")
+        flash('Account not found', 'error')
+        return redirect(url_for('main.index'))
+    
+    logger.info(f"Account found: {account['username']}")
+    
+    return render_template('pages/build.html')
 
 @portfolio_bp.route('/api/portfolios')
 def get_portfolios_api():

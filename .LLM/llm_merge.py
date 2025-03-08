@@ -388,4 +388,3 @@ if __name__ == "__main__":
             sys.exit(1)
     else:
         print(f"ERROR: Config file not found: {config_path}")
-        sys.exit(1)

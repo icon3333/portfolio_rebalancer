@@ -1,9 +1,6 @@
 # Focus
-app/utils/yf_utils.py
-app/utils/db_utils.py
-app/routes/portfolio_routes.py
-app/routes/merton_routes.py
-templates/pages/merton.html
+templates/pages/index.html
+templates/base.html
 # Exclude
 _*/
 .git/

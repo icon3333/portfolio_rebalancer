@@ -44,12 +44,12 @@
     </p>
     <ul class="menu-list">
         <li>
-            <a href="{{ url_for('main.index') }}?page=build" class="{{ 'is-active' if request.args.get('page') == 'build' }}">
+            <a href="{{ url_for('portfolio.build') }}" {% if request.endpoint == 'portfolio.build' %}class="is-active"{% endif %}>
                 <span class="icon-text">
                     <span class="icon">
-                        <i class="fas fa-hammer"></i>
+                        <i class="fas fa-cubes"></i>
                     </span>
-                    <span>Build</span>
+                    <span>Allocation Builder</span>
                 </span>
             </a>
         </li>
