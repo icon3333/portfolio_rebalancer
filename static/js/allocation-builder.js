@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', function() {
       delimiters: ['${', '}'],  // Changed from default {{ }} to avoid collision with Jinja2
       data: {
         budgetData: {
-          netWorth: 0,
+          totalNetWorth: 0,
           alreadyInvested: 0,
           emergencyFund: 0,
           availableToInvest: 0,
@@ -155,12 +155,16 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (response.data && response.data.budgetData) {
               this.budgetData = JSON.parse(response.data.budgetData);
-              // Ensure we have totalInvestableCapital property
-              if (!this.budgetData.hasOwnProperty('totalInvestableCapital')) {
-                this.budgetData.totalInvestableCapital = 
-                  (parseFloat(this.budgetData.alreadyInvested) || 0) + 
-                  (parseFloat(this.budgetData.availableToInvest) || 0);
+              // Ensure we have all required properties
+              if (!this.budgetData.hasOwnProperty('totalNetWorth')) {
+                this.budgetData.totalNetWorth = 
+                  (parseFloat(this.budgetData.totalInvestableCapital) || 0) + 
+                  (parseFloat(this.budgetData.emergencyFund) || 0);
               }
+              
+              // Recalculate totalInvestableCapital and availableToInvest to ensure consistency
+              this.calculateTotalInvestableCapital();
+              this.calculateAvailableToInvest();
             }
             
             if (response.data && response.data.rules) {
@@ -209,10 +213,16 @@ document.addEventListener('DOMContentLoaded', function() {
             
             console.log('Final portfolio list after merging saved state:', this.portfolios);
             
-            // Load companies for each portfolio
+            // Load companies for each portfolio and ensure positions exist
             const portfoliosWithCompanies = [];
             for (const portfolio of this.portfolios) {
               if (portfolio.id) {
+                // Initialize positions array if missing
+                if (!portfolio.positions) {
+                  portfolio.positions = [];
+                }
+                
+                // Load companies and create positions as needed
                 await this.loadPortfolioCompanies(portfolio.id);
                 
                 // Only keep portfolios that have companies
@@ -252,8 +262,10 @@ document.addEventListener('DOMContentLoaded', function() {
         // Load available portfolios
         async loadAvailablePortfolios() {
           try {
-            const response = await axios.get('/portfolio/api/portfolios?include_ids=true');
+            // Add has_companies=true to only get portfolios that have companies with shares
+            const response = await axios.get('/portfolio/api/portfolios?include_ids=true&has_companies=true');
             this.availablePortfolios = response.data;
+            console.log('Loaded portfolios with companies:', this.availablePortfolios);
           } catch (error) {
             console.error('Error loading portfolios:', error);
             portfolioManager.showNotification('Failed to load portfolios', 'is-danger');
@@ -264,7 +276,43 @@ document.addEventListener('DOMContentLoaded', function() {
         async loadPortfolioCompanies(portfolioId) {
           try {
             const response = await axios.get(`/portfolio/api/portfolio_companies/${portfolioId}`);
-            Vue.set(this.portfolioCompanies, portfolioId, response.data);
+            const companies = response.data;
+            console.log(`Loaded ${companies.length} companies for portfolio ${portfolioId}:`, companies);
+            
+            // Store in portfolioCompanies map
+            Vue.set(this.portfolioCompanies, portfolioId, companies);
+            
+            // Find the portfolio in our portfolios array
+            const portfolioIndex = this.portfolios.findIndex(p => p.id === portfolioId);
+            if (portfolioIndex !== -1) {
+              const portfolio = this.portfolios[portfolioIndex];
+              
+              // Create positions for companies if they don't already exist
+              if (companies && companies.length > 0) {
+                // Get existing position company IDs to avoid duplicates
+                const existingCompanyIds = new Set(portfolio.positions
+                  .filter(p => !p.isPlaceholder && p.companyId)
+                  .map(p => p.companyId));
+                
+                // Add positions for companies that don't already have positions
+                for (const company of companies) {
+                  if (!existingCompanyIds.has(company.id)) {
+                    console.log(`Creating position for company ${company.name} (ID: ${company.id})`);
+                    portfolio.positions.push({
+                      companyId: company.id,
+                      companyName: company.name,
+                      weight: 0, // Will be calculated later
+                      isPlaceholder: false
+                    });
+                  }
+                }
+                
+                // Apply consistent weight calculation
+                if (portfolio.evenSplit) {
+                  this.updatePositionAllocations(portfolioIndex);
+                }
+              }
+            }
           } catch (error) {
             console.error(`Error loading companies for portfolio ${portfolioId}:`, error);
             portfolioManager.showNotification(`Failed to load companies for portfolio`, 'is-danger');
@@ -273,31 +321,26 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Budget calculations
         calculateAvailableToInvest() {
-          const netWorth = parseFloat(this.budgetData.netWorth) || 0;
-          const alreadyInvested = parseFloat(this.budgetData.alreadyInvested) || 0;
-          const emergencyFund = parseFloat(this.budgetData.emergencyFund) || 0;
-          
-          this.budgetData.availableToInvest = Math.max(0, netWorth - alreadyInvested - emergencyFund);
-        },
-        
-        calculateTotalInvestableCapital() {
-          const alreadyInvested = parseFloat(this.budgetData.alreadyInvested) || 0;
-          const availableToInvest = parseFloat(this.budgetData.availableToInvest) || 0;
-          
-          this.budgetData.totalInvestableCapital = alreadyInvested + availableToInvest;
-        },
-        
-        updateBudgetData() {
-          // Calculate total investable capital from inputs
           const totalInvestableCapital = parseFloat(this.budgetData.totalInvestableCapital) || 0;
           const alreadyInvested = parseFloat(this.budgetData.alreadyInvested) || 0;
           
-          // Update netWorth based on inputs
-          const emergencyFund = parseFloat(this.budgetData.emergencyFund) || 0;
-          this.budgetData.netWorth = totalInvestableCapital + emergencyFund;
-          
-          // Calculate available to invest
           this.budgetData.availableToInvest = Math.max(0, totalInvestableCapital - alreadyInvested);
+        },
+        
+        calculateTotalInvestableCapital() {
+          const totalNetWorth = parseFloat(this.budgetData.totalNetWorth) || 0;
+          const emergencyFund = parseFloat(this.budgetData.emergencyFund) || 0;
+          
+          // Total Investable Capital is now derived from Total Net Worth minus Emergency Fund
+          this.budgetData.totalInvestableCapital = Math.max(0, totalNetWorth - emergencyFund);
+        },
+        
+        updateBudgetData() {
+          // First calculate Total Investable Capital from Total Net Worth and Emergency Fund
+          this.calculateTotalInvestableCapital();
+          
+          // Then calculate Available to Invest
+          this.calculateAvailableToInvest();
           
           // Trigger auto-save
           this.debouncedSave();
@@ -352,33 +395,39 @@ document.addEventListener('DOMContentLoaded', function() {
             this.calculateMinimumPositions(portfolio);
           }
           
-          // Convert to integer for position count
-          const requiredPositions = Math.ceil(portfolio.minPositions);
+          // Just use the calculated minimum positions, rounded up to nearest integer
+          const minPositions = Math.ceil(portfolio.minPositions);
           
-          // If we already have enough positions, do nothing
-          if (portfolio.positions.length >= requiredPositions) {
+          // First, filter out all placeholder positions to avoid duplicates
+          portfolio.positions = portfolio.positions.filter(p => !p.isPlaceholder);
+          
+          // Count real positions
+          const realPositionCount = portfolio.positions.length;
+          
+          // If we already have enough real positions, we don't need placeholders
+          if (realPositionCount >= minPositions) {
             return;
           }
           
-          // Calculate how many positions we need to add
-          const positionsToAdd = requiredPositions - portfolio.positions.length;
+          // Calculate actual number of positions remaining
+          const positionsRemaining = minPositions - realPositionCount;
           
-          // Create placeholder position with improved text
-          if (positionsToAdd > 0) {
-            portfolio.positions.push({
-              companyId: null,
-              companyName: `${positionsToAdd} positions remaining`,
-              weight: portfolio.evenSplit ? (100 / requiredPositions) : 0,
-              isPlaceholder: true
-            });
-          }
+          // For placeholder position, just add it with basic properties - weight will be calculated consistently
+          portfolio.positions.push({
+            companyId: null,
+            companyName: `${positionsRemaining}x positions remaining`,
+            weight: 0, // This will be calculated correctly by applyConsistentWeightCalculation
+            isPlaceholder: true
+          });
           
-          // Recalculate weights if even split enabled
-          if (portfolio.evenSplit) {
-            this.recalculateEvenWeights(this.portfolios.indexOf(portfolio));
+          // Apply consistent weight calculation to ensure this portfolio has correct weights
+          // Note: We need to find the index of this portfolio in the portfolios array
+          const portfolioIndex = this.portfolios.findIndex(p => p === portfolio);
+          if (portfolioIndex !== -1 && portfolio.evenSplit) {
+            this.applyConsistentWeightCalculation();
           }
         },
-        
+                
         // Update position details when company is selected
         updatePositionDetails(portfolioIndex, positionIndex) {
           const portfolio = this.portfolios[portfolioIndex];
@@ -400,9 +449,14 @@ document.addEventListener('DOMContentLoaded', function() {
         updatePositionAllocations(portfolioIndex) {
           const portfolio = this.portfolios[portfolioIndex];
           
-          // If even split is enabled, recalculate weights
-          if (portfolio.evenSplit && portfolio.positions.length > 0) {
-            this.recalculateEvenWeights(portfolioIndex);
+          // If there are no positions, nothing to update
+          if (portfolio.positions.length === 0) {
+            return;
+          }
+          
+          // If even split is enabled, use our consistent calculation method
+          if (portfolio.evenSplit) {
+            this.applyConsistentWeightCalculation();
           }
           
           // Ensure total weight doesn't exceed 100%
@@ -413,24 +467,80 @@ document.addEventListener('DOMContentLoaded', function() {
             portfolio.positions.forEach(position => {
               position.weight = parseFloat((position.weight * scaleFactor).toFixed(2));
             });
+            
+            // After scaling, reapply consistent weight calculation for placeholders
+            if (portfolio.evenSplit) {
+              this.applyConsistentWeightCalculation();
+            }
           }
           
           // Auto-save
           this.debouncedSave();
         },
         
-        // Recalculate weights for even distribution
-        recalculateEvenWeights(portfolioIndex) {
-          const portfolio = this.portfolios[portfolioIndex];
-          const positionCount = portfolio.positions.length;
-          
-          if (positionCount > 0) {
-            const weightPerPosition = 100 / positionCount;
+        // Apply consistent weight calculation across all portfolios
+        applyConsistentWeightCalculation() {
+          // Apply to each portfolio
+          this.portfolios.forEach((portfolio, portfolioIndex) => {
+            if (!portfolio.evenSplit || !portfolio.positions || portfolio.positions.length === 0) {
+              return; // Skip if not in even split mode or no positions
+            }
             
-            portfolio.positions.forEach(position => {
-              position.weight = parseFloat(weightPerPosition.toFixed(2));
+            // Calculate minimum positions required (just use the calculated value)
+            const minPositions = Math.ceil(portfolio.minPositions || 1);
+            
+            // Get real positions (non-placeholder)
+            const realPositions = portfolio.positions.filter(p => !p.isPlaceholder);
+            const realPositionCount = realPositions.length;
+            
+            // Calculate weight per position based on minimum required positions
+            const weightPerPosition = parseFloat((100 / minPositions).toFixed(2));
+            
+            // Set weight for real positions
+            realPositions.forEach(position => {
+              position.weight = weightPerPosition;
             });
-          }
+            
+            // Check if we need to add or update a placeholder position
+            if (realPositionCount < minPositions) {
+              // Calculate how many positions remain
+              const positionsRemaining = minPositions - realPositionCount;
+              
+              // Look for existing placeholder
+              let placeholder = portfolio.positions.find(p => p.isPlaceholder);
+              
+              // If no placeholder exists, create one
+              if (!placeholder) {
+                placeholder = {
+                  companyId: null,
+                  companyName: `${positionsRemaining}x positions remaining`,
+                  weight: 0,
+                  isPlaceholder: true
+                };
+                portfolio.positions.push(placeholder);
+              }
+              
+              // Update placeholder name and weight
+              placeholder.companyName = `${positionsRemaining}x positions remaining`;
+              placeholder.weight = parseFloat((weightPerPosition * positionsRemaining).toFixed(2));
+            } else {
+              // No placeholders needed if we have enough real positions
+              portfolio.positions = portfolio.positions.filter(p => !p.isPlaceholder);
+              
+              // Ensure total weight is exactly 100%
+              let totalWeight = realPositions.reduce((sum, pos) => sum + pos.weight, 0);
+              if (Math.abs(totalWeight - 100) > 0.01 && realPositionCount > 0) {
+                // Add any remainder to the first position
+                const diff = parseFloat((100 - totalWeight).toFixed(2));
+                realPositions[0].weight = parseFloat((realPositions[0].weight + diff).toFixed(2));
+              }
+            }
+          });
+        },
+        
+        // Recalculate weights for even distribution - delegate to applyConsistentWeightCalculation
+        recalculateEvenWeights(portfolioIndex) {
+          this.applyConsistentWeightCalculation();
         },
         
         // Handle manual weight input
@@ -517,6 +627,9 @@ document.addEventListener('DOMContentLoaded', function() {
           const position = portfolio.positions[positionIndex];
           const portfolioAmount = this.calculateAllocationAmount(portfolio.allocation);
           
+          // Simply use the position's weight percentage to calculate the amount
+          // The weights are already set correctly by applyConsistentWeightCalculation
+          // when evenSplit is enabled
           return portfolioAmount * (parseFloat(position.weight || 0) / 100);
         },
         
@@ -593,11 +706,12 @@ document.addEventListener('DOMContentLoaded', function() {
         sortedPositions(positions) {
           if (!positions || positions.length === 0) return [];
           
-          // Create a copy to avoid mutating the original
-          const sorted = [...positions];
+          // Separate placeholder positions from real positions
+          const placeholders = positions.filter(p => p.isPlaceholder);
+          const realPositions = positions.filter(p => !p.isPlaceholder);
           
-          // Sort by selected column
-          sorted.sort((a, b) => {
+          // Sort only the real positions by selected column
+          realPositions.sort((a, b) => {
             let valueA, valueB;
             
             // Get values based on sort column
@@ -629,7 +743,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
           });
           
-          return sorted;
+          // Return real positions followed by placeholders
+          return [...realPositions, ...placeholders];
         },
         
         // Group positions by weight

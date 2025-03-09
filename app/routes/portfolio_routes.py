@@ -367,16 +367,15 @@ def get_portfolios_api():
         if include_ids:
             # Get portfolios from the portfolios table
             if has_companies:
-                # Only get portfolios that have at least one company with shares
+                # Only get portfolios that have at least one company (don't require company_shares entries)
                 portfolios_from_table = query_db('''
                     SELECT DISTINCT p.id, p.name 
                     FROM portfolios p
                     JOIN companies c ON p.id = c.portfolio_id
-                    JOIN company_shares cs ON c.id = cs.company_id
                     WHERE p.account_id = ? AND p.name IS NOT NULL
                     ORDER BY p.name
                 ''', [account_id])
-                logger.info(f"Filtering for portfolios with companies and shares")
+                logger.info(f"Filtering for portfolios with associated companies")
             else:
                 # Get all portfolios
                 portfolios_from_table = query_db('''
@@ -414,16 +413,15 @@ def get_portfolios_api():
         else:
             # Get portfolio names only
             if has_companies:
-                # Only get portfolios that have at least one company with shares
+                # Only get portfolios that have at least one company (don't require company_shares entries)
                 portfolios_from_table = query_db('''
                     SELECT DISTINCT p.name 
                     FROM portfolios p
                     JOIN companies c ON p.id = c.portfolio_id
-                    JOIN company_shares cs ON c.id = cs.company_id
                     WHERE p.account_id = ? AND p.name IS NOT NULL
                     ORDER BY p.name
                 ''', [account_id])
-                logger.info(f"Filtering for portfolios with companies and shares")
+                logger.info(f"Filtering for portfolios with associated companies")
             else:
                 # Get all portfolios
                 portfolios_from_table = query_db('''

@@ -15,9 +15,10 @@
     display: flex;
     flex-direction: row;
     flex-wrap: nowrap; /* Keep inputs in one row */
-    align-items: center;
-    gap: 1rem;
+    align-items: flex-start;
+    gap: 1.5rem;
     width: 100%;
+    margin-bottom: 0.5rem;
   }
   
   @media (max-width: 768px) {
@@ -29,7 +30,26 @@
   .budget-item {
     flex: 1;
     min-width: 180px;
-    max-width: 25%;
+    max-width: 30%;
+  }
+  
+  /* Fixed value display styling */
+  .fixed-value-display {
+    background-color: #f5f8fa;
+    border-radius: 5px;
+    padding: 0.75rem 1rem;
+    font-weight: 600;
+    border-left: 4px solid #3273dc;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    text-align: right;
+  }
+  
+  /* Tag styling for fixed labels */
+  .tag.is-info.is-light {
+    margin-left: 0.5rem;
+    font-size: 0.7rem;
+    vertical-align: middle;
+    font-weight: normal;
   }
   
   .available-invest {

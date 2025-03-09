@@ -18,44 +18,69 @@
             <p class="card-header-title">Budget Management</p>
         </header>
         <div class="card-content">
+            <div class="budget-row input-row">
+                <div class="columns is-multiline is-mobile">
+                    <!-- Total Net Worth (New) -->
+                    <div class="column is-one-third-desktop is-full-mobile">
+                        <div class="field">
+                            <label class="label">Total Net Worth</label>
+                            <div class="control">
+                                <input class="input" type="text" id="totalNetWorth" placeholder="Enter total net worth" 
+                                       :value="formatNumber(budgetData.totalNetWorth)" 
+                                       @input="budgetData.totalNetWorth = parseFloat($event.target.value.replace(/,/g, '')); updateBudgetData()">
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Already Invested -->
+                    <div class="column is-one-third-desktop is-full-mobile">
+                        <div class="field">
+                            <label class="label">Already Invested</label>
+                            <div class="control">
+                                <input class="input" type="text" id="alreadyInvested" placeholder="Enter amount already invested" 
+                                       :value="formatNumber(budgetData.alreadyInvested)" 
+                                       @input="budgetData.alreadyInvested = parseFloat($event.target.value.replace(/,/g, '')); updateBudgetData()">
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Emergency Fund -->
+                    <div class="column is-one-third-desktop is-full-mobile">
+                        <div class="field">
+                            <label class="label">Emergency Fund</label>
+                            <div class="control">
+                                <input class="input" type="text" id="emergencyFund" placeholder="Enter emergency fund amount" 
+                                       :value="formatNumber(budgetData.emergencyFund)" 
+                                       @input="budgetData.emergencyFund = parseFloat($event.target.value.replace(/,/g, '')); updateBudgetData()">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <hr class="my-4">
+            
+            <!-- Fixed Values Row -->
             <div class="budget-row">
-                <div class="budget-item">
-                    <div class="field">
-                        <label class="label">Total Investable Capital</label>
-                        <div class="control">
-                            <input class="input" type="text" id="totalInvestableCapital" placeholder="Enter total investable capital" 
-                                   :value="formatNumber(budgetData.totalInvestableCapital)" 
-                                   @input="budgetData.totalInvestableCapital = parseFloat($event.target.value.replace(/,/g, '')); updateBudgetData()">
+                <div class="columns is-mobile">
+                    <!-- Total Investable Capital (Fixed) -->
+                    <div class="column is-half">
+                        <div class="field">
+                            <label class="label">Total Investable Capital</label>
+                            <div class="control">
+                                <div class="fixed-value-display">
+                                    ${ formatCurrency(budgetData.totalInvestableCapital) }
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-                <div class="budget-item">
-                    <div class="field">
-                        <label class="label">Already Invested</label>
-                        <div class="control">
-                            <input class="input" type="text" id="alreadyInvested" placeholder="Enter amount already invested" 
-                                   :value="formatNumber(budgetData.alreadyInvested)" 
-                                   @input="budgetData.alreadyInvested = parseFloat($event.target.value.replace(/,/g, '')); updateBudgetData()">
-                        </div>
-                    </div>
-                </div>
-                <div class="budget-item">
-                    <div class="field">
-                        <label class="label">Emergency Fund</label>
-                        <div class="control">
-                            <input class="input" type="text" id="emergencyFund" placeholder="Enter emergency fund amount" 
-                                   :value="formatNumber(budgetData.emergencyFund)" 
-                                   @input="budgetData.emergencyFund = parseFloat($event.target.value.replace(/,/g, '')); updateBudgetData()">
-                        </div>
-                    </div>
-                </div>
-                <div class="budget-item">
-                    <div class="field">
-                        <label class="label">Available to Invest</label>
-                        <div class="control">
-                            <div class="available-invest" :class="{ 'has-background-success-light': budgetData.availableToInvest > 0 }">
-                                ${ formatCurrency(budgetData.availableToInvest) }
-                                <span class="available-percentage">(${ availablePercentage }%)</span>
+                    <!-- Available to Invest (Fixed) -->
+                    <div class="column is-half">
+                        <div class="field">
+                            <label class="label">Available to Invest</label>
+                            <div class="control">
+                                <div class="available-invest">
+                                    ${ formatCurrency(budgetData.availableToInvest) }
+                                    <span class="available-percentage">(${ availablePercentage }% of Total Investable Capital)</span>
+                                </div>
                             </div>
                         </div>
                     </div>
