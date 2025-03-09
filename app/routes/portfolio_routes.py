@@ -73,8 +73,20 @@ def enrich():
         ORDER BY name
     ''', [account_id])
     
-    # Extract portfolio names
-    portfolios = [{'name': p['name']} for p in portfolios_from_table if p['name'] and p['name'].strip()]
+    # Extract portfolio names without filtering out any valid names
+    portfolios = [{'name': p['name']} for p in portfolios_from_table]
+    
+    # Ensure Default is in the list
+    has_default = any(p['name'] == 'Default' for p in portfolios)
+    if not has_default:
+        default_exists = query_db('''
+            SELECT 1 FROM portfolios
+            WHERE account_id = ? AND name = 'Default'
+        ''', [account_id], one=True)
+        
+        if default_exists:
+            portfolios.append({'name': 'Default'})
+            logger.info("Added Default portfolio to the enrich page data")
     
     logger.info(f"Retrieved {len(portfolios)} portfolios from the portfolios table: {[p['name'] for p in portfolios]}")
     
@@ -331,7 +343,10 @@ def build():
     
     logger.info(f"Account found: {account['username']}")
     
-    return render_template('pages/build.html')
+    # Pass empty data that Vue.js will replace
+    position = {'companyName': ''}  # Placeholder to avoid Jinja2 errors
+    
+    return render_template('pages/build.html', position=position)
 
 @portfolio_bp.route('/api/portfolios')
 def get_portfolios_api():
@@ -345,32 +360,101 @@ def get_portfolios_api():
     try:
         account_id = session['account_id']
         include_ids = request.args.get('include_ids', 'false').lower() == 'true'
-        logger.info(f"Getting portfolios for account_id: {account_id}, include_ids: {include_ids}")
+        has_companies = request.args.get('has_companies', 'false').lower() == 'true'
+        logger.info(f"Getting portfolios for account_id: {account_id}, include_ids: {include_ids}, has_companies: {has_companies}")
         
-        # Get portfolio data from portfolios table
+        # Get portfolio data from portfolios table, including all portfolios with non-null names
         if include_ids:
-            portfolios_from_table = query_db('''
-                SELECT id, name FROM portfolios 
-                WHERE account_id = ? AND name IS NOT NULL
-                ORDER BY name
-            ''', [account_id])
+            # Get portfolios from the portfolios table
+            if has_companies:
+                # Only get portfolios that have at least one company with shares
+                portfolios_from_table = query_db('''
+                    SELECT DISTINCT p.id, p.name 
+                    FROM portfolios p
+                    JOIN companies c ON p.id = c.portfolio_id
+                    JOIN company_shares cs ON c.id = cs.company_id
+                    WHERE p.account_id = ? AND p.name IS NOT NULL
+                    ORDER BY p.name
+                ''', [account_id])
+                logger.info(f"Filtering for portfolios with companies and shares")
+            else:
+                # Get all portfolios
+                portfolios_from_table = query_db('''
+                    SELECT id, name FROM portfolios 
+                    WHERE account_id = ? AND name IS NOT NULL
+                    ORDER BY name
+                ''', [account_id])
             
             # Convert to list of objects with id and name
-            portfolios = [{'id': p['id'], 'name': p['name']} for p in portfolios_from_table if p['name'] and p['name'].strip()]
+            portfolios = [{'id': p['id'], 'name': p['name']} for p in portfolios_from_table]
             logger.info(f"Retrieved {len(portfolios)} portfolios with IDs: {portfolios}")
+            
+            # Ensure we're not missing the Default portfolio if it has companies or if we're not filtering
+            has_default = any(p['name'] == 'Default' for p in portfolios)
+            if not has_default and (not has_companies or has_companies_in_default(account_id)):
+                default_portfolio = query_db('''
+                    SELECT id FROM portfolios
+                    WHERE account_id = ? AND name = 'Default'
+                ''', [account_id], one=True)
+                
+                if default_portfolio:
+                    portfolios.append({'id': default_portfolio['id'], 'name': 'Default'})
+                    logger.info("Added Default portfolio to the response")
+                else:
+                    # Create Default portfolio if it doesn't exist
+                    portfolio_id = execute_db('''
+                        INSERT INTO portfolios (account_id, name)
+                        VALUES (?, 'Default')
+                    ''', [account_id])
+                    
+                    portfolios.append({'id': portfolio_id, 'name': 'Default'})
+                    logger.info("Created and added Default portfolio to the response")
             
             json_response = jsonify(portfolios)
         else:
-            # Original behavior - just return names
-            portfolios_from_table = query_db('''
-                SELECT name FROM portfolios 
-                WHERE account_id = ? AND name IS NOT NULL
-                ORDER BY name
-            ''', [account_id])
+            # Get portfolio names only
+            if has_companies:
+                # Only get portfolios that have at least one company with shares
+                portfolios_from_table = query_db('''
+                    SELECT DISTINCT p.name 
+                    FROM portfolios p
+                    JOIN companies c ON p.id = c.portfolio_id
+                    JOIN company_shares cs ON c.id = cs.company_id
+                    WHERE p.account_id = ? AND p.name IS NOT NULL
+                    ORDER BY p.name
+                ''', [account_id])
+                logger.info(f"Filtering for portfolios with companies and shares")
+            else:
+                # Get all portfolios
+                portfolios_from_table = query_db('''
+                    SELECT name FROM portfolios 
+                    WHERE account_id = ? AND name IS NOT NULL
+                    ORDER BY name
+                ''', [account_id])
             
-            # Extract names from the query results
-            names = [p['name'] for p in portfolios_from_table if p['name'] and p['name'].strip()]
+            # Extract names from the query results - don't filter out any valid names
+            names = [p['name'] for p in portfolios_from_table]
             logger.info(f"Retrieved {len(names)} portfolio names from portfolios table: {names}")
+            
+            # Ensure Default is in the list if it has companies or if we're not filtering
+            if 'Default' not in names and (not has_companies or has_companies_in_default(account_id)):
+                default_exists = query_db('''
+                    SELECT 1 FROM portfolios
+                    WHERE account_id = ? AND name = 'Default'
+                ''', [account_id], one=True)
+                
+                if default_exists:
+                    names.append('Default')
+                    logger.info("Added Default portfolio name to the response")
+                else:
+                    # Create Default portfolio if it doesn't exist
+                    execute_db('''
+                        INSERT INTO portfolios (account_id, name)
+                        VALUES (?, 'Default')
+                    ''', [account_id])
+                    
+                    names.append('Default')
+                    logger.info("Created and added Default portfolio name to the response")
             
             json_response = jsonify(names)
         
@@ -380,6 +464,26 @@ def get_portfolios_api():
     except Exception as e:
         logger.error(f"Error getting portfolios: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
+
+def has_companies_in_default(account_id):
+    """Check if the Default portfolio has any companies with shares"""
+    default_portfolio = query_db('''
+        SELECT id FROM portfolios
+        WHERE account_id = ? AND name = 'Default'
+    ''', [account_id], one=True)
+    
+    if default_portfolio:
+        # Check if this portfolio has any companies with shares
+        companies_count = query_db('''
+            SELECT COUNT(*) as count
+            FROM companies c
+            JOIN company_shares cs ON c.id = cs.company_id
+            WHERE c.portfolio_id = ? AND c.account_id = ?
+        ''', [default_portfolio['id'], account_id], one=True)
+        
+        return companies_count and companies_count['count'] > 0
+    
+    return False
 
 @portfolio_bp.route('/upload', methods=['POST'])
 def upload_csv():
@@ -1402,7 +1506,190 @@ def get_price_fetch_progress():
         'is_complete': is_complete
     })
 
+@portfolio_bp.route('/api/bulk_update', methods=['POST'])
+def bulk_update():
+    """API endpoint to update multiple companies at once"""
+    if 'account_id' not in session:
+        return jsonify({'error': 'Not authenticated. Please select an account from the home page.'}), 401
+    
+    try:
+        account_id = session['account_id']
+        data = request.json
+        
+        # Validate data
+        if not data or 'companies' not in data:
+            return jsonify({'error': 'Invalid data format, companies array is required'}), 400
+            
+        company_ids = data.get('companies', [])
+        if not company_ids or not isinstance(company_ids, list):
+            return jsonify({'error': 'No companies selected or invalid companies format'}), 400
+            
+        # Create backup
+        backup_database()
+        
+        # Start transaction
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute('BEGIN TRANSACTION')
+        
+        updated_companies = []
+        errors = []
+        
+        try:
+            # Handle different update types
+            if 'portfolio' in data:
+                # Get or create portfolio
+                portfolio_name = data.get('portfolio', '-')
+                portfolio_result = query_db(
+                    'SELECT id FROM portfolios WHERE name = ? AND account_id = ?',
+                    [portfolio_name, account_id],
+                    one=True
+                )
+                
+                if not portfolio_result:
+                    cursor.execute(
+                        'INSERT INTO portfolios (name, account_id) VALUES (?, ?)',
+                        [portfolio_name, account_id]
+                    )
+                    portfolio_id = cursor.lastrowid
+                else:
+                    portfolio_id = portfolio_result['id']
+                
+                # Update all selected companies
+                for company_id in company_ids:
+                    # Verify company belongs to account
+                    company = query_db(
+                        'SELECT id, name FROM companies WHERE id = ? AND account_id = ?',
+                        [company_id, account_id],
+                        one=True
+                    )
+                    
+                    if not company:
+                        errors.append(f"Company ID {company_id} not found or access denied")
+                        continue
+                    
+                    # Update portfolio
+                    cursor.execute(
+                        'UPDATE companies SET portfolio_id = ? WHERE id = ?',
+                        [portfolio_id, company_id]
+                    )
+                    
+                    updated_companies.append({
+                        'id': company_id,
+                        'name': company.get('name', 'Unknown'),
+                        'portfolio': portfolio_name
+                    })
+            
+            elif 'category' in data:
+                # Update category for all selected companies
+                new_category = data.get('category', '')
+                
+                for company_id in company_ids:
+                    # Verify company belongs to account
+                    company = query_db(
+                        'SELECT id, name FROM companies WHERE id = ? AND account_id = ?',
+                        [company_id, account_id],
+                        one=True
+                    )
+                    
+                    if not company:
+                        errors.append(f"Company ID {company_id} not found or access denied")
+                        continue
+                    
+                    # Update category
+                    cursor.execute(
+                        'UPDATE companies SET category = ? WHERE id = ?',
+                        [new_category, company_id]
+                    )
+                    
+                    updated_companies.append({
+                        'id': company_id,
+                        'name': company.get('name', 'Unknown'),
+                        'category': new_category
+                    })
+            else:
+                return jsonify({'error': 'No update type specified (portfolio or category)'}), 400
+            
+            # Commit transaction
+            db.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': f'Successfully updated {len(updated_companies)} companies',
+                'updated': updated_companies,
+                'errors': errors
+            })
+            
+        except Exception as e:
+            db.rollback()
+            return jsonify({'error': str(e)}), 500
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
+@portfolio_bp.route('/api/company/<int:company_id>', methods=['DELETE'])
+def delete_company(company_id):
+    """API endpoint to delete a company"""
+    if 'account_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    account_id = session['account_id']
+    
+    try:
+        # Create backup before making changes
+        backup_database()
+        
+        # Get company info before deletion
+        company = query_db(
+            'SELECT name, identifier FROM companies WHERE id = ? AND account_id = ?',
+            [company_id, account_id],
+            one=True
+        )
+        
+        if not company:
+            return jsonify({'error': 'Company not found or access denied'}), 404
+            
+        identifier = company['identifier']
+        
+        # Start transaction
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute('BEGIN TRANSACTION')
+        
+        try:
+            # Delete from company_shares first (due to foreign key constraints)
+            cursor.execute('DELETE FROM company_shares WHERE company_id = ?', [company_id])
+            
+            # Delete from companies
+            cursor.execute('DELETE FROM companies WHERE id = ? AND account_id = ?', [company_id, account_id])
+            
+            # Check if any other company uses this identifier
+            other_companies = query_db(
+                'SELECT 1 FROM companies WHERE identifier = ? LIMIT 1',
+                [identifier]
+            )
+            
+            # If no other companies use this identifier, delete from market_prices
+            if not other_companies and identifier:
+                cursor.execute('DELETE FROM market_prices WHERE identifier = ?', [identifier])
+            
+            # Commit transaction
+            db.commit()
+            
+            logger.info(f"Company '{company['name']}' (ID: {company_id}) deleted successfully")
+            return jsonify({
+                'success': True,
+                'message': f'Company "{company["name"]}" deleted successfully'
+            })
+            
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error in transaction: {str(e)}")
+            return jsonify({'error': str(e)}), 500
+            
+    except Exception as e:
+        logger.error(f"Error deleting company: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 def get_portfolio_data(account_id):
     """Get portfolio data from the database"""
@@ -1925,7 +2212,7 @@ def process_csv_data(account_id, file_content):
                 
                 # Check if company_shares record exists
                 share_exists = query_db(
-                    'SELECT 1 FROM company_shares WHERE company_id = ?',
+                    'SELECT company_id, shares FROM company_shares WHERE company_id = ?',
                     [company_id],
                     one=True
                 )
@@ -2074,188 +2361,3 @@ def process_csv_data(account_id, file_content):
     finally:
         if cursor:
             cursor.close()
-
-@portfolio_bp.route('/api/bulk_update', methods=['POST'])
-def bulk_update():
-    """API endpoint to update multiple companies at once"""
-    if 'account_id' not in session:
-        return jsonify({'error': 'Not authenticated. Please select an account from the home page.'}), 401
-    
-    try:
-        account_id = session['account_id']
-        data = request.json
-        
-        # Validate data
-        if not data or 'companies' not in data:
-            return jsonify({'error': 'Invalid data format, companies array is required'}), 400
-            
-        company_ids = data.get('companies', [])
-        if not company_ids or not isinstance(company_ids, list):
-            return jsonify({'error': 'No companies selected or invalid companies format'}), 400
-            
-        # Create backup
-        backup_database()
-        
-        # Start transaction
-        db = get_db()
-        cursor = db.cursor()
-        cursor.execute('BEGIN TRANSACTION')
-        
-        updated_companies = []
-        errors = []
-        
-        try:
-            # Handle different update types
-            if 'portfolio' in data:
-                # Get or create portfolio
-                portfolio_name = data.get('portfolio', '-')
-                portfolio_result = query_db(
-                    'SELECT id FROM portfolios WHERE name = ? AND account_id = ?',
-                    [portfolio_name, account_id],
-                    one=True
-                )
-                
-                if not portfolio_result:
-                    cursor.execute(
-                        'INSERT INTO portfolios (name, account_id) VALUES (?, ?)',
-                        [portfolio_name, account_id]
-                    )
-                    portfolio_id = cursor.lastrowid
-                else:
-                    portfolio_id = portfolio_result['id']
-                
-                # Update all selected companies
-                for company_id in company_ids:
-                    # Verify company belongs to account
-                    company = query_db(
-                        'SELECT id, name FROM companies WHERE id = ? AND account_id = ?',
-                        [company_id, account_id],
-                        one=True
-                    )
-                    
-                    if not company:
-                        errors.append(f"Company ID {company_id} not found or access denied")
-                        continue
-                    
-                    # Update portfolio
-                    cursor.execute(
-                        'UPDATE companies SET portfolio_id = ? WHERE id = ?',
-                        [portfolio_id, company_id]
-                    )
-                    
-                    updated_companies.append({
-                        'id': company_id,
-                        'name': company.get('name', 'Unknown'),
-                        'portfolio': portfolio_name
-                    })
-            
-            elif 'category' in data:
-                # Update category for all selected companies
-                new_category = data.get('category', '')
-                
-                for company_id in company_ids:
-                    # Verify company belongs to account
-                    company = query_db(
-                        'SELECT id, name FROM companies WHERE id = ? AND account_id = ?',
-                        [company_id, account_id],
-                        one=True
-                    )
-                    
-                    if not company:
-                        errors.append(f"Company ID {company_id} not found or access denied")
-                        continue
-                    
-                    # Update category
-                    cursor.execute(
-                        'UPDATE companies SET category = ? WHERE id = ?',
-                        [new_category, company_id]
-                    )
-                    
-                    updated_companies.append({
-                        'id': company_id,
-                        'name': company.get('name', 'Unknown'),
-                        'category': new_category
-                    })
-            else:
-                return jsonify({'error': 'No update type specified (portfolio or category)'}), 400
-            
-            # Commit transaction
-            db.commit()
-            
-            return jsonify({
-                'success': True,
-                'message': f'Successfully updated {len(updated_companies)} companies',
-                'updated': updated_companies,
-                'errors': errors
-            })
-            
-        except Exception as e:
-            db.rollback()
-            return jsonify({'error': str(e)}), 500
-            
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@portfolio_bp.route('/api/company/<int:company_id>', methods=['DELETE'])
-def delete_company(company_id):
-    """API endpoint to delete a company"""
-    if 'account_id' not in session:
-        return jsonify({'error': 'Not authenticated'}), 401
-    
-    account_id = session['account_id']
-    
-    try:
-        # Create backup before making changes
-        backup_database()
-        
-        # Get company info before deletion
-        company = query_db(
-            'SELECT name, identifier FROM companies WHERE id = ? AND account_id = ?',
-            [company_id, account_id],
-            one=True
-        )
-        
-        if not company:
-            return jsonify({'error': 'Company not found or access denied'}), 404
-            
-        identifier = company['identifier']
-        
-        # Start transaction
-        db = get_db()
-        cursor = db.cursor()
-        cursor.execute('BEGIN TRANSACTION')
-        
-        try:
-            # Delete from company_shares first (due to foreign key constraints)
-            cursor.execute('DELETE FROM company_shares WHERE company_id = ?', [company_id])
-            
-            # Delete from companies
-            cursor.execute('DELETE FROM companies WHERE id = ? AND account_id = ?', [company_id, account_id])
-            
-            # Check if any other company uses this identifier
-            other_companies = query_db(
-                'SELECT 1 FROM companies WHERE identifier = ? LIMIT 1',
-                [identifier]
-            )
-            
-            # If no other companies use this identifier, delete from market_prices
-            if not other_companies and identifier:
-                cursor.execute('DELETE FROM market_prices WHERE identifier = ?', [identifier])
-            
-            # Commit transaction
-            db.commit()
-            
-            logger.info(f"Company '{company['name']}' (ID: {company_id}) deleted successfully")
-            return jsonify({
-                'success': True,
-                'message': f'Company "{company["name"]}" deleted successfully'
-            })
-            
-        except Exception as e:
-            db.rollback()
-            logger.error(f"Error in transaction: {str(e)}")
-            return jsonify({'error': str(e)}), 500
-            
-    except Exception as e:
-        logger.error(f"Error deleting company: {str(e)}")
-        return jsonify({'error': str(e)}), 500

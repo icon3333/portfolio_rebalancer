@@ -1,6 +1,14 @@
 # Focus
+templates/pages/build.html
+static/css/*
+static/js/*
+app/routes/portfolio_routes.py
+app/utils/formatting.py
+app/utils/db_utils.py
 templates/pages/index.html
 templates/base.html
+
+
 # Exclude
 _*/
 .git/

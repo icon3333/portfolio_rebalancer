@@ -1,0 +1,187 @@
+/* Improved Allocation Builder Specific Styles */
+
+/* General Styles */
+.vue-loading {
+    text-align: center;
+    padding: 2rem;
+  }
+  
+  [v-cloak] {
+    display: none;
+  }
+  
+  /* Budget Management - Improved layout */
+  .budget-row {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap; /* Keep inputs in one row */
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+  }
+  
+  @media (max-width: 768px) {
+    .budget-row {
+      flex-wrap: wrap; /* Allow wrapping on smaller screens */
+    }
+  }
+  
+  .budget-item {
+    flex: 1;
+    min-width: 180px;
+    max-width: 25%;
+  }
+  
+  .available-invest {
+    background-color: #f5f8fa;
+    border-radius: 5px;
+    padding: 0.75rem 1rem;
+    font-weight: 600;
+    border-left: 4px solid #48c774;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    transition: all 0.3s ease;
+    text-align: right;
+  }
+  
+  .available-invest.has-background-success-light {
+    background-color: #effaf3;
+    border-left-color: #4caf50;
+  }
+  
+  .available-percentage {
+    font-size: 0.85rem;
+    color: #6c757d;
+    margin-left: 0.5rem;
+    font-weight: 500;
+  }
+  
+  /* Portfolio Section */
+  .portfolio-header {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    padding: 0.5rem 0;
+    border-radius: 4px;
+  }
+  
+  .portfolio-header:hover {
+    background-color: rgba(0, 0, 0, 0.03);
+  }
+  
+  .portfolio-toggle {
+    color: #3273dc;
+    transition: transform 0.3s ease;
+  }
+  
+  .is-expanded .portfolio-toggle {
+    transform: rotate(180deg);
+  }
+  
+  /* Position Table */
+  .position-table th.is-sortable {
+    cursor: pointer;
+    user-select: none;
+  }
+  
+  .position-table th.is-sortable:hover {
+    background-color: rgba(0, 0, 0, 0.03);
+  }
+  
+  .sort-icon {
+    margin-left: 5px;
+    font-size: 0.8rem;
+  }
+  
+  .placeholder-position {
+    background-color: rgba(0, 0, 0, 0.02);
+    font-style: italic;
+  }
+  
+  .remaining-positions-text {
+    color: #f14668;
+    font-style: italic;
+    font-weight: 500;
+  }
+  
+  .weight-exceeded {
+    color: #dc3545;
+    font-weight: bold;
+  }
+  
+  /* Allocation Summary */
+  .allocation-row {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+  }
+  
+  .allocation-row:hover {
+    background-color: rgba(0, 0, 0, 0.03);
+  }
+  
+  .allocation-toggle {
+    color: #3273dc;
+    transition: transform 0.3s ease;
+  }
+  
+  .is-expanded .allocation-toggle {
+    transform: rotate(180deg);
+  }
+  
+  .position-details {
+    background-color: rgba(0, 0, 0, 0.02);
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 0.3s ease;
+  }
+  
+  .position-details.is-visible {
+    max-height: 500px; /* Arbitrary large value */
+  }
+  
+  /* Improved auto-save indicator */
+  .auto-save-indicator {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 8px 16px;
+    background-color: rgba(50, 115, 220, 0.9);
+    color: white;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  }
+  
+  .auto-save-indicator.is-visible {
+    opacity: 1;
+  }
+  
+  /* Animation utilities */
+  .fade-enter-active, .fade-leave-active {
+    transition: opacity 0.5s;
+  }
+  
+  .fade-enter, .fade-leave-to {
+    opacity: 0;
+  }
+  
+  .collapse-enter-active, .collapse-leave-active {
+    transition: max-height 0.3s ease;
+    overflow: hidden;
+  }
+  
+  .collapse-enter, .collapse-leave-to {
+    max-height: 0;
+  }
+  
+  /* Input formatting for percentages and numbers */
+  input[type="text"], input[type="number"] {
+    text-align: right;
+  }
+  
+  /* Even weight position display */
+  .even-weight-positions {
+    font-style: italic;
+    color: #555;
+  }
