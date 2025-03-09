@@ -124,15 +124,14 @@
         <div class="card-content">
             <!-- Portfolio List -->
             <div v-if="portfolios.length > 0" class="mt-4">
-                <div v-for="(portfolio, index) in portfolios" :key="index" class="box mb-3">
-                    <!-- Portfolio Header -->
-                    <div class="columns is-vcentered portfolio-header" :class="{'is-expanded': isPortfolioExpanded(index)}" @click="togglePortfolioExpand(index)">
-                        <div class="column is-4">
-                            <div class="is-flex is-align-items-center">
-                                <span class="icon portfolio-toggle mr-2">
-                                    <i class="fas fa-chevron-down"></i>
-                                </span>
-                                <span class="has-text-weight-bold">${ getPortfolioName(portfolio.id) }</span>
+                <div v-for="(portfolio, index) in portfolios" :key="index" class="box compact-box mb-2">
+                    <!-- Compact Portfolio Display -->
+                    <div class="columns is-vcentered is-mobile">
+                        <div class="column is-3">
+                            <div class="field">
+                                <label class="label">
+                                    ${ getPortfolioName(portfolio.id) }
+                                </label>
                             </div>
                         </div>
                         <div class="column is-3">
@@ -141,14 +140,13 @@
                                 <div class="control">
                                     <input class="input" type="text" 
                                            :value="parseFloat(portfolio.allocation).toFixed(2)" 
-                                           @input="portfolio.allocation = parseFloat($event.target.value); updateAllocations()" 
-                                           @click.stop>
+                                           @input="portfolio.allocation = parseFloat($event.target.value); updateAllocations()">
                                 </div>
                             </div>
                         </div>
                         <div class="column is-3">
                             <div class="field">
-                                <label class="label">Allocation Amount</label>
+                                <label class="label">Amount</label>
                                 <div class="control">
                                     <input class="input" type="text" :value="formatCurrency(calculateAllocationAmount(portfolio.allocation))" readonly>
                                 </div>
@@ -158,16 +156,19 @@
                             <div class="field">
                                 <label class="label">Min Positions</label>
                                 <div class="control">
-                                    <input class="input" type="text" :value="portfolio.minPositions.toFixed(2)" readonly @click.stop>
+                                    <input class="input" type="text" :value="portfolio.minPositions.toFixed(2)" readonly>
                                 </div>
                             </div>
+                        </div>
+                        <div class="column is-1">
+                            <span class="icon portfolio-toggle" @click="togglePortfolioExpand(index)">
+                                <i class="fas" :class="isPortfolioExpanded(index) ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                            </span>
                         </div>
                     </div>
 
                     <!-- Position Management (collapsible) -->
-                    <div v-if="isPortfolioExpanded(index)" class="mt-3">
-                        <h5 class="subtitle is-5">Position Management</h5>
-                        
+                    <div v-if="isPortfolioExpanded(index)" class="mt-2">                      
                         <div class="columns">
                             <div class="column is-4">
                                 <div class="field">
@@ -191,7 +192,7 @@
                         </div>
 
                         <!-- Position List -->
-                        <table class="table is-fullwidth is-hoverable position-table">
+                        <table class="table is-fullwidth is-hoverable position-table no-lines">
                             <thead>
                                 <tr>
                                     <th class="is-sortable" @click="sortBy('name')">

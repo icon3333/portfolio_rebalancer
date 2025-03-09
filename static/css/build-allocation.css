@@ -76,15 +76,8 @@
   }
   
   /* Portfolio Section */
-  .portfolio-header {
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-    padding: 0.5rem 0;
-    border-radius: 4px;
-  }
-  
-  .portfolio-header:hover {
-    background-color: rgba(0, 0, 0, 0.03);
+  div.columns.is-vcentered.portfolio-header {
+    display: none !important; /* Hide the portfolio banner container completely */
   }
   
   .portfolio-toggle {
@@ -109,6 +102,33 @@
   .sort-icon {
     margin-left: 5px;
     font-size: 0.8rem;
+  }
+  
+  /* Remove ALL table lines */
+  .position-table.no-lines,
+  .position-table.no-lines * {
+    border: none !important;
+    border-collapse: collapse !important;
+    box-shadow: none !important;
+  }
+  
+  /* Only keep the title row styling */
+  .position-table.no-lines thead tr {
+    border-bottom: 1px solid #dbdbdb !important;
+  }
+  
+  /* Remove all spacing between cells */
+  .position-table.no-lines td,
+  .position-table.no-lines th {
+    padding-top: 0.5em !important;
+    padding-bottom: 0.5em !important;
+  }
+  
+  /* Ensure no borders appear on hover */
+  .position-table.no-lines.is-hoverable tbody tr:hover {
+    background-color: rgba(0, 0, 0, 0.03) !important;
+    border: none !important;
+    outline: none !important;
   }
   
   .placeholder-position {
@@ -198,6 +218,67 @@
   /* Input formatting for percentages and numbers */
   input[type="text"], input[type="number"] {
     text-align: right;
+  }
+  
+  /* More compact layout for allocation boxes */
+  .box.compact-box {
+    margin-bottom: 0.25rem !important;
+    padding: 0.5rem !important;
+    box-shadow: none !important;
+    border: 1px solid #f0f0f0 !important;
+  }
+  
+  /* More minimal card styling */
+  .card.mb-4 {
+    box-shadow: none !important;
+    border: none !important;
+  }
+  
+  .card.mb-4 > header.card-header {
+    background: none !important;
+    border-bottom: none !important;
+    padding: 0.25rem 1rem !important; /* reduce top/bottom padding */
+  }
+  
+  .card.mb-4 > header.card-header .card-header-title {
+    font-size: 1rem;
+    font-weight: 500;
+    margin-bottom: 0 !important;
+  }
+  
+  /* Compact field styling */
+  .field.is-horizontal .field-label.is-small {
+    text-align: left;
+  }
+  
+  .field.is-horizontal .field-body .field {
+    margin-bottom: 0;
+  }
+  
+  /* Consistent font styling for portfolio allocation */
+  .box.compact-box {
+    font-size: 0.9rem;
+  }
+  
+  .box.compact-box .label {
+    font-size: 0.9rem;
+    font-weight: normal;
+  }
+  
+  .box.compact-box .has-text-weight-bold {
+    font-size: 0.9rem;
+  }
+  
+  /* Ensure all inputs have consistent styling */
+  input.input {
+    font-size: 0.9rem !important;
+    height: 2.25em !important;
+    font-family: inherit !important;
+  }
+  
+  /* Portfolio toggle styling */
+  .portfolio-toggle {
+    cursor: pointer;
   }
   
   /* Even weight position display */
