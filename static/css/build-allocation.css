@@ -2,287 +2,303 @@
 
 /* General Styles */
 .vue-loading {
-    text-align: center;
-    padding: 2rem;
-  }
-  
-  [v-cloak] {
-    display: none;
-  }
-  
-  /* Budget Management - Improved layout */
+  text-align: center;
+  padding: 2rem;
+}
+
+[v-cloak] {
+  display: none;
+}
+
+/* Budget Management - Improved layout */
+.budget-row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap; /* Keep inputs in one row */
+  align-items: flex-start;
+  gap: 1.5rem;
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+
+@media (max-width: 768px) {
   .budget-row {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: nowrap; /* Keep inputs in one row */
-    align-items: flex-start;
-    gap: 1.5rem;
-    width: 100%;
-    margin-bottom: 0.5rem;
+    flex-wrap: wrap; /* Allow wrapping on smaller screens */
   }
-  
-  @media (max-width: 768px) {
-    .budget-row {
-      flex-wrap: wrap; /* Allow wrapping on smaller screens */
-    }
-  }
-  
-  .budget-item {
-    flex: 1;
-    min-width: 180px;
-    max-width: 30%;
-  }
-  
-  /* Fixed value display styling */
-  .fixed-value-display {
-    background-color: #f5f8fa;
-    border-radius: 5px;
-    padding: 0.75rem 1rem;
-    font-weight: 600;
-    border-left: 4px solid #3273dc;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-    text-align: right;
-  }
-  
-  /* Tag styling for fixed labels */
-  .tag.is-info.is-light {
-    margin-left: 0.5rem;
-    font-size: 0.7rem;
-    vertical-align: middle;
-    font-weight: normal;
-  }
-  
-  .available-invest {
-    background-color: #f5f8fa;
-    border-radius: 5px;
-    padding: 0.75rem 1rem;
-    font-weight: 600;
-    border-left: 4px solid #48c774;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-    transition: all 0.3s ease;
-    text-align: right;
-  }
-  
-  .available-invest.has-background-success-light {
-    background-color: #effaf3;
-    border-left-color: #4caf50;
-  }
-  
-  .available-percentage {
-    font-size: 0.85rem;
-    color: #6c757d;
-    margin-left: 0.5rem;
-    font-weight: 500;
-  }
-  
-  /* Portfolio Section */
-  div.columns.is-vcentered.portfolio-header {
-    display: none !important; /* Hide the portfolio banner container completely */
-  }
-  
-  .portfolio-toggle {
-    color: #3273dc;
-    transition: transform 0.3s ease;
-  }
-  
-  .is-expanded .portfolio-toggle {
-    transform: rotate(180deg);
-  }
-  
-  /* Position Table */
-  .position-table th.is-sortable {
-    cursor: pointer;
-    user-select: none;
-  }
-  
-  .position-table th.is-sortable:hover {
-    background-color: rgba(0, 0, 0, 0.03);
-  }
-  
-  .sort-icon {
-    margin-left: 5px;
-    font-size: 0.8rem;
-  }
-  
-  /* Remove ALL table lines */
-  .position-table.no-lines,
-  .position-table.no-lines * {
-    border: none !important;
-    border-collapse: collapse !important;
-    box-shadow: none !important;
-  }
-  
-  /* Only keep the title row styling */
-  .position-table.no-lines thead tr {
-    border-bottom: 1px solid #dbdbdb !important;
-  }
-  
-  /* Remove all spacing between cells */
-  .position-table.no-lines td,
-  .position-table.no-lines th {
-    padding-top: 0.5em !important;
-    padding-bottom: 0.5em !important;
-  }
-  
-  /* Ensure no borders appear on hover */
-  .position-table.no-lines.is-hoverable tbody tr:hover {
-    background-color: rgba(0, 0, 0, 0.03) !important;
-    border: none !important;
-    outline: none !important;
-  }
-  
-  .placeholder-position {
-    background-color: rgba(0, 0, 0, 0.02);
-    font-style: italic;
-  }
-  
-  .remaining-positions-text {
-    color: #f14668;
-    font-style: italic;
-    font-weight: 500;
-  }
-  
-  .weight-exceeded {
-    color: #dc3545;
-    font-weight: bold;
-  }
-  
-  /* Allocation Summary */
-  .allocation-row {
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-  }
-  
-  .allocation-row:hover {
-    background-color: rgba(0, 0, 0, 0.03);
-  }
-  
-  .allocation-toggle {
-    color: #3273dc;
-    transition: transform 0.3s ease;
-  }
-  
-  .is-expanded .allocation-toggle {
-    transform: rotate(180deg);
-  }
-  
-  .position-details {
-    background-color: rgba(0, 0, 0, 0.02);
-    overflow: hidden;
-    max-height: 0;
-    transition: max-height 0.3s ease;
-  }
-  
-  .position-details.is-visible {
-    max-height: 500px; /* Arbitrary large value */
-  }
-  
-  /* Improved auto-save indicator */
-  .auto-save-indicator {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    padding: 8px 16px;
-    background-color: rgba(50, 115, 220, 0.9);
-    color: white;
-    border-radius: 4px;
-    font-size: 0.8rem;
-    z-index: 1000;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  }
-  
-  .auto-save-indicator.is-visible {
-    opacity: 1;
-  }
-  
-  /* Animation utilities */
-  .fade-enter-active, .fade-leave-active {
-    transition: opacity 0.5s;
-  }
-  
-  .fade-enter, .fade-leave-to {
-    opacity: 0;
-  }
-  
-  .collapse-enter-active, .collapse-leave-active {
-    transition: max-height 0.3s ease;
-    overflow: hidden;
-  }
-  
-  .collapse-enter, .collapse-leave-to {
-    max-height: 0;
-  }
-  
-  /* Input formatting for percentages and numbers */
-  input[type="text"], input[type="number"] {
-    text-align: right;
-  }
-  
-  /* More compact layout for allocation boxes */
-  .box.compact-box {
-    margin-bottom: 0.25rem !important;
-    padding: 0.5rem !important;
-    box-shadow: none !important;
-    border: 1px solid #f0f0f0 !important;
-  }
-  
-  /* More minimal card styling */
-  .card.mb-4 {
-    box-shadow: none !important;
-    border: none !important;
-  }
-  
-  .card.mb-4 > header.card-header {
-    background: none !important;
-    border-bottom: none !important;
-    padding: 0.25rem 1rem !important; /* reduce top/bottom padding */
-  }
-  
-  .card.mb-4 > header.card-header .card-header-title {
-    font-size: 1rem;
-    font-weight: 500;
-    margin-bottom: 0 !important;
-  }
-  
-  /* Compact field styling */
-  .field.is-horizontal .field-label.is-small {
-    text-align: left;
-  }
-  
-  .field.is-horizontal .field-body .field {
-    margin-bottom: 0;
-  }
-  
-  /* Consistent font styling for portfolio allocation */
-  .box.compact-box {
-    font-size: 0.9rem;
-  }
-  
-  .box.compact-box .label {
-    font-size: 0.9rem;
-    font-weight: normal;
-  }
-  
-  .box.compact-box .has-text-weight-bold {
-    font-size: 0.9rem;
-  }
-  
-  /* Ensure all inputs have consistent styling */
-  input.input {
-    font-size: 0.9rem !important;
-    height: 2.25em !important;
-    font-family: inherit !important;
-  }
-  
-  /* Portfolio toggle styling */
-  .portfolio-toggle {
-    cursor: pointer;
-  }
-  
-  /* Even weight position display */
-  .even-weight-positions {
-    font-style: italic;
-    color: #555;
-  }
+}
+
+.budget-item {
+  flex: 1;
+  min-width: 180px;
+  max-width: 30%;
+}
+
+/* Fixed value display styling */
+.fixed-value-display {
+  background-color: #f5f8fa;
+  border-radius: 5px;
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  border-left: 4px solid #3273dc;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+  text-align: right;
+}
+
+/* Tag styling for fixed labels */
+.tag.is-info.is-light {
+  margin-left: 0.5rem;
+  font-size: 0.7rem;
+  vertical-align: middle;
+  font-weight: normal;
+}
+
+.available-invest {
+  background-color: #f5f8fa;
+  border-radius: 5px;
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  border-left: 4px solid #48c774;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+  transition: all 0.3s ease;
+  text-align: right;
+}
+
+.available-invest.has-background-success-light {
+  background-color: #effaf3;
+  border-left-color: #4caf50;
+}
+
+.available-percentage {
+  font-size: 0.85rem;
+  color: #6c757d;
+  margin-left: 0.5rem;
+  font-weight: 500;
+}
+
+/* Portfolio Section */
+div.columns.is-vcentered.portfolio-header {
+  display: none !important; /* Hide the portfolio banner container completely */
+}
+
+.portfolio-toggle {
+  color: #3273dc;
+  transition: transform 0.3s ease;
+}
+
+.is-expanded .portfolio-toggle {
+  transform: rotate(180deg);
+}
+
+/* Position Table */
+.position-table th.is-sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.position-table th.is-sortable:hover {
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+.sort-icon {
+  margin-left: 5px;
+  font-size: 0.8rem;
+}
+
+.placeholder-position {
+  background-color: rgba(0, 0, 0, 0.02);
+  font-style: italic;
+}
+
+.remaining-positions-text {
+  color: #f14668;
+  font-style: italic;
+  font-weight: 500;
+}
+
+.weight-exceeded {
+  color: #dc3545;
+  font-weight: bold;
+}
+
+/* Allocation Summary */
+.allocation-row {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.allocation-row:hover {
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+.allocation-toggle {
+  color: #3273dc;
+  transition: transform 0.3s ease;
+}
+
+.is-expanded .allocation-toggle {
+  transform: rotate(180deg);
+}
+
+.position-details {
+  background-color: rgba(0, 0, 0, 0.02);
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height 0.3s ease;
+}
+
+.position-details.is-visible {
+  max-height: 500px; /* Arbitrary large value */
+}
+
+/* Improved auto-save indicator */
+.auto-save-indicator {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  padding: 8px 16px;
+  background-color: rgba(50, 115, 220, 0.9);
+  color: white;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.auto-save-indicator.is-visible {
+  opacity: 1;
+}
+
+/* Animation utilities */
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.5s;
+}
+
+.fade-enter, .fade-leave-to {
+  opacity: 0;
+}
+
+.collapse-enter-active, .collapse-leave-active {
+  transition: max-height 0.3s ease;
+  overflow: hidden;
+}
+
+.collapse-enter, .collapse-leave-to {
+  max-height: 0;
+}
+
+/* Input formatting for percentages and numbers */
+input[type="text"], input[type="number"] {
+  text-align: right;
+}
+
+/* More compact layout for allocation boxes */
+.box.compact-box {
+  margin-bottom: 0.25rem !important;
+  padding: 0.5rem !important;
+  box-shadow: none !important;
+  border: 1px solid #f0f0f0 !important;
+}
+
+/* More minimal card styling */
+.card.mb-4 {
+  box-shadow: none !important;
+  border: none !important;
+}
+
+.card.mb-4 > header.card-header {
+  background: none !important;
+  border-bottom: none !important;
+  padding: 0.25rem 1rem !important; /* reduce top/bottom padding */
+}
+
+.card.mb-4 > header.card-header .card-header-title {
+  font-size: 1rem;
+  font-weight: 500;
+  margin-bottom: 0 !important;
+}
+
+/* Compact field styling */
+.field.is-horizontal .field-label.is-small {
+  text-align: left;
+}
+
+.field.is-horizontal .field-body .field {
+  margin-bottom: 0;
+}
+
+/* Consistent font styling for portfolio allocation */
+.box.compact-box {
+  font-size: 0.9rem;
+}
+
+.box.compact-box .label {
+  font-size: 0.9rem;
+  font-weight: normal;
+}
+
+.box.compact-box .has-text-weight-bold {
+  font-size: 0.9rem;
+}
+
+/* Ensure all inputs have consistent styling */
+input.input {
+  font-size: 0.9rem !important;
+  height: 2.25em !important;
+  font-family: inherit !important;
+}
+
+/* Portfolio toggle styling */
+.portfolio-toggle {
+  cursor: pointer;
+}
+
+/* Even weight position display */
+.even-weight-positions {
+  font-style: italic;
+  color: #555;
+}
+
+/* Add Position Section */
+.add-position-section {
+  background-color: #f9f9f9;
+  padding: 1rem;
+  border-radius: 4px;
+  border: 1px solid #f0f0f0;
+}
+
+/* Smaller warning notification for remaining positions */
+.notification.is-small {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+}
+
+/* Style the remove button */
+.button.is-small.is-danger.is-light {
+  padding: 0;
+  height: 28px;
+  width: 28px;
+}
+
+/* Position dropdown styling */
+.add-position-section .select:not(.is-multiple):not(.is-loading)::after {
+  border-color: #3273dc;
+}
+
+.add-position-section .select select {
+  border-color: #dbdbdb;
+}
+
+.add-position-section .select select:focus {
+  border-color: #3273dc;
+}
+
+/* Make the position remaining warning more prominent */
+.remaining-positions-notification {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  margin-bottom: 0;
+}

@@ -1,5 +1,5 @@
 This file is a merged representation of selected files from the codebase.
-Generated on: 2025-03-09T20:36:02.400229
+Generated on: 2025-03-09T21:55:41.172608
 
 ================================================================
 Purpose:
@@ -26,7 +26,6 @@ Repository Structure
         routes/
             portfolio_routes.py
         utils/
-            db_utils.py
             formatting.py
     static/
         css/
@@ -39,8 +38,7 @@ Repository Structure
     templates/
         pages/
             build.html
-            index.html
-        base.html
+    config.py
 
 ================================================================
 ###START_FILE_PATH: templates/pages/build.html###
@@ -51,6 +49,19 @@ Repository Structure
 {% block head %}
 {{ super() }}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/build-allocation.css') }}">
+<style>
+    /* Custom styling for Portfolio Allocation section */
+    .no-lines tbody tr td {
+        border: none;
+    }
+    .no-lines tfoot tr th {
+        border: none;
+    }
+    /* Keep the lines for title row */
+    .no-lines thead tr th {
+        border-bottom: 1px solid #dbdbdb;
+    }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -168,18 +179,27 @@ Repository Structure
             <p class="card-header-title">Portfolio Allocation</p>
         </header>
         <div class="card-content">
+            <!-- Allocation Status Indicator -->
+            <div class="notification" :class="{
+                'is-success': isAllocationValid, 
+                'is-warning': isAllocationUnder, 
+                'is-danger': isAllocationOver
+            }">
+                <p class="has-text-weight-bold" :class="allocationStatusClass">
+                    ${ allocationStatusMessage }
+                </p>
+            </div>
+            
             <!-- Portfolio List -->
             <div v-if="portfolios.length > 0" class="mt-4">
-                <div v-for="(portfolio, index) in portfolios" :key="index" class="box compact-box">
-                    <!-- Portfolio Header -->
-                    <div class="columns is-vcentered portfolio-header" :class="{'is-expanded': isPortfolioExpanded(index)}" @click="togglePortfolioExpand(index)">
-                        <div class="column is-4">
-                            <div class="is-flex is-align-items-center">
-                                <span class="icon portfolio-toggle mr-2">
-                                    <i class="fas fa-chevron-down"></i>
-                                </span>
-                                <!-- Hidden portfolio name -->
-                                <span class="has-text-weight-bold hidden-portfolio-name">${ getPortfolioName(portfolio.id) }</span>
+                <div v-for="(portfolio, index) in portfolios" :key="index" class="box compact-box mb-2">
+                    <!-- Compact Portfolio Display -->
+                    <div class="columns is-vcentered is-mobile">
+                        <div class="column is-3">
+                            <div class="field">
+                                <label class="label">
+                                    ${ getPortfolioName(portfolio.id) }
+                                </label>
                             </div>
                         </div>
                         <div class="column is-3">
@@ -188,14 +208,14 @@ Repository Structure
                                 <div class="control">
                                     <input class="input" type="text" 
                                            :value="parseFloat(portfolio.allocation).toFixed(2)" 
-                                           @input="portfolio.allocation = parseFloat($event.target.value); updateAllocations()" 
-                                           @click.stop>
+                                           @change="$event.target.value && $event.target.value.length > 0 ? portfolio.allocation = parseFloat($event.target.value) : null; updateAllocations()"
+                                           @focus="$event.target.select()">
                                 </div>
                             </div>
                         </div>
                         <div class="column is-3">
                             <div class="field">
-                                <label class="label">Allocation Amount</label>
+                                <label class="label">Amount</label>
                                 <div class="control">
                                     <input class="input" type="text" :value="formatCurrency(calculateAllocationAmount(portfolio.allocation))" readonly>
                                 </div>
@@ -205,16 +225,19 @@ Repository Structure
                             <div class="field">
                                 <label class="label">Min Positions</label>
                                 <div class="control">
-                                    <input class="input" type="text" :value="portfolio.minPositions.toFixed(2)" readonly @click.stop>
+                                    <input class="input" type="text" :value="portfolio.minPositions.toFixed(2)" readonly>
                                 </div>
                             </div>
+                        </div>
+                        <div class="column is-1">
+                            <span class="icon portfolio-toggle" @click="togglePortfolioExpand(index)">
+                                <i class="fas" :class="isPortfolioExpanded(index) ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                            </span>
                         </div>
                     </div>
 
                     <!-- Position Management (collapsible) -->
-                    <div v-if="isPortfolioExpanded(index)" class="mt-3">
-                        <h5 class="subtitle is-5">Position Management</h5>
-                        
+                    <div v-if="isPortfolioExpanded(index)" class="mt-2">                      
                         <div class="columns">
                             <div class="column is-4">
                                 <div class="field">
@@ -238,8 +261,8 @@ Repository Structure
                         </div>
 
                         <!-- Position List -->
-                        <table class="table is-fullwidth is-hoverable position-table">
-                            <thead>
+                        <table class="table is-fullwidth is-hoverable position-table no-lines">
+Allocation Summary                            <thead>
                                 <tr>
                                     <th class="is-sortable" @click="sortBy('name')">
                                         Company
@@ -268,10 +291,8 @@ Repository Structure
                                         <div v-if="position.isPlaceholder" class="remaining-positions-text">
                                             ${ position.companyName }
                                         </div>
-                                        <div v-else class="select is-fullwidth">
-                                            <select v-model="position.companyId" @change="updatePositionDetails(index, pIndex)">
-                                                <option v-for="company in portfolioCompanies[portfolio.id] || []" :value="company.id">${ company.name }</option>
-                                            </select>
+                                        <div v-else class="company-name-display">
+                                            ${ position.companyName || 'Select a company' }
                                         </div>
                                     </td>
                                     <td>
@@ -279,7 +300,8 @@ Repository Structure
                                             class="input" 
                                             type="text" 
                                             :value="parseFloat(position.weight).toFixed(2)"
-                                            @input="updateManualWeight(index, pIndex, $event.target.value)"
+                                            @change="updateManualWeight(index, pIndex, $event.target.value)"
+                                            @focus="$event.target.select()"
                                             :disabled="portfolio.evenSplit" 
                                             :class="{'weight-exceeded': isWeightExceeded(index, pIndex)}"
                                         >
@@ -389,14 +411,7 @@ Repository Structure
                 </tfoot>
             </table>
             
-            <!-- Allocation Progress -->
-            <progress 
-                class="progress mt-3" 
-                :class="{'is-success': isAllocationValid, 'is-warning': isAllocationUnder, 'is-danger': isAllocationOver}"
-                :value="calculateTotalAllocation()" 
-                max="100">
-                ${ calculateTotalAllocation() }%
-            </progress>
+
         </div>
     </div>
 
@@ -492,15 +507,8 @@ Repository Structure
   }
   
   /* Portfolio Section */
-  .portfolio-header {
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-    padding: 0.5rem 0;
-    border-radius: 4px;
-  }
-  
-  .portfolio-header:hover {
-    background-color: rgba(0, 0, 0, 0.03);
+  div.columns.is-vcentered.portfolio-header {
+    display: none !important; /* Hide the portfolio banner container completely */
   }
   
   .portfolio-toggle {
@@ -602,19 +610,6 @@ Repository Structure
     opacity: 0;
   }
   
-  /* Hide portfolio names */
-  .hidden-portfolio-name {
-    color: #1e1e1e; /* Same color as background to hide it */
-    user-select: none; /* Prevent selection */
-    opacity: 0;
-  }
-  
-  /* Make boxes more compact */
-  .compact-box {
-    margin-bottom: 0.5rem !important;
-    padding: 0.75rem !important;
-  }
-  
   .collapse-enter-active, .collapse-leave-active {
     transition: max-height 0.3s ease;
     overflow: hidden;
@@ -627,6 +622,67 @@ Repository Structure
   /* Input formatting for percentages and numbers */
   input[type="text"], input[type="number"] {
     text-align: right;
+  }
+  
+  /* More compact layout for allocation boxes */
+  .box.compact-box {
+    margin-bottom: 0.25rem !important;
+    padding: 0.5rem !important;
+    box-shadow: none !important;
+    border: 1px solid #f0f0f0 !important;
+  }
+  
+  /* More minimal card styling */
+  .card.mb-4 {
+    box-shadow: none !important;
+    border: none !important;
+  }
+  
+  .card.mb-4 > header.card-header {
+    background: none !important;
+    border-bottom: none !important;
+    padding: 0.25rem 1rem !important; /* reduce top/bottom padding */
+  }
+  
+  .card.mb-4 > header.card-header .card-header-title {
+    font-size: 1rem;
+    font-weight: 500;
+    margin-bottom: 0 !important;
+  }
+  
+  /* Compact field styling */
+  .field.is-horizontal .field-label.is-small {
+    text-align: left;
+  }
+  
+  .field.is-horizontal .field-body .field {
+    margin-bottom: 0;
+  }
+  
+  /* Consistent font styling for portfolio allocation */
+  .box.compact-box {
+    font-size: 0.9rem;
+  }
+  
+  .box.compact-box .label {
+    font-size: 0.9rem;
+    font-weight: normal;
+  }
+  
+  .box.compact-box .has-text-weight-bold {
+    font-size: 0.9rem;
+  }
+  
+  /* Ensure all inputs have consistent styling */
+  input.input {
+    font-size: 0.9rem !important;
+    height: 2.25em !important;
+    font-family: inherit !important;
+  }
+  
+  /* Portfolio toggle styling */
+  .portfolio-toggle {
+    cursor: pointer;
   }
   
   /* Even weight position display */
@@ -1941,6 +1997,20 @@ document.addEventListener('DOMContentLoaded', function() {
           const total = this.calculateTotalAllocation();
           return total > 100;
         },
+        allocationStatusMessage() {
+          const total = this.calculateTotalAllocation();
+          return `Total allocation: ${this.formatPercentage(total)}`;
+        },
+        allocationStatusClass() {
+          const total = this.calculateTotalAllocation();
+          if (total < 100) {
+            return 'has-text-warning';
+          } else if (total > 100) {
+            return 'has-text-danger';
+          } else {
+            return 'has-text-success';
+          }
+        },
         // Calculate available percentage
         availablePercentage() {
           if (!this.budgetData.totalInvestableCapital) return "0.00";
@@ -2335,7 +2405,7 @@ document.addEventListener('DOMContentLoaded', function() {
           this.debouncedSave();
         },
         
-        // Update position allocations when weights change
+        // Update position allocations when weights change - only handles even split case
         updatePositionAllocations(portfolioIndex) {
           const portfolio = this.portfolios[portfolioIndex];
           
@@ -2344,23 +2414,23 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
           }
           
-          // If even split is enabled, use our consistent calculation method
+          // Only handle even split - this is an explicit user choice
           if (portfolio.evenSplit) {
-            this.applyConsistentWeightCalculation();
-          }
-          
-          // Ensure total weight doesn't exceed 100%
-          let totalWeight = this.calculateTotalWeight(portfolioIndex);
-          if (totalWeight > 100) {
-            const scaleFactor = 100 / totalWeight;
+            const realPositions = portfolio.positions.filter(p => !p.isPlaceholder);
+            const count = realPositions.length;
             
-            portfolio.positions.forEach(position => {
-              position.weight = parseFloat((position.weight * scaleFactor).toFixed(2));
-            });
-            
-            // After scaling, reapply consistent weight calculation for placeholders
-            if (portfolio.evenSplit) {
-              this.applyConsistentWeightCalculation();
+            if (count > 0) {
+              const evenWeight = parseFloat((100 / count).toFixed(2));
+              
+              // Set even weight for all valid positions
+              realPositions.forEach(position => {
+                position.weight = evenWeight;
+              });
+              
+              // Set placeholders to 0
+              portfolio.positions.filter(p => p.isPlaceholder).forEach(p => {
+                p.weight = 0;
+              });
             }
           }
           
@@ -2368,62 +2438,31 @@ document.addEventListener('DOMContentLoaded', function() {
           this.debouncedSave();
         },
         
-        // Apply consistent weight calculation across all portfolios
+        // Apply consistent weight calculation across all portfolios - simplified for even split only
         applyConsistentWeightCalculation() {
-          // Apply to each portfolio
+          // Apply to each portfolio - only used for even split which is an explicit user choice
           this.portfolios.forEach((portfolio, portfolioIndex) => {
             if (!portfolio.evenSplit || !portfolio.positions || portfolio.positions.length === 0) {
               return; // Skip if not in even split mode or no positions
             }
             
-            // Calculate minimum positions required (just use the calculated value)
-            const minPositions = Math.ceil(portfolio.minPositions || 1);
-            
             // Get real positions (non-placeholder)
             const realPositions = portfolio.positions.filter(p => !p.isPlaceholder);
             const realPositionCount = realPositions.length;
             
-            // Calculate weight per position based on minimum required positions
-            const weightPerPosition = parseFloat((100 / minPositions).toFixed(2));
-            
-            // Set weight for real positions
-            realPositions.forEach(position => {
-              position.weight = weightPerPosition;
-            });
-            
-            // Check if we need to add or update a placeholder position
-            if (realPositionCount < minPositions) {
-              // Calculate how many positions remain
-              const positionsRemaining = minPositions - realPositionCount;
+            if (realPositionCount > 0) {
+              // Simple even split - divide 100% by the number of positions
+              const evenWeight = parseFloat((100 / realPositionCount).toFixed(2));
               
-              // Look for existing placeholder
-              let placeholder = portfolio.positions.find(p => p.isPlaceholder);
+              // Set weight for all real positions
+              realPositions.forEach(position => {
+                position.weight = evenWeight;
+              });
               
-              // If no placeholder exists, create one
-              if (!placeholder) {
-                placeholder = {
-                  companyId: null,
-                  companyName: `${positionsRemaining}x positions remaining`,
-                  weight: 0,
-                  isPlaceholder: true
-                };
-                portfolio.positions.push(placeholder);
-              }
-              
-              // Update placeholder name and weight
-              placeholder.companyName = `${positionsRemaining}x positions remaining`;
-              placeholder.weight = parseFloat((weightPerPosition * positionsRemaining).toFixed(2));
-            } else {
-              // No placeholders needed if we have enough real positions
-              portfolio.positions = portfolio.positions.filter(p => !p.isPlaceholder);
-              
-              // Ensure total weight is exactly 100%
-              let totalWeight = realPositions.reduce((sum, pos) => sum + pos.weight, 0);
-              if (Math.abs(totalWeight - 100) > 0.01 && realPositionCount > 0) {
-                // Add any remainder to the first position
-                const diff = parseFloat((100 - totalWeight).toFixed(2));
-                realPositions[0].weight = parseFloat((realPositions[0].weight + diff).toFixed(2));
-              }
+              // Set placeholders to 0
+              portfolio.positions.filter(p => p.isPlaceholder).forEach(p => {
+                p.weight = 0;
+              });
             }
           });
         },
@@ -2433,7 +2472,7 @@ document.addEventListener('DOMContentLoaded', function() {
           this.applyConsistentWeightCalculation();
         },
         
-        // Handle manual weight input
+        // Handle manual weight input - simplified with no automation
         updateManualWeight(portfolioIndex, positionIndex, value) {
           // Set editing flag to prevent immediate sorting
           this.isEditingWeight = true;
@@ -2442,25 +2481,14 @@ document.addEventListener('DOMContentLoaded', function() {
           let numValue = parseFloat(value.replace('%', ''));
           
           if (!isNaN(numValue)) {
-            // Round to 2 decimal places
-            numValue = parseFloat(numValue.toFixed(2));
-            
-            // Set the new weight
+            // Store exact user input without any adjustments
             this.portfolios[portfolioIndex].positions[positionIndex].weight = numValue;
             
-            // Update other position weights if this is not a placeholder
-            if (!this.portfolios[portfolioIndex].positions[positionIndex].isPlaceholder) {
-              // Only trigger re-distribution if not even split
-              if (!this.portfolios[portfolioIndex].evenSplit) {
-                this.updatePositionAllocations(portfolioIndex);
-              }
-            }
-            
-            // Trigger auto-save
+            // Just save the change, no adjustments or calculations
             this.debouncedSave();
           }
           
-          // Reset editing flag after a short delay
+          // Reset editing flag after a delay
           setTimeout(() => {
             this.isEditingWeight = false;
           }, 1000);
@@ -2477,20 +2505,9 @@ document.addEventListener('DOMContentLoaded', function() {
           return position.weight > maxWeight;
         },
         
-        // Update portfolio allocations
+        // Update portfolio allocations - simplified to just save changes
         updateAllocations() {
-          // Ensure total allocation doesn't exceed 100%
-          let totalAllocation = this.calculateTotalAllocation();
-          
-          if (totalAllocation > 100) {
-            const scaleFactor = 100 / totalAllocation;
-            
-            this.portfolios.forEach(portfolio => {
-              portfolio.allocation = parseFloat((portfolio.allocation * scaleFactor).toFixed(2));
-            });
-          }
-          
-          // Auto-save
+          // Only save changes, no adjustments at all
           this.debouncedSave();
         },
         
@@ -2771,6 +2788,69 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
   });
+###END_FILE###
+
+================================================================
+###START_FILE_PATH: config.py###
+import os
+from datetime import timedelta
+
+class Config:
+    """Base configuration class."""
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-key-please-change-in-production'
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///portfolio.db'
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+    
+    # Application settings
+    DEBUG = False
+    TESTING = False
+    
+    # Session configuration
+    PERMANENT_SESSION_LIFETIME = timedelta(days=1)
+    
+    # Cache settings
+    CACHE_TYPE = 'SimpleCache'
+    CACHE_DEFAULT_TIMEOUT = 300  # 5 minutes
+    
+    # Database backup settings
+    DB_BACKUP_DIR = os.path.join('app', 'database', 'backups')
+    MAX_BACKUP_FILES = 10
+    
+    # Market data settings
+    PRICE_UPDATE_INTERVAL = timedelta(hours=24)
+    BATCH_SIZE = 5  # Number of tickers to fetch in a batch
+    
+    # Upload settings 
+    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max upload
+    UPLOAD_FOLDER = os.path.join('app', 'uploads')
+    ALLOWED_EXTENSIONS = {'csv'}
+    
+    # Default number of items to show in pagination
+    PER_PAGE = 20
+
+class DevelopmentConfig(Config):
+    """Development configuration."""
+    DEBUG = True
+    SQLALCHEMY_ECHO = True
+
+class TestingConfig(Config):
+    """Testing configuration."""
+    TESTING = True
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
+    WTF_CSRF_ENABLED = False
+
+class ProductionConfig(Config):
+    """Production configuration."""
+    # Override in instance/config.py or with environment variables
+    pass
+
+# Configuration dictionary
+config = {
+    'development': DevelopmentConfig,
+    'testing': TestingConfig,
+    'production': ProductionConfig,
+    'default': DevelopmentConfig
+}
 ###END_FILE###
 
 ================================================================
@@ -5348,805 +5428,4 @@ def format_info_text(text: str) -> str:
         HTML-formatted string with consistent styling
     """
     return f'<p style="color: #2196F3; font-style: italic; margin: 0; padding: 0;">{text}</p>'
-###END_FILE###
-
-================================================================
-###START_FILE_PATH: app/utils/db_utils.py###
-# app/utils/db_utils.py
-import logging
-from datetime import datetime
-from app.database.db_manager import query_db, execute_db
-
-logger = logging.getLogger(__name__)
-
-def update_price_in_db(identifier: str, price: float, currency: str, price_eur: float, country: str = None, sector: str = None, industry: str = None, modified_identifier: str = None) -> bool:
-    """
-    Update price in database for a single identifier.
-    
-    Args:
-        identifier: Stock identifier (ISIN or ticker)
-        price: Price in original currency
-        currency: Currency code
-        price_eur: Price in EUR
-        country: Country of the company
-        sector: Sector of the company
-        industry: Industry of the company
-        modified_identifier: If provided, update the company's identifier to this value
-        
-    Returns:
-        Success status
-    """
-    try:
-        if not identifier or price is None:
-            logger.warning(f"Missing identifier or price: {identifier}, {price}")
-            return False
-            
-        now = datetime.now().isoformat()
-        
-        # If we have a modified identifier, update the company records first
-        if modified_identifier:
-            logger.info(f"⚠️ Updating identifier in database from {identifier} to {modified_identifier}")
-            
-            # Update identifier in companies table
-            rows_updated = execute_db('''
-                UPDATE companies 
-                SET identifier = ?
-                WHERE identifier = ?
-            ''', [modified_identifier, identifier])
-            
-            logger.info(f"Updated {rows_updated} company records with new identifier {modified_identifier}")
-            
-            # Use the modified identifier for all subsequent operations
-            identifier = modified_identifier
-        
-        # Check if the record exists in market_prices
-        existing = query_db(
-            'SELECT 1 FROM market_prices WHERE identifier = ?',
-            [identifier],
-            one=True
-        )
-        
-        if existing:
-            # Update existing record
-            execute_db('''
-                UPDATE market_prices 
-                SET price = ?, currency = ?, price_eur = ?, last_updated = ?, 
-                    country = ?, sector = ?, industry = ?
-                WHERE identifier = ?
-            ''', [price, currency, price_eur, now, country, sector, industry, identifier])
-            logger.info(f"Updated existing price record for {identifier} with additional data")
-        else:
-            # Insert new record
-            execute_db('''
-                INSERT INTO market_prices 
-                (identifier, price, currency, price_eur, last_updated, country, sector, industry)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ''', [identifier, price, currency, price_eur, now, country, sector, industry])
-            logger.info(f"Created new price record for {identifier} with additional data")
-        
-        # Update last_price_update in accounts table for all accounts that have this identifier
-        execute_db('''
-            UPDATE accounts 
-            SET last_price_update = ? 
-            WHERE id IN (
-                SELECT DISTINCT account_id 
-                FROM companies 
-                WHERE identifier = ?
-            )
-        ''', [now, identifier])
-        
-        logger.info(f"Successfully updated price for {identifier}: {price} {currency} ({price_eur} EUR) with country={country}, sector={sector}, industry={industry}")
-        return True
-        
-    except Exception as e:
-        logger.error(f"Failed to update price in database for {identifier}: {str(e)}")
-        return False
-
-def get_portfolios(account_id):
-    """Get list of portfolios for an account"""
-    try:
-        portfolios = query_db('''
-            SELECT id, name
-            FROM portfolios
-            WHERE account_id = ?
-            ORDER BY name
-        ''', [account_id])
-        
-        return [{'id': p['id'], 'name': p['name']} for p in portfolios]
-    except Exception as e:
-        logger.error(f"Error getting portfolios: {str(e)}")
-        return []
-
-def load_portfolio_data(account_id=None, portfolio_id=None):
-    """
-    Load portfolio data from the database.
-    
-    Args:
-        account_id: Optional account ID to filter by
-        portfolio_id: Optional portfolio ID to filter by
-        
-    Returns:
-        List of portfolio items or empty list if error
-    """
-    try:
-        # Validate inputs
-        if account_id is None and portfolio_id is None:
-            logger.error("Both account_id and portfolio_id are None - at least one is required")
-            return []
-            
-        # Check for valid account_id
-        if account_id is not None:
-            account_check = query_db('SELECT id FROM accounts WHERE id = ?', [account_id], one=True)
-            if not account_check:
-                logger.error(f"Account with ID {account_id} does not exist in database")
-                return []
-        
-        # Check for valid portfolio_id
-        if portfolio_id is not None:
-            portfolio_check = query_db('SELECT id FROM portfolios WHERE id = ?', [portfolio_id], one=True)
-            if not portfolio_check:
-                logger.error(f"Portfolio with ID {portfolio_id} does not exist in database")
-                return []
-        
-        # Check for companies associated with this account/portfolio
-        company_check_query = 'SELECT COUNT(*) as count FROM companies WHERE 1=1'
-        company_check_params = []
-        
-        if account_id:
-            company_check_query += ' AND account_id = ?'
-            company_check_params.append(account_id)
-        if portfolio_id:
-            company_check_query += ' AND portfolio_id = ?'
-            company_check_params.append(portfolio_id)
-            
-        company_count = query_db(company_check_query, company_check_params, one=True)
-        if not company_count or company_count['count'] == 0:
-            logger.warning(f"No companies found for the specified filters (account_id={account_id}, portfolio_id={portfolio_id})")
-        else:
-            logger.info(f"Found {company_count['count']} companies for the specified filters")
-        
-        # Build main query
-        params = []
-        query = '''
-            SELECT 
-                c.id, c.name, c.identifier, c.category, c.total_invested,
-                cs.shares, cs.override_share,
-                p.name as portfolio_name, p.id as portfolio_id,
-                mp.price, mp.currency, mp.price_eur, mp.last_updated,
-                mp.country, mp.sector, mp.industry
-            FROM companies c
-            LEFT JOIN company_shares cs ON c.id = cs.company_id
-            LEFT JOIN portfolios p ON c.portfolio_id = p.id
-            LEFT JOIN market_prices mp ON c.identifier = mp.identifier
-            WHERE 1=1
-        '''
-        
-        if account_id:
-            query += ' AND c.account_id = ?'
-            params.append(account_id)
-            
-        if portfolio_id:
-            query += ' AND c.portfolio_id = ?'
-            params.append(portfolio_id)
-        
-        # Execute query and get results
-        logger.info(f"Executing portfolio data query with params: {params}")
-        results = query_db(query, params)
-        
-        # Add detailed logging about results
-        if not results:
-            logger.warning("Query returned no results")
-            return []
-            
-        if len(results) > 0:
-            sample = results[0]
-            logger.debug(f"Sample portfolio data keys: {list(sample.keys())}")
-            if 'portfolio_name' in sample:
-                logger.debug(f"Sample portfolio_name value: '{sample['portfolio_name']}'")
-            else:
-                logger.warning("portfolio_name key not found in results - check portfolio_id references")
-            
-            # Log some metrics about the results
-            missing_portfolio_names = sum(1 for r in results if not r.get('portfolio_name'))
-            if missing_portfolio_names > 0:
-                logger.warning(f"{missing_portfolio_names} out of {len(results)} items have missing portfolio names")
-                
-        logger.info(f"Successfully loaded {len(results)} portfolio data items")
-        return results
-        
-    except Exception as e:
-        logger.error(f"Error loading portfolio data: {str(e)}", exc_info=True)
-        return []
-
-def process_portfolio_dataframe(df, account_id=None, portfolio_id=None):
-    """
-    Process a portfolio dataframe and calculate additional metrics.
-    
-    Args:
-        df: Pandas DataFrame with portfolio data
-        account_id: Optional account ID to filter by
-        portfolio_id: Optional portfolio ID to filter by
-        
-    Returns:
-        Processed DataFrame with additional columns
-    """
-    try:
-        if df.empty:
-            return df
-            
-        # Make a copy to avoid SettingWithCopyWarning
-        df = df.copy()
-        
-        # Calculate value in EUR
-        df['value_eur'] = df.apply(
-            lambda row: row.get('quantity', 0) * row.get('price_eur', 0) 
-            if row.get('price_eur') is not None else 0, 
-            axis=1
-        )
-        
-        # Calculate value in original currency
-        df['value'] = df.apply(
-            lambda row: row.get('quantity', 0) * row.get('price', 0) 
-            if row.get('price') is not None else 0, 
-            axis=1
-        )
-        
-        # Calculate totals
-        total_value_eur = df['value_eur'].sum()
-        
-        # Calculate portfolio weights
-        if total_value_eur > 0:
-            df['weight'] = df['value_eur'] / total_value_eur
-        else:
-            df['weight'] = 0
-            
-        return df
-        
-    except Exception as e:
-        logger.error(f"Error processing portfolio dataframe: {str(e)}")
-        return df
-
-def update_batch_prices_in_db(results):
-    """Update market prices with results from batch processing."""
-    success_count = 0
-    modified_count = 0
-    failed_count = 0
-    
-    try:
-        for isin, result in results.items():
-            if result.get('success') and result.get('price') is not None:
-                # Check if we have a modified identifier
-                modified_identifier = result.get('modified_identifier')
-                
-                if modified_identifier:
-                    logger.info(f"📝 Found modified identifier: {isin} -> {modified_identifier}")
-                    modified_count += 1
-                
-                success = update_price_in_db(
-                    isin,
-                    result.get('price'),
-                    result.get('currency', 'USD'),
-                    result.get('price_eur', result.get('price')),
-                    result.get('country'),  # Add country information
-                    result.get('sector'),    # Add sector information 
-                    result.get('industry'),  # Add industry information
-                    modified_identifier      # Pass modified_identifier if present
-                )
-                
-                if success:
-                    success_count += 1
-                    if modified_identifier:
-                        logger.info(f"✅ Successfully updated price AND identifier for {isin} -> {modified_identifier}")
-                else:
-                    failed_count += 1
-                    logger.warning(f"❌ Failed to update price for {isin}")
-        
-        logger.info(f"Batch update complete. Success: {success_count}, Modified: {modified_count}, Failed: {failed_count}")
-        return True
-    except Exception as e:
-        logger.error(f"Error updating batch prices in database: {str(e)}")
-        return False
-
-def update_prices(portfolio_items, get_price_function=None):
-    """
-    Update prices for portfolio items.
-    
-    Args:
-        portfolio_items: List of portfolio items
-        get_price_function: Optional function to get price for an identifier
-        
-    Returns:
-        Tuple of (updated items, success count, failure count)
-    """
-    if not portfolio_items:
-        return [], 0, 0
-        
-    success_count = 0
-    failure_count = 0
-    updated_items = []
-    
-    for item in portfolio_items:
-        identifier = item.get('identifier')
-        if not identifier:
-            failure_count += 1
-            updated_items.append(item)
-            continue
-            
-        if get_price_function:
-            # Use provided price function
-            success, price_data = get_price_function(identifier)
-        else:
-            # Use default implementation
-            from app.utils.yfinance_utils import get_yfinance_info
-            result = get_yfinance_info(identifier)  # Use get_yfinance_info which includes all data fields
-            success = result.get('success', False)
-            price_data = result if success else None
-            
-        if success and price_data:
-            # Extract price details from result
-            price = price_data.get('price')
-            currency = price_data.get('currency', 'USD')
-            price_eur = price_data.get('price_eur', price)
-            country = price_data.get('country')
-            sector = price_data.get('sector')
-            industry = price_data.get('industry')
-            
-            # Update database
-            updated = update_price_in_db(
-                identifier, price, currency, price_eur, country, sector, industry
-            )
-            
-            if updated:
-                # Update item with new price and additional data
-                item['price'] = price
-                item['currency'] = currency
-                item['price_eur'] = price_eur
-                item['country'] = country
-                item['sector'] = sector
-                item['industry'] = industry
-                item['last_updated'] = datetime.now().isoformat()
-                success_count += 1
-            else:
-                failure_count += 1
-        else:
-            failure_count += 1
-            
-        updated_items.append(item)
-        
-    return updated_items, success_count, failure_count
-
-def calculate_portfolio_composition(portfolio_data):
-    """
-    Calculate portfolio composition metrics.
-    
-    Args:
-        portfolio_data: List of portfolio items or DataFrame
-        
-    Returns:
-        Dictionary with portfolio metrics
-    """
-    import pandas as pd
-    
-    try:
-        # Convert to DataFrame if list
-        if isinstance(portfolio_data, list):
-            df = pd.DataFrame(portfolio_data)
-        else:
-            df = portfolio_data
-            
-        if df.empty:
-            return {
-                'total_value_eur': 0,
-                'holdings_count': 0,
-                'holdings_by_currency': {},
-                'holdings_by_type': {},
-                'sectors': {}
-            }
-            
-        # Calculate total portfolio value in EUR
-        total_value_eur = df['value_eur'].sum() if 'value_eur' in df.columns else 0
-        
-        # Count holdings
-        holdings_count = len(df)
-        
-        # Group by currency
-        holdings_by_currency = {}
-        if 'currency' in df.columns and 'value' in df.columns:
-            currency_groups = df.groupby('currency')['value'].sum()
-            for currency, value in currency_groups.items():
-                holdings_by_currency[currency] = float(value)
-                
-        # Group by asset type
-        holdings_by_type = {}
-        if 'type' in df.columns and 'value_eur' in df.columns:
-            type_groups = df.groupby('type')['value_eur'].sum()
-            for asset_type, value in type_groups.items():
-                if total_value_eur > 0:
-                    holdings_by_type[asset_type] = {
-                        'value': float(value),
-                        'percentage': float(value / total_value_eur * 100)
-                    }
-                else:
-                    holdings_by_type[asset_type] = {
-                        'value': float(value),
-                        'percentage': 0
-                    }
-                    
-        # Group by sector
-        sectors = {}
-        if 'sector' in df.columns and 'value_eur' in df.columns:
-            sector_groups = df.groupby('sector')['value_eur'].sum()
-            for sector, value in sector_groups.items():
-                if sector and total_value_eur > 0:
-                    sectors[sector] = {
-                        'value': float(value),
-                        'percentage': float(value / total_value_eur * 100)
-                    }
-                    
-        return {
-            'total_value_eur': float(total_value_eur),
-            'holdings_count': holdings_count,
-            'holdings_by_currency': holdings_by_currency,
-            'holdings_by_type': holdings_by_type,
-            'sectors': sectors
-        }
-        
-    except Exception as e:
-        logger.error(f"Error calculating portfolio composition: {str(e)}")
-        return {
-            'total_value_eur': 0,
-            'holdings_count': 0,
-            'holdings_by_currency': {},
-            'holdings_by_type': {},
-            'sectors': {}
-        }
-###END_FILE###
-
-================================================================
-###START_FILE_PATH: templates/pages/index.html###
-{% extends "base.html" %}
-
-{% block title %}Portfolio Manager - Welcome{% endblock %}
-
-{% block content %}
-    {% if session.account_id %}
-        <!-- Logged in state - Dashboard -->
-        <div class="columns is-multiline">
-            <!-- Portfolio Summary -->
-            {% if portfolios %}
-                <div class="column is-12">
-                    <div class="card">
-                        <header class="card-header">
-                            <p class="card-header-title">
-                                <span class="icon-text">
-                                    <span class="icon">
-                                        <i class="fas fa-folder-open"></i>
-                                    </span>
-                                    <span>Your Portfolios</span>
-                                </span>
-                            </p>
-                        </header>
-                        <div class="card-content">
-                            <div class="content">
-                                <div class="table-container">
-                                    <table class="table is-fullwidth is-hoverable">
-                                        <thead>
-                                            <tr>
-                                                <th>Portfolio</th>
-                                                <th>Companies</th>
-                                                <th>Value</th>
-                                                <th>Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for portfolio in portfolios %}
-                                                <tr>
-                                                    <td>
-                                                        <span class="icon-text">
-                                                            <span class="icon">
-                                                                <i class="fas fa-briefcase"></i>
-                                                            </span>
-                                                            <span>{{ portfolio.name }}</span>
-                                                        </span>
-                                                    </td>
-                                                    <td>{{ portfolio.company_count }}</td>
-                                                    <td>
-                                                        {% if portfolio.total_value %}
-                                                            €{{ '{:,.2f}'.format(portfolio.total_value) }}
-                                                        {% else %}
-                                                            -
-                                                        {% endif %}
-                                                    </td>
-                                                    <td>
-                                                        <div class="buttons are-small">
-                                                            <a href="{{ url_for('portfolio.analyse') }}?portfolio={{ portfolio.name }}" class="button is-info is-small">
-                                                                <span class="icon">
-                                                                    <i class="fas fa-chart-bar"></i>
-                                                                </span>
-                                                                <span>Analyse</span>
-                                                            </a>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            {% endfor %}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            {% else %}
-                <div class="column is-12">
-                    <div class="notification is-warning">
-                        <p>You don't have any portfolios yet. Get started by importing your data.</p>
-                        <a href="{{ url_for('portfolio.enrich') }}" class="button is-warning is-light mt-2">
-                            <span class="icon">
-                                <i class="fas fa-upload"></i>
-                            </span>
-                            <span>Import Data</span>
-                        </a>
-                    </div>
-                </div>
-            {% endif %}
-
-            <!-- Quick Links -->
-            <div class="column is-12">
-                <h2 class="title is-4">Quick Actions</h2>
-                <div class="columns is-multiline">
-                    <div class="column is-3">
-                        <div class="card">
-                            <div class="card-content has-text-centered">
-                                <span class="icon is-large has-text-primary">
-                                    <i class="fas fa-gem fa-2x"></i>
-                                </span>
-                                <p class="title is-5 mt-3">Enrich Data</p>
-                                <p class="subtitle is-6">Import and update your portfolio</p>
-                            </div>
-                            <footer class="card-footer">
-                                <a href="{{ url_for('portfolio.enrich') }}" class="card-footer-item">Go</a>
-                            </footer>
-                        </div>
-                    </div>
-                    <div class="column is-3">
-                        <div class="card">
-                            <div class="card-content has-text-centered">
-                                <span class="icon is-large has-text-success">
-                                    <i class="fas fa-search fa-2x"></i>
-                                </span>
-                                <p class="title is-5 mt-3">Analyse</p>
-                                <p class="subtitle is-6">View portfolio analytics</p>
-                            </div>
-                            <footer class="card-footer">
-                                <a href="{{ url_for('portfolio.analyse') }}" class="card-footer-item">Go</a>
-                            </footer>
-                        </div>
-                    </div>
-                    <div class="column is-3">
-                        <div class="card">
-                            <div class="card-content has-text-centered">
-                                <span class="icon is-large has-text-warning">
-                                    <i class="fas fa-cog fa-2x"></i>
-                                </span>
-                                <p class="title is-5 mt-3">Account</p>
-                                <p class="subtitle is-6">Manage your account</p>
-                            </div>
-                            <footer class="card-footer">
-                                <a href="{{ url_for('account.index') }}" class="card-footer-item">Go</a>
-                            </footer>
-                        </div>
-                    </div>
-                    <div class="column is-3">
-                        <div class="card">
-                            <div class="card-content has-text-centered">
-                                <span class="icon is-large has-text-info">
-                                    <i class="fas fa-cubes fa-2x"></i>
-                                </span>
-                                <p class="title is-5 mt-3">Allocation Builder</p>
-                                <p class="subtitle is-6">Plan your investment allocations</p>
-                            </div>
-                            <footer class="card-footer">
-                                <a href="{{ url_for('portfolio.build') }}" class="card-footer-item">Go</a>
-                            </footer>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    {% else %}
-        <!-- Not logged in state - Account selection -->
-        <section class="hero is-light is-bold">
-            <div class="hero-body">
-                <div class="container">
-                    <h1 class="title">
-                        Welcome to Portfolio Manager
-                    </h1>
-                    <h2 class="subtitle">
-                        Manage and optimize your investment portfolio
-                    </h2>
-                </div>
-            </div>
-        </section>
-
-        <div class="section">
-            {% if accounts %}
-                <h3 class="title is-4">Select an Account</h3>
-                <div class="columns is-multiline">
-                    {% for account in accounts %}
-                        <div class="column is-3">
-                            <div class="card">
-                                <div class="card-content">
-                                    <div class="content has-text-centered">
-                                        <span class="icon is-large">
-                                            <i class="fas fa-user-circle fa-3x"></i>
-                                        </span>
-                                        <p class="title is-4 mt-3">{{ account.username }}</p>
-                                    </div>
-                                </div>
-                                <footer class="card-footer">
-                                    <a href="{{ url_for('main.select_account', account_id=account.id) }}" class="card-footer-item">
-                                        <span class="icon">
-                                            <i class="fas fa-sign-in-alt"></i>
-                                        </span>
-                                        <span>Select</span>
-                                    </a>
-                                </footer>
-                            </div>
-                        </div>
-                    {% endfor %}
-                    
-                    <!-- Create new account card -->
-                    <div class="column is-3">
-                        <div class="card">
-                            <div class="card-content">
-                                <div class="content has-text-centered">
-                                    <span class="icon is-large has-text-grey-light">
-                                        <i class="fas fa-plus-circle fa-3x"></i>
-                                    </span>
-                                    <p class="title is-4 mt-3">New Account</p>
-                                </div>
-                            </div>
-                            <footer class="card-footer">
-                                <a class="card-footer-item js-modal-trigger" data-target="create-account-modal">
-                                    <span class="icon">
-                                        <i class="fas fa-plus"></i>
-                                    </span>
-                                    <span>Create</span>
-                                </a>
-                            </footer>
-                        </div>
-                    </div>
-                </div>
-            {% else %}
-                <div class="notification is-info is-light">
-                    <p>Welcome to Portfolio Manager! To get started, create your first account.</p>
-                    <button class="button is-info mt-3 js-modal-trigger" data-target="create-account-modal">
-                        <span class="icon">
-                            <i class="fas fa-user-plus"></i>
-                        </span>
-                        <span>Create Account</span>
-                    </button>
-                </div>
-            {% endif %}
-        </div>
-
-        <!-- Features section -->
-        <div class="section">
-            <h3 class="title is-4">Features</h3>
-            <div class="columns">
-                <div class="column">
-                    <div class="box">
-                        <h4 class="title is-5">
-                            <span class="icon-text">
-                                <span class="icon has-text-primary">
-                                    <i class="fas fa-chart-line"></i>
-                                </span>
-                                <span>Portfolio Tracking</span>
-                            </span>
-                        </h4>
-                        <p>Track your investments across multiple portfolios and categories. Import your data easily from CSV files.</p>
-                    </div>
-                </div>
-                <div class="column">
-                    <div class="box">
-                        <h4 class="title is-5">
-                            <span class="icon-text">
-                                <span class="icon has-text-success">
-                                    <i class="fas fa-chart-pie"></i>
-                                </span>
-                                <span>Portfolio Analytics</span>
-                            </span>
-                        </h4>
-                        <p>Visualize your portfolio with interactive charts and comprehensive analytics to make informed decisions.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    {% endif %}
-{% endblock %}
-
-{% block scripts %}
-<script>
-    document.addEventListener('DOMContentLoaded', () => {
-        // Handle notification delete button
-        const deleteButtons = document.querySelectorAll('.notification .delete');
-        deleteButtons.forEach(button => {
-            const notification = button.parentNode;
-            button.addEventListener('click', () => {
-                notification.remove();
-            });
-        });
-    });
-</script>
-{% endblock %}
-###END_FILE###
-
-================================================================
-###START_FILE_PATH: templates/base.html###
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Portfolio Manager{% endblock %}</title>
-    
-    <!-- Bulma CSS (base styles) -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
-    
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- Bulma Tooltip Extension -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma-tooltip@3.0.2/dist/css/bulma-tooltip.min.css">
-    
-    <!-- Plotly.js (updated to latest version) -->
-    <script src="https://cdn.plot.ly/plotly-3.0.1.min.js"></script>
-    
-    <!-- Custom CSS (overrides) -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}?v={{ range(1, 10000) | random }}">
-    
-    <!-- Bulk Edit Styles -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/bulk-edit.css') }}?v={{ range(1, 10000) | random }}">
-    
-    {% block head_extras %}{% endblock %}
-</head>
-<body>
-    <!-- Navigation -->
-    {% include 'components/navbar.html' %}
-    
-    <div class="columns is-gapless" style="min-height: calc(100vh - 3.25rem);">
-        <!-- Sidebar -->
-        <div class="column is-narrow sidebar">
-            {% include 'components/sidebar.html' %}
-        </div>
-        
-        <!-- Main Content -->
-        <div class="column">
-            <main class="section">
-                <div class="container">
-                    <!-- Flash Messages -->
-                    {% include 'components/messages.html' %}
-                    
-                    <!-- Page Content -->
-                    {% block content %}{% endblock %}
-                </div>
-            </main>
-        </div>
-    </div>
-    
-    <!-- Footer -->
-    {% include 'components/footer.html' %}
-    
-    <!-- Vue.js (for components that need it) -->
-    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.min.js"></script>
-    
-    <!-- Axios for AJAX requests -->
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    
-    <!-- Main JavaScript -->
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-    
-    {% block scripts %}{% endblock %}
-</body>
-</html>
 ###END_FILE###

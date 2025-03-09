@@ -5,6 +5,19 @@
 {% block head %}
 {{ super() }}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/build-allocation.css') }}">
+<style>
+    /* Custom styling for Portfolio Allocation section */
+    .no-lines tbody tr td {
+        border: none;
+    }
+    .no-lines tfoot tr th {
+        border: none;
+    }
+    /* Keep the lines for title row */
+    .no-lines thead tr th {
+        border-bottom: 1px solid #dbdbdb;
+    }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -122,6 +135,17 @@
             <p class="card-header-title">Portfolio Allocation</p>
         </header>
         <div class="card-content">
+            <!-- Allocation Status Indicator -->
+            <div class="notification" :class="{
+                'is-success': isAllocationValid, 
+                'is-warning': isAllocationUnder, 
+                'is-danger': isAllocationOver
+            }">
+                <p class="has-text-weight-bold" :class="allocationStatusClass">
+                    ${ allocationStatusMessage }
+                </p>
+            </div>
+            
             <!-- Portfolio List -->
             <div v-if="portfolios.length > 0" class="mt-4">
                 <div v-for="(portfolio, index) in portfolios" :key="index" class="box compact-box mb-2">
@@ -140,7 +164,8 @@
                                 <div class="control">
                                     <input class="input" type="text" 
                                            :value="parseFloat(portfolio.allocation).toFixed(2)" 
-                                           @input="portfolio.allocation = parseFloat($event.target.value); updateAllocations()">
+                                           @change="$event.target.value && $event.target.value.length > 0 ? portfolio.allocation = parseFloat($event.target.value) : null; updateAllocations()"
+                                           @focus="$event.target.select()">
                                 </div>
                             </div>
                         </div>
@@ -191,6 +216,43 @@
                             </div>
                         </div>
 
+                        <!-- Add Position Section (New) -->
+                        <div class="add-position-section mb-4">
+                            <div class="columns">
+                                <div class="column is-8">
+                                    <div class="field has-addons">
+                                        <div class="control is-expanded">
+                                            <div class="select is-fullwidth">
+                                                <select v-model="portfolio.selectedPosition">
+                                                    <option value="">Select a position to add</option>
+                                                    <option v-for="company in availableCompaniesForPortfolio(portfolio.id)" 
+                                                            :value="company.id"
+                                                            :key="company.id">
+                                                        ${ company.name }
+                                                    </option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="control">
+                                            <button class="button is-info" 
+                                                    @click="addSelectedPosition(index)"
+                                                    :disabled="!portfolio.selectedPosition">
+                                                Add Position
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="column is-4">
+                                    <div v-if="getRemainingPositionsCount(index) > 0" 
+                                         class="notification is-light is-warning is-small py-2 px-3 mb-0">
+                                        <span class="has-text-weight-medium">
+                                            ${ getRemainingPositionsCount(index) } positions remaining to meet minimum
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Position List -->
                         <table class="table is-fullwidth is-hoverable position-table no-lines">
                             <thead>
@@ -213,6 +275,7 @@
                                             <i :class="sortOptions.direction === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
                                         </span>
                                     </th>
+                                    <th width="50"></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -222,10 +285,8 @@
                                         <div v-if="position.isPlaceholder" class="remaining-positions-text">
                                             ${ position.companyName }
                                         </div>
-                                        <div v-else class="select is-fullwidth">
-                                            <select v-model="position.companyId" @change="updatePositionDetails(index, pIndex)">
-                                                <option v-for="company in portfolioCompanies[portfolio.id] || []" :value="company.id">${ company.name }</option>
-                                            </select>
+                                        <div v-else class="company-name-display">
+                                            ${ position.companyName || 'Select a company' }
                                         </div>
                                     </td>
                                     <td>
@@ -233,7 +294,8 @@
                                             class="input" 
                                             type="text" 
                                             :value="parseFloat(position.weight).toFixed(2)"
-                                            @input="updateManualWeight(index, pIndex, $event.target.value)"
+                                            @change="updateManualWeight(index, pIndex, $event.target.value)"
+                                            @focus="$event.target.select()"
                                             :disabled="portfolio.evenSplit" 
                                             :class="{'weight-exceeded': isWeightExceeded(index, pIndex)}"
                                         >
@@ -241,9 +303,17 @@
                                     <td>
                                         <input class="input" type="text" :value="formatCurrency(calculatePositionAmount(index, pIndex))" readonly>
                                     </td>
+                                    <td>
+                                        <button v-if="!position.isPlaceholder" 
+                                                class="button is-small is-danger is-light" 
+                                                @click="removePosition(index, pIndex)"
+                                                title="Remove position">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </td>
                                 </tr>
                                 <tr v-if="portfolio.positions.length === 0">
-                                    <td colspan="3" class="has-text-centered">No positions added yet.</td>
+                                    <td colspan="4" class="has-text-centered">No positions added yet.</td>
                                 </tr>
                             </tbody>
                             <tfoot v-if="portfolio.positions.length > 0">
@@ -251,13 +321,7 @@
                                     <th>Total</th>
                                     <th>${ calculateTotalWeight(index).toFixed(2) }%</th>
                                     <th>${ formatCurrency(calculateAllocationAmount(portfolio.allocation)) }</th>
-                                </tr>
-                                <tr v-if="portfolio.minPositions > portfolio.positions.filter(p => !p.isPlaceholder).length">
-                                    <td colspan="3" class="has-text-centered">
-                                        <span class="remaining-positions-text">
-                                            ${ portfolio.minPositions - portfolio.positions.filter(p => !p.isPlaceholder).length } positions remaining
-                                        </span>
-                                    </td>
+                                    <th></th>
                                 </tr>
                             </tfoot>
                         </table>
@@ -343,14 +407,7 @@
                 </tfoot>
             </table>
             
-            <!-- Allocation Progress -->
-            <progress 
-                class="progress mt-3" 
-                :class="{'is-success': isAllocationValid, 'is-warning': isAllocationUnder, 'is-danger': isAllocationOver}"
-                :value="calculateTotalAllocation()" 
-                max="100">
-                ${ calculateTotalAllocation() }%
-            </progress>
+
         </div>
     </div>
 
