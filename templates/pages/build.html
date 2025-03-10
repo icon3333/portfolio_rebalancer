@@ -42,6 +42,13 @@
         border-color: #3273dc;
     }
     
+    /* Disable highlighting for allocation summary table */
+    .no-highlight, .no-highlight td {
+        background-color: transparent !important;
+        border-left: none !important;
+        font-style: normal !important;
+    }
+    
     /* Portfolio header styling */
     .compact-box {
         border-left: 4px solid #209cee;
@@ -64,7 +71,7 @@
         100% { background-color: rgba(50, 115, 220, 0.15); }
     }
     
-    .placeholder-position {
+    .placeholder-position:not(.no-highlight) {
         animation: highlight-pulse 3s infinite;
     }
 </style>
@@ -340,7 +347,28 @@
                                         </div>
                                     </td>
                                     <td>
+                                        <!-- Special display for placeholder positions to ensure weight is shown clearly -->
+                                        <div v-if="position.isPlaceholder" class="field has-addons">
+                                            <div class="control is-expanded">
+                                                <input 
+                                                    class="input" 
+                                                    type="text" 
+                                                    :value="(position.weight || 0).toFixed(2)"
+                                                    @change="updateManualWeight(index, pIndex, $event.target.value)"
+                                                    @focus="$event.target.select()"
+                                                    :disabled="portfolio.evenSplit" 
+                                                    :class="{'weight-exceeded': isWeightExceeded(index, pIndex)}"
+                                                >
+                                            </div>
+                                            <div class="control">
+                                                <a class="button is-static">
+                                                    % per position
+                                                </a>
+                                            </div>
+                                        </div>
+                                        <!-- Regular input for normal positions -->
                                         <input 
+                                            v-else
                                             class="input" 
                                             type="text" 
                                             :value="(position.weight || 0).toFixed(2)"
@@ -396,74 +424,62 @@
                 <thead>
                     <tr>
                         <th>Portfolio</th>
-                        <th>Allocation %</th>
+                        <th>Position</th>
+                        <th>Global Perspective %</th>
+                        <th>Portfolio Relative %</th>
                         <th>To Be Invested</th>
-                        <th>Positions</th>
                     </tr>
                 </thead>
                 <tbody>
                     <template v-for="(portfolio, index) in portfolios">
-                        <tr 
-                            class="allocation-row" 
-                            :class="{'is-expanded': isAllocationExpanded(portfolio.id)}" 
-                            @click="toggleAllocationExpand(portfolio.id)"
-                        >
-                            <td>
-                                <span class="icon allocation-toggle mr-2">
-                                    <i class="fas fa-chevron-down"></i>
-                                </span>
+                        <!-- Portfolio row -->
+                        <tr class="allocation-row is-portfolio-row">
+                            <td class="has-text-weight-bold">
                                 ${ getPortfolioName(portfolio.id) }
                             </td>
-                            <td>${ formatPercentage(portfolio.allocation) }</td>
-                            <td>${ formatCurrency(calculateAllocationAmount(portfolio.allocation)) }</td>
-                            <td>${ portfolio.positions.filter(p => !p.isPlaceholder).length }</td>
-                        </tr>
-                        <!-- Collapsible position details -->
-                        <tr v-if="isAllocationExpanded(portfolio.id) && portfolio.positions.length > 0">
-                            <td colspan="4" class="p-0">
-                                <div class="position-details is-visible">
-                                    <table class="table is-fullwidth">
-                                        <thead>
-                                            <tr>
-                                                <th>Position</th>
-                                                <th>Weight %</th>
-                                                <th>To Be Invested</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <!-- Grouped positions by weight -->
-                                            <tr v-for="group in groupPositionsByWeight(portfolio.positions, portfolio)">
-                                                <td class="pl-5">${ group.companyName }</td>
-                                                <td>${ formatPercentage(group.weight) }</td>
-                                                <td>${ formatCurrency(calculateAllocationAmount(portfolio.allocation) * group.weight / 100) }</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
+                            <td class="has-text-weight-bold"></td>
+                            <td class="has-text-weight-bold">
+                                <span class="global-allocation">${ formatPercentage(portfolio.allocation) }</span>
                             </td>
+                            <td class="has-text-weight-bold">100%</td>
+                            <td class="has-text-weight-bold">${ formatCurrency(calculateAllocationAmount(portfolio.allocation)) }</td>
+                        </tr>
+                        
+                        <!-- Position rows directly embedded -->
+                        <tr v-for="group in groupPositionsByWeight(portfolio.positions, portfolio)" 
+                            :class="{'no-highlight': group.isPlaceholder}" 
+                            class="position-row"
+                            v-if="group.weight > 0">
+                            <td class="position-name"></td>
+                            <td class="position-name">
+                                ${ group.companyName }
+                            </td>
+                            <td>
+                                <span class="global-allocation">${ formatPercentage((portfolio.allocation * group.weight) / 100) }</span>
+                            </td>
+                            <td>
+                                <span class="portfolio-allocation">${ formatPercentage(group.weight) }</span>
+                            </td>
+                            <td>${ formatCurrency(calculateAllocationAmount(portfolio.allocation) * group.weight / 100) }</td>
                         </tr>
                     </template>
                     <tr v-if="portfolios.length === 0">
-                        <td colspan="4" class="has-text-centered">No portfolios added yet.</td>
+                        <td colspan="5" class="has-text-centered">No portfolios added yet.</td>
                     </tr>
                 </tbody>
                 <tfoot v-if="portfolios.length > 0">
                     <tr>
                         <th>Total</th>
+                        <th></th>
                         <th>${ formatPercentage(calculateTotalAllocation()) }</th>
+                        <th>-</th>
                         <th>${ formatCurrency(calculateTotalAllocatedAmount()) }</th>
-                        <th>${ calculateTotalPositions() }</th>
                     </tr>
                 </tfoot>
             </table>
             
 
         </div>
-    </div>
-
-    <!-- Auto-save indicator (more subtle now) -->
-    <div class="auto-save-indicator" :class="{'is-visible': autoSaveIndicator}">
-        Changes saved
     </div>
 </div>
 {% endblock %}

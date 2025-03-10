@@ -62,7 +62,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } else if (total > 100) {
           return 'has-text-danger';
         } else {
-          return 'has-text-success';
+          return 'has-text-mint';
         }
       },
       // Calculate available percentage
@@ -421,8 +421,9 @@ document.addEventListener('DOMContentLoaded', function() {
         // First, filter out all placeholder positions to avoid duplicates
         portfolio.positions = portfolio.positions.filter(p => !p.isPlaceholder);
         
-        // Count real positions
-        const realPositionCount = portfolio.positions.length;
+        // Get all real (non-placeholder) positions
+        const realPositions = portfolio.positions;
+        const realPositionCount = realPositions.length;
         
         // If we already have enough real positions, we don't need placeholders
         if (realPositionCount >= minPositions) {
@@ -434,19 +435,25 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Add a placeholder position that represents ALL remaining positions
         // The companyName shows total remaining for user information
-        // For ensureMinimumPositions we recalculate this weight from scratch
-        // (calculation is now centralized in updatePlaceholderWeight which will be called later)
-        // Start with default weight of 0
-        const remainingWeight = 0;
+        // Calculate weight based on real positions for immediate display
+        // Calculate total weight of real positions
+        const realPositionsWeight = realPositions.reduce((total, position) => {
+          return total + parseFloat(position.weight || 0);
+        }, 0);
+        
+        // Calculate total remaining weight and per-position weight
+        const totalRemainingWeight = Math.max(0, parseFloat((100 - realPositionsWeight).toFixed(2)));
+        const weightPerPosition = parseFloat((totalRemainingWeight / positionsRemaining).toFixed(2));
         
         portfolio.positions.push({
           companyId: null,
           companyName: `${positionsRemaining}x positions remaining`,
-          weight: remainingWeight, // Apply the remaining weight (100% - existing positions weight)
+          weight: weightPerPosition, // Apply the PER POSITION weight
           isPlaceholder: true,
           isSinglePosition: false, // Changed to false since this now represents multiple positions
           minPositions: minPositions, // Store the minPositions for allocation calculation
-          positionsRemaining: positionsRemaining // Store number of positions this placeholder represents
+          positionsRemaining: positionsRemaining, // Store number of positions this placeholder represents
+          totalRemainingWeight: totalRemainingWeight // Store the total remaining weight for calculations
         });
         
         // Apply consistent weight calculation to ensure this portfolio has correct weights
@@ -821,9 +828,20 @@ document.addEventListener('DOMContentLoaded', function() {
       // Calculate total number of positions
       calculateTotalPositions() {
         return this.portfolios.reduce((total, portfolio) => {
-          // Don't count placeholder positions
-          return total + portfolio.positions.filter(p => !p.isPlaceholder).length;
+          return total + this.getTotalPositionsForPortfolio(portfolio);
         }, 0);
+      },
+      
+      // Calculate total positions for a specific portfolio (including remaining positions)
+      getTotalPositionsForPortfolio(portfolio) {
+        // Count real positions
+        const realPositions = portfolio.positions.filter(p => !p.isPlaceholder).length;
+        
+        // Add remaining positions from placeholders
+        const placeholder = portfolio.positions.find(p => p.isPlaceholder);
+        const remainingPositions = placeholder ? placeholder.positionsRemaining : 0;
+        
+        return realPositions + remainingPositions;
       },
       
       // Get portfolio name by ID
@@ -845,10 +863,10 @@ document.addEventListener('DOMContentLoaded', function() {
         return parseFloat(value).toLocaleString('en-US', {maximumFractionDigits: 2, minimumFractionDigits: 2});
       },
       
-      // Format percentage with 2 decimal places
+      // Format percentage without decimal places
       formatPercentage(value) {
-        if (value === null || value === undefined) return '0.00%';
-        return `${parseFloat(value).toFixed(2)}%`;
+        if (value === null || value === undefined) return '0%';
+        return `${Math.round(parseFloat(value))}%`;
       },
       
       // Sort table by column
@@ -916,74 +934,41 @@ document.addEventListener('DOMContentLoaded', function() {
         return [...realPositions, ...placeholders];
       },
       
-      // Group positions by weight
+      // Display all positions individually (no grouping)
       groupPositionsByWeight(positions, portfolio) {
-        // Don't include placeholder positions
+        // Include placeholder positions for the allocation summary
         const realPositions = positions.filter(p => !p.isPlaceholder);
+        const placeholderPosition = positions.find(p => p.isPlaceholder);
         
-        const weightGroups = {};
-        
-        // Group positions by their weights
-        realPositions.forEach(position => {
-          const weight = parseFloat(position.weight).toFixed(2);
-          
-          if (!weightGroups[weight]) {
-            weightGroups[weight] = {
-              weight: parseFloat(weight),
-              positions: [],
-              count: 0
-            };
-          }
-          
-          weightGroups[weight].positions.push(position);
-          weightGroups[weight].count++;
-        });
-        
-        // Convert to array for rendering
+        // Convert to array for rendering - show each position individually
         const result = [];
         
-        for (const weight in weightGroups) {
-          const group = weightGroups[weight];
-          
-          if (group.count === 1) {
-            // Single position, display normally
-            const position = group.positions[0];
-            const company = this.portfolioCompanies[portfolio.id]?.find(c => c.id === position.companyId);
-            
-            result.push({
-              companyName: company ? company.name : 'Unknown',
-              weight: group.weight,
-              count: 1
-            });
-          } else {
-            // Multiple positions with same weight, group them
-            result.push({
-              companyName: `${group.count}x positions with equal weight`,
-              weight: group.weight,
-              count: group.count
-            });
-          }
+        // Add each real position individually
+        realPositions.forEach(position => {
+          const company = this.portfolioCompanies[portfolio.id]?.find(c => c.id === position.companyId);
+          result.push({
+            companyName: company ? company.name : 'Unknown',
+            weight: parseFloat(position.weight),
+            count: 1
+          });
+        });
+        
+        // Add placeholder position if it exists and has remaining positions
+        if (placeholderPosition && placeholderPosition.positionsRemaining > 0) {
+          result.push({
+            companyName: `Remaining positions (${placeholderPosition.positionsRemaining})`,
+            weight: placeholderPosition.weight,
+            count: placeholderPosition.positionsRemaining,
+            isPlaceholder: true
+          });
         }
         
         // Sort by weight (descending)
         return result.sort((a, b) => b.weight - a.weight);
       },
       
-      // Toggle allocation row expansion
-      toggleAllocationExpand(portfolioId) {
-        if (!this.expandedAllocations[portfolioId]) {
-          Vue.set(this.expandedAllocations, portfolioId, true);
-        } else {
-          Vue.set(this.expandedAllocations, portfolioId, !this.expandedAllocations[portfolioId]);
-        }
-        
-        // Save expanded state
-        this.debouncedSave();
-      },
-      
-      isAllocationExpanded(portfolioId) {
-        return this.expandedAllocations[portfolioId] === true;
-      },
+      // These functions were removed as part of removing expand/collapse functionality
+      // from the Allocation Summary section
       
       // Save allocation state
       async saveAllocation() {

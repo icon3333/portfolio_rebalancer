@@ -120,34 +120,65 @@ div.columns.is-vcentered.portfolio-header {
   font-weight: bold;
 }
 
-/* Allocation Summary */
-.allocation-row {
-  cursor: pointer;
-  transition: background-color 0.2s ease;
+/* Allocation Summary - improved hierarchy and clarity */
+.allocation-row.is-portfolio-row {
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
 }
 
-.allocation-row:hover {
-  background-color: rgba(0, 0, 0, 0.03);
+.position-row {
+  background-color: #ffffff;
+  border-bottom: 1px solid #f8f9fa;
 }
 
-.allocation-toggle {
+/* Improved position indentation */
+.position-name {
+  padding-left: 1.5rem !important;
+  position: relative;
+}
+
+.position-indent {
+  color: #6c757d;
+  margin-right: 8px;
+  font-family: monospace;
+}
+
+/* Allocation percentage labels */
+.allocation-label {
+  display: inline-block;
+  font-size: 0.75rem;
+  color: #6c757d;
+  margin-left: 6px;
+  vertical-align: middle;
+  font-style: italic;
+}
+
+.global-allocation {
   color: #3273dc;
-  transition: transform 0.3s ease;
+  font-weight: bold;
 }
 
-.is-expanded .allocation-toggle {
-  transform: rotate(180deg);
+.portfolio-allocation {
+  color: #555;
 }
 
-.position-details {
-  background-color: rgba(0, 0, 0, 0.02);
-  overflow: hidden;
-  max-height: 0;
-  transition: max-height 0.3s ease;
+/* Table header with subtitle */
+.th-with-subtitle {
+  display: block;
+  margin-bottom: 2px;
 }
 
-.position-details.is-visible {
-  max-height: 500px; /* Arbitrary large value */
+.th-subtitle {
+  font-size: 0.75rem;
+  display: block;
+  font-weight: normal;
+  color: #6c757d;
+  font-style: italic;
+}
+
+/* Custom text color classes */
+.has-text-mint {
+  color: #90EE90 !important;
 }
 
 /* Improved auto-save indicator */
