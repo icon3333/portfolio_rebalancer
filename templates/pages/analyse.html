@@ -1903,62 +1903,29 @@ document.addEventListener('DOMContentLoaded', function() {
         const leftMargin = Math.min(150, 60 + (longestCountryLabel * 4)); // 4px per character with a max
         const bottomMargin = Math.min(150, 50 + (longestDimLabel * 3)); // 3px per character with a max
         
+        // Layout settings for the heatmap
         const layout = {
-            title: {
-                text: 'Portfolio Concentration: Country × ' + formattedDimensionName,
-                font: { size: 16, family: 'Arial, sans-serif' }
+            title: '',
+            showlegend: false,
+            margin: {
+                l: 50,
+                r: 40,
+                b: 50,
+                t: 30,
+                pad: 0
             },
-            xaxis: { 
-                title: { text: formattedDimensionName, standoff: 15 },
-                automargin: true,
-                tickangle: -45,
+            xaxis: {
+                title: 'Volatility',
                 tickfont: { size: 10 }
             },
-            yaxis: { 
-                title: { text: 'Country', standoff: 10 },
-                automargin: true,
+            yaxis: {
+                title: 'Return',
                 tickfont: { size: 10 }
-            },
-            height: responsiveHeight,
-            margin: { 
-                l: leftMargin, 
-                r: 30, 
-                t: 60, 
-                b: bottomMargin 
-            },
-            // Add annotations to show filtering info
-            annotations: [{
-                text: `Showing top allocations (at least 1% or top 8)`,
-                showarrow: false,
-                x: 0.5,
-                y: 1.07,
-                xref: 'paper',
-                yref: 'paper',
-                font: {
-                    size: 10,
-                    color: 'rgba(0,0,0,0.6)'
-                }
-            }],
-            coloraxis: {
-                colorbar: {
-                    title: {
-                        text: 'Allocation %',
-                        font: { size: 12 }
-                    },
-                    thickness: 15,
-                    len: 0.9,
-                    tickfont: { size: 10 }
-                }
             }
         };
         
-        // Config to disable modebar (tooling) that takes unnecessary space
-        const config = {
-            displayModeBar: false, // Remove the plotly toolbar
-            responsive: true       // Make chart responsive to window resizing
-        };
-        
-        Plotly.newPlot('riskHeatmap', [trace], layout, config);
+        // Use the centralized chart configuration
+        Plotly.newPlot('riskHeatmap', [trace], layout, ChartConfig.plotlyConfig);
         
         // Force a resize after a short delay to ensure proper rendering
         setTimeout(() => {
@@ -2047,10 +2014,11 @@ document.addEventListener('DOMContentLoaded', function() {
             xaxis: { title: 'Percentage (%)' },
             yaxis: { title: '' },
             height: 400,
-            margin: { l: 150, r: 50, t: 50, b: 50 }
+            margin: { l: 150, r: 50, t: 50, b: 50 },
+            showlegend: false
         };
         
-        Plotly.newPlot(elementId, [trace], layout);
+        Plotly.newPlot(elementId, [trace], layout, ChartConfig.plotlyConfig);
     }
 
     // Render doughnut charts

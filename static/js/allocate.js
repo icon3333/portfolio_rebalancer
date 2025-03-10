@@ -548,16 +548,9 @@ document.addEventListener('DOMContentLoaded', function() {
              * Initialize plotly charts for visualization
              */
             initializeCharts() {
-                // Enhanced layout with automargin
+                // Enhanced layout with consistent settings
                 const layout = {
-                    showlegend: true,
-                    legend: { 
-                        orientation: 'h', 
-                        y: -0.15,
-                        xanchor: 'center',
-                        x: 0.5,
-                        font: { size: 12 }
-                    },
+                    showlegend: false,
                     height: 350,
                     autosize: true,
                     margin: { l: 30, r: 30, t: 30, b: 50 },
@@ -592,10 +585,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         size: 12,
                         color: '#333333'
                     },
-                    automargin: true
+                    automargin: true,
+                    showlegend: false
                 }];
                 
-                Plotly.newPlot('current-distribution-chart', currentData, { ...layout });
+                // Use Plotly.purge to fully clean and redraw
+                Plotly.purge('current-distribution-chart');
+                Plotly.newPlot('current-distribution-chart', currentData, { ...layout }, ChartConfig.plotlyConfig);
             
                 // Create target distribution chart
                 const targetData = [{
@@ -621,10 +617,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         size: 12,
                         color: '#333333'
                     },
-                    automargin: true
+                    automargin: true,
+                    showlegend: false
                 }];
                 
-                Plotly.newPlot('target-distribution-chart', targetData, { ...layout });
+                // Use Plotly.purge to fully clean and redraw
+                Plotly.purge('target-distribution-chart');
+                Plotly.newPlot('target-distribution-chart', targetData, { ...layout }, ChartConfig.plotlyConfig);
             },
             
             /**
@@ -649,14 +648,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 // Create chart layout - ensure consistency with initialization
                 const layout = {
-                    showlegend: true,
-                    legend: {
-                        orientation: 'h',
-                        y: -0.15,
-                        xanchor: 'center',
-                        x: 0.5,
-                        font: { size: 12 }
-                    },
+                    showlegend: false,
                     height: 350,
                     autosize: true,
                     margin: { l: 30, r: 30, t: 30, b: 50 },
@@ -699,7 +691,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Use Plotly.purge to fully clean and redraw
                     Plotly.purge('current-distribution-chart');
-                    Plotly.newPlot('current-distribution-chart', currentData, { ...layout });
+                    Plotly.newPlot('current-distribution-chart', currentData, { ...layout }, ChartConfig.plotlyConfig);
                     console.log('Updated current distribution chart');
                 }
 
@@ -733,7 +725,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Use Plotly.purge to fully clean and redraw
                     Plotly.purge('target-distribution-chart');
-                    Plotly.newPlot('target-distribution-chart', targetData, { ...layout });
+                    Plotly.newPlot('target-distribution-chart', targetData, { ...layout }, ChartConfig.plotlyConfig);
                     console.log('Updated target distribution chart');
                 } else {
                     // If we have target data but no element or couldn't plot, log a warning

@@ -56,54 +56,15 @@ const PortfolioCharts = (function() {
         // Use the globally defined formatCurrency:
         const formatCurrency = window.formatCurrency || (v => v);
 
-        const total = values.reduce((a, b) => a + b, 0);
-        const formattedTotal = formatCurrency(total);
-
-        // Default hover template uses calculated percentages
-        let hoverTemplate = '%{label}: €%{value:,.2f} (%{percent})<extra></extra>';
-        
-        // If percentages are explicitly provided, use custom hover template
-        if (percentages && percentages.length === values.length) {
-            // Create custom hover text array for each data point
-            const customText = labels.map((label, i) => {
-                return `${label}: ${formatCurrency(values[i])} (${percentages[i].toFixed(1)}%)`;
-            });
-
-            hoverTemplate = '%{text}<extra></extra>';
-        }
-
-        const data = [{
-            values: values,
-            labels: labels,
-            type: 'pie',
-            hole: 0.5,
-            hoverinfo: 'label+percent+value',
-            hovertemplate: hoverTemplate,
-            text: percentages ? labels.map((label, i) => {
-                return `${label}: ${formatCurrency(values[i])} (${percentages[i].toFixed(1)}%)`;
-            }) : undefined,
-            textinfo: 'label+percent',
-            textposition: 'inside',
-            insidetextorientation: 'radial',
-            marker: { colors: colors },
-            showlegend: false
-        }];
-
-        const layout = {
-            title: '',
-            height: 400,
-            margin: { l: 20, r: 20, t: 20, b: 20 },
-            annotations: [{
-                font: { size: 14 },
-                showarrow: false,
-                text: formattedTotal,
-                x: 0.5,
-                y: 0.5
-            }]
-        };
-
-        const config = { responsive: true, displayModeBar: false };
-        return Plotly.newPlot(elementId, data, layout, config);
+        // Use the centralized chart configuration
+        return ChartConfig.createDoughnutChart(elementId, labels, values, {
+            title: title,
+            colors: colors,
+            percentages: percentages,
+            formatCurrency: formatCurrency,
+            formatPercentage: window.formatPercentage || (v => v),
+            height: 400
+        });
     }
 
     /**
@@ -253,11 +214,12 @@ const PortfolioCharts = (function() {
                 const pieLayout = {
                     title: 'Companies (Uncategorized)',
                     height: 450,
-                    margin: { l: 20, r: 20, t: 50, b: 20 }
+                    margin: { l: 20, r: 20, t: 50, b: 20 },
+                    showlegend: false
                 };
                 
-                const config = { responsive: true, displayModeBar: false };
-                return Plotly.newPlot(elementId, pieData, pieLayout, config);
+                // Use the centralized configuration
+                return Plotly.newPlot(elementId, pieData, pieLayout, ChartConfig.plotlyConfig);
             }
         }
         
@@ -285,7 +247,8 @@ const PortfolioCharts = (function() {
         
         console.log(`Creating sunburst with dimensions: ${layout.width}x${layout.height}`);
         
-        const config = { responsive: true, displayModeBar: false };
+        // Use the centralized configuration
+        const config = ChartConfig.plotlyConfig;
         
         try {
             // Create the plot
@@ -418,12 +381,7 @@ const PortfolioCharts = (function() {
      * Updates an existing doughnut chart with new data.
      */
     function updateDoughnutChart(elementId, labels, values, colors) {
-        const update = {
-            labels: [labels],
-            values: [values],
-            marker: [{ colors: colors }]
-        };
-        Plotly.update(elementId, update, {});
+        ChartConfig.updateDoughnutChart(elementId, labels, values, colors);
     }
 
     /**
