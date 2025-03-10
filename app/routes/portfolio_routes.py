@@ -348,6 +348,150 @@ def build():
     
     return render_template('pages/build.html', position=position)
 
+# Route to serve the allocate.html page
+@portfolio_bp.route('/allocate')
+def allocate():
+    """Portfolio Rebalancer page"""
+    logger.info("Accessing portfolio rebalancer page")
+    
+    # Check if user is authenticated with an account
+    if 'account_id' not in session:
+        logger.warning("No account_id in session")
+        flash('Please select an account first', 'warning')
+        return redirect(url_for('main.index'))
+    
+    account_id = session['account_id']
+    logger.info(f"Loading portfolio rebalancer page for account_id: {account_id}")
+    
+    # Verify account exists
+    account = query_db('SELECT * FROM accounts WHERE id = ?', 
+                      [account_id], one=True)
+    if not account:
+        logger.warning(f"Account {account_id} not found")
+        flash('Account not found', 'error')
+        return redirect(url_for('main.index'))
+    
+    logger.info(f"Account found: {account['username']}")
+    
+    return render_template('pages/allocate.html')
+
+@portfolio_bp.route('/api/allocate/portfolio-data')
+def get_allocate_portfolio_data():
+    """API endpoint to get structured portfolio data for the rebalancing feature"""
+    logger.info("API request for allocate portfolio data")
+    
+    if 'account_id' not in session:
+        logger.warning("No account_id in session")
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    account_id = session['account_id']
+    logger.info(f"Getting portfolio data for rebalancing, account_id: {account_id}")
+    
+    try:
+        # Get all portfolios for this account
+        portfolios_data = query_db('''
+            SELECT id, name
+            FROM portfolios
+            WHERE account_id = ? AND name IS NOT NULL
+            ORDER BY name
+        ''', [account_id])
+        
+        if not portfolios_data:
+            logger.warning(f"No portfolios found for account {account_id}")
+            return jsonify({'portfolios': []})
+        
+        result = {'portfolios': []}
+        
+        # Process each portfolio
+        for portfolio in portfolios_data:
+            portfolio_id = portfolio['id']
+            portfolio_name = portfolio['name']
+            
+            # Get categories for this portfolio
+            categories_data = query_db('''
+                SELECT DISTINCT category 
+                FROM companies
+                WHERE account_id = ? AND portfolio_id = ? AND category IS NOT NULL
+                ORDER BY category
+            ''', [account_id, portfolio_id])
+            
+            # Calculate total portfolio value - FIXED QUERY
+            portfolio_value_result = query_db('''
+                SELECT SUM(mp.price_eur * cs.shares) as total_value
+                FROM companies c
+                JOIN market_prices mp ON c.identifier = mp.identifier
+                JOIN company_shares cs ON c.id = cs.company_id
+                WHERE c.account_id = ? AND c.portfolio_id = ? AND cs.shares > 0
+            ''', [account_id, portfolio_id], one=True)
+            
+            portfolio_value = portfolio_value_result['total_value'] if portfolio_value_result['total_value'] else 0
+            
+            # Create portfolio entry
+            portfolio_entry = {
+                'name': portfolio_name,
+                'currentValue': portfolio_value,
+                'targetWeight': 0,  # Will be calculated on frontend
+                'color': '',  # Will be assigned on frontend
+                'categories': []
+            }
+            
+            # Process each category
+            for category_item in categories_data:
+                category_name = category_item['category']
+                
+                # Get positions for this category - FIXED QUERY
+                positions_data = query_db('''
+                    SELECT c.id, c.name, mp.price_eur, cs.shares
+                    FROM companies c
+                    JOIN market_prices mp ON c.identifier = mp.identifier
+                    JOIN company_shares cs ON c.id = cs.company_id
+                    WHERE c.account_id = ? AND c.portfolio_id = ? AND c.category = ? AND cs.shares > 0
+                    ORDER BY c.name
+                ''', [account_id, portfolio_id, category_name])
+                
+                # Calculate category value
+                category_value = sum(pos['price_eur'] * pos['shares'] for pos in positions_data if pos['price_eur'])
+                
+                # Create category entry
+                category_entry = {
+                    'name': category_name,
+                    'currentValue': category_value,
+                    'targetWeight': 0,
+                    'color': '',
+                    'positions': []
+                }
+                
+                # Process each position
+                for position in positions_data:
+                    position_value = 0
+                    if position['price_eur'] and position['shares']:
+                        position_value = position['price_eur'] * position['shares']
+                    
+                    # Create position entry
+                    position_entry = {
+                        'name': position['name'],
+                        'currentValue': position_value,
+                        'targetWeight': 0,
+                        'color': ''
+                    }
+                    
+                    category_entry['positions'].append(position_entry)
+                
+                # Only add categories with positions
+                if category_entry['positions']:
+                    portfolio_entry['categories'].append(category_entry)
+            
+            # Only add portfolios with categories
+            if portfolio_entry['categories']:
+                result['portfolios'].append(portfolio_entry)
+        
+        logger.info(f"Returning {len(result['portfolios'])} portfolios for rebalancing")
+        return jsonify(result)
+    
+    except Exception as e:
+        logger.error(f"Error getting portfolio data for rebalancing: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 @portfolio_bp.route('/api/portfolios')
 def get_portfolios_api():
     """API endpoint to get portfolios for an account"""

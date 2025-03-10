@@ -41,12 +41,12 @@
             </a>
         </li>
         <li>
-            <a href="{{ url_for('main.index') }}?page=allocate" class="{{ 'is-active' if request.args.get('page') == 'allocate' }}">
+            <a href="{{ url_for('portfolio.allocate') }}" class="{{ 'is-active' if request.endpoint == 'portfolio.allocate' }}">
                 <span class="icon-text">
                     <span class="icon">
-                        <i class="fas fa-coins"></i>
+                        <i class="fas fa-balance-scale"></i>
                     </span>
-                    <span>Allocate</span>
+                    <span>Portfolio Rebalancer</span>
                 </span>
             </a>
         </li>

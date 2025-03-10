@@ -6,84 +6,6 @@
     {% if session.account_id %}
         <!-- Logged in state - Dashboard -->
         <div class="columns is-multiline">
-            <!-- Portfolio Summary -->
-            {% if portfolios %}
-                <div class="column is-12">
-                    <div class="card">
-                        <header class="card-header">
-                            <p class="card-header-title">
-                                <span class="icon-text">
-                                    <span class="icon">
-                                        <i class="fas fa-folder-open"></i>
-                                    </span>
-                                    <span>Your Portfolios</span>
-                                </span>
-                            </p>
-                        </header>
-                        <div class="card-content">
-                            <div class="content">
-                                <div class="table-container">
-                                    <table class="table is-fullwidth is-hoverable">
-                                        <thead>
-                                            <tr>
-                                                <th>Portfolio</th>
-                                                <th>Companies</th>
-                                                <th>Value</th>
-                                                <th>Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for portfolio in portfolios %}
-                                                <tr>
-                                                    <td>
-                                                        <span class="icon-text">
-                                                            <span class="icon">
-                                                                <i class="fas fa-briefcase"></i>
-                                                            </span>
-                                                            <span>{{ portfolio.name }}</span>
-                                                        </span>
-                                                    </td>
-                                                    <td>{{ portfolio.company_count }}</td>
-                                                    <td>
-                                                        {% if portfolio.total_value %}
-                                                            €{{ '{:,.2f}'.format(portfolio.total_value) }}
-                                                        {% else %}
-                                                            -
-                                                        {% endif %}
-                                                    </td>
-                                                    <td>
-                                                        <div class="buttons are-small">
-                                                            <a href="{{ url_for('portfolio.analyse') }}?portfolio={{ portfolio.name }}" class="button is-info is-small">
-                                                                <span class="icon">
-                                                                    <i class="fas fa-chart-bar"></i>
-                                                                </span>
-                                                                <span>Analyse</span>
-                                                            </a>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            {% endfor %}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            {% else %}
-                <div class="column is-12">
-                    <div class="notification is-warning">
-                        <p>You don't have any portfolios yet. Get started by importing your data.</p>
-                        <a href="{{ url_for('portfolio.enrich') }}" class="button is-warning is-light mt-2">
-                            <span class="icon">
-                                <i class="fas fa-upload"></i>
-                            </span>
-                            <span>Import Data</span>
-                        </a>
-                    </div>
-                </div>
-            {% endif %}
-
             <!-- Quick Links -->
             <div class="column is-12">
                 <h2 class="title is-4">Quick Actions</h2>
@@ -141,6 +63,20 @@
                             </div>
                             <footer class="card-footer">
                                 <a href="{{ url_for('portfolio.build') }}" class="card-footer-item">Go</a>
+                            </footer>
+                        </div>
+                    </div>
+                    <div class="column is-3">
+                        <div class="card">
+                            <div class="card-content has-text-centered">
+                                <span class="icon is-large has-text-success">
+                                    <i class="fas fa-balance-scale fa-2x"></i>
+                                </span>
+                                <p class="title is-5 mt-3">Portfolio Rebalancer</p>
+                                <p class="subtitle is-6">Rebalance your portfolio</p>
+                            </div>
+                            <footer class="card-footer">
+                                <a href="{{ url_for('portfolio.allocate') }}" class="card-footer-item">Go</a>
                             </footer>
                         </div>
                     </div>
