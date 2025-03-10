@@ -102,21 +102,21 @@ document.addEventListener('DOMContentLoaded', function() {
                     id: portfolio.id,
                     name: portfolio.name,
                     allocation: 0,
-                    positions: [],
+                    positions: [], // Start with empty positions - don't auto-create any for companies
                     selectedPosition: "", // Initialize the selectedPosition property
                     evenSplit: true // Initialize evenSplit property
                   });
                   console.log(`Added portfolio ${portfolio.name} (ID: ${portfolio.id}) to this.portfolios`);
                   
-                  // Load companies for this portfolio
+                  // Load companies for this portfolio (for dropdown only, not creating positions)
                   console.log(`Fetching companies for portfolio ${portfolio.name} (ID: ${portfolio.id})...`);
                   const response = await axios.get(`/portfolio/api/portfolio_companies/${portfolio.id}`);
                   console.log(`Received company data for portfolio ${portfolio.name}:`, response.data);
                   
                   if (response.data && Array.isArray(response.data)) {
-                    // Store companies in portfolioCompanies
+                    // Store companies in portfolioCompanies (for dropdown selection only)
                     Vue.set(this.portfolioCompanies, portfolio.id, response.data);
-                    console.log(`Stored ${response.data.length} companies for portfolio ${portfolio.name}`);
+                    console.log(`Stored ${response.data.length} companies for portfolio ${portfolio.name} (for dropdown only)`);
                   } else {
                     // Initialize with empty array if no companies
                     Vue.set(this.portfolioCompanies, portfolio.id, []);
@@ -238,11 +238,12 @@ document.addEventListener('DOMContentLoaded', function() {
           
           console.log('Final portfolio list after merging saved state:', this.portfolios);
           
-          // Load companies for each portfolio and ensure positions exist
+          // Load companies for each portfolio (for dropdown only) and ensure placeholder positions exist
           const portfoliosWithCompanies = [];
           for (const portfolio of this.portfolios) {
             if (portfolio.id) {
-              // Initialize positions array if missing
+              // Initialize positions array if missing, but keep any existing positions
+              // from previously saved state to preserve user selections
               if (!portfolio.positions) {
                 portfolio.positions = [];
               }
@@ -252,7 +253,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 Vue.set(portfolio, 'selectedPosition', "");
               }
               
-              // Load companies and create positions as needed
+              // Load companies for dropdown selection only, don't auto-create positions
               await this.loadPortfolioCompanies(portfolio.id);
               
               // Only keep portfolios that have companies
@@ -260,7 +261,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 portfoliosWithCompanies.push(portfolio);
                 // Calculate minimum positions needed
                 this.calculateMinimumPositions(portfolio);
-                // Add placeholder positions if needed
+                // Add placeholder positions if needed - this will not create actual company positions
                 this.ensureMinimumPositions(portfolio);
               } else {
                 console.log(`Skipping portfolio ${portfolio.name} (ID: ${portfolio.id}) because it has no companies`);
@@ -271,6 +272,12 @@ document.addEventListener('DOMContentLoaded', function() {
           // Replace the portfolios array with only those that have companies
           this.portfolios = portfoliosWithCompanies;
           console.log('Final filtered portfolio list (only with companies):', this.portfolios);
+          
+          // Force recalculation of all placeholder weights
+          this.portfolios.forEach((portfolio, portfolioIndex) => {
+            this.updatePlaceholderWeight(portfolioIndex);
+            console.log(`Recalculated placeholder weight for portfolio ${portfolio.name} (index: ${portfolioIndex})`);
+          });
           
           if (response.data && response.data.expandedPortfolios) {
             this.expandedPortfolios = JSON.parse(response.data.expandedPortfolios);
@@ -296,6 +303,9 @@ document.addEventListener('DOMContentLoaded', function() {
           const response = await axios.get('/portfolio/api/portfolios?include_ids=true&has_companies=true');
           this.availablePortfolios = response.data;
           console.log('Loaded portfolios with companies:', this.availablePortfolios);
+          
+          // Note: We don't auto-create positions for these portfolios
+          // Positions will only be added when the user explicitly selects them from the dropdown
         } catch (error) {
           console.error('Error loading portfolios:', error);
           portfolioManager.showNotification('Failed to load portfolios', 'is-danger');
@@ -309,39 +319,19 @@ document.addEventListener('DOMContentLoaded', function() {
           const companies = response.data;
           console.log(`Loaded ${companies.length} companies for portfolio ${portfolioId}:`, companies);
           
-          // Store in portfolioCompanies map
+          // Store in portfolioCompanies map (for dropdown only)
           Vue.set(this.portfolioCompanies, portfolioId, companies);
           
-          // Find the portfolio in our portfolios array
+          // Do NOT automatically create positions for companies
+          // This keeps the positions array empty until user explicitly adds companies
+          
+          // Find the portfolio in our portfolios array to ensure minimum positions (placeholders)
           const portfolioIndex = this.portfolios.findIndex(p => p.id === portfolioId);
           if (portfolioIndex !== -1) {
             const portfolio = this.portfolios[portfolioIndex];
             
-            // Create positions for companies if they don't already exist
-            if (companies && companies.length > 0) {
-              // Get existing position company IDs to avoid duplicates
-              const existingCompanyIds = new Set(portfolio.positions
-                .filter(p => !p.isPlaceholder && p.companyId)
-                .map(p => p.companyId));
-              
-              // Add positions for companies that don't already have positions
-              for (const company of companies) {
-                if (!existingCompanyIds.has(company.id)) {
-                  console.log(`Creating position for company ${company.name} (ID: ${company.id})`);
-                  portfolio.positions.push({
-                    companyId: company.id,
-                    companyName: company.name,
-                    weight: 0, // Will be calculated later
-                    isPlaceholder: false
-                  });
-                }
-              }
-              
-              // Apply consistent weight calculation
-              if (portfolio.evenSplit) {
-                this.updatePositionAllocations(portfolioIndex);
-              }
-            }
+            // Ensure placeholders are shown if needed
+            this.ensureMinimumPositions(portfolio);
           }
         } catch (error) {
           console.error(`Error loading companies for portfolio ${portfolioId}:`, error);
@@ -402,8 +392,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const maxPerStock = this.rules.maxPerStock;
         
         // Calculate minimum positions needed: Z = X% ÷ Y%
-        // Round up and apply 2 decimal precision
-        let minPositions = Math.ceil(portfolioPercentage / maxPerStock * 100) / 100;
+        // Always round up to ensure we have enough positions
+        let minPositions = Math.ceil(portfolioPercentage / maxPerStock);
         
         // Ensure at least 1 position
         minPositions = Math.max(1, minPositions);
@@ -425,8 +415,8 @@ document.addEventListener('DOMContentLoaded', function() {
           this.calculateMinimumPositions(portfolio);
         }
         
-        // Just use the calculated minimum positions, rounded up to nearest integer
-        const minPositions = Math.ceil(portfolio.minPositions);
+        // Use the calculated minimum positions (already rounded up in calculateMinimumPositions)
+        const minPositions = portfolio.minPositions;
         
         // First, filter out all placeholder positions to avoid duplicates
         portfolio.positions = portfolio.positions.filter(p => !p.isPlaceholder);
@@ -442,12 +432,21 @@ document.addEventListener('DOMContentLoaded', function() {
         // Calculate actual number of positions remaining
         const positionsRemaining = minPositions - realPositionCount;
         
-        // For placeholder position, just add it with basic properties - weight will be calculated consistently
+        // Add a placeholder position that represents ALL remaining positions
+        // The companyName shows total remaining for user information
+        // For ensureMinimumPositions we recalculate this weight from scratch
+        // (calculation is now centralized in updatePlaceholderWeight which will be called later)
+        // Start with default weight of 0
+        const remainingWeight = 0;
+        
         portfolio.positions.push({
           companyId: null,
           companyName: `${positionsRemaining}x positions remaining`,
-          weight: 0, // This will be calculated correctly by applyConsistentWeightCalculation
-          isPlaceholder: true
+          weight: remainingWeight, // Apply the remaining weight (100% - existing positions weight)
+          isPlaceholder: true,
+          isSinglePosition: false, // Changed to false since this now represents multiple positions
+          minPositions: minPositions, // Store the minPositions for allocation calculation
+          positionsRemaining: positionsRemaining // Store number of positions this placeholder represents
         });
         
         // Apply consistent weight calculation to ensure this portfolio has correct weights
@@ -521,6 +520,9 @@ document.addEventListener('DOMContentLoaded', function() {
         // Ensure minimum positions (updates placeholder)
         this.ensureMinimumPositions(portfolio);
         
+        // Update the placeholder weight to reflect the remaining percentage
+        this.updatePlaceholderWeight(portfolioIndex);
+        
         // Save changes
         this.debouncedSave();
       },
@@ -544,6 +546,9 @@ document.addEventListener('DOMContentLoaded', function() {
           
           // Ensure minimum positions (updates placeholder)
           this.ensureMinimumPositions(portfolio);
+          
+          // Update the placeholder weight to reflect the remaining percentage
+          this.updatePlaceholderWeight(portfolioIndex);
           
           // Save changes
           this.debouncedSave();
@@ -591,17 +596,19 @@ document.addEventListener('DOMContentLoaded', function() {
           const count = realPositions.length;
           
           if (count > 0) {
-            const evenWeight = parseFloat((100 / count).toFixed(2));
+            // Calculate weight based on minimum positions, not just real positions count
+            const minPositions = portfolio.minPositions || count;
+            const evenWeight = parseFloat((100 / minPositions).toFixed(2));
             
             // Set even weight for all valid positions
             realPositions.forEach(position => {
               position.weight = evenWeight;
             });
             
-            // Set placeholders to 0
-            portfolio.positions.filter(p => p.isPlaceholder).forEach(p => {
-              p.weight = 0;
-            });
+            // Instead of manually handling placeholder positions here,
+            // use the updatePlaceholderWeight method which will correctly
+            // set the placeholder weight to (100% - existing positions weight)
+            this.updatePlaceholderWeight(portfolioIndex);
           }
         }
         
@@ -622,20 +629,25 @@ document.addEventListener('DOMContentLoaded', function() {
           const realPositionCount = realPositions.length;
           
           if (realPositionCount > 0) {
-            // Simple even split - divide 100% by the number of positions
-            const evenWeight = parseFloat((100 / realPositionCount).toFixed(2));
+            // Calculate weight based on minimum positions, not real positions
+            // This ensures proper distribution of weight: 100% / minPositions 
+            const minPositions = portfolio.minPositions || realPositionCount;
+            const evenWeight = parseFloat((100 / minPositions).toFixed(2));
             
             // Set weight for all real positions
             realPositions.forEach(position => {
               position.weight = evenWeight;
             });
             
-            // Set placeholders to 0
-            portfolio.positions.filter(p => p.isPlaceholder).forEach(p => {
-              p.weight = 0;
-            });
+            // Instead of manually handling placeholder positions here,
+            // use the updatePlaceholderWeight method which will correctly
+            // set the placeholder weight to (100% - existing positions weight)
+            this.updatePlaceholderWeight(portfolioIndex);
           }
         });
+        
+        // Auto-save
+        this.debouncedSave();
       },
       
       // Recalculate weights for even distribution - delegate to applyConsistentWeightCalculation
@@ -652,10 +664,15 @@ document.addEventListener('DOMContentLoaded', function() {
         let numValue = parseFloat(value.replace('%', ''));
         
         if (!isNaN(numValue)) {
-          // Store exact user input without any adjustments
-          this.portfolios[portfolioIndex].positions[positionIndex].weight = numValue;
+          const portfolio = this.portfolios[portfolioIndex];
           
-          // Just save the change, no adjustments or calculations
+          // Store exact user input without any adjustments
+          portfolio.positions[positionIndex].weight = numValue;
+          
+          // Update the placeholder weight to reflect the remaining percentage
+          this.updatePlaceholderWeight(portfolioIndex);
+          
+          // Save the changes
           this.debouncedSave();
         }
         
@@ -663,6 +680,56 @@ document.addEventListener('DOMContentLoaded', function() {
         setTimeout(() => {
           this.isEditingWeight = false;
         }, 1000);
+      },
+      
+      // Update the placeholder weight based on real positions' weights
+      updatePlaceholderWeight(portfolioIndex) {
+        const portfolio = this.portfolios[portfolioIndex];
+        
+        // Find real positions and placeholder
+        const realPositions = portfolio.positions.filter(p => !p.isPlaceholder);
+        const placeholder = portfolio.positions.find(p => p.isPlaceholder);
+        
+        console.log('Updating placeholder weight:', {
+          portfolioIndex,
+          placeholder,
+          realPositions,
+          positionsRemaining: placeholder ? placeholder.positionsRemaining : 0
+        });
+        
+        if (placeholder && placeholder.positionsRemaining > 0) {
+          // Calculate total weight of real positions
+          const realPositionsWeight = realPositions.reduce((total, position) => {
+            return total + parseFloat(position.weight || 0);
+          }, 0);
+          
+          // Calculate total remaining weight (100% - already allocated weight)
+          // Never allow negative weight
+          const totalRemainingWeight = Math.max(0, parseFloat((100 - realPositionsWeight).toFixed(2)));
+          
+          // Calculate weight per remaining position
+          const weightPerPosition = parseFloat((totalRemainingWeight / placeholder.positionsRemaining).toFixed(2));
+          
+          console.log('Weight calculation:', {
+            realPositionsWeight,
+            totalRemainingWeight,
+            weightPerPosition,
+            positionsRemaining: placeholder.positionsRemaining
+          });
+          
+          // Update the placeholder weight to show weight PER POSITION (not total remaining)
+          placeholder.weight = weightPerPosition;
+          
+          // Store the total remaining weight for calculations
+          placeholder.totalRemainingWeight = totalRemainingWeight;
+          
+          console.log('Updated placeholder weight to:', placeholder.weight);
+        } else if (placeholder) {
+          // If no positions remaining, set weight to 0
+          placeholder.weight = 0;
+          placeholder.totalRemainingWeight = 0;
+          console.log('Set placeholder weight to 0 (no positions remaining)');
+        }
       },
       
       // Check if position weight exceeds maximum
@@ -685,6 +752,19 @@ document.addEventListener('DOMContentLoaded', function() {
       // Calculate total weight for a portfolio
       calculateTotalWeight(portfolioIndex) {
         const portfolio = this.portfolios[portfolioIndex];
+        
+        // If no positions, return 0
+        if (!portfolio.positions || portfolio.positions.length === 0) {
+          return 0;
+        }
+        
+        // If we have any real positions, the total should be 100%
+        const realPositions = portfolio.positions.filter(p => !p.isPlaceholder);
+        if (realPositions.length > 0) {
+          return 100;
+        }
+        
+        // If only placeholder positions, return their weights
         return portfolio.positions.reduce((total, position) => total + parseFloat(position.weight || 0), 0);
       },
       
@@ -705,10 +785,21 @@ document.addEventListener('DOMContentLoaded', function() {
         const position = portfolio.positions[positionIndex];
         const portfolioAmount = this.calculateAllocationAmount(portfolio.allocation);
         
-        // Simply use the position's weight percentage to calculate the amount
-        // The weights are already set correctly by applyConsistentWeightCalculation
-        // when evenSplit is enabled
-        return portfolioAmount * (parseFloat(position.weight || 0) / 100);
+        // For placeholder positions, we need to handle it differently since weight now represents per-position weight
+        if (position.isPlaceholder && position.positionsRemaining) {
+          if (position.totalRemainingWeight !== undefined) {
+            // Use the total remaining weight (stored during updatePlaceholderWeight) 
+            // to calculate the total amount for all remaining positions
+            return portfolioAmount * (parseFloat(position.totalRemainingWeight || 0) / 100);
+          } else {
+            // Fallback - multiply the per-position weight by number of positions remaining
+            const totalWeight = parseFloat(position.weight || 0) * position.positionsRemaining;
+            return portfolioAmount * (totalWeight / 100);
+          }
+        } else {
+          // For regular positions, use the weight percentage as normal
+          return portfolioAmount * (parseFloat(position.weight || 0) / 100);
+        }
       },
       
       // Calculate total allocated amount

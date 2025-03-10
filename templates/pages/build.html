@@ -17,6 +17,56 @@
     .no-lines thead tr th {
         border-bottom: 1px solid #dbdbdb;
     }
+    
+    /* Highlighting for placeholder positions - MUCH MORE VISIBLE NOW */
+    .placeholder-position {
+        background-color: rgba(50, 115, 220, 0.15) !important;
+        font-style: italic;
+    }
+    
+    .placeholder-position td {
+        border-left: 5px solid #3273dc !important;
+        padding-left: 12px;
+    }
+    
+    .placeholder-position .remaining-positions-text {
+        font-weight: 700;
+        color: #3273dc;
+        font-size: 1.05em;
+    }
+    
+    .placeholder-position input {
+        background-color: rgba(50, 115, 220, 0.1);
+        font-weight: 600;
+        color: #3273dc;
+        border-color: #3273dc;
+    }
+    
+    /* Portfolio header styling */
+    .compact-box {
+        border-left: 4px solid #209cee;
+        transition: all 0.3s ease;
+    }
+    
+    .compact-box:hover {
+        box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+    }
+    
+    .columns.is-vcentered.is-mobile .label {
+        color: #363636;
+        font-weight: 600;
+    }
+    
+    /* Highlight the "remaining positions" row with animation */
+    @keyframes highlight-pulse {
+        0% { background-color: rgba(50, 115, 220, 0.15); }
+        50% { background-color: rgba(50, 115, 220, 0.25); }
+        100% { background-color: rgba(50, 115, 220, 0.15); }
+    }
+    
+    .placeholder-position {
+        animation: highlight-pulse 3s infinite;
+    }
 </style>
 {% endblock %}
 
@@ -150,7 +200,7 @@
             <div v-if="portfolios.length > 0" class="mt-4">
                 <div v-for="(portfolio, index) in portfolios" :key="index" class="box compact-box mb-2">
                     <!-- Compact Portfolio Display -->
-                    <div class="columns is-vcentered is-mobile">
+                    <div class="columns is-vcentered is-mobile portfolio-header">
                         <div class="column is-3">
                             <div class="field">
                                 <label class="label">
@@ -293,7 +343,7 @@
                                         <input 
                                             class="input" 
                                             type="text" 
-                                            :value="parseFloat(position.weight).toFixed(2)"
+                                            :value="(position.weight || 0).toFixed(2)"
                                             @change="updateManualWeight(index, pIndex, $event.target.value)"
                                             @focus="$event.target.select()"
                                             :disabled="portfolio.evenSplit" 
