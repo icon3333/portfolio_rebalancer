@@ -16,6 +16,25 @@
     display: flex;
     justify-content: center;
     align-items: center;
+    overflow: hidden;
+    min-height: 350px; /* Ensure minimum height */
+}
+
+/* Make sure the Plotly chart is properly centered */
+.chart-container .js-plotly-plot {
+    width: 100% !important;
+    margin: 0 auto;
+}
+
+/* Additional styles to ensure charts render properly */
+.js-plotly-plot .plotly .main-svg {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+.js-plotly-plot .plotly .svg-container {
+    width: 100% !important;
+    height: 100% !important;
 }
 
 /* Portfolio icon styling */

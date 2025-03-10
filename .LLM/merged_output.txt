@@ -1,5 +1,5 @@
 This file is a merged representation of selected files from the codebase.
-Generated on: 2025-03-10T19:05:37.487514
+Generated on: 2025-03-10T20:18:59.821131
 
 ================================================================
 Purpose:
@@ -412,8 +412,30 @@ input.input {
 /* Chart container styling */
 .chart-container {
     position: relative;
-    height: 300px;
+    height: 350px; /* Match the layout config */
     width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    min-height: 350px; /* Ensure minimum height */
+}
+
+/* Make sure the Plotly chart is properly centered */
+.chart-container .js-plotly-plot {
+    width: 100% !important;
+    margin: 0 auto;
+}
+
+/* Additional styles to ensure charts render properly */
+.js-plotly-plot .plotly .main-svg {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+.js-plotly-plot .plotly .svg-container {
+    width: 100% !important;
+    height: 100% !important;
 }
 
 /* Portfolio icon styling */
@@ -2700,16 +2722,27 @@ document.addEventListener('DOMContentLoaded', function() {
              * Set the active view (global or detail)
              */
             setActiveView(view) {
-                this.activeView = view;
-                
-                if (view === 'detail' && !this.selectedPortfolio && this.portfolioData.portfolios.length > 0) {
-                    this.selectedPortfolio = this.portfolioData.portfolios[0].name;
+                if (this.activeView !== view) {
+                    this.activeView = view;
+                    
+                    // Set default portfolio if needed when switching to detail view
+                    if (view === 'detail' && !this.selectedPortfolio && this.portfolioData.portfolios.length > 0) {
+                        this.selectedPortfolio = this.portfolioData.portfolios[0].name;
+                    }
+                    
+                    // Wait for DOM update before updating charts
+                    this.$nextTick(() => {
+                        // Force a complete redraw of the charts
+                        Plotly.purge('current-distribution-chart');
+                        Plotly.purge('target-distribution-chart');
+                        this.updateChartData();
+                        
+                        // Resize charts to ensure they fit the container
+                        setTimeout(() => {
+                            window.dispatchEvent(new Event('resize'));
+                        }, 100);
+                    });
                 }
-                
-                // Update charts after view change
-                this.$nextTick(() => {
-                    this.updateChartData();
-                });
             },
             
             /**
@@ -2746,15 +2779,41 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Calculate portfolio weights
                 this.portfolioData.portfolios.forEach(portfolio => {
-                    portfolio.currentWeight = (portfolio.currentValue / this.totalValue * 100);
+                    portfolio.currentWeight = this.totalValue ? 
+                        (portfolio.currentValue / this.totalValue * 100).toFixed(2) : 0;
+                        
+                    // Make sure each portfolio has a target weight (use current if missing)
+                    if (!portfolio.targetWeight || isNaN(parseFloat(portfolio.targetWeight))) {
+                        portfolio.targetWeight = parseFloat(portfolio.currentWeight);
+                    }
                     
                     // Calculate category weights within each portfolio
+                    let portfolioCategoryTotal = portfolio.categories.reduce(
+                        (sum, category) => sum + category.currentValue, 0
+                    );
+                    
                     portfolio.categories.forEach(category => {
-                        category.currentWeight = (category.currentValue / portfolio.currentValue * 100);
+                        category.currentWeight = portfolioCategoryTotal ? 
+                            (category.currentValue / portfolioCategoryTotal * 100).toFixed(2) : 0;
+                            
+                        // Make sure each category has a target weight (use current if missing)
+                        if (!category.targetWeight || isNaN(parseFloat(category.targetWeight))) {
+                            category.targetWeight = parseFloat(category.currentWeight);
+                        }
                         
                         // Calculate position weights within each category
+                        let categoryPositionTotal = category.positions.reduce(
+                            (sum, position) => sum + position.currentValue, 0
+                        );
+                        
                         category.positions.forEach(position => {
-                            position.currentWeight = (position.currentValue / category.currentValue * 100);
+                            position.currentWeight = categoryPositionTotal ? 
+                                (position.currentValue / categoryPositionTotal * 100).toFixed(2) : 0;
+                                
+                            // Make sure each position has a target weight (use current if missing)
+                            if (!position.targetWeight || isNaN(parseFloat(position.targetWeight))) {
+                                position.targetWeight = parseFloat(position.currentWeight);
+                            }
                         });
                     });
                 });
@@ -2946,10 +3005,7 @@ document.addEventListener('DOMContentLoaded', function() {
              * Initialize plotly charts for visualization
              */
             initializeCharts() {
-                // Get chart data
-                const chartData = this.getChartData();
-
-                // Create chart configuration
+                // Enhanced layout with automargin
                 const layout = {
                     showlegend: true,
                     legend: { 
@@ -2963,97 +3019,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     autosize: true,
                     margin: { l: 30, r: 30, t: 30, b: 50 },
                     paper_bgcolor: 'transparent',
-                    plot_bgcolor: 'transparent'
+                    plot_bgcolor: 'transparent',
+                    automargin: true
                 };
-
-                // Create current distribution chart
-                const currentDistributionElement = document.getElementById('current-distribution-chart');
-                if (currentDistributionElement) {
-                    const currentData = [{
-                        type: 'pie',
-                        values: chartData.current.map(item => item.value),
-                        labels: chartData.current.map(item => item.name),
-                        textinfo: 'label+percent',
-                        textposition: 'auto',
-                        hoverinfo: 'label+percent+value',
-                        hole: 0.5,
-                        marker: {
-                            colors: chartData.current.map(item => item.color)
-                        },
-                        textfont: {
-                            size: 12,
-                            color: '#ffffff'
-                        },
-                        insidetextfont: {
-                            size: 12,
-                            color: '#ffffff'
-                        },
-                        outsidetextfont: {
-                            size: 12,
-                            color: '#333333'
-                        }
-                    }];
-                    
-                    Plotly.newPlot('current-distribution-chart', currentData, { ...layout });
-                }
-
-                // Create target distribution chart
-                const targetDistributionElement = document.getElementById('target-distribution-chart');
-                if (targetDistributionElement) {
-                    const targetData = [{
-                        type: 'pie',
-                        values: chartData.target.map(item => item.value),
-                        labels: chartData.target.map(item => item.name),
-                        textinfo: 'label+percent',
-                        textposition: 'auto',
-                        hoverinfo: 'label+percent+value',
-                        hole: 0.5,
-                        marker: {
-                            colors: chartData.target.map(item => item.color)
-                        },
-                        textfont: {
-                            size: 12,
-                            color: '#ffffff'
-                        },
-                        insidetextfont: {
-                            size: 12,
-                            color: '#ffffff'
-                        },
-                        outsidetextfont: {
-                            size: 12,
-                            color: '#333333'
-                        }
-                    }];
-                    
-                    Plotly.newPlot('target-distribution-chart', targetData, { ...layout });
-                }
-            },
             
-            /**
-             * Update chart data when view or state changes
-             */
-            updateChartData() {
-                // Get updated chart data
                 const chartData = this.getChartData();
-
-                // Create chart layout
-                const layout = {
-                    showlegend: true,
-                    legend: {
-                        orientation: 'h',
-                        y: -0.15,
-                        xanchor: 'center',
-                        x: 0.5,
-                        font: { size: 12 }
-                    },
-                    height: 350,
-                    autosize: true,
-                    margin: { l: 30, r: 30, t: 30, b: 50 },
-                    paper_bgcolor: 'transparent',
-                    plot_bgcolor: 'transparent'
-                };
-
-                // Update current distribution chart
+                
+                // Create current distribution chart
                 const currentData = [{
                     type: 'pie',
                     values: chartData.current.map(item => item.value),
@@ -3076,12 +3048,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     outsidetextfont: {
                         size: 12,
                         color: '#333333'
-                    }
+                    },
+                    automargin: true
                 }];
                 
-                Plotly.react('current-distribution-chart', currentData, { ...layout });
-
-                // Update target distribution chart
+                Plotly.newPlot('current-distribution-chart', currentData, { ...layout });
+            
+                // Create target distribution chart
                 const targetData = [{
                     type: 'pie',
                     values: chartData.target.map(item => item.value),
@@ -3104,10 +3077,128 @@ document.addEventListener('DOMContentLoaded', function() {
                     outsidetextfont: {
                         size: 12,
                         color: '#333333'
-                    }
+                    },
+                    automargin: true
                 }];
                 
-                Plotly.react('target-distribution-chart', targetData, { ...layout });
+                Plotly.newPlot('target-distribution-chart', targetData, { ...layout });
+            },
+            
+            /**
+             * Update chart data when view or state changes
+             */
+            updateChartData() {
+                // Get updated chart data
+                const chartData = this.getChartData();
+                
+                console.log('Updating chart data:', {
+                    currentLength: chartData.current.length,
+                    targetLength: chartData.target.length,
+                    current: chartData.current,
+                    target: chartData.target
+                });
+
+                // If there's no data, don't try to render the charts
+                if (!chartData.current.length && !chartData.target.length) {
+                    console.warn('No chart data available for rendering');
+                    return;
+                }
+
+                // Create chart layout - ensure consistency with initialization
+                const layout = {
+                    showlegend: true,
+                    legend: {
+                        orientation: 'h',
+                        y: -0.15,
+                        xanchor: 'center',
+                        x: 0.5,
+                        font: { size: 12 }
+                    },
+                    height: 350,
+                    autosize: true,
+                    margin: { l: 30, r: 30, t: 30, b: 50 },
+                    paper_bgcolor: 'transparent',
+                    plot_bgcolor: 'transparent',
+                    automargin: true
+                };
+
+                // Check for the chart elements in the DOM
+                const currentElement = document.getElementById('current-distribution-chart');
+                const targetElement = document.getElementById('target-distribution-chart');
+
+                // Update current distribution chart if element exists and we have data
+                if (currentElement && chartData.current.length > 0) {
+                    const currentData = [{
+                        type: 'pie',
+                        values: chartData.current.map(item => item.value),
+                        labels: chartData.current.map(item => item.name),
+                        textinfo: 'label+percent',
+                        textposition: 'auto',
+                        hoverinfo: 'label+percent+value',
+                        hole: 0.5,
+                        marker: {
+                            colors: chartData.current.map(item => item.color)
+                        },
+                        textfont: {
+                            size: 12,
+                            color: '#ffffff'
+                        },
+                        insidetextfont: {
+                            size: 12,
+                            color: '#ffffff'
+                        },
+                        outsidetextfont: {
+                            size: 12,
+                            color: '#333333'
+                        },
+                        automargin: true
+                    }];
+                    
+                    // Use Plotly.purge to fully clean and redraw
+                    Plotly.purge('current-distribution-chart');
+                    Plotly.newPlot('current-distribution-chart', currentData, { ...layout });
+                    console.log('Updated current distribution chart');
+                }
+
+                // Update target distribution chart if element exists and we have data
+                if (targetElement && chartData.target.length > 0) {
+                    const targetData = [{
+                        type: 'pie',
+                        values: chartData.target.map(item => item.value),
+                        labels: chartData.target.map(item => item.name),
+                        textinfo: 'label+percent',
+                        textposition: 'auto',
+                        hoverinfo: 'label+percent+value',
+                        hole: 0.5,
+                        marker: {
+                            colors: chartData.target.map(item => item.color)
+                        },
+                        textfont: {
+                            size: 12,
+                            color: '#ffffff'
+                        },
+                        insidetextfont: {
+                            size: 12,
+                            color: '#ffffff'
+                        },
+                        outsidetextfont: {
+                            size: 12,
+                            color: '#333333'
+                        },
+                        automargin: true
+                    }];
+                    
+                    // Use Plotly.purge to fully clean and redraw
+                    Plotly.purge('target-distribution-chart');
+                    Plotly.newPlot('target-distribution-chart', targetData, { ...layout });
+                    console.log('Updated target distribution chart');
+                } else {
+                    // If we have target data but no element or couldn't plot, log a warning
+                    if (chartData.target.length > 0) {
+                        console.warn('Target chart element not found or unable to render target chart', 
+                            targetElement ? 'Element exists' : 'Element not found');
+                    }
+                }
             },
             
             /**
@@ -3115,33 +3206,103 @@ document.addEventListener('DOMContentLoaded', function() {
              */
             getChartData() {
                 if (this.activeView === 'global') {
-                    return {
-                        current: this.portfolioData.portfolios.map(item => ({
-                            name: item.name,
-                            value: parseFloat(item.currentWeight.toFixed(2)),
-                            color: item.color
-                        })),
-                        target: this.portfolioData.portfolios.map(item => ({
-                            name: item.name,
-                            value: parseFloat(item.finalWeight),
-                            color: item.color
+                    // Ensure all portfolios have valid target weights
+                    const portfoliosWithTargets = this.portfolioData.portfolios.map(item => {
+                        // Ensure target weight exists
+                        if (!item.targetWeight && item.targetWeight !== 0) {
+                            item.targetWeight = parseFloat(item.currentWeight || 0);
+                        }
+                        return item;
+                    });
+                    
+                    // Filter out any items with zero values to prevent empty charts
+                    const currentItems = portfoliosWithTargets.filter(item => 
+                        item.currentWeight && parseFloat(item.currentWeight) > 0
+                    ).map(item => ({
+                        name: item.name,
+                        value: parseFloat((item.currentWeight || 0).toFixed(2)),
+                        color: item.color
+                    }));
+                    
+                    const targetItems = portfoliosWithTargets.filter(item => {
+                        // Use finalWeight, targetWeight, or currentWeight (in that order)
+                        const value = parseFloat(
+                            (item.finalWeight || item.targetWeight || item.currentWeight || 0).toString()
+                        );
+                        return value > 0;
+                    }).map(item => ({
+                        name: item.name,
+                        value: parseFloat(
+                            (item.finalWeight || item.targetWeight || item.currentWeight || 0).toString()
+                        ),
+                        color: item.color
+                    }));
+                    
+                    console.log('Global View Chart Data:', {
+                        current: currentItems,
+                        target: targetItems,
+                        portfolios: portfoliosWithTargets.map(p => ({
+                            name: p.name,
+                            currentWeight: p.currentWeight,
+                            targetWeight: p.targetWeight,
+                            finalWeight: p.finalWeight
                         }))
+                    });
+                    
+                    return {
+                        current: currentItems,
+                        target: targetItems
                     };
                 } else if (this.activeView === 'detail' && this.selectedPortfolio) {
                     const portfolio = this.portfolioData.portfolios.find(p => p.name === this.selectedPortfolio);
-                    if (!portfolio) return { current: [], target: [] };
+                    if (!portfolio || !portfolio.categories) return { current: [], target: [] };
+                    
+                    // Ensure all categories have valid target weights
+                    const categoriesWithTargets = portfolio.categories.map(item => {
+                        // Ensure target weight exists
+                        if (!item.targetWeight && item.targetWeight !== 0) {
+                            item.targetWeight = parseFloat(item.currentWeight || 0);
+                        }
+                        return item;
+                    });
+                    
+                    // Filter out any categories with zero values to prevent empty charts
+                    const currentItems = categoriesWithTargets.filter(item => 
+                        item.currentWeight && parseFloat(item.currentWeight) > 0
+                    ).map(item => ({
+                        name: item.name,
+                        value: parseFloat((item.currentWeight || 0).toFixed(2)),
+                        color: item.color
+                    }));
+                    
+                    const targetItems = categoriesWithTargets.filter(item => {
+                        // Use finalWeight, targetWeight, or currentWeight (in that order)
+                        const value = parseFloat(
+                            (item.finalWeight || item.targetWeight || item.currentWeight || 0).toString()
+                        );
+                        return value > 0;
+                    }).map(item => ({
+                        name: item.name,
+                        value: parseFloat(
+                            (item.finalWeight || item.targetWeight || item.currentWeight || 0).toString()
+                        ),
+                        color: item.color
+                    }));
+                    
+                    console.log('Detail View Chart Data:', {
+                        current: currentItems,
+                        target: targetItems,
+                        categories: categoriesWithTargets.map(c => ({
+                            name: c.name,
+                            currentWeight: c.currentWeight,
+                            targetWeight: c.targetWeight,
+                            finalWeight: c.finalWeight
+                        }))
+                    });
                     
                     return {
-                        current: portfolio.categories.map(item => ({
-                            name: item.name,
-                            value: parseFloat(item.currentWeight.toFixed(2)),
-                            color: item.color
-                        })),
-                        target: portfolio.categories.map(item => ({
-                            name: item.name,
-                            value: parseFloat(item.finalWeight),
-                            color: item.color
-                        }))
+                        current: currentItems,
+                        target: targetItems
                     };
                 }
                 
@@ -3168,20 +3329,70 @@ document.addEventListener('DOMContentLoaded', function() {
                 return `${parseFloat(value).toFixed(1)}%`;
             }
         },
+        // In mounted hook:
         mounted() {
             // Initialize the component
             this.initialize();
             
-            // Dismiss notifications (if any)
-            document.querySelectorAll('.notification .delete').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    btn.parentNode.classList.add('is-hidden');
+            // Ensure charts are properly rendered when data changes
+            this.$watch('portfolioData', () => {
+                this.$nextTick(() => {
+                    // First calculate weights and actions
+                    this.calculateCurrentWeights();
+                    this.calculateRequiredCapitalForNoSales();
+                    this.calculateTargetValuesAndActions();
+                    
+                    // Then update charts
+                    this.updateChartData();
+                });
+            }, { deep: true });
+            
+            // Update charts when view changes
+            this.$watch('activeView', () => {
+                this.$nextTick(() => {
+                    this.updateChartData();
+                    
+                    // Resize charts to ensure they fit the container
+                    setTimeout(() => {
+                        window.dispatchEvent(new Event('resize'));
+                    }, 100);
                 });
             });
             
-            // In a real implementation, we would load data from an API here
-            // For example:
-            // this.loadPortfolioData();
+            // Update charts when selected portfolio changes
+            this.$watch('selectedPortfolio', () => {
+                this.$nextTick(() => {
+                    this.updateChartData();
+                });
+            });
+            
+            // Update charts when rebalance mode changes
+            this.$watch('rebalanceMode', () => {
+                this.$nextTick(() => {
+                    this.calculateTargetValuesAndActions();
+                    this.updateChartData();
+                });
+            });
+            
+            // Update charts when new capital amount changes
+            this.$watch('newCapitalAmount', () => {
+                this.$nextTick(() => {
+                    this.calculateTargetValuesAndActions();
+                    this.updateChartData();
+                });
+            });
+            
+            // Add window resize handler to ensure charts are responsive
+            window.addEventListener('resize', () => {
+                this.$nextTick(() => {
+                    this.updateChartData();
+                });
+            });
+            
+            // Force an update after a short delay to ensure DOM is ready
+            setTimeout(() => {
+                this.updateChartData();
+            }, 500);
         }
     });
 });

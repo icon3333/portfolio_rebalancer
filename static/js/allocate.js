@@ -265,16 +265,27 @@ document.addEventListener('DOMContentLoaded', function() {
              * Set the active view (global or detail)
              */
             setActiveView(view) {
-                this.activeView = view;
-                
-                if (view === 'detail' && !this.selectedPortfolio && this.portfolioData.portfolios.length > 0) {
-                    this.selectedPortfolio = this.portfolioData.portfolios[0].name;
+                if (this.activeView !== view) {
+                    this.activeView = view;
+                    
+                    // Set default portfolio if needed when switching to detail view
+                    if (view === 'detail' && !this.selectedPortfolio && this.portfolioData.portfolios.length > 0) {
+                        this.selectedPortfolio = this.portfolioData.portfolios[0].name;
+                    }
+                    
+                    // Wait for DOM update before updating charts
+                    this.$nextTick(() => {
+                        // Force a complete redraw of the charts
+                        Plotly.purge('current-distribution-chart');
+                        Plotly.purge('target-distribution-chart');
+                        this.updateChartData();
+                        
+                        // Resize charts to ensure they fit the container
+                        setTimeout(() => {
+                            window.dispatchEvent(new Event('resize'));
+                        }, 100);
+                    });
                 }
-                
-                // Update charts after view change
-                this.$nextTick(() => {
-                    this.updateChartData();
-                });
             },
             
             /**
@@ -311,15 +322,41 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Calculate portfolio weights
                 this.portfolioData.portfolios.forEach(portfolio => {
-                    portfolio.currentWeight = (portfolio.currentValue / this.totalValue * 100);
+                    portfolio.currentWeight = this.totalValue ? 
+                        parseFloat((portfolio.currentValue / this.totalValue * 100).toFixed(2)) : 0;
+                        
+                    // Make sure each portfolio has a target weight (use current if missing)
+                    if (!portfolio.targetWeight || isNaN(parseFloat(String(portfolio.targetWeight)))) {
+                        portfolio.targetWeight = parseFloat(String(portfolio.currentWeight));
+                    }
                     
                     // Calculate category weights within each portfolio
+                    let portfolioCategoryTotal = portfolio.categories.reduce(
+                        (sum, category) => sum + category.currentValue, 0
+                    );
+                    
                     portfolio.categories.forEach(category => {
-                        category.currentWeight = (category.currentValue / portfolio.currentValue * 100);
+                        category.currentWeight = portfolioCategoryTotal ? 
+                            parseFloat((category.currentValue / portfolioCategoryTotal * 100).toFixed(2)) : 0;
+                            
+                        // Make sure each category has a target weight (use current if missing)
+                        if (!category.targetWeight || isNaN(parseFloat(String(category.targetWeight)))) {
+                            category.targetWeight = parseFloat(String(category.currentWeight));
+                        }
                         
                         // Calculate position weights within each category
+                        let categoryPositionTotal = category.positions.reduce(
+                            (sum, position) => sum + position.currentValue, 0
+                        );
+                        
                         category.positions.forEach(position => {
-                            position.currentWeight = (position.currentValue / category.currentValue * 100);
+                            position.currentWeight = categoryPositionTotal ? 
+                                parseFloat((position.currentValue / categoryPositionTotal * 100).toFixed(2)) : 0;
+                                
+                            // Make sure each position has a target weight (use current if missing)
+                            if (!position.targetWeight || isNaN(parseFloat(String(position.targetWeight)))) {
+                                position.targetWeight = parseFloat(String(position.currentWeight));
+                            }
                         });
                     });
                 });
@@ -493,15 +530,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Recalculate final weights after actions
                 this.portfolioData.portfolios.forEach(portfolio => {
-                    portfolio.finalWeight = (portfolio.targetValue / this.newPortfolioValue * 100).toFixed(2);
+                    portfolio.finalWeight = parseFloat((portfolio.targetValue / this.newPortfolioValue * 100).toFixed(2));
                     
                     // Recalculate category final weights
                     portfolio.categories.forEach(category => {
-                        category.finalWeight = (category.targetValue / portfolio.targetValue * 100).toFixed(2);
+                        category.finalWeight = parseFloat((category.targetValue / portfolio.targetValue * 100).toFixed(2));
                         
                         // Recalculate position final weights
                         category.positions.forEach(position => {
-                            position.finalWeight = (position.targetValue / category.targetValue * 100).toFixed(2);
+                            position.finalWeight = parseFloat((position.targetValue / category.targetValue * 100).toFixed(2));
                         });
                     });
                 });
@@ -596,8 +633,21 @@ document.addEventListener('DOMContentLoaded', function() {
             updateChartData() {
                 // Get updated chart data
                 const chartData = this.getChartData();
+                
+                console.log('Updating chart data:', {
+                    currentLength: chartData.current.length,
+                    targetLength: chartData.target.length,
+                    current: chartData.current,
+                    target: chartData.target
+                });
 
-                // Create chart layout
+                // If there's no data, don't try to render the charts
+                if (!chartData.current.length && !chartData.target.length) {
+                    console.warn('No chart data available for rendering');
+                    return;
+                }
+
+                // Create chart layout - ensure consistency with initialization
                 const layout = {
                     showlegend: true,
                     legend: {
@@ -611,64 +661,87 @@ document.addEventListener('DOMContentLoaded', function() {
                     autosize: true,
                     margin: { l: 30, r: 30, t: 30, b: 50 },
                     paper_bgcolor: 'transparent',
-                    plot_bgcolor: 'transparent'
+                    plot_bgcolor: 'transparent',
+                    automargin: true
                 };
 
-                // Update current distribution chart
-                const currentData = [{
-                    type: 'pie',
-                    values: chartData.current.map(item => item.value),
-                    labels: chartData.current.map(item => item.name),
-                    textinfo: 'label+percent',
-                    textposition: 'auto',
-                    hoverinfo: 'label+percent+value',
-                    hole: 0.5,
-                    marker: {
-                        colors: chartData.current.map(item => item.color)
-                    },
-                    textfont: {
-                        size: 12,
-                        color: '#ffffff'
-                    },
-                    insidetextfont: {
-                        size: 12,
-                        color: '#ffffff'
-                    },
-                    outsidetextfont: {
-                        size: 12,
-                        color: '#333333'
-                    }
-                }];
-                
-                Plotly.react('current-distribution-chart', currentData, { ...layout });
+                // Check for the chart elements in the DOM
+                const currentElement = document.getElementById('current-distribution-chart');
+                const targetElement = document.getElementById('target-distribution-chart');
 
-                // Update target distribution chart
-                const targetData = [{
-                    type: 'pie',
-                    values: chartData.target.map(item => item.value),
-                    labels: chartData.target.map(item => item.name),
-                    textinfo: 'label+percent',
-                    textposition: 'auto',
-                    hoverinfo: 'label+percent+value',
-                    hole: 0.5,
-                    marker: {
-                        colors: chartData.target.map(item => item.color)
-                    },
-                    textfont: {
-                        size: 12,
-                        color: '#ffffff'
-                    },
-                    insidetextfont: {
-                        size: 12,
-                        color: '#ffffff'
-                    },
-                    outsidetextfont: {
-                        size: 12,
-                        color: '#333333'
+                // Update current distribution chart if element exists and we have data
+                if (currentElement && chartData.current.length > 0) {
+                    const currentData = [{
+                        type: 'pie',
+                        values: chartData.current.map(item => item.value),
+                        labels: chartData.current.map(item => item.name),
+                        textinfo: 'label+percent',
+                        textposition: 'auto',
+                        hoverinfo: 'label+percent+value',
+                        hole: 0.5,
+                        marker: {
+                            colors: chartData.current.map(item => item.color)
+                        },
+                        textfont: {
+                            size: 12,
+                            color: '#ffffff'
+                        },
+                        insidetextfont: {
+                            size: 12,
+                            color: '#ffffff'
+                        },
+                        outsidetextfont: {
+                            size: 12,
+                            color: '#333333'
+                        },
+                        automargin: true
+                    }];
+                    
+                    // Use Plotly.purge to fully clean and redraw
+                    Plotly.purge('current-distribution-chart');
+                    Plotly.newPlot('current-distribution-chart', currentData, { ...layout });
+                    console.log('Updated current distribution chart');
+                }
+
+                // Update target distribution chart if element exists and we have data
+                if (targetElement && chartData.target.length > 0) {
+                    const targetData = [{
+                        type: 'pie',
+                        values: chartData.target.map(item => item.value),
+                        labels: chartData.target.map(item => item.name),
+                        textinfo: 'label+percent',
+                        textposition: 'auto',
+                        hoverinfo: 'label+percent+value',
+                        hole: 0.5,
+                        marker: {
+                            colors: chartData.target.map(item => item.color)
+                        },
+                        textfont: {
+                            size: 12,
+                            color: '#ffffff'
+                        },
+                        insidetextfont: {
+                            size: 12,
+                            color: '#ffffff'
+                        },
+                        outsidetextfont: {
+                            size: 12,
+                            color: '#333333'
+                        },
+                        automargin: true
+                    }];
+                    
+                    // Use Plotly.purge to fully clean and redraw
+                    Plotly.purge('target-distribution-chart');
+                    Plotly.newPlot('target-distribution-chart', targetData, { ...layout });
+                    console.log('Updated target distribution chart');
+                } else {
+                    // If we have target data but no element or couldn't plot, log a warning
+                    if (chartData.target.length > 0) {
+                        console.warn('Target chart element not found or unable to render target chart', 
+                            targetElement ? 'Element exists' : 'Element not found');
                     }
-                }];
-                
-                Plotly.react('target-distribution-chart', targetData, { ...layout });
+                }
             },
             
             /**
@@ -676,39 +749,135 @@ document.addEventListener('DOMContentLoaded', function() {
              */
             getChartData() {
                 if (this.activeView === 'global') {
-                    return {
-                        current: this.portfolioData.portfolios.map(item => ({
-                            name: item.name,
-                            value: parseFloat((item.currentWeight || 0).toFixed(2)),
-                            color: item.color
-                        })),
-                        target: this.portfolioData.portfolios.map(item => ({
-                            name: item.name,
-                            // Check both properties with fallback
-                            value: parseFloat(
-                                (item.finalWeight || item.targetWeight || item.currentWeight || 0).toString()
-                            ),
-                            color: item.color
+                    // Ensure all portfolios have valid target weights
+                    const portfoliosWithTargets = this.portfolioData.portfolios.map(item => {
+                        // Ensure target weight exists
+                        if (!item.targetWeight && item.targetWeight !== 0) {
+                            item.targetWeight = parseFloat(item.currentWeight || 0);
+                        }
+                        return item;
+                    });
+                    
+                    // Filter out any items with zero values to prevent empty charts
+                    const currentItems = portfoliosWithTargets.filter(item => 
+                        item.currentWeight && parseFloat(String(item.currentWeight)) > 0
+                    ).map(item => ({
+                        name: item.name,
+                        value: parseFloat(String(item.currentWeight || 0)),
+                        color: item.color
+                    }));
+                    
+                    const targetItems = portfoliosWithTargets.filter(item => {
+                        // Use finalWeight, targetWeight, or currentWeight (in that order)
+                        const value = parseFloat(
+                            String(item.finalWeight || item.targetWeight || item.currentWeight || 0)
+                        );
+                        return value > 0;
+                    }).map(item => ({
+                        name: item.name,
+                        value: parseFloat(
+                            String(item.finalWeight || item.targetWeight || item.currentWeight || 0)
+                        ),
+                        color: item.color
+                    }));
+                    
+                    console.log('Global View Chart Data:', {
+                        current: currentItems,
+                        target: targetItems,
+                        portfolios: portfoliosWithTargets.map(p => ({
+                            name: p.name,
+                            currentWeight: p.currentWeight,
+                            targetWeight: p.targetWeight,
+                            finalWeight: p.finalWeight
                         }))
+                    });
+                    
+                    // Fallback: if no data exists, supply dummy data so a blank chart is still rendered
+                    if (currentItems.length === 0) {
+                        currentItems.push({
+                            name: 'No Data',
+                            value: 100,
+                            color: '#CCCCCC'
+                        });
+                    }
+                    if (targetItems.length === 0) {
+                        targetItems.push({
+                            name: 'No Data',
+                            value: 100,
+                            color: '#CCCCCC'
+                        });
+                    }
+                    
+                    return {
+                        current: currentItems,
+                        target: targetItems
                     };
                 } else if (this.activeView === 'detail' && this.selectedPortfolio) {
                     const portfolio = this.portfolioData.portfolios.find(p => p.name === this.selectedPortfolio);
                     if (!portfolio || !portfolio.categories) return { current: [], target: [] };
                     
-                    return {
-                        current: portfolio.categories.map(item => ({
-                            name: item.name,
-                            value: parseFloat((item.currentWeight || 0).toFixed(2)),
-                            color: item.color
-                        })),
-                        target: portfolio.categories.map(item => ({
-                            name: item.name,
-                            // Check both properties with fallback
-                            value: parseFloat(
-                                (item.finalWeight || item.targetWeight || item.currentWeight || 0).toString()
-                            ),
-                            color: item.color
+                    // Ensure all categories have valid target weights
+                    const categoriesWithTargets = portfolio.categories.map(item => {
+                        // Ensure target weight exists
+                        if (!item.targetWeight && item.targetWeight !== 0) {
+                            item.targetWeight = parseFloat(item.currentWeight || 0);
+                        }
+                        return item;
+                    });
+                    
+                    // Filter out any categories with zero values to prevent empty charts
+                    const currentItems = categoriesWithTargets.filter(item => 
+                        item.currentWeight && parseFloat(String(item.currentWeight)) > 0
+                    ).map(item => ({
+                        name: item.name,
+                        value: parseFloat(String(item.currentWeight || 0)),
+                        color: item.color
+                    }));
+                    
+                    const targetItems = categoriesWithTargets.filter(item => {
+                        // Use finalWeight, targetWeight, or currentWeight (in that order)
+                        const value = parseFloat(
+                            (item.finalWeight || item.targetWeight || item.currentWeight || 0).toString()
+                        );
+                        return value > 0;
+                    }).map(item => ({
+                        name: item.name,
+                        value: parseFloat(
+                            (item.finalWeight || item.targetWeight || item.currentWeight || 0).toString()
+                        ),
+                        color: item.color
+                    }));
+                    
+                    console.log('Detail View Chart Data:', {
+                        current: currentItems,
+                        target: targetItems,
+                        categories: categoriesWithTargets.map(c => ({
+                            name: c.name,
+                            currentWeight: c.currentWeight,
+                            targetWeight: c.targetWeight,
+                            finalWeight: c.finalWeight
                         }))
+                    });
+                    
+                    // Fallback: if no data exists, supply dummy data so a blank chart is still rendered
+                    if (currentItems.length === 0) {
+                        currentItems.push({
+                            name: 'No Data',
+                            value: 100,
+                            color: '#CCCCCC'
+                        });
+                    }
+                    if (targetItems.length === 0) {
+                        targetItems.push({
+                            name: 'No Data',
+                            value: 100,
+                            color: '#CCCCCC'
+                        });
+                    }
+                    
+                    return {
+                        current: currentItems,
+                        target: targetItems
                     };
                 }
                 
@@ -732,7 +901,8 @@ document.addEventListener('DOMContentLoaded', function() {
              */
             formatPercentage(value) {
                 if (value === null || value === undefined) return '0%';
-                return `${parseFloat(value).toFixed(1)}%`;
+                // Ensure value is a number before calling toFixed
+                return `${parseFloat(String(value)).toFixed(1)}%`;
             }
         },
         // In mounted hook:
@@ -743,6 +913,12 @@ document.addEventListener('DOMContentLoaded', function() {
             // Ensure charts are properly rendered when data changes
             this.$watch('portfolioData', () => {
                 this.$nextTick(() => {
+                    // First calculate weights and actions
+                    this.calculateCurrentWeights();
+                    this.calculateRequiredCapitalForNoSales();
+                    this.calculateTargetValuesAndActions();
+                    
+                    // Then update charts
                     this.updateChartData();
                 });
             }, { deep: true });
@@ -751,6 +927,11 @@ document.addEventListener('DOMContentLoaded', function() {
             this.$watch('activeView', () => {
                 this.$nextTick(() => {
                     this.updateChartData();
+                    
+                    // Resize charts to ensure they fit the container
+                    setTimeout(() => {
+                        window.dispatchEvent(new Event('resize'));
+                    }, 100);
                 });
             });
             
@@ -760,6 +941,34 @@ document.addEventListener('DOMContentLoaded', function() {
                     this.updateChartData();
                 });
             });
+            
+            // Update charts when rebalance mode changes
+            this.$watch('rebalanceMode', () => {
+                this.$nextTick(() => {
+                    this.calculateTargetValuesAndActions();
+                    this.updateChartData();
+                });
+            });
+            
+            // Update charts when new capital amount changes
+            this.$watch('newCapitalAmount', () => {
+                this.$nextTick(() => {
+                    this.calculateTargetValuesAndActions();
+                    this.updateChartData();
+                });
+            });
+            
+            // Add window resize handler to ensure charts are responsive
+            window.addEventListener('resize', () => {
+                this.$nextTick(() => {
+                    this.updateChartData();
+                });
+            });
+            
+            // Force an update after a short delay to ensure DOM is ready
+            setTimeout(() => {
+                this.updateChartData();
+            }, 500);
         }
     });
 });
