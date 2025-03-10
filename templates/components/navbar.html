@@ -16,6 +16,22 @@
 
     <div id="navbarBasic" class="navbar-menu">
         <div class="navbar-start">
+            <!-- Navigation items can be added here if needed -->
+        </div>
+
+        <div class="navbar-end">
+            <div class="navbar-item">
+                <div class="buttons">
+                    {% if not session.account_id %}
+                    <button class="button is-primary is-light js-modal-trigger" data-target="create-account-modal">
+                        <span class="icon">
+                            <i class="fas fa-plus"></i>
+                        </span>
+                        <span>Create Account</span>
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
             {% if session.account_id %}
             <div class="navbar-item has-dropdown is-hoverable">
                 <a class="navbar-link">
@@ -25,7 +41,7 @@
                     <span>{{ session.username }}</span>
                 </a>
 
-                <div class="navbar-dropdown">
+                <div class="navbar-dropdown is-right">
                     <a class="navbar-item" href="{{ url_for('account.index') }}">
                         <span class="icon">
                             <i class="fas fa-cog"></i>
@@ -42,27 +58,6 @@
                 </div>
             </div>
             {% endif %}
-        </div>
-
-        <div class="navbar-end">
-            <div class="navbar-item">
-                <div class="buttons">
-                    {% if not session.account_id %}
-                    <button class="button is-primary is-light js-modal-trigger" data-target="create-account-modal">
-                        <span class="icon">
-                            <i class="fas fa-plus"></i>
-                        </span>
-                        <span>Create Account</span>
-                    </button>
-                    {% endif %}
-                    <a class="button is-light" href="https://github.com/your-username/portfolio-app" target="_blank">
-                        <span class="icon">
-                            <i class="fab fa-github"></i>
-                        </span>
-                        <span>GitHub</span>
-                    </a>
-                </div>
-            </div>
         </div>
     </div>
 </nav>

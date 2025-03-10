@@ -1,11 +1,13 @@
 # Focus
-templates/pages/build.html
 static/css/*
 static/js/*
 config.py
 app/routes/portfolio_routes.py
 app/utils/formatting.py
-#app/utils/db_utils.py
+app/utils/db_utils.py
+templates/pages/allocation.html
+templates/pages/build.html
+
 #templates/pages/enrich.html
 #templates/pages/index.html
 #templates/base.html

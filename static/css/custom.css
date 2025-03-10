@@ -6,15 +6,25 @@
 }
 
 .navbar-item,
-.navbar-link,
-.navbar-dropdown .navbar-item {
+.navbar-link {
     color: var(--white) !important;
+}
+
+/* Ensure dropdown items have dark text for visibility */
+.navbar-dropdown .navbar-item {
+    color: var(--dark-grey) !important;
 }
 
 .navbar-item:hover,
 .navbar-link:hover {
     background-color: var(--blue-700) !important;
     color: var(--white) !important;
+}
+
+/* Custom hover for dropdown items */
+.navbar-dropdown .navbar-item:hover {
+    background-color: var(--blue-100) !important;
+    color: var(--dark-grey) !important;
 }
 
 .navbar-burger {

@@ -1,19 +1,6 @@
 <aside class="menu p-4 has-background-light" style="height: 100%; min-height: calc(100vh - 3.25rem);">
     {% if session.account_id %}
-    <ul class="menu-list">
-        <li>
-            <a href="{{ url_for('account.index') }}" class="{{ 'is-active' if request.endpoint == 'account.index' }}">
-                <span class="icon-text">
-                    <span class="icon">
-                        <i class="fas fa-user-cog"></i>
-                    </span>
-                    <span>Account</span>
-                </span>
-            </a>
-        </li>
-    </ul>
-    
-    <p class="menu-label mt-5">
+    <p class="menu-label">
         Portfolios
     </p>
     <ul class="menu-list">
