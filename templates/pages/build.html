@@ -220,7 +220,7 @@
                                 <label class="label">Allocation %</label>
                                 <div class="control">
                                     <input class="input" type="text" 
-                                           :value="parseFloat(portfolio.allocation).toFixed(2)" 
+                                           :value="parseFloat(portfolio.allocation).toFixed(0)" 
                                            @change="$event.target.value && $event.target.value.length > 0 ? portfolio.allocation = parseFloat($event.target.value) : null; updateAllocations()"
                                            @focus="$event.target.select()">
                                 </div>
@@ -267,7 +267,7 @@
                                 <div class="field">
                                     <label class="label">Maximum Weight per Position</label>
                                     <div class="control">
-                                        <input class="input" type="text" :value="(100 / Math.max(1, Math.ceil(portfolio.minPositions))).toFixed(2) + '%'" readonly>
+                                        <input class="input" type="text" :value="(100 / Math.max(1, Math.ceil(portfolio.minPositions))).toFixed(0) + '%'" readonly>
                                     </div>
                                 </div>
                             </div>
@@ -353,7 +353,7 @@
                                                 <input 
                                                     class="input" 
                                                     type="text" 
-                                                    :value="(position.weight || 0).toFixed(2)"
+                                                    :value="(position.weight || 0).toFixed(0)"
                                                     @change="updateManualWeight(index, pIndex, $event.target.value)"
                                                     @focus="$event.target.select()"
                                                     :disabled="portfolio.evenSplit" 
@@ -371,7 +371,7 @@
                                             v-else
                                             class="input" 
                                             type="text" 
-                                            :value="(position.weight || 0).toFixed(2)"
+                                            :value="(position.weight || 0).toFixed(0)"
                                             @change="updateManualWeight(index, pIndex, $event.target.value)"
                                             @focus="$event.target.select()"
                                             :disabled="portfolio.evenSplit" 
@@ -397,7 +397,7 @@
                             <tfoot v-if="portfolio.positions.length > 0">
                                 <tr>
                                     <th>Total</th>
-                                    <th>${ calculateTotalWeight(index).toFixed(2) }%</th>
+                                    <th>${ calculateTotalWeight(index).toFixed(0) }%</th>
                                     <th>${ formatCurrency(calculateAllocationAmount(portfolio.allocation)) }</th>
                                     <th></th>
                                 </tr>
@@ -439,7 +439,7 @@
                             </td>
                             <td class="has-text-weight-bold"></td>
                             <td class="has-text-weight-bold">
-                                <span class="global-allocation">${ formatPercentage(portfolio.allocation) }</span>
+                                <span class="global-allocation">${ parseFloat(portfolio.allocation).toFixed(1) }%</span>
                             </td>
                             <td class="has-text-weight-bold">100%</td>
                             <td class="has-text-weight-bold">${ formatCurrency(calculateAllocationAmount(portfolio.allocation)) }</td>
@@ -455,10 +455,10 @@
                                 ${ group.companyName }
                             </td>
                             <td>
-                                <span class="global-allocation">${ formatPercentage((portfolio.allocation * group.weight) / 100) }</span>
+                                <span class="global-allocation">${ ((portfolio.allocation * group.weight) / 100).toFixed(1) }%</span>
                             </td>
                             <td>
-                                <span class="portfolio-allocation">${ formatPercentage(group.weight) }</span>
+                                <span class="portfolio-allocation">${ parseFloat(group.weight).toFixed(1) }%</span>
                             </td>
                             <td>${ formatCurrency(calculateAllocationAmount(portfolio.allocation) * group.weight / 100) }</td>
                         </tr>
@@ -471,7 +471,7 @@
                     <tr>
                         <th>Total</th>
                         <th></th>
-                        <th>${ formatPercentage(calculateTotalAllocation()) }</th>
+                        <th>${ calculateTotalAllocation().toFixed(1) }%</th>
                         <th>-</th>
                         <th>${ formatCurrency(calculateTotalAllocatedAmount()) }</th>
                     </tr>
