@@ -186,6 +186,16 @@ document.addEventListener('DOMContentLoaded', function() {
                             this.portfolioData = response.data;
                             console.log('Portfolio data loaded:', this.portfolioData);
                             
+                            // Log target weights received from the server
+                            if (this.portfolioData.portfolios.length > 0) {
+                                console.log('Target weights from server:', 
+                                    this.portfolioData.portfolios.map(p => ({
+                                        name: p.name, 
+                                        targetWeight: p.targetWeight
+                                    }))
+                                );
+                            }
+                            
                             // If we received no portfolios or they have no data, fall back to mock data
                             if (this.portfolioData.portfolios.length === 0) {
                                 console.warn('No portfolio data found, using mock data for demo purposes');
@@ -324,7 +334,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         parseFloat((portfolio.currentValue / this.totalValue * 100).toFixed(2)) : 0;
                         
                     // Make sure each portfolio has a target weight (use current if missing)
-                    if (!portfolio.targetWeight || isNaN(parseFloat(String(portfolio.targetWeight)))) {
+                    // Don't overwrite target weights that came from the server
+                    if (!portfolio.targetWeight && portfolio.targetWeight !== 0) {
                         portfolio.targetWeight = parseFloat(String(portfolio.currentWeight));
                     }
                     
@@ -338,7 +349,8 @@ document.addEventListener('DOMContentLoaded', function() {
                             parseFloat((category.currentValue / portfolioCategoryTotal * 100).toFixed(2)) : 0;
                             
                         // Make sure each category has a target weight (use current if missing)
-                        if (!category.targetWeight || isNaN(parseFloat(String(category.targetWeight)))) {
+                        // Don't overwrite target weights that came from the server
+                        if (!category.targetWeight && category.targetWeight !== 0) {
                             category.targetWeight = parseFloat(String(category.currentWeight));
                         }
                         
@@ -352,7 +364,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                 parseFloat((position.currentValue / categoryPositionTotal * 100).toFixed(2)) : 0;
                                 
                             // Make sure each position has a target weight (use current if missing)
-                            if (!position.targetWeight || isNaN(parseFloat(String(position.targetWeight)))) {
+                            // Don't overwrite target weights that came from the server
+                            if (!position.targetWeight && position.targetWeight !== 0) {
                                 position.targetWeight = parseFloat(String(position.currentWeight));
                             }
                         });
@@ -877,7 +890,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (this.activeView === 'global') {
                     // Ensure all portfolios have valid target weights
                     const portfoliosWithTargets = this.portfolioData.portfolios.map(item => {
-                        // Ensure target weight exists
+                        // Target weight should already be loaded from the server via the API
+                        // but ensure it exists as a fallback
                         if (!item.targetWeight && item.targetWeight !== 0) {
                             item.targetWeight = parseFloat(item.currentWeight || 0);
                         }
@@ -938,13 +952,15 @@ document.addEventListener('DOMContentLoaded', function() {
                         current: currentItems,
                         target: targetItems
                     };
-                } else if (this.activeView === 'detail' && this.selectedPortfolio) {
+                }
+                else {
                     const portfolio = this.portfolioData.portfolios.find(p => p.name === this.selectedPortfolio);
                     if (!portfolio || !portfolio.categories) return { current: [], target: [] };
                     
                     // Ensure all categories have valid target weights
                     const categoriesWithTargets = portfolio.categories.map(item => {
-                        // Ensure target weight exists
+                        // Target weight should already be loaded from the server via the API
+                        // but ensure it exists as a fallback
                         if (!item.targetWeight && item.targetWeight !== 0) {
                             item.targetWeight = parseFloat(item.currentWeight || 0);
                         }
@@ -1006,8 +1022,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         target: targetItems
                     };
                 }
-                
-                return { current: [], target: [] };
             },
             
             /**

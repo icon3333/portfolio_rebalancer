@@ -17,6 +17,14 @@ import time
 import uuid
 import json
 from flask import g, Response
+import os
+import json
+import time
+import logging
+from datetime import datetime
+from random import randint
+from flask import Blueprint, render_template, redirect, url_for, session, request, jsonify, flash, current_app
+from app.utils.formatting import format_currency
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -400,6 +408,22 @@ def get_allocate_portfolio_data():
             logger.warning(f"No portfolios found for account {account_id}")
             return jsonify({'portfolios': []})
         
+        # Get target allocations from expanded_state
+        target_allocation_data = query_db('''
+            SELECT variable_value
+            FROM expanded_state
+            WHERE account_id = ? AND page_name = ? AND variable_name = ?
+        ''', [account_id, 'build', 'portfolios'], one=True)
+        
+        # Parse target allocations if available
+        target_allocations = []
+        if target_allocation_data and target_allocation_data['variable_value']:
+            try:
+                target_allocations = json.loads(target_allocation_data['variable_value'])
+                logger.info(f"Found target allocations in expanded_state: {len(target_allocations)} portfolios")
+            except json.JSONDecodeError:
+                logger.error("Failed to parse target allocations JSON")
+        
         result = {'portfolios': []}
         
         # Process each portfolio
@@ -426,11 +450,18 @@ def get_allocate_portfolio_data():
             
             portfolio_value = portfolio_value_result['total_value'] if portfolio_value_result['total_value'] else 0
             
+            # Find target allocation for this portfolio from the expanded_state data
+            target_weight = 0
+            target_portfolio = next((p for p in target_allocations if p.get('id') == portfolio_id), None)
+            if target_portfolio:
+                target_weight = target_portfolio.get('allocation', 0)
+                logger.info(f"Found target weight for portfolio {portfolio_name}: {target_weight}%")
+            
             # Create portfolio entry
             portfolio_entry = {
                 'name': portfolio_name,
                 'currentValue': portfolio_value,
-                'targetWeight': 0,  # Will be calculated on frontend
+                'targetWeight': target_weight,  # Using target weight from expanded_state
                 'color': '',  # Will be assigned on frontend
                 'categories': []
             }
@@ -452,11 +483,21 @@ def get_allocate_portfolio_data():
                 # Calculate category value
                 category_value = sum(pos['price_eur'] * pos['shares'] for pos in positions_data if pos['price_eur'])
                 
+                # Find target allocation for this category
+                category_target_weight = 0  # Default if not found
+                if target_portfolio and target_portfolio.get('positions'):
+                    # Find a placeholder position that represents all positions in this category
+                    for position in target_portfolio.get('positions', []):
+                        if position.get('companyName') and position.get('companyName').lower().endswith(f"positions remaining"):
+                            if category_name in position.get('companyName'):
+                                category_target_weight = position.get('weight', 0)
+                                break
+                
                 # Create category entry
                 category_entry = {
                     'name': category_name,
                     'currentValue': category_value,
-                    'targetWeight': 0,
+                    'targetWeight': category_target_weight,
                     'color': '',
                     'positions': []
                 }
@@ -467,11 +508,22 @@ def get_allocate_portfolio_data():
                     if position['price_eur'] and position['shares']:
                         position_value = position['price_eur'] * position['shares']
                     
+                    # Find target allocation for this position
+                    position_target_weight = 0  # Default if not found
+                    position_id = position['id']
+                    
+                    if target_portfolio and target_portfolio.get('positions'):
+                        # Look for this position by company ID
+                        target_position = next((p for p in target_portfolio.get('positions', []) 
+                                             if p.get('companyId') == position_id), None)
+                        if target_position:
+                            position_target_weight = target_position.get('weight', 0)
+                    
                     # Create position entry
                     position_entry = {
                         'name': position['name'],
                         'currentValue': position_value,
-                        'targetWeight': 0,
+                        'targetWeight': position_target_weight,
                         'color': ''
                     }
                     
