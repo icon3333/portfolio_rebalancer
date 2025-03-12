@@ -167,3 +167,25 @@
     min-width: 100%;
     width: auto;
   }
+
+ /* Placeholder position styling */
+.placeholder-position {
+    background-color: rgba(0, 0, 0, 0.02);
+    font-style: italic;
+  }
+
+  .placeholder-position td {
+    color: #666;
+  }
+
+  /* Add subtle visual indicator for placeholders */
+  .placeholder-position .fa-plus-circle {
+    color: #3298dc; /* Bulma info color */
+  }
+  
+  /* Style for remaining positions text to match build-allocation.css */
+  .remaining-positions-text {
+    color: #f14668;
+    font-style: italic;
+    font-weight: 500;
+  }

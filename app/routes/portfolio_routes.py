@@ -483,15 +483,46 @@ def get_allocate_portfolio_data():
                 # Calculate category value
                 category_value = sum(pos['price_eur'] * pos['shares'] for pos in positions_data if pos['price_eur'])
                 
-                # Find target allocation for this category
-                category_target_weight = 0  # Default if not found
+                # Find target allocation for this category - IMPROVED IMPLEMENTATION
+                # Initialize variables for tracking weights
+                known_weight = 0
+                known_position_ids = set()
+                
+                # Check which positions already have known weights from expanded_state
+                for pos in positions_data:
+                    # Find if this position has a target weight in expanded_state
+                    if target_portfolio and target_portfolio.get('positions'):
+                        target_position = next((p for p in target_portfolio.get('positions', []) 
+                                              if p.get('companyId') == pos['id'] and not p.get('isPlaceholder', False)), None)
+                        if target_position:
+                            known_weight += target_position.get('weight', 0)
+                            known_position_ids.add(pos['id'])
+                
+                # Calculate positions without known weights
+                positions_without_weights = sum(1 for pos in positions_data if pos['id'] not in known_position_ids)
+                
+                # Find placeholder position for remaining weights
+                placeholder = None
                 if target_portfolio and target_portfolio.get('positions'):
-                    # Find a placeholder position that represents all positions in this category
-                    for position in target_portfolio.get('positions', []):
-                        if position.get('companyName') and position.get('companyName').lower().endswith(f"positions remaining"):
-                            if category_name in position.get('companyName'):
-                                category_target_weight = position.get('weight', 0)
-                                break
+                    placeholder = next((p for p in target_portfolio.get('positions', []) if p.get('isPlaceholder', False)), None)
+                
+                # Calculate category target weight
+                category_target_weight = known_weight  # Default to known weight
+                if placeholder and positions_without_weights > 0:
+                    # Get total remaining positions and weight from placeholder
+                    positions_remaining = placeholder.get('positionsRemaining', 0)
+                    total_remaining_weight = placeholder.get('totalRemainingWeight', 0)
+                    
+                    if positions_remaining > 0:
+                        # Calculate weight per position
+                        weight_per_position = total_remaining_weight / positions_remaining
+                        
+                        # Calculate placeholder weight for this category
+                        category_placeholder_weight = positions_without_weights * weight_per_position
+                        
+                        # Add placeholder weight to known weight
+                        category_target_weight = known_weight + category_placeholder_weight
+                        logger.info(f"Category {category_name} target weight: {category_target_weight}% (known: {known_weight}%, placeholder: {category_placeholder_weight}%)")
                 
                 # Create category entry
                 category_entry = {
@@ -518,6 +549,18 @@ def get_allocate_portfolio_data():
                                              if p.get('companyId') == position_id), None)
                         if target_position:
                             position_target_weight = target_position.get('weight', 0)
+                        else:
+                            # Position doesn't have explicit weight in expanded_state
+                            # Check if it should get weight from the placeholder
+                            if placeholder and placeholder.get('positionsRemaining', 0) > 0:
+                                # Calculate weight per position from placeholder
+                                positions_remaining = placeholder.get('positionsRemaining', 0)
+                                total_remaining_weight = placeholder.get('totalRemainingWeight', 0)
+                                
+                                if positions_remaining > 0:
+                                    # Assign the per-position weight from placeholder
+                                    position_target_weight = total_remaining_weight / positions_remaining
+                                    logger.info(f"Position {position['name']} assigned weight {position_target_weight}% from placeholder")
                     
                     # Create position entry
                     position_entry = {
@@ -528,6 +571,26 @@ def get_allocate_portfolio_data():
                     }
                     
                     category_entry['positions'].append(position_entry)
+                
+                # Add a placeholder position if needed
+                if placeholder and positions_without_weights > 0:
+                    positions_remaining = placeholder.get('positionsRemaining', 0)
+                    total_remaining_weight = placeholder.get('totalRemainingWeight', 0)
+                    
+                    if positions_remaining > 0:
+                        # Add a placeholder position to represent remaining positions
+                        placeholder_position = {
+                            'name': f"{positions_remaining}x positions remaining",
+                            'currentValue': 0,
+                            'currentWeight': 0,  # Zero current weight
+                            'targetWeight': total_remaining_weight,
+                            'color': '',
+                            'isPlaceholder': True,
+                            'positionsRemaining': positions_remaining
+                        }
+                        
+                        category_entry['positions'].append(placeholder_position)
+                        logger.info(f"Added placeholder position for {positions_remaining} remaining positions with total weight {total_remaining_weight}%")
                 
                 # Only add categories with positions
                 if category_entry['positions']:
