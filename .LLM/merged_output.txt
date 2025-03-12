@@ -1,5 +1,5 @@
 This file is a merged representation of selected files from the codebase.
-Generated on: 2025-03-12T00:01:50.933201
+Generated on: 2025-03-12T13:28:53.297041
 
 ================================================================
 Purpose:
@@ -2478,7 +2478,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 ================================================================
 ###START_FILE_PATH: static/js/allocate.js###
-// Modified allocate.js - Fixed implementation of getChartData and other issues
+// Improved Portfolio Rebalancer JavaScript
 
 document.addEventListener('DOMContentLoaded', function() {
     // Add viewport size detection to Vue.js
@@ -2493,20 +2493,24 @@ document.addEventListener('DOMContentLoaded', function() {
         Vue.prototype.$viewport.height = window.innerHeight;
     });
 
+    // Debounce function to prevent excessive updates
+    function debounce(func, wait = 300) {
+        let timeout;
+        return function(...args) {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(this, args), wait);
+        };
+    }
+
     // Create Vue application
     new Vue({
         el: '#portfolio-rebalancer',
         delimiters: ['${', '}'],  // Match existing Vue delimiters
         data() {
             return {
-                // View state
-                activeView: 'global',
+                // Selected portfolio
                 selectedPortfolio: '',
                 expandedCategories: {},
-                
-                // Rebalancing settings
-                rebalanceMode: 'existingCapital',
-                newCapitalAmount: 5000,
                 
                 // Chart instances
                 currentChart: null,
@@ -2517,17 +2521,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     portfolios: []
                 },
                 
-                // Mock data for initial rendering - will be replaced with API data
-                mockData: {
-                    portfolios: [
-                        // ... mock data content remains unchanged ...
-                    ]
-                },
-                
                 // Calculated values
                 totalValue: 0,
                 newPortfolioValue: 0,
-                requiredCapitalForNoSales: 0,
                 
                 // Loading state
                 isLoading: false,
@@ -2547,38 +2543,6 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         watch: {
             /**
-             * Watch for changes to rebalance mode and recalculate
-             */
-            rebalanceMode() {
-                // Prevent infinite loops by checking the isUpdating flag
-                if (this.isUpdating) return;
-                
-                this.isUpdating = true;
-                try {
-                    this.calculateTargetValuesAndActions();
-                    this.updateChartData();
-                } finally {
-                    this.isUpdating = false;
-                }
-            },
-            
-            /**
-             * Watch for changes to new capital amount and recalculate
-             */
-            newCapitalAmount() {
-                // Only process if we're in the right mode and not already updating
-                if (this.rebalanceMode !== 'newCapitalSpecific' || this.isUpdating) return;
-                
-                this.isUpdating = true;
-                try {
-                    this.calculateTargetValuesAndActions();
-                    this.updateChartData();
-                } finally {
-                    this.isUpdating = false;
-                }
-            },
-            
-            /**
              * Watch portfolio data for changes
              */
             portfolioData: {
@@ -2590,7 +2554,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         this.$nextTick(() => {
                             // First calculate weights and actions
                             this.calculateCurrentWeights();
-                            this.calculateRequiredCapitalForNoSales();
                             this.calculateTargetValuesAndActions();
                             
                             // Then update charts
@@ -2601,22 +2564,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 },
                 deep: true
-            },
-            
-            /**
-             * Watch for view changes
-             */
-            activeView() {
-                if (this.isUpdating) return;
-                
-                this.isUpdating = true;
-                try {
-                    this.$nextTick(() => {
-                        this.updateChartData();
-                    });
-                } finally {
-                    this.isUpdating = false;
-                }
             },
             
             /**
@@ -2643,40 +2590,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Fetch portfolio data from the API
                 this.isLoading = true;
                 
-                // Fetch data from our new API endpoint
+                // Fetch data from our API endpoint
                 axios.get('/portfolio/api/allocate/portfolio-data')
                     .then(response => {
                         if (response.data && response.data.portfolios) {
                             this.portfolioData = response.data;
                             console.log('Portfolio data loaded:', this.portfolioData);
                             
-                            // Log target weights received from the server
-                            if (this.portfolioData.portfolios.length > 0) {
-                                console.log('Target weights from server:', 
-                                    this.portfolioData.portfolios.map(p => ({
-                                        name: p.name, 
-                                        targetWeight: p.targetWeight
-                                    }))
-                                );
-                            }
-                            
-                            // If we received no portfolios or they have no data, fall back to mock data
-                            if (this.portfolioData.portfolios.length === 0) {
-                                console.warn('No portfolio data found, using mock data for demo purposes');
-                                this.portfolioData = JSON.parse(JSON.stringify(this.mockData));
-                            }
-                            
                             this.isUpdating = true;
                             try {
                                 // Calculate initial values
                                 this.calculateCurrentWeights();
-                                this.calculateRequiredCapitalForNoSales();
                                 this.calculateTargetValuesAndActions();
-                                
-                                // Set default selected portfolio
-                                if (this.portfolioData.portfolios.length > 0 && !this.selectedPortfolio) {
-                                    this.selectedPortfolio = this.portfolioData.portfolios[0].name;
-                                }
                                 
                                 // Initialize charts
                                 this.$nextTick(() => {
@@ -2689,99 +2614,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     })
                     .catch(error => {
                         console.error('Error fetching portfolio data:', error);
-                        
-                        // Display more helpful error in console
-                        if (error.response) {
-                            // Server responded with error status
-                            console.warn(`Server returned error ${error.response.status}: ${error.response.data.error || 'Unknown error'}`);
-                        } else if (error.request) {
-                            // Request was made but no response
-                            console.warn('No response received from server. Server might be down or network issue.');
-                        } else {
-                            // Something else caused the error
-                            console.warn('Error setting up request:', error.message);
-                        }
-                        
-                        // Fall back to mock data if API fails
-                        this.portfolioData = JSON.parse(JSON.stringify(this.mockData));
-                        
-                        // Show notification that we're using demo data
-                        const notification = document.querySelector('.notification.is-info');
-                        if (notification) {
-                            notification.classList.remove('is-info');
-                            notification.classList.add('is-warning');
-                            notification.innerHTML = `
-                                <button class="delete"></button>
-                                <p><strong>Unable to load your portfolio data.</strong> Using demonstration data instead.</p>
-                                <p class="mt-2">You can still explore the Portfolio Rebalancer features with this sample data.</p>
-                            `;
-                            
-                            // Re-attach event listener for the delete button
-                            const deleteBtn = notification.querySelector('.delete');
-                            if (deleteBtn) {
-                                deleteBtn.addEventListener('click', () => {
-                                    notification.remove();
-                                });
-                            }
-                        }
-                        
-                        this.isUpdating = true;
-                        try {
-                            // Calculate initial values
-                            this.calculateCurrentWeights();
-                            this.calculateRequiredCapitalForNoSales();
-                            this.calculateTargetValuesAndActions();
-                            
-                            // Set default selected portfolio
-                            if (this.portfolioData.portfolios.length > 0 && !this.selectedPortfolio) {
-                                this.selectedPortfolio = this.portfolioData.portfolios[0].name;
-                            }
-                            
-                            // Initialize charts
-                            this.$nextTick(() => {
-                                this.initializeCharts();
-                            });
-                        } finally {
-                            this.isUpdating = false;
+                        // Show error notification
+                        if (typeof portfolioManager !== 'undefined' && portfolioManager.showNotification) {
+                            portfolioManager.showNotification('Failed to load portfolio data', 'is-danger');
                         }
                     })
                     .finally(() => {
                         this.isLoading = false;
                     });
-            },
-            
-            /**
-             * Set the active view (global or detail)
-             */
-            setActiveView(view) {
-                if (this.activeView === view) return;
-                
-                this.activeView = view;
-                
-                // If switching to detail view, ensure a portfolio is selected
-                if (view === 'detail' && !this.selectedPortfolio && this.portfolioData.portfolios.length > 0) {
-                    this.selectedPortfolio = this.portfolioData.portfolios[0].name;
-                }
-                
-                // Update charts after view change
-                this.$nextTick(() => {
-                    this.updateChartData();
-                });
-            },
-            
-            /**
-             * Navigate to global view
-             */
-            navigateToGlobal() {
-                this.setActiveView('global');
-            },
-            
-            /**
-             * Navigate to detail view for a specific portfolio
-             */
-            navigateToDetail(portfolioName) {
-                this.selectedPortfolio = portfolioName;
-                this.setActiveView('detail');
             },
             
             /**
@@ -2850,128 +2690,42 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             
             /**
-             * Calculate required capital for "No Sales" mode
-             */
-            calculateRequiredCapitalForNoSales() {
-                // Find the most overweight portfolio relative to target
-                let maxOverweightRatio = 0;
-                this.portfolioData.portfolios.forEach(portfolio => {
-                    if (portfolio.currentWeight > portfolio.targetWeight) {
-                        const ratio = portfolio.currentWeight / portfolio.targetWeight;
-                        maxOverweightRatio = Math.max(maxOverweightRatio, ratio);
-                    }
-                });
-                
-                // If no portfolio is overweight, no new capital needed
-                if (maxOverweightRatio <= 1) {
-                    this.requiredCapitalForNoSales = 0;
-                    return;
-                }
-                
-                // Calculate new portfolio value needed to dilute overweight positions
-                const newTotalValue = this.totalValue * maxOverweightRatio;
-                this.requiredCapitalForNoSales = Math.round(newTotalValue - this.totalValue);
-            },
-            
-            /**
              * Calculate target values and actions for all portfolios and positions
              */
             calculateTargetValuesAndActions() {
-                // Calculate new portfolio value based on rebalance mode
+                // Set new portfolio value equal to current value (no new capital in this version)
                 this.newPortfolioValue = this.totalValue;
-                if (this.rebalanceMode === 'newCapitalSpecific') {
-                    this.newPortfolioValue += this.newCapitalAmount;
-                } else if (this.rebalanceMode === 'newCapitalOnly') {
-                    this.newPortfolioValue += this.requiredCapitalForNoSales;
-                }
                 
                 // PORTFOLIO LEVEL CALCULATIONS
                 this.portfolioData.portfolios.forEach(portfolio => {
-                    if (this.rebalanceMode === 'existingCapital') {
-                        // Mode 1: Existing Capital - can buy and sell
-                        portfolio.targetValue = Math.round(this.totalValue * portfolio.targetWeight / 100);
-                        portfolio.action = {
-                            type: portfolio.targetValue > portfolio.currentValue ? "Buy" : 
-                                portfolio.targetValue < portfolio.currentValue ? "Sell" : "Hold",
-                            amount: Math.abs(portfolio.targetValue - portfolio.currentValue)
-                        };
-                    } 
-                    else if (this.rebalanceMode === 'newCapitalOnly') {
-                        // Mode 2: New Capital only (no sales)
-                        const idealTargetValue = Math.round(this.newPortfolioValue * portfolio.targetWeight / 100);
-                        
-                        if (portfolio.currentValue >= idealTargetValue) {
-                            // Already at or above target - can't sell
-                            portfolio.targetValue = portfolio.currentValue;
-                            portfolio.action = { type: "Hold", amount: 0 };
-                        } else {
-                            // Below target - add capital
-                            portfolio.targetValue = idealTargetValue;
-                            portfolio.action = { 
-                                type: "Buy", 
-                                amount: idealTargetValue - portfolio.currentValue
-                            };
-                        }
-                    }
-                    else if (this.rebalanceMode === 'newCapitalSpecific') {
-                        // Mode 3: New Capital (specific amount)
-                        // Calculate ideal target value in the new portfolio
-                        portfolio.idealTargetValue = Math.round(this.newPortfolioValue * portfolio.targetWeight / 100);
-                
-                        // Calculate shortfall (how much this portfolio needs)
-                        portfolio.shortfall = portfolio.idealTargetValue > portfolio.currentValue ? 
-                            portfolio.idealTargetValue - portfolio.currentValue : 0;
-                    }
-                });
-                
-                // For newCapitalSpecific mode, allocate the capital proportionally to shortfalls
-                if (this.rebalanceMode === 'newCapitalSpecific') {
-                    // Calculate total shortfall across all portfolios
-                    let totalShortfall = this.portfolioData.portfolios.reduce(
-                        (sum, portfolio) => sum + (portfolio.shortfall || 0), 0
-                    );
+                    // Calculate target value based on weight
+                    portfolio.targetValue = Math.round(this.totalValue * portfolio.targetWeight / 100);
                     
-                    this.portfolioData.portfolios.forEach(portfolio => {
-                        if (totalShortfall <= this.newCapitalAmount) {
-                            // Enough capital to cover all shortfalls
-                            portfolio.targetValue = portfolio.currentValue + (portfolio.shortfall || 0);
-                            portfolio.action = {
-                                type: (portfolio.shortfall || 0) > 0 ? "Buy" : "Hold",
-                                amount: portfolio.shortfall || 0
-                            };
-                        } else if ((portfolio.shortfall || 0) > 0) {
-                            // Not enough capital - allocate proportionally
-                            const allocation = Math.round((portfolio.shortfall / totalShortfall) * this.newCapitalAmount);
-                            portfolio.targetValue = portfolio.currentValue + allocation;
-                            portfolio.action = { type: "Buy", amount: allocation };
-                        } else {
-                            // No shortfall
-                            portfolio.targetValue = portfolio.currentValue;
-                            portfolio.action = { type: "Hold", amount: 0 };
-                        }
-                    });
-                }
-                
-                // CATEGORY AND POSITION LEVEL CALCULATIONS
-                this.portfolioData.portfolios.forEach(portfolio => {
-                    // Process each category
+                    // Determine action (buy, sell, or hold)
+                    portfolio.action = {
+                        type: portfolio.targetValue > portfolio.currentValue ? "Buy" : 
+                              portfolio.targetValue < portfolio.currentValue ? "Sell" : "Hold",
+                        amount: Math.abs(portfolio.targetValue - portfolio.currentValue)
+                    };
+                    
+                    // CATEGORY AND POSITION LEVEL CALCULATIONS
                     portfolio.categories.forEach(category => {
-                        // Calculate target value based on portfolio target
+                        // Calculate target value for category based on portfolio's target value
                         category.targetValue = Math.round(portfolio.targetValue * category.targetWeight / 100);
                         
-                        // Calculate action
+                        // Determine action for category
                         category.action = {
                             type: category.targetValue > category.currentValue ? "Buy" : 
                                   category.targetValue < category.currentValue ? "Sell" : "Hold",
                             amount: Math.abs(category.targetValue - category.currentValue)
                         };
                         
-                        // Process each position within the category
+                        // Calculate target values and actions for positions
                         category.positions.forEach(position => {
-                            // Calculate target value based on category target
+                            // Calculate target value for position based on category's target value
                             position.targetValue = Math.round(category.targetValue * position.targetWeight / 100);
                             
-                            // Calculate action
+                            // Determine action for position
                             position.action = {
                                 type: position.targetValue > position.currentValue ? "Buy" : 
                                       position.targetValue < position.currentValue ? "Sell" : "Hold",
@@ -2979,10 +2733,8 @@ document.addEventListener('DOMContentLoaded', function() {
                             };
                         });
                     });
-                });
-                
-                // Recalculate final weights after actions
-                this.portfolioData.portfolios.forEach(portfolio => {
+                    
+                    // Recalculate final weights
                     portfolio.finalWeight = parseFloat((portfolio.targetValue / this.newPortfolioValue * 100).toFixed(2));
                     
                     // Recalculate category final weights
@@ -2998,15 +2750,64 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             
             /**
-             * Initialize plotly charts for visualization
+             * Initialize charts for visualization
              */
             initializeCharts() {
-                // Make sure we have data before initializing charts
-                if (!this.portfolioData || !this.portfolioData.portfolios || this.portfolioData.portfolios.length === 0) {
-                    console.warn('No portfolio data available, skipping chart initialization');
-                    return;
+                this.updateChartData();
+            },
+            
+            /**
+             * Update chart data when view or state changes
+             */
+            updateChartData() {
+                // Get updated chart data
+                const chartData = this.getChartData();
+                
+                // Clear previous charts
+                Plotly.purge('current-distribution-chart');
+                Plotly.purge('target-distribution-chart');
+                
+                // Determine which data to display based on selectedPortfolio
+                if (this.selectedPortfolio) {
+                    // Detail view - use sunburst chart for selected portfolio
+                    const portfolio = this.selectedPortfolioData;
+                    if (!portfolio) return;
+                    
+                    // Prepare data for sunburst charts
+                    const currentPortfolio = this.preparePortfolioDataForSunburst(portfolio, 'current');
+                    const targetPortfolio = this.preparePortfolioDataForSunburst(portfolio, 'target');
+                    
+                    // Create sunburst charts using PortfolioCharts if available
+                    if (typeof PortfolioCharts !== 'undefined' && PortfolioCharts.createSunburstChart) {
+                        PortfolioCharts.createSunburstChart(
+                            'current-distribution-chart',
+                            currentPortfolio,
+                            this.formatCurrency,
+                            this.formatPercentage,
+                            this.generateColors
+                        );
+                        
+                        PortfolioCharts.createSunburstChart(
+                            'target-distribution-chart',
+                            targetPortfolio,
+                            this.formatCurrency,
+                            this.formatPercentage,
+                            this.generateColors
+                        );
+                    } else {
+                        // Fallback to pie charts if sunburst not available
+                        this.createPieCharts(chartData);
+                    }
+                } else {
+                    // Global view - use pie charts
+                    this.createPieCharts(chartData);
                 }
-
+            },
+            
+            /**
+             * Create pie charts for current and target distribution
+             */
+            createPieCharts(chartData) {
                 // Enhanced layout with consistent settings
                 const layout = {
                     showlegend: false,
@@ -3017,411 +2818,176 @@ document.addEventListener('DOMContentLoaded', function() {
                     plot_bgcolor: 'transparent',
                     automargin: true
                 };
-            
-                const chartData = this.getChartData();
                 
-                // Initialize based on active view
-                if (this.activeView === 'global') {
-                    this.initializeGlobalCharts(chartData, layout);
-                } else {
-                    this.initializeDetailCharts(chartData);
-                }
-            },
-            
-            /**
-             * Initialize charts for Global view (pie charts)
-             */
-            initializeGlobalCharts(chartData, layout) {
-                // Check if we have valid data
-                if (!chartData || !chartData.current || !chartData.target) {
-                    console.warn('Invalid chart data for global view:', chartData);
-                    return;
-                }
-
-                // Verify chart data has the expected structure
-                if (!chartData.current.length || !chartData.target.length) {
-                    console.warn('Empty chart data arrays, cannot create charts');
-                    console.log('Current data:', chartData.current);
-                    console.log('Target data:', chartData.target);
-                    return;
-                }
-
-                try {
-                    // Create current distribution chart
-                    const currentData = [{
-                        type: 'pie',
-                        values: chartData.current.map(item => item.value),
-                        labels: chartData.current.map(item => item.name),
-                        textinfo: 'label+percent',
-                        textposition: 'auto',
-                        hoverinfo: 'label+percent+value',
-                        hole: 0.5,
-                        marker: {
-                            colors: chartData.current.map(item => item.color)
-                        },
-                        textfont: {
-                            size: 12,
-                            color: '#ffffff'
-                        },
-                        insidetextfont: {
-                            size: 12,
-                            color: '#ffffff'
-                        },
-                        outsidetextfont: {
-                            size: 12,
-                            color: '#333333'
-                        },
-                        automargin: true,
-                        showlegend: false
-                    }];
-                    
-                    // Use Plotly.purge to fully clean and redraw
-                    Plotly.purge('current-distribution-chart');
-                    Plotly.newPlot('current-distribution-chart', currentData, { ...layout }, ChartConfig.plotlyConfig);
+                // Create current distribution chart
+                const currentData = [{
+                    type: 'pie',
+                    values: chartData.current.map(item => item.value),
+                    labels: chartData.current.map(item => item.name),
+                    textinfo: 'label+percent',
+                    textposition: 'auto',
+                    hoverinfo: 'label+percent+value',
+                    hole: 0.5,
+                    marker: {
+                        colors: chartData.current.map(item => item.color)
+                    },
+                    textfont: {
+                        size: 12,
+                        color: '#ffffff'
+                    },
+                    insidetextfont: {
+                        size: 12,
+                        color: '#ffffff'
+                    },
+                    outsidetextfont: {
+                        size: 12,
+                        color: '#333333'
+                    },
+                    automargin: true,
+                    showlegend: false
+                }];
                 
-                    // Create target distribution chart
-                    const targetData = [{
-                        type: 'pie',
-                        values: chartData.target.map(item => item.value),
-                        labels: chartData.target.map(item => item.name),
-                        textinfo: 'label+percent',
-                        textposition: 'auto',
-                        hoverinfo: 'label+percent+value',
-                        hole: 0.5,
-                        marker: {
-                            colors: chartData.target.map(item => item.color)
-                        },
-                        textfont: {
-                            size: 12,
-                            color: '#ffffff'
-                        },
-                        insidetextfont: {
-                            size: 12,
-                            color: '#ffffff'
-                        },
-                        outsidetextfont: {
-                            size: 12,
-                            color: '#333333'
-                        },
-                        automargin: true,
-                        showlegend: false
-                    }];
-                    
-                    // Use Plotly.purge to fully clean and redraw
-                    Plotly.purge('target-distribution-chart');
-                    Plotly.newPlot('target-distribution-chart', targetData, { ...layout }, ChartConfig.plotlyConfig);
-                } catch (error) {
-                    console.error('Error initializing global charts:', error);
-                }
-            },
+                Plotly.newPlot('current-distribution-chart', currentData, layout, 
+                    typeof ChartConfig !== 'undefined' ? ChartConfig.plotlyConfig : { displayModeBar: false });
             
-            /**
-             * Initialize charts for Detail view (sunburst charts)
-             */
-            initializeDetailCharts(chartData) {
-                // Get the selected portfolio data
-                const portfolio = this.selectedPortfolioData;
-                if (!portfolio) {
-                    console.warn('No selected portfolio data available for detail charts');
-                    return;
-                }
-
-                try {
-                    // Clear any existing charts
-                    Plotly.purge('current-distribution-chart');
-                    Plotly.purge('target-distribution-chart');
-                    
-                    // Setup chartData for sunburst format (if available in PortfolioCharts)
-                    if (typeof PortfolioCharts !== 'undefined' && PortfolioCharts.createSunburstChart) {
-                        // Create current distribution sunburst chart
-                        const currentPortfolio = this.preparePortfolioDataForSunburst(portfolio, 'current');
-                        PortfolioCharts.createSunburstChart(
-                            'current-distribution-chart',
-                            currentPortfolio,
-                            this.formatCurrency,
-                            this.formatPercentage,
-                            this.generateColors
-                        );
-                        
-                        // Create target distribution sunburst chart
-                        const targetPortfolio = this.preparePortfolioDataForSunburst(portfolio, 'target');
-                        PortfolioCharts.createSunburstChart(
-                            'target-distribution-chart',
-                            targetPortfolio,
-                            this.formatCurrency,
-                            this.formatPercentage,
-                            this.generateColors
-                        );
-                    } else {
-                        console.warn('PortfolioCharts.createSunburstChart not available, falling back to pie charts');
-                        // Fallback to pie charts if sunburst not available
-                        const layout = {
-                            showlegend: false,
-                            height: 350,
-                            autosize: true,
-                            margin: { l: 30, r: 30, t: 30, b: 50 },
-                            paper_bgcolor: 'transparent',
-                            plot_bgcolor: 'transparent',
-                            automargin: true
-                        };
-                        this.initializeGlobalCharts(chartData, layout);
-                    }
-                } catch (error) {
-                    console.error('Error initializing detail charts:', error);
-                }
-            },
-            
-            /**
-             * Update chart data when view or state changes
-             */
-            updateChartData() {
-                // Get updated chart data
-                const chartData = this.getChartData();
+                // Create target distribution chart
+                const targetData = [{
+                    type: 'pie',
+                    values: chartData.target.map(item => item.value),
+                    labels: chartData.target.map(item => item.name),
+                    textinfo: 'label+percent',
+                    textposition: 'auto',
+                    hoverinfo: 'label+percent+value',
+                    hole: 0.5,
+                    marker: {
+                        colors: chartData.target.map(item => item.color)
+                    },
+                    textfont: {
+                        size: 12,
+                        color: '#ffffff'
+                    },
+                    insidetextfont: {
+                        size: 12,
+                        color: '#ffffff'
+                    },
+                    outsidetextfont: {
+                        size: 12,
+                        color: '#333333'
+                    },
+                    automargin: true,
+                    showlegend: false
+                }];
                 
-                console.log('Updating chart data:', {
-                    currentLength: chartData.current.length,
-                    targetLength: chartData.target.length,
-                    current: chartData.current,
-                    target: chartData.target
-                });
-
-                // If there's no data, don't try to render the charts
-                if (!chartData.current.length && !chartData.target.length) {
-                    console.warn('No chart data available for rendering');
-                    return;
-                }
-
-                // Create chart layout - ensure consistency with initialization
-                const layout = {
-                    showlegend: false,
-                    height: 350,
-                    autosize: true,
-                    margin: { l: 30, r: 30, t: 30, b: 50 },
-                    paper_bgcolor: 'transparent',
-                    plot_bgcolor: 'transparent',
-                    automargin: true
-                };
-
-                // Check for the chart elements in the DOM
-                const currentElement = document.getElementById('current-distribution-chart');
-                const targetElement = document.getElementById('target-distribution-chart');
-
-                if (!currentElement || !targetElement) {
-                    console.warn('Chart containers not found in DOM');
-                    return;
-                }
-
-                try {
-                    // Initialize based on active view
-                    if (this.activeView === 'global') {
-                        // Update global view charts (pie charts)
-                        const currentData = [{
-                            type: 'pie',
-                            values: chartData.current.map(item => item.value),
-                            labels: chartData.current.map(item => item.name),
-                            textinfo: 'label+percent',
-                            textposition: 'auto',
-                            hoverinfo: 'label+percent+value',
-                            hole: 0.5,
-                            marker: {
-                                colors: chartData.current.map(item => item.color)
-                            },
-                            textfont: {
-                                size: 12,
-                                color: '#ffffff'
-                            },
-                            insidetextfont: {
-                                size: 12,
-                                color: '#ffffff'
-                            },
-                            outsidetextfont: {
-                                size: 12,
-                                color: '#333333'
-                            },
-                            automargin: true,
-                            showlegend: false
-                        }];
-                        
-                        Plotly.react('current-distribution-chart', currentData, layout, ChartConfig.plotlyConfig);
-                        
-                        const targetData = [{
-                            type: 'pie',
-                            values: chartData.target.map(item => item.value),
-                            labels: chartData.target.map(item => item.name),
-                            textinfo: 'label+percent',
-                            textposition: 'auto',
-                            hoverinfo: 'label+percent+value',
-                            hole: 0.5,
-                            marker: {
-                                colors: chartData.target.map(item => item.color)
-                            },
-                            textfont: {
-                                size: 12,
-                                color: '#ffffff'
-                            },
-                            insidetextfont: {
-                                size: 12,
-                                color: '#ffffff'
-                            },
-                            outsidetextfont: {
-                                size: 12,
-                                color: '#333333'
-                            },
-                            automargin: true,
-                            showlegend: false
-                        }];
-                        
-                        Plotly.react('target-distribution-chart', targetData, layout, ChartConfig.plotlyConfig);
-                    } else {
-                        // Update detail view charts (sunburst charts)
-                        const portfolio = this.selectedPortfolioData;
-                        if (!portfolio) {
-                            console.warn('No selected portfolio data available for detail charts update');
-                            return;
-                        }
-                        
-                        // Setup chartData for sunburst format (if available in PortfolioCharts)
-                        if (typeof PortfolioCharts !== 'undefined' && PortfolioCharts.createSunburstChart) {
-                            // Create current distribution sunburst chart
-                            Plotly.purge('current-distribution-chart');
-                            const currentPortfolio = this.preparePortfolioDataForSunburst(portfolio, 'current');
-                            PortfolioCharts.createSunburstChart(
-                                'current-distribution-chart',
-                                currentPortfolio,
-                                this.formatCurrency,
-                                this.formatPercentage,
-                                this.generateColors
-                            );
-                            
-                            // Create target distribution sunburst chart
-                            Plotly.purge('target-distribution-chart');
-                            const targetPortfolio = this.preparePortfolioDataForSunburst(portfolio, 'target');
-                            PortfolioCharts.createSunburstChart(
-                                'target-distribution-chart',
-                                targetPortfolio,
-                                this.formatCurrency,
-                                this.formatPercentage,
-                                this.generateColors
-                            );
-                        } else {
-                            console.warn('PortfolioCharts.createSunburstChart not available, falling back to pie charts');
-                            // Fallback to pie charts if sunburst not available
-                            this.initializeGlobalCharts(chartData, layout);
-                        }
-                    }
-                } catch (error) {
-                    console.error('Error updating charts:', error);
-                }
+                Plotly.newPlot('target-distribution-chart', targetData, layout,
+                    typeof ChartConfig !== 'undefined' ? ChartConfig.plotlyConfig : { displayModeBar: false });
             },
             
             /**
-             * Get data for charts based on active view
-             * This is the MISSING function that causes the problems!
+             * Get data for charts based on selected portfolio
              */
             getChartData() {
-                try {
-                    // Default colors for portfolios
-                    const colors = this.generateColors(this.portfolioData.portfolios.length);
-                    
-                    // Assign colors to portfolios if not already assigned
-                    this.portfolioData.portfolios.forEach((portfolio, index) => {
-                        if (!portfolio.color) {
-                            portfolio.color = colors[index % colors.length];
-                        }
-                    });
-                    
-                    // For global view, show data at portfolio level
-                    if (this.activeView === 'global') {
-                        return {
-                            current: this.portfolioData.portfolios.map(portfolio => ({
-                                name: portfolio.name,
-                                value: portfolio.currentValue,
-                                color: portfolio.color
-                            })),
-                            target: this.portfolioData.portfolios.map(portfolio => ({
-                                name: portfolio.name,
-                                value: portfolio.targetValue,
-                                color: portfolio.color
-                            }))
-                        };
-                    }
-                    
-                    // For detail view, show data for the selected portfolio at category level
-                    if (this.activeView === 'detail' && this.selectedPortfolioData) {
-                        const categoriesColors = this.generateColors(this.selectedPortfolioData.categories.length);
+                const colors = this.generateColors(this.portfolioData.portfolios.length);
+                let currentData = [];
+                let targetData = [];
+                
+                if (this.selectedPortfolio) {
+                    // Selected portfolio mode - show categories
+                    const portfolio = this.selectedPortfolioData;
+                    if (portfolio) {
+                        // Map colors to portfolio and categories
+                        portfolio.color = colors[0]; // Use first color for portfolio
                         
-                        // Assign colors to categories if not already assigned
-                        this.selectedPortfolioData.categories.forEach((category, index) => {
-                            if (!category.color) {
-                                category.color = categoriesColors[index % categoriesColors.length];
-                            }
-                        });
+                        // Create chart data for categories
+                        const categoryColors = this.generateColors(portfolio.categories.length);
                         
-                        return {
-                            current: this.selectedPortfolioData.categories.map(category => ({
+                        portfolio.categories.forEach((category, index) => {
+                            category.color = categoryColors[index];
+                            
+                            currentData.push({
                                 name: category.name,
                                 value: category.currentValue,
+                                weight: category.currentWeight,
                                 color: category.color
-                            })),
-                            target: this.selectedPortfolioData.categories.map(category => ({
+                            });
+                            
+                            targetData.push({
                                 name: category.name,
                                 value: category.targetValue,
+                                weight: category.targetWeight,
                                 color: category.color
-                            }))
-                        };
+                            });
+                        });
                     }
-                    
-                    // If no valid view or no selected portfolio, return empty arrays
-                    return {
-                        current: [],
-                        target: []
-                    };
-                } catch (error) {
-                    console.error('Error getting chart data:', error);
-                    return {
-                        current: [],
-                        target: []
-                    };
+                } else {
+                    // Global mode - show all portfolios
+                    this.portfolioData.portfolios.forEach((portfolio, index) => {
+                        portfolio.color = colors[index % colors.length];
+                        
+                        currentData.push({
+                            name: portfolio.name,
+                            value: portfolio.currentValue,
+                            weight: portfolio.currentWeight,
+                            color: portfolio.color
+                        });
+                        
+                        targetData.push({
+                            name: portfolio.name,
+                            value: portfolio.targetValue,
+                            weight: portfolio.targetWeight,
+                            color: portfolio.color
+                        });
+                    });
                 }
+                
+                return {
+                    current: currentData,
+                    target: targetData
+                };
             },
             
             /**
              * Prepare portfolio data in the format required by the sunburst chart
              */
             preparePortfolioDataForSunburst(portfolio, mode) {
-                if (!portfolio || !portfolio.categories) {
-                    return {
-                        name: portfolio ? portfolio.name : 'No Portfolio',
-                        children: []
-                    };
-                }
-                
-                // Value field name based on mode (current or target)
+                // Create a deep structure with portfolio at root, categories as children, and positions as leaf nodes
                 const valueField = mode === 'current' ? 'currentValue' : 'targetValue';
+                const weightField = mode === 'current' ? 'currentWeight' : 'targetWeight';
                 
-                // Get color palette for categories
-                const categoryColors = this.generateColors(portfolio.categories.length);
-                
-                // Create hierarchy for sunburst chart
-                return {
+                const result = {
                     name: portfolio.name,
                     value: portfolio[valueField],
-                    children: portfolio.categories.map((category, catIndex) => {
-                        // Get color palette for positions within this category
-                        const positionColors = this.generateColors(category.positions.length);
-                        
-                        return {
-                            name: category.name,
-                            value: category[valueField],
-                            color: categoryColors[catIndex % categoryColors.length],
-                            children: category.positions.map((position, posIndex) => ({
-                                name: position.name,
-                                value: position[valueField],
-                                color: positionColors[posIndex % positionColors.length]
-                            }))
-                        };
-                    })
+                    weight: portfolio[weightField],
+                    children: []
                 };
+                
+                // Add categories as children
+                portfolio.categories.forEach(category => {
+                    const categoryNode = {
+                        name: category.name,
+                        value: category[valueField],
+                        weight: category[weightField],
+                        children: []
+                    };
+                    
+                    // Add positions as children of categories
+                    category.positions.forEach(position => {
+                        // Skip placeholder positions for cleaner visualization
+                        if (position.isPlaceholder) return;
+                        
+                        categoryNode.children.push({
+                            name: position.name,
+                            value: position[valueField],
+                            weight: position[weightField]
+                        });
+                    });
+                    
+                    // Only add categories that have positions
+                    if (categoryNode.children.length > 0) {
+                        result.children.push(categoryNode);
+                    }
+                });
+                
+                return result;
             },
             
             /**
@@ -3458,6 +3024,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 return `${parseFloat(String(value)).toFixed(1)}%`;
             }
         },
+        created() {
+            // Create debounced methods
+            this.debouncedUpdateChartData = debounce(this.updateChartData, 250);
+        },
         mounted() {
             // Initialize the component
             this.initialize();
@@ -3467,8 +3037,8 @@ document.addEventListener('DOMContentLoaded', function() {
             window.formatPercentage = this.formatPercentage;
             window.generateColors = this.generateColors;
             
-            // Single, debounced resize handler
-            const debouncedResize = _.debounce(() => {
+            // Add the debounced resize handler
+            const debouncedResize = debounce(() => {
                 if (!this.isUpdating) {
                     this.isUpdating = true;
                     try {
@@ -3479,15 +3049,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }, 250);
             
-            // Add the debounced resize handler
             window.addEventListener('resize', debouncedResize);
-            
-            // Add event listeners for notification close buttons
-            document.querySelectorAll('.notification .delete').forEach(button => {
-                button.addEventListener('click', () => {
-                    button.parentNode.remove();
-                });
-            });
         }
     });
 });
@@ -9452,7 +9014,7 @@ def calculate_portfolio_composition(portfolio_data):
 ================================================================
 ###START_FILE_PATH: templates/pages/allocate.html###
 {% extends "base.html" %}
-{% block title %}Rebalancer - Portfolio Manager{% endblock %}
+{% block title %}Portfolio Rebalancer{% endblock %}
 
 {% block head %}
 {{ super() }}
@@ -9466,7 +9028,7 @@ def calculate_portfolio_composition(portfolio_data):
             <span class="icon">
                 <i class="fas fa-balance-scale"></i>
             </span>
-            <span>Rebalancer</span>
+            <span>Portfolio Rebalancer</span>
         </span>
     </h1>
 
@@ -9480,213 +9042,130 @@ def calculate_portfolio_composition(portfolio_data):
 
     <!-- Main Content (hidden during loading) -->
     <div v-show="!isLoading">
-
-    <!-- Navigation Tabs -->
-    <div class="tabs">
-        <ul>
-            <li :class="{'is-active': activeView === 'global'}">
-                <a @click="navigateToGlobal">
-                    <span class="icon"><i class="fas fa-globe"></i></span>
-                    <span>Global View</span>
-                </a>
-            </li>
-            <li :class="{'is-active': activeView === 'detail'}">
-                <a @click="setActiveView('detail')">
-                    <span class="icon"><i class="fas fa-search"></i></span>
-                    <span>Detail View</span>
-                </a>
-            </li>
-        </ul>
-    </div>
-
-    <!-- Portfolio Selector (for Detail View) -->
-    <div v-if="activeView === 'detail'" class="field mb-4">
-        <div class="control has-icons-left">
-            <div class="select is-medium">
-                <select v-model="selectedPortfolio" @change="debouncedUpdateChartData">
-                    <!-- No empty option needed as we set a default in the JavaScript -->
-                    <option v-for="portfolio in portfolioData.portfolios" 
-                            :key="portfolio.name" 
-                            :value="portfolio.name">
-                        ${portfolio.name}
-                    </option>
-                </select>
-            </div>
-            <span class="icon is-left">
-                <i class="fas fa-folder"></i>
-            </span>
-        </div>
-        <!-- No data indicator -->
-        <p v-if="portfolioData.portfolios.length === 0" class="help has-text-warning">
-            <span class="icon-text">
-                <span class="icon"><i class="fas fa-exclamation-triangle"></i></span>
-                <span>No portfolios found. Please create a portfolio with positions in the Enrich page first.</span>
-            </span>
-        </p>
-    </div>
-
-    <!-- Main Content Grid -->
-    <div class="columns is-multiline">
-        <!-- Current Distribution -->
-        <div class="column" :class="{'is-12': $viewport.width < 768, 'is-6': $viewport.width >= 768 && activeView !== 'global', 'is-4': $viewport.width >= 768 && activeView === 'global'}">
-            <div class="card">
-                <header class="card-header">
-                    <p class="card-header-title">
-                        <span class="icon-text">
-                            <span class="icon">
-                                <i class="fas fa-chart-pie"></i>
-                            </span>
-                            <span>Current Distribution</span>
-                        </span>
-                    </p>
-                </header>
-                <div class="card-content">
-                    <div class="chart-container" id="current-distribution-chart" style="height: 350px; width: 100%;"></div>
+        <!-- Portfolio Selector - Now prominently displayed at the top -->
+        <div class="field mb-5">
+            <label class="label is-medium">Select Portfolio to Rebalance</label>
+            <div class="control has-icons-left">
+                <div class="select is-medium is-fullwidth">
+                    <select v-model="selectedPortfolio" @change="updateChartData">
+                        <option value="">All Portfolios (Global View)</option>
+                        <option v-for="portfolio in portfolioData.portfolios" 
+                                :key="portfolio.name" 
+                                :value="portfolio.name">
+                            ${portfolio.name}
+                        </option>
+                    </select>
                 </div>
+                <span class="icon is-left">
+                    <i class="fas fa-folder"></i>
+                </span>
             </div>
-        </div>
-
-        <!-- Target Distribution -->
-        <div class="column" :class="{'is-12': $viewport.width < 768, 'is-6': $viewport.width >= 768 && activeView !== 'global', 'is-4': $viewport.width >= 768 && activeView === 'global'}">
-            <div class="card">
-                <header class="card-header">
-                    <p class="card-header-title">
-                        <span class="icon-text">
-                            <span class="icon">
-                                <i class="fas fa-bullseye"></i>
-                            </span>
-                            <span>Target Distribution</span>
-                        </span>
-                    </p>
-                </header>
-                <div class="card-content">
-                    <div class="chart-container" id="target-distribution-chart" style="height: 350px; width: 100%;"></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Settings - Only shown in Global View -->
-        <div v-if="activeView === 'global'" class="column" :class="{'is-12': $viewport.width < 768, 'is-4': $viewport.width >= 768}">
-            <div class="card">
-                <header class="card-header">
-                    <p class="card-header-title">
-                        <span class="icon-text">
-                            <span class="icon">
-                                <i class="fas fa-cog"></i>
-                            </span>
-                            <span>Rebalancing Settings</span>
-                        </span>
-                    </p>
-                </header>
-                <div class="card-content">
-                    <div class="field">
-                        <label class="label">Rebalancing Mode</label>
-                        
-                        <div class="control">
-                            <label class="radio">
-                                <input type="radio" 
-                                       name="rebalanceMode" 
-                                       value="existingCapital" 
-                                       v-model="rebalanceMode">
-                                <span>Existing Capital</span>
-                            </label>
-                        </div>
-                        
-                        <div class="control">
-                            <label class="radio">
-                                <input type="radio" 
-                                       name="rebalanceMode" 
-                                       value="newCapitalOnly" 
-                                       v-model="rebalanceMode">
-                                <span>New Capital Only (no sales)</span>
-                            </label>
-                        </div>
-                        
-                        <div class="control">
-                            <label class="radio">
-                                <input type="radio" 
-                                       name="rebalanceMode" 
-                                       value="newCapitalSpecific" 
-                                       v-model="rebalanceMode">
-                                <span>New Capital (specific amount)</span>
-                            </label>
-                        </div>
-                    </div>
-                    
-                    <div v-if="rebalanceMode === 'newCapitalSpecific'" class="field mt-4">
-                        <label class="label">New Capital Amount</label>
-                        <div class="control has-icons-left">
-                            <input class="input" 
-                                   type="number" 
-                                   v-model.number="newCapitalAmount" 
-                                   @change="debouncedCalculateTargetValuesAndActions">
-                            <span class="icon is-small is-left">
-                                <i class="fas fa-euro-sign"></i>
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Rebalancing Table -->
-    <div class="card mt-5">
-        <header class="card-header">
-            <p class="card-header-title">
+            <!-- No data indicator -->
+            <p v-if="portfolioData.portfolios.length === 0" class="help has-text-warning">
                 <span class="icon-text">
-                    <span class="icon">
-                        <i class="fas fa-exchange-alt"></i>
-                    </span>
-                    <span>Rebalancing Actions</span>
+                    <span class="icon"><i class="fas fa-exclamation-triangle"></i></span>
+                    <span>No portfolios found. Please create a portfolio with positions in the Enrich page first.</span>
                 </span>
             </p>
-        </header>
-        <div class="card-content">
-            <!-- Global View Table -->
-            <div v-if="activeView === 'global'" class="table-container">
-                <table class="table is-fullwidth is-hoverable">
-                    <thead>
-                        <tr>
-                            <th style="width: 20%;">Portfolio</th>
-                            <th style="width: 16%;" class="has-text-right">Current Value</th>
-                            <th style="width: 16%;" class="has-text-right">Current Weight</th>
-                            <th style="width: 16%;" class="has-text-right">Target Weight</th>
-                            <th style="width: 16%;" class="has-text-right">Target Value</th>
-                            <th style="width: 16%;" class="has-text-right">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="portfolio in portfolioData.portfolios" 
-                            :key="portfolio.name"
-                            class="is-clickable"
-                            @click="navigateToDetail(portfolio.name)">
-                            <td>
-                                <div class="media-content">
-                                    ${portfolio.name}
-                                </div>
-                            </td>
-                            <td class="has-text-right">${formatCurrency(portfolio.currentValue)}</td>
-                            <td class="has-text-right">${formatPercentage(portfolio.currentWeight)}</td>
-                            <td class="has-text-right">${formatPercentage(portfolio.targetWeight)}</td>
-                            <td class="has-text-right">${formatCurrency(portfolio.targetValue)}</td>
-                            <td class="has-text-right">
-                                <span :class="{
-                                    'has-text-success': portfolio.action.type === 'Buy',
-                                    'has-text-danger': portfolio.action.type === 'Sell',
-                                    'has-text-grey': portfolio.action.type === 'Hold'
-                                }">
-                                    ${portfolio.action.type} ${formatCurrency(portfolio.action.amount)}
+        </div>
+
+        <!-- Main Content Grid -->
+        <div class="columns is-multiline">
+            <!-- Current Distribution -->
+            <div class="column" :class="{'is-12': $viewport.width < 768, 'is-6': $viewport.width >= 768}">
+                <div class="card">
+                    <header class="card-header">
+                        <p class="card-header-title">
+                            <span class="icon-text">
+                                <span class="icon">
+                                    <i class="fas fa-chart-pie"></i>
                                 </span>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                                <span>Current Distribution</span>
+                            </span>
+                        </p>
+                    </header>
+                    <div class="card-content">
+                        <div class="chart-container" id="current-distribution-chart" style="height: 350px; width: 100%;"></div>
+                    </div>
+                </div>
             </div>
-            
-            <!-- Detail View Table -->
-            <div v-else-if="activeView === 'detail' && selectedPortfolio">
-                <div v-if="selectedPortfolioData">
+
+            <!-- Target Distribution -->
+            <div class="column" :class="{'is-12': $viewport.width < 768, 'is-6': $viewport.width >= 768}">
+                <div class="card">
+                    <header class="card-header">
+                        <p class="card-header-title">
+                            <span class="icon-text">
+                                <span class="icon">
+                                    <i class="fas fa-bullseye"></i>
+                                </span>
+                                <span>Target Distribution</span>
+                            </span>
+                        </p>
+                    </header>
+                    <div class="card-content">
+                        <div class="chart-container" id="target-distribution-chart" style="height: 350px; width: 100%;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rebalancing Table -->
+        <div class="card mt-5">
+            <header class="card-header">
+                <p class="card-header-title">
+                    <span class="icon-text">
+                        <span class="icon">
+                            <i class="fas fa-exchange-alt"></i>
+                        </span>
+                        <span>Rebalancing Actions</span>
+                    </span>
+                </p>
+            </header>
+            <div class="card-content">
+                <!-- Global View Table (shown when no specific portfolio is selected) -->
+                <div v-if="!selectedPortfolio" class="table-container">
+                    <table class="table is-fullwidth is-hoverable">
+                        <thead>
+                            <tr>
+                                <th style="width: 20%;">Portfolio</th>
+                                <th style="width: 16%;" class="has-text-right">Current Value</th>
+                                <th style="width: 16%;" class="has-text-right">Current Weight</th>
+                                <th style="width: 16%;" class="has-text-right">Target Weight</th>
+                                <th style="width: 16%;" class="has-text-right">Target Value</th>
+                                <th style="width: 16%;" class="has-text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="portfolio in portfolioData.portfolios" 
+                                :key="portfolio.name"
+                                class="is-clickable"
+                                @click="selectedPortfolio = portfolio.name">
+                                <td>
+                                    <div class="media-content">
+                                        ${portfolio.name}
+                                    </div>
+                                </td>
+                                <td class="has-text-right">${formatCurrency(portfolio.currentValue)}</td>
+                                <td class="has-text-right">${formatPercentage(portfolio.currentWeight)}</td>
+                                <td class="has-text-right">${formatPercentage(portfolio.targetWeight)}</td>
+                                <td class="has-text-right">${formatCurrency(portfolio.targetValue)}</td>
+                                <td class="has-text-right">
+                                    <span :class="{
+                                        'has-text-success': portfolio.action && portfolio.action.type === 'Buy',
+                                        'has-text-danger': portfolio.action && portfolio.action.type === 'Sell',
+                                        'has-text-grey': !portfolio.action || portfolio.action.type === 'Hold'
+                                    }">
+                                        ${portfolio.action ? portfolio.action.type + ' ' + formatCurrency(portfolio.action.amount) : 'Hold €0.00'}
+                                    </span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Detail View Table (shown when a specific portfolio is selected) -->
+                <div v-else-if="selectedPortfolio && selectedPortfolioData">
                     <h3 class="subtitle">${selectedPortfolioData.name} Portfolio Detail</h3>
                     
                     <div class="table-container">
@@ -9724,11 +9203,11 @@ def calculate_portfolio_composition(portfolio_data):
                                     <td class="has-text-right">${formatCurrency(category.targetValue)}</td>
                                     <td class="has-text-right">
                                         <span :class="{
-                                            'has-text-success': category.action.type === 'Buy',
-                                            'has-text-danger': category.action.type === 'Sell',
-                                            'has-text-grey': category.action.type === 'Hold'
+                                            'has-text-success': category.action && category.action.type === 'Buy',
+                                            'has-text-danger': category.action && category.action.type === 'Sell',
+                                            'has-text-grey': !category.action || category.action.type === 'Hold'
                                         }">
-                                            ${category.action.type} ${formatCurrency(category.action.amount)}
+                                            ${category.action ? category.action.type + ' ' + formatCurrency(category.action.amount) : 'Hold €0.00'}
                                         </span>
                                     </td>
                                 </tr>
@@ -9779,46 +9258,31 @@ def calculate_portfolio_composition(portfolio_data):
                     </div>
                 </div>
                 <div v-else class="notification is-warning">
-                    Please select a portfolio from the dropdown above.
+                    Please select a portfolio from the dropdown above to see detailed rebalancing actions.
                 </div>
             </div>
+            
+            <!-- Portfolio Summary Footer -->
+            <footer class="card-footer">
+                <div class="card-footer-item">
+                    <div class="level is-mobile is-justify-content-space-between w-100">
+                        <div class="level-item has-text-centered">
+                            <div>
+                                <p class="heading">Portfolio Value</p>
+                                <p class="title is-5">${formatCurrency(totalValue)}</p>
+                            </div>
+                        </div>
+                        
+                        <div class="level-item has-text-centered">
+                            <div>
+                                <p class="heading">Rebalanced Value</p>
+                                <p class="title is-5">${formatCurrency(newPortfolioValue)}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </footer>
         </div>
-        
-        <!-- Portfolio Summary Footer -->
-        <footer class="card-footer">
-            <div class="card-footer-item">
-                <div class="level is-mobile is-justify-content-space-between w-100">
-                    <div class="level-item has-text-centered">
-                        <div>
-                            <p class="heading">Portfolio Value</p>
-                            <p class="title is-5">${formatCurrency(totalValue)}</p>
-                        </div>
-                    </div>
-                    
-                    <div v-if="rebalanceMode === 'newCapitalOnly'" class="level-item has-text-centered">
-                        <div>
-                            <p class="heading">New Capital Required</p>
-                            <p class="title is-5">${formatCurrency(requiredCapitalForNoSales)}</p>
-                        </div>
-                    </div>
-                    
-                    <div v-if="rebalanceMode === 'newCapitalSpecific'" class="level-item has-text-centered">
-                        <div>
-                            <p class="heading">New Capital Added</p>
-                            <p class="title is-5">${formatCurrency(newCapitalAmount)}</p>
-                        </div>
-                    </div>
-                    
-                    <div v-if="rebalanceMode !== 'existingCapital'" class="level-item has-text-centered">
-                        <div>
-                            <p class="heading">New Portfolio Value</p>
-                            <p class="title is-5">${formatCurrency(newPortfolioValue)}</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </footer>
-    </div>
     </div> <!-- End of main content wrapper (hidden during loading) -->
 </div>
 {% endblock %}

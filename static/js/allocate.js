@@ -1,4 +1,4 @@
-// Improved Portfolio Rebalancer JavaScript
+// Portfolio Rebalancer JavaScript
 
 document.addEventListener('DOMContentLoaded', function() {
     // Add viewport size detection to Vue.js
@@ -28,9 +28,14 @@ document.addEventListener('DOMContentLoaded', function() {
         delimiters: ['${', '}'],  // Match existing Vue delimiters
         data() {
             return {
-                // Selected portfolio
+                // View state
+                activeView: 'global',
                 selectedPortfolio: '',
                 expandedCategories: {},
+                
+                // Rebalancing settings
+                rebalanceMode: 'existingCapital',
+                newCapitalAmount: 5000,
                 
                 // Chart instances
                 currentChart: null,
@@ -44,6 +49,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Calculated values
                 totalValue: 0,
                 newPortfolioValue: 0,
+                requiredCapitalForNoSales: 0,
                 
                 // Loading state
                 isLoading: false,
@@ -63,6 +69,38 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         watch: {
             /**
+             * Watch for changes to rebalance mode and recalculate
+             */
+            rebalanceMode() {
+                // Prevent infinite loops by checking the isUpdating flag
+                if (this.isUpdating) return;
+                
+                this.isUpdating = true;
+                try {
+                    this.calculateTargetValuesAndActions();
+                    this.updateChartData();
+                } finally {
+                    this.isUpdating = false;
+                }
+            },
+            
+            /**
+             * Watch for changes to new capital amount and recalculate
+             */
+            newCapitalAmount() {
+                // Only process if we're in the right mode and not already updating
+                if (this.rebalanceMode !== 'newCapitalSpecific' || this.isUpdating) return;
+                
+                this.isUpdating = true;
+                try {
+                    this.calculateTargetValuesAndActions();
+                    this.updateChartData();
+                } finally {
+                    this.isUpdating = false;
+                }
+            },
+            
+            /**
              * Watch portfolio data for changes
              */
             portfolioData: {
@@ -74,6 +112,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         this.$nextTick(() => {
                             // First calculate weights and actions
                             this.calculateCurrentWeights();
+                            this.calculateRequiredCapitalForNoSales();
                             this.calculateTargetValuesAndActions();
                             
                             // Then update charts
@@ -84,6 +123,22 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 },
                 deep: true
+            },
+            
+            /**
+             * Watch for view changes
+             */
+            activeView() {
+                if (this.isUpdating) return;
+                
+                this.isUpdating = true;
+                try {
+                    this.$nextTick(() => {
+                        this.updateChartData();
+                    });
+                } finally {
+                    this.isUpdating = false;
+                }
             },
             
             /**
@@ -117,10 +172,21 @@ document.addEventListener('DOMContentLoaded', function() {
                             this.portfolioData = response.data;
                             console.log('Portfolio data loaded:', this.portfolioData);
                             
+                            // Log target weights received from the server
+                            if (this.portfolioData.portfolios.length > 0) {
+                                console.log('Target weights from server:', 
+                                    this.portfolioData.portfolios.map(p => ({
+                                        name: p.name, 
+                                        targetWeight: p.targetWeight
+                                    }))
+                                );
+                            }
+                            
                             this.isUpdating = true;
                             try {
                                 // Calculate initial values
                                 this.calculateCurrentWeights();
+                                this.calculateRequiredCapitalForNoSales();
                                 this.calculateTargetValuesAndActions();
                                 
                                 // Initialize charts
@@ -142,6 +208,33 @@ document.addEventListener('DOMContentLoaded', function() {
                     .finally(() => {
                         this.isLoading = false;
                     });
+            },
+            
+            /**
+             * Set the active view (global or detail)
+             */
+            setActiveView(view) {
+                if (this.activeView === view) return;
+                
+                this.activeView = view;
+                
+                // If switching to detail view, ensure a portfolio is selected
+                if (view === 'detail' && !this.selectedPortfolio && this.portfolioData.portfolios.length > 0) {
+                    this.selectedPortfolio = this.portfolioData.portfolios[0].name;
+                }
+                
+                // Update charts after view changes
+                this.$nextTick(() => {
+                    this.updateChartData();
+                });
+            },
+            
+            /**
+             * Navigate to detail view for a specific portfolio
+             */
+            navigateToDetail(portfolioName) {
+                this.selectedPortfolio = portfolioName;
+                this.setActiveView('detail');
             },
             
             /**
@@ -210,25 +303,111 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             
             /**
+             * Calculate required capital for "No Sales" mode
+             */
+            calculateRequiredCapitalForNoSales() {
+                // Find the most overweight portfolio relative to target
+                let maxOverweightRatio = 0;
+                this.portfolioData.portfolios.forEach(portfolio => {
+                    if (portfolio.currentWeight > portfolio.targetWeight) {
+                        const ratio = portfolio.currentWeight / portfolio.targetWeight;
+                        maxOverweightRatio = Math.max(maxOverweightRatio, ratio);
+                    }
+                });
+                
+                // If no portfolio is overweight, no new capital needed
+                if (maxOverweightRatio <= 1) {
+                    this.requiredCapitalForNoSales = 0;
+                    return;
+                }
+                
+                // Calculate new portfolio value needed to dilute overweight positions
+                const newTotalValue = this.totalValue * maxOverweightRatio;
+                this.requiredCapitalForNoSales = Math.round(newTotalValue - this.totalValue);
+            },
+            
+            /**
              * Calculate target values and actions for all portfolios and positions
              */
             calculateTargetValuesAndActions() {
-                // Set new portfolio value equal to current value (no new capital in this version)
+                // Calculate new portfolio value based on rebalance mode
                 this.newPortfolioValue = this.totalValue;
+                if (this.rebalanceMode === 'newCapitalSpecific') {
+                    this.newPortfolioValue += this.newCapitalAmount;
+                } else if (this.rebalanceMode === 'newCapitalOnly') {
+                    this.newPortfolioValue += this.requiredCapitalForNoSales;
+                }
                 
                 // PORTFOLIO LEVEL CALCULATIONS
                 this.portfolioData.portfolios.forEach(portfolio => {
-                    // Calculate target value based on weight
-                    portfolio.targetValue = Math.round(this.totalValue * portfolio.targetWeight / 100);
+                    if (this.rebalanceMode === 'existingCapital') {
+                        // Mode 1: Existing Capital - can buy and sell
+                        portfolio.targetValue = Math.round(this.totalValue * portfolio.targetWeight / 100);
+                        portfolio.action = {
+                            type: portfolio.targetValue > portfolio.currentValue ? "Buy" : 
+                                portfolio.targetValue < portfolio.currentValue ? "Sell" : "Hold",
+                            amount: Math.abs(portfolio.targetValue - portfolio.currentValue)
+                        };
+                    } 
+                    else if (this.rebalanceMode === 'newCapitalOnly') {
+                        // Mode 2: New Capital only (no sales)
+                        const idealTargetValue = Math.round(this.newPortfolioValue * portfolio.targetWeight / 100);
+                        
+                        if (portfolio.currentValue >= idealTargetValue) {
+                            // Already at or above target - can't sell
+                            portfolio.targetValue = portfolio.currentValue;
+                            portfolio.action = { type: "Hold", amount: 0 };
+                        } else {
+                            // Below target - add capital
+                            portfolio.targetValue = idealTargetValue;
+                            portfolio.action = { 
+                                type: "Buy", 
+                                amount: idealTargetValue - portfolio.currentValue
+                            };
+                        }
+                    }
+                    else if (this.rebalanceMode === 'newCapitalSpecific') {
+                        // Mode 3: New Capital (specific amount)
+                        // Calculate ideal target value in the new portfolio
+                        portfolio.idealTargetValue = Math.round(this.newPortfolioValue * portfolio.targetWeight / 100);
+                
+                        // Calculate shortfall (how much this portfolio needs)
+                        portfolio.shortfall = portfolio.idealTargetValue > portfolio.currentValue ? 
+                            portfolio.idealTargetValue - portfolio.currentValue : 0;
+                    }
+                });
+                
+                // For newCapitalSpecific mode, allocate the capital proportionally to shortfalls
+                if (this.rebalanceMode === 'newCapitalSpecific') {
+                    // Calculate total shortfall across all portfolios
+                    let totalShortfall = this.portfolioData.portfolios.reduce(
+                        (sum, portfolio) => sum + (portfolio.shortfall || 0), 0
+                    );
                     
-                    // Determine action (buy, sell, or hold)
-                    portfolio.action = {
-                        type: portfolio.targetValue > portfolio.currentValue ? "Buy" : 
-                              portfolio.targetValue < portfolio.currentValue ? "Sell" : "Hold",
-                        amount: Math.abs(portfolio.targetValue - portfolio.currentValue)
-                    };
-                    
-                    // CATEGORY AND POSITION LEVEL CALCULATIONS
+                    this.portfolioData.portfolios.forEach(portfolio => {
+                        if (totalShortfall <= this.newCapitalAmount) {
+                            // Enough capital to cover all shortfalls
+                            portfolio.targetValue = portfolio.currentValue + (portfolio.shortfall || 0);
+                            portfolio.action = {
+                                type: (portfolio.shortfall || 0) > 0 ? "Buy" : "Hold",
+                                amount: portfolio.shortfall || 0
+                            };
+                        } else if ((portfolio.shortfall || 0) > 0) {
+                            // Not enough capital - allocate proportionally
+                            const allocation = Math.round((portfolio.shortfall / totalShortfall) * this.newCapitalAmount);
+                            portfolio.targetValue = portfolio.currentValue + allocation;
+                            portfolio.action = { type: "Buy", amount: allocation };
+                        } else {
+                            // No shortfall
+                            portfolio.targetValue = portfolio.currentValue;
+                            portfolio.action = { type: "Hold", amount: 0 };
+                        }
+                    });
+                }
+                
+                // CATEGORY AND POSITION LEVEL CALCULATIONS
+                this.portfolioData.portfolios.forEach(portfolio => {
+                    // Process each category and position
                     portfolio.categories.forEach(category => {
                         // Calculate target value for category based on portfolio's target value
                         category.targetValue = Math.round(portfolio.targetValue * category.targetWeight / 100);
@@ -248,13 +427,15 @@ document.addEventListener('DOMContentLoaded', function() {
                             // Determine action for position
                             position.action = {
                                 type: position.targetValue > position.currentValue ? "Buy" : 
-                                      position.targetValue < position.currentValue ? "Sell" : "Hold",
+                                    position.targetValue < position.currentValue ? "Sell" : "Hold",
                                 amount: Math.abs(position.targetValue - position.currentValue)
                             };
                         });
                     });
-                    
-                    // Recalculate final weights
+                });
+                
+                // Recalculate final weights after actions
+                this.portfolioData.portfolios.forEach(portfolio => {
                     portfolio.finalWeight = parseFloat((portfolio.targetValue / this.newPortfolioValue * 100).toFixed(2));
                     
                     // Recalculate category final weights
@@ -270,64 +451,9 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             
             /**
-             * Initialize charts for visualization
+             * Initialize plotly charts for visualization
              */
             initializeCharts() {
-                this.updateChartData();
-            },
-            
-            /**
-             * Update chart data when view or state changes
-             */
-            updateChartData() {
-                // Get updated chart data
-                const chartData = this.getChartData();
-                
-                // Clear previous charts
-                Plotly.purge('current-distribution-chart');
-                Plotly.purge('target-distribution-chart');
-                
-                // Determine which data to display based on selectedPortfolio
-                if (this.selectedPortfolio) {
-                    // Detail view - use sunburst chart for selected portfolio
-                    const portfolio = this.selectedPortfolioData;
-                    if (!portfolio) return;
-                    
-                    // Prepare data for sunburst charts
-                    const currentPortfolio = this.preparePortfolioDataForSunburst(portfolio, 'current');
-                    const targetPortfolio = this.preparePortfolioDataForSunburst(portfolio, 'target');
-                    
-                    // Create sunburst charts using PortfolioCharts if available
-                    if (typeof PortfolioCharts !== 'undefined' && PortfolioCharts.createSunburstChart) {
-                        PortfolioCharts.createSunburstChart(
-                            'current-distribution-chart',
-                            currentPortfolio,
-                            this.formatCurrency,
-                            this.formatPercentage,
-                            this.generateColors
-                        );
-                        
-                        PortfolioCharts.createSunburstChart(
-                            'target-distribution-chart',
-                            targetPortfolio,
-                            this.formatCurrency,
-                            this.formatPercentage,
-                            this.generateColors
-                        );
-                    } else {
-                        // Fallback to pie charts if sunburst not available
-                        this.createPieCharts(chartData);
-                    }
-                } else {
-                    // Global view - use pie charts
-                    this.createPieCharts(chartData);
-                }
-            },
-            
-            /**
-             * Create pie charts for current and target distribution
-             */
-            createPieCharts(chartData) {
                 // Enhanced layout with consistent settings
                 const layout = {
                     showlegend: false,
@@ -338,7 +464,21 @@ document.addEventListener('DOMContentLoaded', function() {
                     plot_bgcolor: 'transparent',
                     automargin: true
                 };
+            
+                const chartData = this.getChartData();
                 
+                // Initialize based on active view
+                if (this.activeView === 'global') {
+                    this.initializeGlobalCharts(chartData, layout);
+                } else {
+                    this.initializeDetailCharts(chartData);
+                }
+            },
+            
+            /**
+             * Initialize charts for Global view (pie charts)
+             */
+            initializeGlobalCharts(chartData, layout) {
                 // Create current distribution chart
                 const currentData = [{
                     type: 'pie',
@@ -367,7 +507,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     showlegend: false
                 }];
                 
-                Plotly.newPlot('current-distribution-chart', currentData, layout, 
+                // Use Plotly.purge to fully clean and redraw
+                Plotly.purge('current-distribution-chart');
+                Plotly.newPlot('current-distribution-chart', currentData, { ...layout }, 
                     typeof ChartConfig !== 'undefined' ? ChartConfig.plotlyConfig : { displayModeBar: false });
             
                 // Create target distribution chart
@@ -398,20 +540,205 @@ document.addEventListener('DOMContentLoaded', function() {
                     showlegend: false
                 }];
                 
-                Plotly.newPlot('target-distribution-chart', targetData, layout,
+                // Use Plotly.purge to fully clean and redraw
+                Plotly.purge('target-distribution-chart');
+                Plotly.newPlot('target-distribution-chart', targetData, { ...layout }, 
                     typeof ChartConfig !== 'undefined' ? ChartConfig.plotlyConfig : { displayModeBar: false });
             },
             
             /**
-             * Get data for charts based on selected portfolio
+             * Initialize charts for Detail view (sunburst charts)
+             */
+            initializeDetailCharts(chartData) {
+                // Get the selected portfolio data
+                const portfolio = this.selectedPortfolioData;
+                if (!portfolio) return;
+                
+                // Clear any existing charts
+                Plotly.purge('current-distribution-chart');
+                Plotly.purge('target-distribution-chart');
+                
+                // Setup chartData for sunburst format (if available in PortfolioCharts)
+                if (typeof PortfolioCharts !== 'undefined' && PortfolioCharts.createSunburstChart) {
+                    // Create current distribution sunburst chart
+                    const currentPortfolio = this.preparePortfolioDataForSunburst(portfolio, 'current');
+                    PortfolioCharts.createSunburstChart(
+                        'current-distribution-chart',
+                        currentPortfolio,
+                        this.formatCurrency,
+                        this.formatPercentage,
+                        this.generateColors
+                    );
+                    
+                    // Create target distribution sunburst chart
+                    const targetPortfolio = this.preparePortfolioDataForSunburst(portfolio, 'target');
+                    PortfolioCharts.createSunburstChart(
+                        'target-distribution-chart',
+                        targetPortfolio,
+                        this.formatCurrency,
+                        this.formatPercentage,
+                        this.generateColors
+                    );
+                } else {
+                    console.warn('PortfolioCharts.createSunburstChart not available, falling back to pie charts');
+                    // Fallback to pie charts if sunburst not available
+                    const layout = {
+                        showlegend: false,
+                        height: 350,
+                        autosize: true,
+                        margin: { l: 30, r: 30, t: 30, b: 50 },
+                        paper_bgcolor: 'transparent',
+                        plot_bgcolor: 'transparent',
+                        automargin: true
+                    };
+                    this.initializeGlobalCharts(chartData, layout);
+                }
+            },
+            
+            /**
+             * Update chart data when view or state changes
+             */
+            updateChartData() {
+                // Get updated chart data
+                const chartData = this.getChartData();
+                
+                // If there's no data, don't try to render the charts
+                if (!chartData.current.length && !chartData.target.length) {
+                    console.warn('No chart data available for rendering');
+                    return;
+                }
+
+                // Create chart layout - ensure consistency with initialization
+                const layout = {
+                    showlegend: false,
+                    height: 350,
+                    autosize: true,
+                    margin: { l: 30, r: 30, t: 30, b: 50 },
+                    paper_bgcolor: 'transparent',
+                    plot_bgcolor: 'transparent',
+                    automargin: true
+                };
+
+                // Check for the chart elements in the DOM
+                const currentElement = document.getElementById('current-distribution-chart');
+                const targetElement = document.getElementById('target-distribution-chart');
+
+                // Initialize based on active view
+                if (this.activeView === 'global') {
+                    // Update global view charts (pie charts)
+                    if (currentElement) {
+                        const currentData = [{
+                            type: 'pie',
+                            values: chartData.current.map(item => item.value),
+                            labels: chartData.current.map(item => item.name),
+                            textinfo: 'label+percent',
+                            textposition: 'auto',
+                            hoverinfo: 'label+percent+value',
+                            hole: 0.5,
+                            marker: {
+                                colors: chartData.current.map(item => item.color)
+                            },
+                            textfont: {
+                                size: 12,
+                                color: '#ffffff'
+                            },
+                            insidetextfont: {
+                                size: 12,
+                                color: '#ffffff'
+                            },
+                            outsidetextfont: {
+                                size: 12,
+                                color: '#333333'
+                            },
+                            automargin: true,
+                            showlegend: false
+                        }];
+                        
+                        Plotly.react('current-distribution-chart', currentData, layout, 
+                            typeof ChartConfig !== 'undefined' ? ChartConfig.plotlyConfig : { displayModeBar: false });
+                    }
+                    
+                    if (targetElement) {
+                        const targetData = [{
+                            type: 'pie',
+                            values: chartData.target.map(item => item.value),
+                            labels: chartData.target.map(item => item.name),
+                            textinfo: 'label+percent',
+                            textposition: 'auto',
+                            hoverinfo: 'label+percent+value',
+                            hole: 0.5,
+                            marker: {
+                                colors: chartData.target.map(item => item.color)
+                            },
+                            textfont: {
+                                size: 12,
+                                color: '#ffffff'
+                            },
+                            insidetextfont: {
+                                size: 12,
+                                color: '#ffffff'
+                            },
+                            outsidetextfont: {
+                                size: 12,
+                                color: '#333333'
+                            },
+                            automargin: true,
+                            showlegend: false
+                        }];
+                        
+                        Plotly.react('target-distribution-chart', targetData, layout, 
+                            typeof ChartConfig !== 'undefined' ? ChartConfig.plotlyConfig : { displayModeBar: false });
+                    }
+                } else {
+                    // Update detail view charts (sunburst charts)
+                    const portfolio = this.selectedPortfolioData;
+                    if (!portfolio) return;
+                    
+                    // Setup chartData for sunburst format (if available in PortfolioCharts)
+                    if (typeof PortfolioCharts !== 'undefined' && PortfolioCharts.createSunburstChart) {
+                        // Create current distribution sunburst chart
+                        if (currentElement) {
+                            Plotly.purge('current-distribution-chart');
+                            const currentPortfolio = this.preparePortfolioDataForSunburst(portfolio, 'current');
+                            PortfolioCharts.createSunburstChart(
+                                'current-distribution-chart',
+                                currentPortfolio,
+                                this.formatCurrency,
+                                this.formatPercentage,
+                                this.generateColors
+                            );
+                        }
+                        
+                        // Create target distribution sunburst chart
+                        if (targetElement) {
+                            Plotly.purge('target-distribution-chart');
+                            const targetPortfolio = this.preparePortfolioDataForSunburst(portfolio, 'target');
+                            PortfolioCharts.createSunburstChart(
+                                'target-distribution-chart',
+                                targetPortfolio,
+                                this.formatCurrency,
+                                this.formatPercentage,
+                                this.generateColors
+                            );
+                        }
+                    } else {
+                        console.warn('PortfolioCharts.createSunburstChart not available, falling back to pie charts');
+                        // Fallback to pie charts if sunburst not available
+                        this.initializeGlobalCharts(chartData, layout);
+                    }
+                }
+            },
+            
+            /**
+             * Get data for charts based on active view
              */
             getChartData() {
                 const colors = this.generateColors(this.portfolioData.portfolios.length);
                 let currentData = [];
                 let targetData = [];
                 
-                if (this.selectedPortfolio) {
-                    // Selected portfolio mode - show categories
+                if (this.activeView === 'detail' && this.selectedPortfolio) {
+                    // Detail view - get data for selected portfolio's categories
                     const portfolio = this.selectedPortfolioData;
                     if (portfolio) {
                         // Map colors to portfolio and categories
@@ -421,7 +748,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         const categoryColors = this.generateColors(portfolio.categories.length);
                         
                         portfolio.categories.forEach((category, index) => {
-                            category.color = categoryColors[index];
+                            category.color = categoryColors[index % categoryColors.length];
                             
                             currentData.push({
                                 name: category.name,
@@ -439,7 +766,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         });
                     }
                 } else {
-                    // Global mode - show all portfolios
+                    // Global view - show all portfolios
                     this.portfolioData.portfolios.forEach((portfolio, index) => {
                         portfolio.color = colors[index % colors.length];
                         
@@ -557,7 +884,7 @@ document.addEventListener('DOMContentLoaded', function() {
             window.formatPercentage = this.formatPercentage;
             window.generateColors = this.generateColors;
             
-            // Add the debounced resize handler
+            // Single, debounced resize handler
             const debouncedResize = debounce(() => {
                 if (!this.isUpdating) {
                     this.isUpdating = true;
@@ -569,7 +896,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }, 250);
             
+            // Add the debounced resize handler
             window.addEventListener('resize', debouncedResize);
+            
+            // Add event listeners for notification close buttons
+            document.querySelectorAll('.notification .delete').forEach(button => {
+                button.addEventListener('click', () => {
+                    button.parentNode.remove();
+                });
+            });
         }
     });
 });
