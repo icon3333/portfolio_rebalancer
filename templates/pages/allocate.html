@@ -48,72 +48,10 @@
 
         <!-- Global View Content -->
         <div v-if="activeView === 'global'">
-            <!-- Rebalancing Mode Selection -->
-            <div class="card mb-4">
-                <header class="card-header">
-                    <p class="card-header-title">
-                        <span class="icon-text">
-                            <span class="icon">
-                                <i class="fas fa-cog"></i>
-                            </span>
-                            <span>Rebalancing Settings</span>
-                        </span>
-                    </p>
-                </header>
-                <div class="card-content">
-                    <div class="field">
-                        <label class="label">Rebalancing Mode</label>
-                        
-                        <div class="control">
-                            <label class="radio">
-                                <input type="radio" 
-                                    name="rebalanceMode" 
-                                    value="existingCapital" 
-                                    v-model="rebalanceMode">
-                                <span>Existing Capital</span>
-                            </label>
-                        </div>
-                        
-                        <div class="control">
-                            <label class="radio">
-                                <input type="radio" 
-                                    name="rebalanceMode" 
-                                    value="newCapitalOnly" 
-                                    v-model="rebalanceMode">
-                                <span>New Capital Only (no sales)</span>
-                            </label>
-                        </div>
-                        
-                        <div class="control">
-                            <label class="radio">
-                                <input type="radio" 
-                                    name="rebalanceMode" 
-                                    value="newCapitalSpecific" 
-                                    v-model="rebalanceMode">
-                                <span>New Capital (specific amount)</span>
-                            </label>
-                        </div>
-                    </div>
-                    
-                    <div v-if="rebalanceMode === 'newCapitalSpecific'" class="field mt-4">
-                        <label class="label">New Capital Amount</label>
-                        <div class="control has-icons-left">
-                            <input class="input" 
-                                type="number" 
-                                v-model.number="newCapitalAmount" 
-                                @change="calculateTargetValuesAndActions">
-                            <span class="icon is-small is-left">
-                                <i class="fas fa-euro-sign"></i>
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Global Charts -->
-            <div class="columns is-multiline">
+            <!-- Replace Bulma columns with custom exact percentage grid -->
+            <div class="exact-75-container" style="display: flex !important; flex-wrap: wrap !important; width: 100% !important; margin: 0 !important;">
                 <!-- Current Distribution -->
-                <div class="column" :class="{'is-12': $viewport.width < 768, 'is-6': $viewport.width >= 768}">
+                <div class="chart-column" :class="{'is-12': $viewport && $viewport.width < 768}" style="width: 37.5% !important; padding: 0.75rem !important;">
                     <div class="card">
                         <header class="card-header">
                             <p class="card-header-title">
@@ -126,13 +64,13 @@
                             </p>
                         </header>
                         <div class="card-content">
-                            <div class="chart-container" id="current-distribution-chart" style="height: 350px; width: 100%;"></div>
+                            <div class="chart-container" id="current-distribution-chart-global" style="height: 350px; width: 100%;"></div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Target Distribution -->
-                <div class="column" :class="{'is-12': $viewport.width < 768, 'is-6': $viewport.width >= 768}">
+                <div class="chart-column" :class="{'is-12': $viewport && $viewport.width < 768}" style="width: 37.5% !important; padding: 0.75rem !important;">
                     <div class="card">
                         <header class="card-header">
                             <p class="card-header-title">
@@ -145,7 +83,69 @@
                             </p>
                         </header>
                         <div class="card-content">
-                            <div class="chart-container" id="target-distribution-chart" style="height: 350px; width: 100%;"></div>
+                            <div class="chart-container" id="target-distribution-chart-global" style="height: 350px; width: 100%;"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Rebalancing Mode (now with exact 25% width) -->
+                <div class="settings-column" :class="{'is-12': $viewport && $viewport.width < 768}" style="width: 25% !important; padding: 0.75rem !important;">
+                    <div class="card">
+                        <header class="card-header">
+                            <p class="card-header-title">
+                                <span class="icon-text">
+                                    <span class="icon">
+                                        <i class="fas fa-cog"></i>
+                                    </span>
+                                    <span>Rebalancing Mode</span>
+                                </span>
+                            </p>
+                        </header>
+                        <div class="card-content">
+                            <div class="field">
+                                <div class="control">
+                                    <label class="radio">
+                                        <input type="radio" 
+                                            name="rebalanceMode" 
+                                            value="existingCapital" 
+                                            v-model="rebalanceMode">
+                                        <span>Existing Capital</span>
+                                    </label>
+                                </div>
+                                
+                                <div class="control">
+                                    <label class="radio">
+                                        <input type="radio" 
+                                            name="rebalanceMode" 
+                                            value="newCapitalOnly" 
+                                            v-model="rebalanceMode">
+                                        <span>New Capital Only</span>
+                                    </label>
+                                </div>
+                                
+                                <div class="control">
+                                    <label class="radio">
+                                        <input type="radio" 
+                                            name="rebalanceMode" 
+                                            value="newCapitalSpecific" 
+                                            v-model="rebalanceMode">
+                                        <span>New Capital (specific)</span>
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div v-if="rebalanceMode === 'newCapitalSpecific'" class="field mt-4">
+                                <label class="label">Amount</label>
+                                <div class="control has-icons-left">
+                                    <input class="input" 
+                                        type="number" 
+                                        v-model.number="newCapitalAmount" 
+                                        @change="calculateTargetValuesAndActions">
+                                    <span class="icon is-small is-left">
+                                        <i class="fas fa-euro-sign"></i>
+                                    </span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -244,72 +244,11 @@
 
         <!-- Detail View Content -->
         <div v-if="activeView === 'detail'">
-            <!-- Rebalancing Mode Info Box -->
-            <div class="notification" :class="{
-                'is-info': rebalanceMode === 'existingCapital',
-                'is-success': rebalanceMode === 'newCapitalOnly',
-                'is-primary': rebalanceMode === 'newCapitalSpecific'
-            }">
-                <div class="level is-mobile">
-                    <div class="level-left">
-                        <div class="level-item">
-                            <span class="icon-text">
-                                <span class="icon">
-                                    <i class="fas fa-info-circle"></i>
-                                </span>
-                                <span><strong>Rebalancing Mode:</strong> 
-                                    <span v-if="rebalanceMode === 'existingCapital'">Existing Capital (Buy & Sell)</span>
-                                    <span v-else-if="rebalanceMode === 'newCapitalOnly'">New Capital Only (No Sales)</span>
-                                    <span v-else-if="rebalanceMode === 'newCapitalSpecific'">New Capital (${formatCurrency(newCapitalAmount)})</span>
-                                </span>
-                            </span>
-                        </div>
-                    </div>
-                    <div class="level-right">
-                        <div class="level-item">
-                            <a @click="setActiveView('global')" class="button is-small is-white is-outlined">
-                                <span class="icon">
-                                    <i class="fas fa-cog"></i>
-                                </span>
-                                <span>Change Mode</span>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Portfolio Selector -->
-            <div class="field mb-4">
-                <label class="label">Select Portfolio</label>
-                <div class="control has-icons-left">
-                    <div class="select is-medium is-fullwidth">
-                        <select v-model="selectedPortfolio" @change="updateChartData">
-                            <option value="" disabled>Select a portfolio</option>
-                            <option v-for="portfolio in portfolioData.portfolios" 
-                                    :key="portfolio.name" 
-                                    :value="portfolio.name">
-                                ${portfolio.name}
-                            </option>
-                        </select>
-                    </div>
-                    <span class="icon is-left">
-                        <i class="fas fa-folder"></i>
-                    </span>
-                </div>
-                <!-- No data indicator -->
-                <p v-if="portfolioData.portfolios.length === 0" class="help has-text-warning">
-                    <span class="icon-text">
-                        <span class="icon"><i class="fas fa-exclamation-triangle"></i></span>
-                        <span>No portfolios found. Please create a portfolio with positions in the Enrich page first.</span>
-                    </span>
-                </p>
-            </div>
-
-            <!-- Detail Charts -->
-            <div v-if="selectedPortfolio" class="columns is-multiline">
+            <!-- Replace Bulma columns with custom exact percentage grid -->
+            <div class="exact-75-container" style="display: flex !important; flex-wrap: wrap !important; width: 100% !important; margin: 0 !important;">
                 <!-- Current Distribution -->
-                <div class="column" :class="{'is-12': $viewport.width < 768, 'is-6': $viewport.width >= 768}">
-                    <div class="card">
+                <div class="chart-column" :class="{'is-12': $viewport && $viewport.width < 768}" style="width: 37.5% !important; padding: 0.75rem !important;">
+                    <div v-if="selectedPortfolio" class="card">
                         <header class="card-header">
                             <p class="card-header-title">
                                 <span class="icon-text">
@@ -321,14 +260,22 @@
                             </p>
                         </header>
                         <div class="card-content">
-                            <div class="chart-container" id="current-distribution-chart" style="height: 350px; width: 100%;"></div>
+                            <div class="chart-container" id="current-distribution-chart-detail" style="height: 350px; width: 100%;"></div>
                         </div>
+                    </div>
+                    <div v-if="!selectedPortfolio" class="notification is-info is-light">
+                        <p class="has-text-centered">
+                            <span class="icon-text">
+                                <span class="icon"><i class="fas fa-info-circle"></i></span>
+                                <span>Please select a portfolio to see distribution charts.</span>
+                            </span>
+                        </p>
                     </div>
                 </div>
 
                 <!-- Target Distribution -->
-                <div class="column" :class="{'is-12': $viewport.width < 768, 'is-6': $viewport.width >= 768}">
-                    <div class="card">
+                <div class="chart-column" :class="{'is-12': $viewport && $viewport.width < 768}" style="width: 37.5% !important; padding: 0.75rem !important;">
+                    <div v-if="selectedPortfolio" class="card">
                         <header class="card-header">
                             <p class="card-header-title">
                                 <span class="icon-text">
@@ -340,7 +287,82 @@
                             </p>
                         </header>
                         <div class="card-content">
-                            <div class="chart-container" id="target-distribution-chart" style="height: 350px; width: 100%;"></div>
+                            <div class="chart-container" id="target-distribution-chart-detail" style="height: 350px; width: 100%;"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Right side: Mode info and Portfolio Selection -->
+                <div class="settings-column" :class="{'is-12': $viewport && $viewport.width < 768}" style="width: 25% !important; padding: 0.75rem !important;">
+                    <!-- Mode Card -->
+                    <div class="card mb-4">
+                        <header class="card-header">
+                            <p class="card-header-title">
+                                <span class="icon-text">
+                                    <span class="icon">
+                                        <i class="fas fa-info-circle"></i>
+                                    </span>
+                                    <span>Mode</span>
+                                </span>
+                            </p>
+                        </header>
+                        <div class="card-content">
+                            <div class="content">
+                                <p class="has-text-weight-semibold">
+                                    <span v-if="rebalanceMode === 'existingCapital'">Existing Capital</span>
+                                    <span v-else-if="rebalanceMode === 'newCapitalOnly'">New Capital Only</span>
+                                    <span v-else-if="rebalanceMode === 'newCapitalSpecific'">New Capital</span>
+                                </p>
+                                
+                                <p v-if="rebalanceMode === 'newCapitalSpecific'" class="has-text-grey">
+                                    Amount: ${formatCurrency(newCapitalAmount)}
+                                </p>
+                                
+                                <a @click="setActiveView('global')" class="button is-small is-link is-light is-fullwidth mt-3">
+                                    <span class="icon is-small">
+                                        <i class="fas fa-cog"></i>
+                                    </span>
+                                    <span>Change Mode</span>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Portfolio Selector -->
+                    <div class="card">
+                        <header class="card-header">
+                            <p class="card-header-title">
+                                <span class="icon-text">
+                                    <span class="icon">
+                                        <i class="fas fa-folder"></i>
+                                    </span>
+                                    <span>Select Portfolio</span>
+                                </span>
+                            </p>
+                        </header>
+                        <div class="card-content">
+                            <div class="field">
+                                <div class="control">
+                                    <div class="select is-fullwidth">
+                                        <select v-model="selectedPortfolio" @change="updateChartData">
+                                            <option value="" disabled>Select portfolio</option>
+                                            <option v-for="portfolio in portfolioData.portfolios" 
+                                                    :key="portfolio.name" 
+                                                    :value="portfolio.name">
+                                                ${portfolio.name}
+                                            </option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <!-- No data indicator -->
+                                <p v-if="portfolioData.portfolios.length === 0" class="help has-text-warning mt-2">
+                                    <small>
+                                        <i class="fas fa-exclamation-triangle mr-1"></i>
+                                        No portfolios found.
+                                    </small>
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -506,6 +528,190 @@
 {% block scripts %}
 <!-- Include chart components from analyse.html -->
 {% include "components/analyse_components.html" %}
+
+<!-- Check for PortfolioCharts availability -->
+<script>
+// Ensure PortfolioCharts is defined even if analyse_components.html fails to load
+if (typeof PortfolioCharts === 'undefined') {
+    console.warn('PortfolioCharts not defined, creating fallback implementation');
+    window.PortfolioCharts = {
+        createSunburstChart: function(elementId, portfolio, formatCurrency, formatPercentage, generateColors) {
+            console.log(`Creating fallback sunburst chart for ${elementId}`, { portfolio });
+            
+            // Ensure format functions are defined
+            formatCurrency = formatCurrency || (v => `€${v}`);
+            formatPercentage = formatPercentage || (v => `${v}%`);
+            
+            // Get the container
+            const container = document.getElementById(elementId);
+            if (!container) {
+                console.error(`Chart container not found: ${elementId}`);
+                return null;
+            }
+            
+            // Ensure container is visible
+            container.style.display = 'block';
+            container.style.visibility = 'visible';
+            container.style.height = '450px';
+            container.style.width = '100%';
+            
+            // If portfolio is null or undefined, show an error message
+            if (!portfolio) {
+                console.error('Portfolio data is null or undefined');
+                container.innerHTML = `
+                    <div class="has-text-centered p-6">
+                        <p class="has-text-danger">
+                            <span class="icon"><i class="fas fa-exclamation-triangle"></i></span>
+                            <span>No portfolio data available</span>
+                        </p>
+                    </div>
+                `;
+                return container;
+            }
+            
+            // Check if we have valid data in the expected format
+            if (!portfolio.ids || !portfolio.labels || !portfolio.parents || !portfolio.values) {
+                console.warn(`Portfolio data not in expected format:`, portfolio);
+                
+                // Try to create simple pie chart if we have categories
+                if (portfolio.categories && portfolio.categories.length > 0) {
+                    try {
+                        console.log(`Creating simple pie chart from ${portfolio.categories.length} categories`);
+                        
+                        const labels = [];
+                        const values = [];
+                        const colors = [];
+                        
+                        // Generate some default colors
+                        const defaultColors = [
+                            '#3366CC', '#DC3912', '#FF9900', '#109618', '#990099', '#3B3EAC',
+                            '#0099C6', '#DD4477', '#66AA00', '#B82E2E', '#316395', '#994499'
+                        ];
+                        
+                        portfolio.categories.forEach((category, i) => {
+                            labels.push(category.name);
+                            values.push(category.currentValue || category.targetValue || 0);
+                            colors.push(defaultColors[i % defaultColors.length]);
+                        });
+                        
+                        if (labels.length > 0 && values.length > 0) {
+                            const data = [{
+                                type: 'pie',
+                                values: values,
+                                labels: labels,
+                                textinfo: 'label+percent',
+                                hoverinfo: 'label+percent+value',
+                                marker: { colors: colors }
+                            }];
+                            
+                            const layout = {
+                                margin: { l: 0, r: 0, t: 0, b: 0 },
+                                height: 450,
+                                autosize: true,
+                                showlegend: false
+                            };
+                            
+                            Plotly.newPlot(elementId, data, layout, { responsive: true, displayModeBar: false });
+                            return container;
+                        }
+                    } catch (error) {
+                        console.error('Error creating fallback pie chart:', error);
+                    }
+                }
+                
+                // If all else fails, show an error message
+                container.innerHTML = `
+                    <div class="has-text-centered p-6">
+                        <p class="has-text-warning">
+                            <span class="icon"><i class="fas fa-exclamation-triangle"></i></span>
+                            <span>Unable to create chart. Invalid data format.</span>
+                        </p>
+                    </div>
+                `;
+                return container;
+            }
+            
+            // Check that we have at least some data points
+            if (portfolio.ids.length === 0 || portfolio.values.length === 0) {
+                console.error('Portfolio has no data points');
+                container.innerHTML = `
+                    <div class="has-text-centered p-6">
+                        <p class="has-text-warning">
+                            <span class="icon"><i class="fas fa-exclamation-triangle"></i></span>
+                            <span>No data available for chart</span>
+                        </p>
+                    </div>
+                `;
+                return container;
+            }
+            
+            // Create the plot with provided data
+            try {
+                console.log(`Creating sunburst chart with ${portfolio.ids.length} data points`);
+                
+                const data = [{
+                    type: 'sunburst',
+                    ids: portfolio.ids,
+                    labels: portfolio.labels,
+                    parents: portfolio.parents,
+                    values: portfolio.values,
+                    text: portfolio.text,
+                    textinfo: 'label',
+                    hoverinfo: portfolio.hoverinfo || 'text',
+                    hovertemplate: '<b>%{label}</b><br>%{text}<extra></extra>',
+                    branchvalues: 'total',
+                    insidetextorientation: 'radial',
+                    marker: { line: { width: 1, color: 'white' } }
+                }];
+                
+                const layout = {
+                    margin: { l: 0, r: 0, t: 0, b: 0 },
+                    height: 450,
+                    autosize: true
+                };
+                
+                Plotly.newPlot(elementId, data, layout, { responsive: true, displayModeBar: false })
+                    .then(() => {
+                        console.log(`Sunburst chart ${elementId} created successfully`);
+                        
+                        // Force a resize to ensure proper rendering
+                        setTimeout(() => {
+                            Plotly.Plots.resize(document.getElementById(elementId));
+                        }, 100);
+                    })
+                    .catch(error => {
+                        console.error(`Error in Plotly.newPlot promise:`, error);
+                        throw error;
+                    });
+                    
+                return container;
+            } catch (error) {
+                console.error('Error creating sunburst chart:', error);
+                container.innerHTML = `
+                    <div class="has-text-centered p-6">
+                        <p class="has-text-danger">Error creating chart: ${error.message}</p>
+                        <button class="button is-small is-info mt-2" onclick="location.reload()">
+                            Refresh Page
+                        </button>
+                    </div>
+                `;
+                return container;
+            }
+        }
+    };
+}
+
+// Check for ChartConfig
+if (typeof ChartConfig === 'undefined') {
+    console.warn('ChartConfig not defined, creating fallback implementation');
+    window.ChartConfig = {
+        plotlyConfig: {
+            responsive: true,
+            displayModeBar: false
+        }
+    };
+}
+</script>
 
 <!-- Required chart libraries -->
 <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist@2.3.0/plotly.min.js"></script>

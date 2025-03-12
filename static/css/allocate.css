@@ -1,191 +1,191 @@
-/**
- * Portfolio Rebalancer Styles
- * This file contains styles for the portfolio rebalancer component.
- */
+   /**
+    * Portfolio Rebalancer Styles
+    * This file contains styles for the portfolio rebalancer component.
+    */
 
-/* Ensure Vue cloak works properly */
-[v-cloak] {
-    display: none;
-}
-
-/* Chart container styling */
-.chart-container {
-    position: relative;
-    height: 350px; /* Match the layout config */
-    width: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    overflow: hidden;
-    min-height: 350px; /* Ensure minimum height */
-}
-
-/* Make sure the Plotly chart is properly centered */
-.chart-container .js-plotly-plot {
-    width: 100% !important;
-    margin: 0 auto;
-}
-
-/* Additional styles to ensure charts render properly */
-.js-plotly-plot .plotly .main-svg {
-    width: 100% !important;
-    height: 100% !important;
-}
-
-.js-plotly-plot .plotly .svg-container {
-    width: 100% !important;
-    height: 100% !important;
-}
-
-/* Portfolio icon styling */
-.portfolio-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    color: white;
-    font-weight: bold;
-}
-
-/* Category icon styling */
-.category-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    color: white;
-    font-weight: bold;
-}
-
-/* Position icon styling */
-.position-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    color: white;
-    font-weight: bold;
-}
-
-/* Position row styling */
-.position-row td {
-    padding-left: 2rem;
-}
-
-/* Fix for sticky tables */
-.table-container {
-    overflow-x: auto;
-    max-width: 100%;
-}
-
-/* Media queries for responsive layouts */
-@media screen and (max-width: 768px) {
-    .columns {
-        display: block;
+    /* Ensure Vue cloak works properly */
+    [v-cloak] {
+        display: none;
     }
-    
-    .column {
-        width: 100% !important;
-    }
-    
+
+    /* Chart container styling */
     .chart-container {
-        height: 250px;
+        position: relative;
+        height: 350px; /* Match the layout config */
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        overflow: hidden;
+        min-height: 350px; /* Ensure minimum height */
     }
-}
 
-/* Responsive action buttons */
-.action-buttons {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.5rem;
-}
+    /* Make sure the Plotly chart is properly centered */
+    .chart-container .js-plotly-plot {
+        width: 100% !important;
+        margin: 0 auto;
+    }
 
-/* Action type styling */
-.has-text-success {
-    color: #48c774 !important;
-}
+    /* Additional styles to ensure charts render properly */
+    .js-plotly-plot .plotly .main-svg {
+        width: 100% !important;
+        height: 100% !important;
+    }
 
-.has-text-danger {
-    color: #f14668 !important;
-}
+    .js-plotly-plot .plotly .svg-container {
+        width: 100% !important;
+        height: 100% !important;
+    }
 
-.has-text-grey {
-    color: #7a7a7a !important;
-}
+    /* Portfolio icon styling */
+    .portfolio-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        color: white;
+        font-weight: bold;
+    }
 
-/* Utility for full width */
-.w-100 {
-    width: 100%;
-}
+    /* Category icon styling */
+    .category-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        color: white;
+        font-weight: bold;
+    }
 
-/* Tooltip styling */
-.has-tooltip-left[data-tooltip]:not(.is-loading)::after {
-    font-size: 0.75rem;
-}
+    /* Position icon styling */
+    .position-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        color: white;
+        font-weight: bold;
+    }
 
-/* Notification styling */
-.notification {
-    position: relative;
-}
+    /* Position row styling */
+    .position-row td {
+        padding-left: 2rem;
+    }
 
-.notification .delete {
-    position: absolute;
-    right: 0.5rem;
-    top: 0.5rem;
-}
+    /* Fix for sticky tables */
+    .table-container {
+        overflow-x: auto;
+        max-width: 100%;
+    }
+
+    /* Media queries for responsive layouts */
+    @media screen and (max-width: 768px) {
+        .columns {
+            display: block;
+        }
+        
+        .column {
+            width: 100% !important;
+        }
+        
+        .chart-container {
+            height: 250px;
+        }
+    }
+
+    /* Responsive action buttons */
+    .action-buttons {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.5rem;
+    }
+
+    /* Action type styling */
+    .has-text-success {
+        color: #48c774 !important;
+    }
+
+    .has-text-danger {
+        color: #f14668 !important;
+    }
+
+    .has-text-grey {
+        color: #7a7a7a !important;
+    }
+
+    /* Utility for full width */
+    .w-100 {
+        width: 100%;
+    }
+
+    /* Tooltip styling */
+    .has-tooltip-left[data-tooltip]:not(.is-loading)::after {
+        font-size: 0.75rem;
+    }
+
+    /* Notification styling */
+    .notification {
+        position: relative;
+    }
+
+    .notification .delete {
+        position: absolute;
+        right: 0.5rem;
+        top: 0.5rem;
+    }
 
 
-/* Add to allocate.css */
-@media screen and (max-width: 768px) {
-    .columns {
-      display: block !important;
-      margin-left: 0 !important;
-      margin-right: 0 !important;
+    /* Add to allocate.css */
+    @media screen and (max-width: 768px) {
+        .columns {
+        display: block !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        }
+        
+        .column {
+        width: 100% !important;
+        padding: 0.75rem !important;
+        }
     }
     
-    .column {
-      width: 100% !important;
-      padding: 0.75rem !important;
+    /* Add to allocate.css */
+    .table-container {
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
     }
-  }
-  
-  /* Add to allocate.css */
-  .table-container {
-    width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-  
-  /* Ensure tables don't break layout */
-  .table {
-    min-width: 100%;
-    width: auto;
-  }
+    
+    /* Ensure tables don't break layout */
+    .table {
+        min-width: 100%;
+        width: auto;
+    }
 
- /* Placeholder position styling */
-.placeholder-position {
-    background-color: rgba(0, 0, 0, 0.02);
-    font-style: italic;
-  }
+    /* Placeholder position styling */
+    .placeholder-position {
+        background-color: rgba(0, 0, 0, 0.02);
+        font-style: italic;
+    }
 
-  .placeholder-position td {
-    color: #666;
-  }
+    .placeholder-position td {
+        color: #666;
+    }
 
-  /* Add subtle visual indicator for placeholders */
-  .placeholder-position .fa-plus-circle {
-    color: #3298dc; /* Bulma info color */
-  }
-  
-  /* Style for remaining positions text to match build-allocation.css */
-  .remaining-positions-text {
-    color: #f14668;
-    font-style: italic;
-    font-weight: 500;
-  }
+    /* Add subtle visual indicator for placeholders */
+    .placeholder-position .fa-plus-circle {
+        color: #3298dc; /* Bulma info color */
+    }
+    
+    /* Style for remaining positions text to match build-allocation.css */
+    .remaining-positions-text {
+        color: #f14668;
+        font-style: italic;
+        font-weight: 500;
+    }
