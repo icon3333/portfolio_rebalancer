@@ -46,36 +46,13 @@
         </ul>
     </div>
 
-    <!-- Portfolio Selector (for Detail View) -->
-    <div v-if="activeView === 'detail'" class="field mb-4">
-        <div class="control has-icons-left">
-            <div class="select is-medium">
-                <select v-model="selectedPortfolio" @change="debouncedUpdateChartData">
-                    <!-- No empty option needed as we set a default in the JavaScript -->
-                    <option v-for="portfolio in portfolioData.portfolios" 
-                            :key="portfolio.name" 
-                            :value="portfolio.name">
-                        ${portfolio.name}
-                    </option>
-                </select>
-            </div>
-            <span class="icon is-left">
-                <i class="fas fa-folder"></i>
-            </span>
-        </div>
-        <!-- No data indicator -->
-        <p v-if="portfolioData.portfolios.length === 0" class="help has-text-warning">
-            <span class="icon-text">
-                <span class="icon"><i class="fas fa-exclamation-triangle"></i></span>
-                <span>No portfolios found. Please create a portfolio with positions in the Enrich page first.</span>
-            </span>
-        </p>
-    </div>
+    <!-- Portfolio Selector (for Detail View) - Moving to after the main layout -->
+    <!-- ... existing code ... -->
 
     <!-- Main Content Grid -->
     <div class="columns is-multiline">
         <!-- Current Distribution -->
-        <div class="column" :class="{'is-12': $viewport.width < 768, 'is-6': $viewport.width >= 768 && activeView !== 'global', 'is-4': $viewport.width >= 768 && activeView === 'global'}">
+        <div class="column" :class="{'is-12': $viewport.width < 768, 'is-4': $viewport.width >= 768}">
             <div class="card">
                 <header class="card-header">
                     <p class="card-header-title">
@@ -95,7 +72,7 @@
         </div>
 
         <!-- Target Distribution -->
-        <div class="column" :class="{'is-12': $viewport.width < 768, 'is-6': $viewport.width >= 768 && activeView !== 'global', 'is-4': $viewport.width >= 768 && activeView === 'global'}">
+        <div class="column" :class="{'is-12': $viewport.width < 768, 'is-4': $viewport.width >= 768}">
             <div class="card">
                 <header class="card-header">
                     <p class="card-header-title">
@@ -114,8 +91,8 @@
             </div>
         </div>
 
-        <!-- Settings - Only shown in Global View -->
-        <div v-if="activeView === 'global'" class="column" :class="{'is-12': $viewport.width < 768, 'is-4': $viewport.width >= 768}">
+        <!-- Rebalancing Mode - Shown in both views now -->
+        <div class="column" :class="{'is-12': $viewport.width < 768, 'is-4': $viewport.width >= 768}">
             <div class="card">
                 <header class="card-header">
                     <p class="card-header-title">
@@ -129,36 +106,51 @@
                 </header>
                 <div class="card-content">
                     <div class="field">
-                        <label class="label">Rebalancing Mode</label>
+                        <label class="label">Select Rebalancing Strategy</label>
                         
-                        <div class="control">
+                        <div class="control mb-2">
                             <label class="radio">
                                 <input type="radio" 
                                     name="rebalanceMode" 
                                     value="existingCapital" 
-                                    v-model="rebalanceMode">
+                                    v-model="rebalanceMode"
+                                    :disabled="activeView === 'detail'">
                                 <span>Existing Capital</span>
                             </label>
+                            <p class="help ml-4" :class="rebalanceMode === 'existingCapital' ? 'has-text-primary' : 'has-text-grey'">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                Rebalance by buying and selling using current portfolio value only.
+                            </p>
                         </div>
                         
-                        <div class="control">
+                        <div class="control mb-2">
                             <label class="radio">
                                 <input type="radio" 
                                     name="rebalanceMode" 
                                     value="newCapitalOnly" 
-                                    v-model="rebalanceMode">
-                                <span>New Capital Only (no sales)</span>
+                                    v-model="rebalanceMode"
+                                    :disabled="activeView === 'detail'">
+                                <span>New Capital Only</span>
                             </label>
+                            <p class="help ml-4" :class="rebalanceMode === 'newCapitalOnly' ? 'has-text-success' : 'has-text-grey'">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                Only buy assets with new capital. No selling of existing positions.
+                            </p>
                         </div>
                         
-                        <div class="control">
+                        <div class="control mb-2">
                             <label class="radio">
                                 <input type="radio" 
                                     name="rebalanceMode" 
                                     value="newCapitalSpecific" 
-                                    v-model="rebalanceMode">
+                                    v-model="rebalanceMode"
+                                    :disabled="activeView === 'detail'">
                                 <span>New Capital (specific amount)</span>
                             </label>
+                            <p class="help ml-4" :class="rebalanceMode === 'newCapitalSpecific' ? 'has-text-info' : 'has-text-grey'">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                Add a specific amount of new capital to rebalance your portfolio.
+                            </p>
                         </div>
                     </div>
                     
@@ -168,11 +160,82 @@
                             <input class="input" 
                                 type="number" 
                                 v-model.number="newCapitalAmount" 
-                                @change="debouncedCalculateTargetValuesAndActions">
+                                @change="debouncedCalculateTargetValuesAndActions"
+                                :disabled="activeView === 'detail'">
                             <span class="icon is-small is-left">
                                 <i class="fas fa-euro-sign"></i>
                             </span>
                         </div>
+                    </div>
+                    
+                    <!-- Current active mode summary box -->
+                    <div v-if="activeView === 'detail'" class="notification mt-4" 
+                        :class="{
+                            'is-primary is-light': rebalanceMode === 'existingCapital',
+                            'is-success is-light': rebalanceMode === 'newCapitalOnly',
+                            'is-info is-light': rebalanceMode === 'newCapitalSpecific'
+                        }">
+                        <p class="has-text-weight-medium">
+                            <span class="icon-text">
+                                <span class="icon"><i class="fas fa-info-circle"></i></span>
+                                <span>Active Rebalancing Mode: 
+                                    <strong v-if="rebalanceMode === 'existingCapital'">Existing Capital</strong>
+                                    <strong v-else-if="rebalanceMode === 'newCapitalOnly'">New Capital Only</strong>
+                                    <strong v-else-if="rebalanceMode === 'newCapitalSpecific'">New Capital (${formatCurrency(newCapitalAmount)})</strong>
+                                </span>
+                            </span>
+                        </p>
+                        <p class="is-size-7 mt-2">
+                            <span v-if="rebalanceMode === 'existingCapital'">
+                                Rebalancing using only existing portfolio assets. Both buy and sell actions will be generated.
+                            </span>
+                            <span v-else-if="rebalanceMode === 'newCapitalOnly'">
+                                Only buy recommendations will be provided. No existing positions will be sold.
+                            </span>
+                            <span v-else-if="rebalanceMode === 'newCapitalSpecific'">
+                                Adding ${formatCurrency(newCapitalAmount)} of new capital to your portfolio.
+                            </span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Portfolio Selector - Moved to below Rebalancing Mode container -->
+            <div v-if="activeView === 'detail'" class="card mt-3">
+                <header class="card-header">
+                    <p class="card-header-title">
+                        <span class="icon-text">
+                            <span class="icon">
+                                <i class="fas fa-folder"></i>
+                            </span>
+                            <span>Portfolio Selection</span>
+                        </span>
+                    </p>
+                </header>
+                <div class="card-content">
+                    <div class="field">
+                        <label class="label">Select Portfolio</label>
+                        <div class="control has-icons-left">
+                            <div class="select is-fullwidth">
+                                <select v-model="selectedPortfolio" @change="debouncedUpdateChartData">
+                                    <option v-for="portfolio in portfolioData.portfolios" 
+                                            :key="portfolio.name" 
+                                            :value="portfolio.name">
+                                        ${portfolio.name}
+                                    </option>
+                                </select>
+                            </div>
+                            <span class="icon is-left">
+                                <i class="fas fa-folder"></i>
+                            </span>
+                        </div>
+                        <!-- No data indicator -->
+                        <p v-if="portfolioData.portfolios.length === 0" class="help has-text-warning mt-2">
+                            <span class="icon-text">
+                                <span class="icon"><i class="fas fa-exclamation-triangle"></i></span>
+                                <span>No portfolios found. Please create a portfolio with positions in the Enrich page first.</span>
+                            </span>
+                        </p>
                     </div>
                 </div>
             </div>
@@ -237,20 +300,6 @@
             <div v-else-if="activeView === 'detail'">
                 <div v-if="selectedPortfolioData">
                     <h3 class="subtitle">${selectedPortfolioData.name} Portfolio Detail</h3>
-                    
-                    <!-- Display rebalancing mode (informative, synced with Global View) -->
-                    <div class="notification is-info is-light mb-4">
-                        <p class="has-text-weight-medium">
-                            <span class="icon-text">
-                                <span class="icon"><i class="fas fa-info-circle"></i></span>
-                                <span>Current Rebalancing Mode: 
-                                    <strong v-if="rebalanceMode === 'existingCapital'">Existing Capital</strong>
-                                    <strong v-else-if="rebalanceMode === 'newCapitalOnly'">New Capital Only (no sales)</strong>
-                                    <strong v-else-if="rebalanceMode === 'newCapitalSpecific'">New Capital (specific amount: ${formatCurrency(newCapitalAmount)})</strong>
-                                </span>
-                            </span>
-                        </p>
-                    </div>
                     
                     <div class="table-container">
                         <table class="table is-fullwidth is-hoverable">
