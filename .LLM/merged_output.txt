@@ -1,5 +1,5 @@
 This file is a merged representation of selected files from the codebase.
-Generated on: 2025-03-12T20:29:30.514222
+Generated on: 2025-03-12T22:26:38.441809
 
 ================================================================
 Purpose:
@@ -401,256 +401,331 @@ input.input {
 
 ================================================================
 ###START_FILE_PATH: static/css/allocate.css###
-   /**
-    * Portfolio Rebalancer Styles
-    * This file contains styles for the portfolio rebalancer component.
-    */
+/**
+ * Portfolio Rebalancer Styles
+ * This file contains styles for the portfolio rebalancer component.
+ */
 
-    /* Ensure Vue cloak works properly */
-    [v-cloak] {
-        display: none;
-    }
+/* Ensure Vue cloak works properly */
+[v-cloak] {
+    display: none;
+}
 
-    /* Chart container styling */
-    .chart-container {
-        position: relative;
-        height: 350px; /* Match the layout config */
-        width: 100%;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        overflow: hidden;
-        min-height: 350px; /* Ensure minimum height */
-        opacity: 1;
-        transition: opacity 0.2s ease-in-out;
-    }
+/* Chart container styling - UNIFIED 320px HEIGHT FOR ALL CONTAINERS */
+.chart-container {
+    position: relative !important;
+    height: 320px !important; /* Fixed at 320px for consistency */
+    width: 100% !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    overflow: hidden !important;
+    min-height: 320px !important; /* Fixed at 320px for consistency */
+    opacity: 1 !important;
+    visibility: visible !important;
+}
 
-    /* Make sure the Plotly chart is properly centered */
-    .chart-container .js-plotly-plot {
-        width: 100% !important;
-        margin: 0 auto;
-        opacity: 1;
-        transition: opacity 0.2s ease-in-out;
-    }
+/* Make sure the Plotly chart is properly centered */
+.chart-container .js-plotly-plot {
+    width: 100% !important;
+    margin: 0 auto;
+    opacity: 1;
+    transition: opacity 0.2s ease-in-out;
+}
 
-    /* Additional styles to ensure charts render properly */
-    .js-plotly-plot .plotly .main-svg {
-        width: 100% !important;
-        height: 100% !important;
-    }
+/* Additional styles to ensure charts render properly */
+.js-plotly-plot .plotly .main-svg {
+    width: 100% !important;
+    height: 100% !important;
+}
 
-    .js-plotly-plot .plotly .svg-container {
-        width: 100% !important;
-        height: 100% !important;
-    }
+.js-plotly-plot .plotly .svg-container {
+    width: 100% !important;
+    height: 100% !important;
+}
 
-    /* Fix for Plotly sizing issues */
-    .plotly, .plot-container {
-        width: 100% !important;
-        height: 100% !important;
-    }
+/* Fix for Plotly sizing issues */
+.plotly, .plot-container {
+    width: 100% !important;
+    height: 100% !important;
+}
 
-    /* Ensure charts maintain aspect ratio */
-    .js-plotly-plot, .plot-container.plotly {
-        position: absolute !important;
-        top: 0 !important;
-        left: 0 !important;
-        right: 0 !important;
-        bottom: 0 !important;
-        width: 100% !important;
-        height: 100% !important;
-    }
+/* Ensure charts maintain aspect ratio */
+.js-plotly-plot, .plot-container.plotly {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+}
 
-    /* Ensure pie charts are centered in their containers */
-    .chart-container[id$="-global"] .js-plotly-plot,
-    .chart-container[id$="-detail"] .js-plotly-plot {
-        display: flex !important;
-        justify-content: center !important;
-        align-items: center !important;
-    }
+/* Ensure pie charts are centered in their containers */
+.chart-container[id$="-global"] .js-plotly-plot,
+.chart-container[id$="-detail"] .js-plotly-plot {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+}
 
-    /* Portfolio icon styling */
-    .portfolio-icon {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        color: white;
-        font-weight: bold;
-    }
+/* Portfolio icon styling */
+.portfolio-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    color: white;
+    font-weight: bold;
+}
 
-    /* Category icon styling */
-    .category-icon {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 28px;
-        height: 28px;
-        border-radius: 50%;
-        color: white;
-        font-weight: bold;
-    }
+/* Category icon styling */
+.category-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    color: white;
+    font-weight: bold;
+}
 
-    /* Position icon styling */
-    .position-icon {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 24px;
-        height: 24px;
-        border-radius: 50%;
-        color: white;
-        font-weight: bold;
-    }
+/* Position icon styling */
+.position-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    color: white;
+    font-weight: bold;
+}
 
-    /* Position row styling */
-    .position-row td {
-        padding-left: 2rem;
-    }
+/* Position row styling */
+.position-row td {
+    padding-left: 2rem;
+}
 
-    /* Fix for sticky tables */
-    .table-container {
-        overflow-x: auto;
-        max-width: 100%;
-    }
+/* Fix for sticky tables */
+.table-container {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
 
-    /* Media queries for responsive layouts */
-    @media screen and (max-width: 768px) {
-        .columns {
-            display: block;
-        }
-        
-        .column {
-            width: 100% !important;
-        }
-        
-        .chart-container {
-            height: 250px;
-        }
-    }
-
-    /* Responsive action buttons */
-    .action-buttons {
-        display: flex;
-        justify-content: flex-end;
-        gap: 0.5rem;
-    }
-
-    /* Action type styling */
-    .has-text-success {
-        color: #48c774 !important;
-    }
-
-    .has-text-danger {
-        color: #f14668 !important;
-    }
-
-    .has-text-grey {
-        color: #7a7a7a !important;
-    }
-
-    /* Utility for full width */
-    .w-100 {
-        width: 100%;
-    }
-
-    /* Tooltip styling */
-    .has-tooltip-left[data-tooltip]:not(.is-loading)::after {
-        font-size: 0.75rem;
-    }
-
-    /* Notification styling */
-    .notification {
-        position: relative;
-    }
-
-    .notification .delete {
-        position: absolute;
-        right: 0.5rem;
-        top: 0.5rem;
-    }
-
-
-    /* Add to allocate.css */
-    @media screen and (max-width: 768px) {
-        .columns {
+@media screen and (max-width: 768px) {
+    /* Layout fixes */
+    .columns {
         display: block !important;
         margin-left: 0 !important;
         margin-right: 0 !important;
-        }
-        
-        .column {
+    }
+    
+    .column {
         width: 100% !important;
         padding: 0.75rem !important;
-        }
+        display: block !important;
     }
     
-    /* Add to allocate.css */
-    .table-container {
-        width: 100%;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
+    /* Set consistent heights for mobile */
+    .chart-container {
+        height: 250px !important;
+        min-height: 250px !important;
     }
     
-    /* Ensure tables don't break layout */
-    .table {
-        min-width: 100%;
-        width: auto;
-    }
-
-    /* Placeholder position styling */
-    .placeholder-position {
-        background-color: rgba(0, 0, 0, 0.02);
-        font-style: italic;
-    }
-
-    .placeholder-position td {
-        color: #666;
-    }
-
-    /* Add subtle visual indicator for placeholders */
-    .placeholder-position .fa-plus-circle {
-        color: #3298dc; /* Bulma info color */
-    }
-    
-    /* Style for remaining positions text to match build-allocation.css */
-    .remaining-positions-text {
-        color: #f14668;
-        font-style: italic;
-        font-weight: 500;
-    }
-
-    /* Force the content boxes to maintain dimensions */
+    /* Adjust card-content for mobile */
     .card-content {
-        display: flex;
-        flex-direction: column;
-        min-height: 350px; /* Match chart height */
+        min-height: 250px !important;
+        max-height: 250px !important;
+        overflow-y: auto !important; /* Allow scrolling for smaller screens */
     }
+    
+    /* Ensure sunburst charts resize properly on mobile */
+    .js-plotly-plot .plotly, 
+    .js-plotly-plot .plotly .main-svg, 
+    .js-plotly-plot .plotly .svg-container {
+        height: 250px !important;
+    }
+}
 
-    /* Force column display even during initial load */
-    .column {
-        display: flex !important;
-        flex-direction: column;
-    }
+/* Responsive action buttons */
+.action-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
 
-    /* Make cards fill the column height */
-    .card {
-        display: flex;
-        flex-direction: column;
-        flex: 1;
-        height: 100%;
-    }
+/* Action type styling */
+.has-text-success {
+    color: #48c774 !important;
+}
 
-    /* Fix for Safari and mobile browsers */
-    @supports (-webkit-touch-callout: none) {
-        .chart-container {
-            position: relative;
-            height: 350px !important;
-            width: 100% !important;
-        }
+.has-text-danger {
+    color: #f14668 !important;
+}
+
+.has-text-grey {
+    color: #7a7a7a !important;
+}
+
+/* Utility for full width */
+.w-100 {
+    width: 100%;
+}
+
+/* Tooltip styling */
+.has-tooltip-left[data-tooltip]:not(.is-loading)::after {
+    font-size: 0.75rem;
+}
+
+/* Notification styling */
+.notification {
+    position: relative;
+    padding: 0.75rem 1rem !important;
+    margin-bottom: 0.75rem !important;
+}
+
+.notification .delete {
+    position: absolute;
+    right: 0.5rem;
+    top: 0.5rem;
+}
+
+/* Ensure tables don't break layout */
+.table {
+    min-width: 100%;
+    width: auto;
+}
+
+/* Placeholder position styling */
+.placeholder-position {
+    background-color: rgba(0, 0, 0, 0.02);
+    font-style: italic;
+}
+
+.placeholder-position td {
+    color: #666;
+}
+
+/* Add subtle visual indicator for placeholders */
+.placeholder-position .fa-plus-circle {
+    color: #3298dc; /* Bulma info color */
+}
+
+/* Style for remaining positions text to match build-allocation.css */
+.remaining-positions-text {
+    color: #f14668;
+    font-style: italic;
+    font-weight: 500;
+}
+
+/* Force the content boxes to maintain consistent dimensions */
+.card-content {
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 320px !important; /* Fixed at 320px for consistency */
+    max-height: 320px !important; /* Fixed at 320px for consistency */ 
+    overflow: visible !important; /* Allow dropdown to extend outside */
+}
+
+/* Force the content boxes to maintain consistent dimensions - more specific selector */
+.columns .column .card:not(.mt-3) .card-content {
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 320px !important; /* Reduced from 350px for consistency */
+    max-height: 320px !important; /* Reduced from 350px for consistency */ 
+    overflow: visible !important; /* Allow dropdown to extend outside */
+}
+
+/* Force column display even during initial load */
+.column {
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+/* Make cards fill the column height */
+.card {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    height: 100% !important;
+}
+
+/* Fix for Safari and mobile browsers */
+@supports (-webkit-touch-callout: none) {
+    .chart-container {
+        position: relative !important;
+        height: 320px !important; /* Fixed at 320px for consistency */
+        width: 100% !important;
     }
+}
+
+/* Make rebalancing mode fields more compact */
+#portfolio-rebalancer .field {
+    margin-bottom: 0.75rem !important;
+}
+
+#portfolio-rebalancer .control.mb-2 {
+    margin-bottom: 0.5rem !important;
+}
+
+#portfolio-rebalancer .help.ml-4 {
+    margin-left: 1rem !important;
+    margin-bottom: 0.35rem !important;
+}
+
+/* Portfolio Selection - more compact */
+#portfolio-rebalancer .card.mt-3 {
+    margin-top: 0.75rem !important;
+}
+
+/* Make radio controls more compact */
+#portfolio-rebalancer label.radio {
+    margin-bottom: 0.25rem !important;
+    display: flex !important;
+    align-items: center !important;
+}
+
+/* Reduce margin between mode description and change button */
+#portfolio-rebalancer .mt-2 {
+    margin-top: 0.5rem !important;
+}
+
+/* Smaller margin for action button */
+#portfolio-rebalancer .mt-3 {
+    margin-top: 0.75rem !important;
+}
+
+/* Special handling for the portfolio selector dropdown */
+#portfolio-rebalancer .card.mt-3 .card-content {
+    min-height: auto !important;
+    max-height: none !important;
+}
+
+/* Ensure charts maintain visibility */
+.chart-container[id$="-global"],
+.chart-container[id$="-detail"] {
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* Rebalancing mode container specific styles using the added class */
+.rebalancing-mode-card .card-content {
+    min-height: 320px !important; /* Match the height of chart containers */
+    max-height: 320px !important; /* Match the height of chart containers */
+    overflow-y: auto !important; /* Allow scrolling if content is larger */
+    padding-bottom: 1rem !important; /* Ensure padding at the bottom */
+}
+
+/* Ensure proper spacing for the dropdown that will be placed beneath */
+.rebalancing-mode-card {
+    margin-bottom: 1.5rem !important; /* Add space for dropdown below */
+}
+
 ###END_FILE###
 
 ================================================================
@@ -2540,6 +2615,9 @@ document.addEventListener('DOMContentLoaded', function() {
 ###START_FILE_PATH: static/js/allocate.js###
 // Modified allocate.js - Fixed duplicate watchers that caused infinite loops
 
+    // Define chart height constants to ensure consistency
+    const CHART_HEIGHT = 320; // Single source of truth for chart height
+    const CHART_HEIGHT_MOBILE = 250; // Height for mobile devices
 document.addEventListener('DOMContentLoaded', function() {
     // Add viewport size detection to Vue.js
     Vue.prototype.$viewport = {
@@ -3280,7 +3358,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Enhanced layout with consistent settings
                 const layout = {
                     showlegend: false,
-                    height: 350,
+                    height: CHART_HEIGHT,
                     autosize: true,
                     margin: { l: 30, r: 30, t: 30, b: 50 },
                     paper_bgcolor: 'transparent',
@@ -3318,7 +3396,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Ensure the container is visible with proper dimensions
                     container.style.display = 'block';
                     container.style.visibility = 'visible';
-                    container.style.height = '350px';
+                    container.style.height = `${CHART_HEIGHT}px`;
                     container.style.width = '100%';
                     
                     // Force a reflow
@@ -3487,7 +3565,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     const layout = {
                         showlegend: false,
-                        height: 350,
+                        height: CHART_HEIGHT,
                         autosize: true,
                         margin: { l: 30, r: 30, t: 30, b: 50 },
                         paper_bgcolor: 'transparent',
@@ -3511,6 +3589,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (typeof PortfolioCharts !== 'undefined' && PortfolioCharts.createSunburstChart) {
                     // Create current distribution sunburst chart
                     const currentPortfolio = this.preparePortfolioDataForSunburst(portfolio, 'current');
+                    
+                    // Ensure container has proper dimensions before creating the chart
+                    const currentContainer = document.getElementById('current-distribution-chart-detail');
+                    if (currentContainer) {
+                        currentContainer.style.height = `${CHART_HEIGHT}px`;
+                        currentContainer.style.minHeight = `${CHART_HEIGHT}px`;
+                    }
+                    
                     PortfolioCharts.createSunburstChart(
                         'current-distribution-chart-detail',
                         currentPortfolio,
@@ -3521,6 +3607,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Create target distribution sunburst chart
                     const targetPortfolio = this.preparePortfolioDataForSunburst(portfolio, 'target');
+                    
+                    // Ensure container has proper dimensions before creating the chart
+                    const targetContainer = document.getElementById('target-distribution-chart-detail');
+                    if (targetContainer) {
+                        targetContainer.style.height = `${CHART_HEIGHT}px`;
+                        targetContainer.style.minHeight = `${CHART_HEIGHT}px`;
+                    }
+                    
                     PortfolioCharts.createSunburstChart(
                         'target-distribution-chart-detail',
                         targetPortfolio,
@@ -3528,12 +3622,24 @@ document.addEventListener('DOMContentLoaded', function() {
                         this.formatPercentage,
                         this.generateColors
                     );
+                    
+                    // Force container dimensions after charts are created
+                    setTimeout(() => {
+                        if (currentContainer) {
+                            currentContainer.style.height = `${CHART_HEIGHT}px`;
+                            currentContainer.style.minHeight = `${CHART_HEIGHT}px`;
+                        }
+                        if (targetContainer) {
+                            targetContainer.style.height = `${CHART_HEIGHT}px`;
+                            targetContainer.style.minHeight = `${CHART_HEIGHT}px`;
+                        }
+                    }, 100);
                 } else {
                     console.warn('PortfolioCharts.createSunburstChart not available, falling back to pie charts');
                     // Fallback to pie charts if sunburst not available
                     const layout = {
                         showlegend: false,
-                        height: 350,
+                        height: CHART_HEIGHT,
                         autosize: true,
                         margin: { l: 30, r: 30, t: 30, b: 50 },
                         paper_bgcolor: 'transparent',
@@ -3567,7 +3673,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Create chart layout - ensure consistency with initialization
                 const layout = {
                     showlegend: false,
-                    height: 350,
+                    height: CHART_HEIGHT,
                     autosize: true,
                     margin: { l: 30, r: 30, t: 30, b: 50 },
                     paper_bgcolor: 'transparent',
@@ -3607,15 +3713,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     container.style.opacity = '1';
                     
                     // Force dimensions to be explicit
-                    container.style.height = '350px';
-                    container.style.minHeight = '350px';
+                    container.style.height = `${CHART_HEIGHT}px`;
+                    container.style.minHeight = `${CHART_HEIGHT}px`;
                     container.style.width = '100%';
                     
                     // Ensure parent elements are properly sized
                     const cardContent = container.closest('.card-content');
                     if (cardContent) {
                         cardContent.style.height = 'auto';
-                        cardContent.style.minHeight = '350px';
+                        cardContent.style.minHeight = `${CHART_HEIGHT}px`;
                     }
                     
                     // Force a reflow to ensure container dimensions are calculated
@@ -3955,7 +4061,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             
                             const layout = {
                                 showlegend: false,
-                                height: 350,
+                                height: CHART_HEIGHT,
                                 autosize: true,
                                 margin: { l: 30, r: 30, t: 30, b: 50 },
                                 paper_bgcolor: 'transparent',
@@ -9803,36 +9909,13 @@ def calculate_portfolio_composition(portfolio_data):
         </ul>
     </div>
 
-    <!-- Portfolio Selector (for Detail View) -->
-    <div v-if="activeView === 'detail'" class="field mb-4">
-        <div class="control has-icons-left">
-            <div class="select is-medium">
-                <select v-model="selectedPortfolio" @change="debouncedUpdateChartData">
-                    <!-- No empty option needed as we set a default in the JavaScript -->
-                    <option v-for="portfolio in portfolioData.portfolios" 
-                            :key="portfolio.name" 
-                            :value="portfolio.name">
-                        ${portfolio.name}
-                    </option>
-                </select>
-            </div>
-            <span class="icon is-left">
-                <i class="fas fa-folder"></i>
-            </span>
-        </div>
-        <!-- No data indicator -->
-        <p v-if="portfolioData.portfolios.length === 0" class="help has-text-warning">
-            <span class="icon-text">
-                <span class="icon"><i class="fas fa-exclamation-triangle"></i></span>
-                <span>No portfolios found. Please create a portfolio with positions in the Enrich page first.</span>
-            </span>
-        </p>
-    </div>
+    <!-- Portfolio Selector (for Detail View) - Moving to after the main layout -->
+    <!-- ... existing code ... -->
 
     <!-- Main Content Grid -->
     <div class="columns is-multiline">
         <!-- Current Distribution -->
-        <div class="column" :class="{'is-12': $viewport.width < 768, 'is-6': $viewport.width >= 768 && activeView !== 'global', 'is-4': $viewport.width >= 768 && activeView === 'global'}">
+        <div class="column" :class="{'is-12': $viewport.width < 768, 'is-4': $viewport.width >= 768}">
             <div class="card">
                 <header class="card-header">
                     <p class="card-header-title">
@@ -9845,14 +9928,14 @@ def calculate_portfolio_composition(portfolio_data):
                     </p>
                 </header>
                 <div class="card-content">
-                    <div v-if="activeView === 'global'" class="chart-container" id="current-distribution-chart-global" style="height: 350px; width: 100%;"></div>
-                    <div v-else class="chart-container" id="current-distribution-chart-detail" style="height: 350px; width: 100%;"></div>
+                    <div v-if="activeView === 'global'" class="chart-container" id="current-distribution-chart-global" style="height: 320px; width: 100%;"></div>
+                    <div v-else class="chart-container" id="current-distribution-chart-detail" style="height: 320px; width: 100%;"></div>
                 </div>
             </div>
         </div>
 
         <!-- Target Distribution -->
-        <div class="column" :class="{'is-12': $viewport.width < 768, 'is-6': $viewport.width >= 768 && activeView !== 'global', 'is-4': $viewport.width >= 768 && activeView === 'global'}">
+        <div class="column" :class="{'is-12': $viewport.width < 768, 'is-4': $viewport.width >= 768}">
             <div class="card">
                 <header class="card-header">
                     <p class="card-header-title">
@@ -9865,15 +9948,15 @@ def calculate_portfolio_composition(portfolio_data):
                     </p>
                 </header>
                 <div class="card-content">
-                    <div v-if="activeView === 'global'" class="chart-container" id="target-distribution-chart-global" style="height: 350px; width: 100%;"></div>
-                    <div v-else class="chart-container" id="target-distribution-chart-detail" style="height: 350px; width: 100%;"></div>
+                    <div v-if="activeView === 'global'" class="chart-container" id="target-distribution-chart-global" style="height: 320px; width: 100%;"></div>
+                    <div v-else class="chart-container" id="target-distribution-chart-detail" style="height: 320px; width: 100%;"></div>
                 </div>
             </div>
         </div>
 
-        <!-- Settings - Only shown in Global View -->
-        <div v-if="activeView === 'global'" class="column" :class="{'is-12': $viewport.width < 768, 'is-4': $viewport.width >= 768}">
-            <div class="card">
+        <!-- Rebalancing Mode - Shown in both views now -->
+        <div class="column" :class="{'is-12': $viewport.width < 768, 'is-4': $viewport.width >= 768}">
+            <div class="card rebalancing-mode-card">
                 <header class="card-header">
                     <p class="card-header-title">
                         <span class="icon-text">
@@ -9885,10 +9968,11 @@ def calculate_portfolio_composition(portfolio_data):
                     </p>
                 </header>
                 <div class="card-content">
-                    <div class="field">
-                        <label class="label">Rebalancing Mode</label>
+                    <!-- For Global View: Show full rebalancing strategy selection -->
+                    <div v-if="activeView === 'global'" class="field">
+                        <label class="label">Select Rebalancing Strategy</label>
                         
-                        <div class="control">
+                        <div class="control mb-2">
                             <label class="radio">
                                 <input type="radio" 
                                     name="rebalanceMode" 
@@ -9896,19 +9980,27 @@ def calculate_portfolio_composition(portfolio_data):
                                     v-model="rebalanceMode">
                                 <span>Existing Capital</span>
                             </label>
+                            <p class="help ml-4" :class="rebalanceMode === 'existingCapital' ? 'has-text-primary' : 'has-text-grey'">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                Rebalance by buying and selling using current portfolio value only.
+                            </p>
                         </div>
                         
-                        <div class="control">
+                        <div class="control mb-2">
                             <label class="radio">
                                 <input type="radio" 
                                     name="rebalanceMode" 
                                     value="newCapitalOnly" 
                                     v-model="rebalanceMode">
-                                <span>New Capital Only (no sales)</span>
+                                <span>New Capital Only</span>
                             </label>
+                            <p class="help ml-4" :class="rebalanceMode === 'newCapitalOnly' ? 'has-text-success' : 'has-text-grey'">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                Only buy assets with new capital. No selling of existing positions.
+                            </p>
                         </div>
                         
-                        <div class="control">
+                        <div class="control mb-2">
                             <label class="radio">
                                 <input type="radio" 
                                     name="rebalanceMode" 
@@ -9916,10 +10008,14 @@ def calculate_portfolio_composition(portfolio_data):
                                     v-model="rebalanceMode">
                                 <span>New Capital (specific amount)</span>
                             </label>
+                            <p class="help ml-4" :class="rebalanceMode === 'newCapitalSpecific' ? 'has-text-info' : 'has-text-grey'">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                Add a specific amount of new capital to rebalance your portfolio.
+                            </p>
                         </div>
                     </div>
                     
-                    <div v-if="rebalanceMode === 'newCapitalSpecific'" class="field mt-4">
+                    <div v-if="activeView === 'global' && rebalanceMode === 'newCapitalSpecific'" class="field mt-4">
                         <label class="label">New Capital Amount</label>
                         <div class="control has-icons-left">
                             <input class="input" 
@@ -9930,6 +10026,84 @@ def calculate_portfolio_composition(portfolio_data):
                                 <i class="fas fa-euro-sign"></i>
                             </span>
                         </div>
+                    </div>
+                    
+                    <!-- For Detail View: Only show active mode and change mode button -->
+                    <div v-if="activeView === 'detail'" class="notification" 
+                        :class="{
+                            'is-primary is-light': rebalanceMode === 'existingCapital',
+                            'is-success is-light': rebalanceMode === 'newCapitalOnly',
+                            'is-info is-light': rebalanceMode === 'newCapitalSpecific'
+                        }">
+                        <p class="has-text-weight-medium">
+                            <span class="icon-text">
+                                <span class="icon"><i class="fas fa-info-circle"></i></span>
+                                <span>Active Rebalancing Mode: 
+                                    <strong v-if="rebalanceMode === 'existingCapital'">Existing Capital</strong>
+                                    <strong v-else-if="rebalanceMode === 'newCapitalOnly'">New Capital Only</strong>
+                                    <strong v-else-if="rebalanceMode === 'newCapitalSpecific'">New Capital (${formatCurrency(newCapitalAmount)})</strong>
+                                </span>
+                            </span>
+                        </p>
+                        <p class="mt-2">
+                            <span v-if="rebalanceMode === 'existingCapital'">
+                                Rebalancing using only existing portfolio assets. Both buy and sell actions will be generated.
+                            </span>
+                            <span v-else-if="rebalanceMode === 'newCapitalOnly'">
+                                Only buy recommendations will be provided. No existing positions will be sold.
+                            </span>
+                            <span v-else-if="rebalanceMode === 'newCapitalSpecific'">
+                                Adding ${formatCurrency(newCapitalAmount)} of new capital to your portfolio.
+                            </span>
+                        </p>
+                        
+                        <!-- Add Change Mode button -->
+                        <button class="button is-small is-primary mt-3" @click="navigateToGlobal">
+                            <span class="icon">
+                                <i class="fas fa-exchange-alt"></i>
+                            </span>
+                            <span>Change Mode</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Portfolio Selector - Moved to below Rebalancing Mode container -->
+            <div v-if="activeView === 'detail'" class="card mt-3">
+                <header class="card-header">
+                    <p class="card-header-title">
+                        <span class="icon-text">
+                            <span class="icon">
+                                <i class="fas fa-folder"></i>
+                            </span>
+                            <span>Portfolio Selection</span>
+                        </span>
+                    </p>
+                </header>
+                <div class="card-content">
+                    <div class="field">
+                        <label class="label">Select Portfolio</label>
+                        <div class="control has-icons-left">
+                            <div class="select is-fullwidth">
+                                <select v-model="selectedPortfolio" @change="debouncedUpdateChartData">
+                                    <option v-for="portfolio in portfolioData.portfolios" 
+                                            :key="portfolio.name" 
+                                            :value="portfolio.name">
+                                        ${portfolio.name}
+                                    </option>
+                                </select>
+                            </div>
+                            <span class="icon is-left">
+                                <i class="fas fa-folder"></i>
+                            </span>
+                        </div>
+                        <!-- No data indicator -->
+                        <p v-if="portfolioData.portfolios.length === 0" class="help has-text-warning mt-2">
+                            <span class="icon-text">
+                                <span class="icon"><i class="fas fa-exclamation-triangle"></i></span>
+                                <span>No portfolios found. Please create a portfolio with positions in the Enrich page first.</span>
+                            </span>
+                        </p>
                     </div>
                 </div>
             </div>
@@ -9994,20 +10168,6 @@ def calculate_portfolio_composition(portfolio_data):
             <div v-else-if="activeView === 'detail'">
                 <div v-if="selectedPortfolioData">
                     <h3 class="subtitle">${selectedPortfolioData.name} Portfolio Detail</h3>
-                    
-                    <!-- Display rebalancing mode (informative, synced with Global View) -->
-                    <div class="notification is-info is-light mb-4">
-                        <p class="has-text-weight-medium">
-                            <span class="icon-text">
-                                <span class="icon"><i class="fas fa-info-circle"></i></span>
-                                <span>Current Rebalancing Mode: 
-                                    <strong v-if="rebalanceMode === 'existingCapital'">Existing Capital</strong>
-                                    <strong v-else-if="rebalanceMode === 'newCapitalOnly'">New Capital Only (no sales)</strong>
-                                    <strong v-else-if="rebalanceMode === 'newCapitalSpecific'">New Capital (specific amount: ${formatCurrency(newCapitalAmount)})</strong>
-                                </span>
-                            </span>
-                        </p>
-                    </div>
                     
                     <div class="table-container">
                         <table class="table is-fullwidth is-hoverable">

@@ -1,4 +1,4 @@
-// Modified allocate.js - Fixed duplicate watchers that caused infinite loops
+// Modified allocate.js - Fixed duplicate watchers that caused infinite loops and adjusted chart heights
 
 document.addEventListener('DOMContentLoaded', function() {
     // Add viewport size detection to Vue.js
@@ -740,7 +740,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Enhanced layout with consistent settings
                 const layout = {
                     showlegend: false,
-                    height: 350,
+                    height: 300, // Reduced from 350px to match container height
                     autosize: true,
                     margin: { l: 30, r: 30, t: 30, b: 50 },
                     paper_bgcolor: 'transparent',
@@ -778,7 +778,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Ensure the container is visible with proper dimensions
                     container.style.display = 'block';
                     container.style.visibility = 'visible';
-                    container.style.height = '350px';
+                    container.style.height = '300px'; // Reduced from 350px
                     container.style.width = '100%';
                     
                     // Force a reflow
@@ -947,7 +947,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     const layout = {
                         showlegend: false,
-                        height: 350,
+                        height: 300, // Reduced from 350px
                         autosize: true,
                         margin: { l: 30, r: 30, t: 30, b: 50 },
                         paper_bgcolor: 'transparent',
@@ -993,7 +993,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Fallback to pie charts if sunburst not available
                     const layout = {
                         showlegend: false,
-                        height: 350,
+                        height: 300, // Reduced from 350px
                         autosize: true,
                         margin: { l: 30, r: 30, t: 30, b: 50 },
                         paper_bgcolor: 'transparent',
@@ -1027,7 +1027,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Create chart layout - ensure consistency with initialization
                 const layout = {
                     showlegend: false,
-                    height: 350,
+                    height: 300, // Reduced from 350px
                     autosize: true,
                     margin: { l: 30, r: 30, t: 30, b: 50 },
                     paper_bgcolor: 'transparent',
@@ -1067,15 +1067,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     container.style.opacity = '1';
                     
                     // Force dimensions to be explicit
-                    container.style.height = '350px';
-                    container.style.minHeight = '350px';
+                    container.style.height = '300px'; // Reduced from 350px
+                    container.style.minHeight = '300px'; // Reduced from 350px
                     container.style.width = '100%';
                     
                     // Ensure parent elements are properly sized
                     const cardContent = container.closest('.card-content');
                     if (cardContent) {
                         cardContent.style.height = 'auto';
-                        cardContent.style.minHeight = '350px';
+                        cardContent.style.minHeight = '300px'; // Reduced from 350px
                     }
                     
                     // Force a reflow to ensure container dimensions are calculated
@@ -1306,7 +1306,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 // Create position/company object
                                 categoryObj.companies.push({
                                     name: position.name,
-                                    percentage: mode === 'current' ? position.currentWeight : position.targetWeight,
+                                    percentage: mode === 'current' ? position.currentWeight || 0 : position.targetWeight,
                                     currentValue: mode === 'current' ? position.currentValue : position.targetValue,
                                     // Calculate percentage within the category
                                     categoryPercentage: mode === 'current' 
@@ -1415,7 +1415,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             
                             const layout = {
                                 showlegend: false,
-                                height: 350,
+                                height: 300, // Reduced from 350px
                                 autosize: true,
                                 margin: { l: 30, r: 30, t: 30, b: 50 },
                                 paper_bgcolor: 'transparent',
