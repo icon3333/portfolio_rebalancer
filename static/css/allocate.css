@@ -18,12 +18,16 @@
         align-items: center;
         overflow: hidden;
         min-height: 350px; /* Ensure minimum height */
+        opacity: 1;
+        transition: opacity 0.2s ease-in-out;
     }
 
     /* Make sure the Plotly chart is properly centered */
     .chart-container .js-plotly-plot {
         width: 100% !important;
         margin: 0 auto;
+        opacity: 1;
+        transition: opacity 0.2s ease-in-out;
     }
 
     /* Additional styles to ensure charts render properly */
@@ -35,6 +39,31 @@
     .js-plotly-plot .plotly .svg-container {
         width: 100% !important;
         height: 100% !important;
+    }
+
+    /* Fix for Plotly sizing issues */
+    .plotly, .plot-container {
+        width: 100% !important;
+        height: 100% !important;
+    }
+
+    /* Ensure charts maintain aspect ratio */
+    .js-plotly-plot, .plot-container.plotly {
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+    }
+
+    /* Ensure pie charts are centered in their containers */
+    .chart-container[id$="-global"] .js-plotly-plot,
+    .chart-container[id$="-detail"] .js-plotly-plot {
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
     }
 
     /* Portfolio icon styling */
@@ -188,4 +217,34 @@
         color: #f14668;
         font-style: italic;
         font-weight: 500;
+    }
+
+    /* Force the content boxes to maintain dimensions */
+    .card-content {
+        display: flex;
+        flex-direction: column;
+        min-height: 350px; /* Match chart height */
+    }
+
+    /* Force column display even during initial load */
+    .column {
+        display: flex !important;
+        flex-direction: column;
+    }
+
+    /* Make cards fill the column height */
+    .card {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        height: 100%;
+    }
+
+    /* Fix for Safari and mobile browsers */
+    @supports (-webkit-touch-callout: none) {
+        .chart-container {
+            position: relative;
+            height: 350px !important;
+            width: 100% !important;
+        }
     }

@@ -198,9 +198,20 @@ document.addEventListener('DOMContentLoaded', function() {
                                     this.selectedPortfolio = this.portfolioData.portfolios[0].name;
                                 }
                                 
-                                // Initialize charts
+                                // Initialize charts with a small delay to ensure DOM is ready
                                 this.$nextTick(() => {
-                                    this.initializeCharts();
+                                    // Force a browser reflow to correctly calculate container sizes
+                                    document.body.offsetHeight;
+                                    
+                                    // Add a short delay to ensure all Vue transitions and browser layouts are complete
+                                    setTimeout(() => {
+                                        this.initializeCharts();
+                                        
+                                        // Force another resize event after a longer delay to ensure everything is correct
+                                        setTimeout(() => {
+                                            window.dispatchEvent(new Event('resize'));
+                                        }, 300);
+                                    }, 150);
                                 });
                             } finally {
                                 this.isUpdating = false;
@@ -252,9 +263,20 @@ document.addEventListener('DOMContentLoaded', function() {
                             this.calculateRequiredCapitalForNoSales();
                             this.calculateTargetValuesAndActions();
                             
-                            // Initialize charts
+                            // Initialize charts with a delay to ensure DOM is ready
                             this.$nextTick(() => {
-                                this.initializeCharts();
+                                // Force a browser reflow to correctly calculate container sizes
+                                document.body.offsetHeight;
+                                
+                                // Add a short delay to ensure all Vue transitions and browser layouts are complete
+                                setTimeout(() => {
+                                    this.initializeCharts();
+                                    
+                                    // Force another resize event after charts are initialized
+                                    setTimeout(() => {
+                                        window.dispatchEvent(new Event('resize'));
+                                    }, 300);
+                                }, 150);
                             });
                         } finally {
                             this.isUpdating = false;
@@ -277,6 +299,23 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (view === 'detail' && !this.selectedPortfolio && this.portfolioData.portfolios.length > 0) {
                     this.selectedPortfolio = this.portfolioData.portfolios[0].name;
                 }
+                
+                // When switching views, ensure charts are reinitialized properly
+                this.$nextTick(() => {
+                    // Force a reflow to ensure container dimensions are calculated
+                    document.body.offsetHeight;
+                    
+                    // Add a small delay to ensure DOM is updated after view switch
+                    setTimeout(() => {
+                        // Reinitialize charts in the new view
+                        this.initializeCharts();
+                        
+                        // Force another layout update after charts are rendered
+                        setTimeout(() => {
+                            window.dispatchEvent(new Event('resize'));
+                        }, 100);
+                    }, 50);
+                });
             },
             
             /**
@@ -498,21 +537,99 @@ document.addEventListener('DOMContentLoaded', function() {
                     plot_bgcolor: 'transparent',
                     automargin: true
                 };
-            
+
+                // Enhanced config for better responsiveness
+                const config = {
+                    ...ChartConfig.plotlyConfig,
+                    responsive: true,
+                    displayModeBar: false
+                };
+
+                // Function to pre-process the chart container
+                const prepareChartContainer = (elementId) => {
+                    const container = document.getElementById(elementId);
+                    if (!container) {
+                        console.error(`Chart container not found: ${elementId}`);
+                        return null;
+                    }
+
+                    // Ensure the container is visible
+                    container.style.display = 'flex';
+                    container.style.visibility = 'visible';
+                    container.style.opacity = '1';
+                    
+                    // Force dimensions to be explicit
+                    container.style.height = '350px';
+                    container.style.minHeight = '350px';
+                    container.style.width = '100%';
+                    
+                    // Ensure parent elements are properly sized
+                    const cardContent = container.closest('.card-content');
+                    if (cardContent) {
+                        cardContent.style.height = 'auto';
+                        cardContent.style.minHeight = '350px';
+                    }
+                    
+                    // Force a reflow to ensure container dimensions are calculated
+                    void container.offsetHeight;
+                    
+                    console.log(`Chart container ${elementId} dimensions: ${container.offsetWidth}x${container.offsetHeight}`);
+                    return container;
+                };
+
+                // Determine which chart containers to use based on the active view
+                let currentChartId, targetChartId;
+                if (this.activeView === 'global') {
+                    currentChartId = 'current-distribution-chart-global';
+                    targetChartId = 'target-distribution-chart-global';
+                } else {
+                    currentChartId = 'current-distribution-chart-detail';
+                    targetChartId = 'target-distribution-chart-detail';
+                }
+
+                // Prepare both chart containers first
+                const currentContainer = prepareChartContainer(currentChartId);
+                const targetContainer = prepareChartContainer(targetChartId);
+
+                // If either container is missing, try again after a delay
+                if (!currentContainer || !targetContainer) {
+                    console.warn('Chart containers not ready, retrying in 200ms');
+                    setTimeout(() => this.initializeCharts(), 200);
+                    return;
+                }
+
+                // Get chart data
                 const chartData = this.getChartData();
                 
                 // Initialize based on active view
                 if (this.activeView === 'global') {
-                    this.initializeGlobalCharts(chartData, layout);
+                    this.initializeGlobalCharts(chartData, layout, config);
                 } else {
-                    this.initializeDetailCharts(chartData);
+                    this.initializeDetailCharts(chartData, config);
                 }
+                
+                // Force a resize event after charts are created to make sure they fit properly
+                setTimeout(() => {
+                    window.dispatchEvent(new Event('resize'));
+                    
+                    // Log dimensions after resize
+                    const currentElement = document.getElementById(currentChartId);
+                    const targetElement = document.getElementById(targetChartId);
+                    
+                    if (currentElement) {
+                        console.log(`After resize: ${currentChartId} dimensions: ${currentElement.offsetWidth}x${currentElement.offsetHeight}`);
+                    }
+                    
+                    if (targetElement) {
+                        console.log(`After resize: ${targetChartId} dimensions: ${targetElement.offsetWidth}x${targetElement.offsetHeight}`);
+                    }
+                }, 100);
             },
             
             /**
             * Initialize charts for Global view (pie charts)
             */
-            initializeGlobalCharts(chartData, layout) {
+            initializeGlobalCharts(chartData, layout, config) {
                 // Create current distribution chart
                 const currentData = [{
                     type: 'pie',
@@ -542,8 +659,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 }];
                 
                 // Use Plotly.purge to fully clean and redraw
-                Plotly.purge('current-distribution-chart');
-                Plotly.newPlot('current-distribution-chart', currentData, { ...layout }, ChartConfig.plotlyConfig);
+                Plotly.purge('current-distribution-chart-global');
+                Plotly.newPlot('current-distribution-chart-global', currentData, { ...layout }, config);
             
                 // Create target distribution chart
                 const targetData = [{
@@ -574,28 +691,28 @@ document.addEventListener('DOMContentLoaded', function() {
                 }];
                 
                 // Use Plotly.purge to fully clean and redraw
-                Plotly.purge('target-distribution-chart');
-                Plotly.newPlot('target-distribution-chart', targetData, { ...layout }, ChartConfig.plotlyConfig);
+                Plotly.purge('target-distribution-chart-global');
+                Plotly.newPlot('target-distribution-chart-global', targetData, { ...layout }, config);
             },
             
             /**
             * Initialize charts for Detail view (sunburst charts)
             */
-            initializeDetailCharts(chartData) {
+            initializeDetailCharts(chartData, config) {
                 // Get the selected portfolio data
                 const portfolio = this.selectedPortfolioData;
                 if (!portfolio) return;
                 
                 // Clear any existing charts
-                Plotly.purge('current-distribution-chart');
-                Plotly.purge('target-distribution-chart');
+                Plotly.purge('current-distribution-chart-detail');
+                Plotly.purge('target-distribution-chart-detail');
                 
                 // Setup chartData for sunburst format (if available in PortfolioCharts)
                 if (typeof PortfolioCharts !== 'undefined' && PortfolioCharts.createSunburstChart) {
                     // Create current distribution sunburst chart
                     const currentPortfolio = this.preparePortfolioDataForSunburst(portfolio, 'current');
                     PortfolioCharts.createSunburstChart(
-                        'current-distribution-chart',
+                        'current-distribution-chart-detail',
                         currentPortfolio,
                         this.formatCurrency,
                         this.formatPercentage,
@@ -605,7 +722,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Create target distribution sunburst chart
                     const targetPortfolio = this.preparePortfolioDataForSunburst(portfolio, 'target');
                     PortfolioCharts.createSunburstChart(
-                        'target-distribution-chart',
+                        'target-distribution-chart-detail',
                         targetPortfolio,
                         this.formatCurrency,
                         this.formatPercentage,
@@ -623,7 +740,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         plot_bgcolor: 'transparent',
                         automargin: true
                     };
-                    this.initializeGlobalCharts(chartData, layout);
+                    this.initializeGlobalCharts(chartData, layout, config);
                 }
             },
             
@@ -658,9 +775,65 @@ document.addEventListener('DOMContentLoaded', function() {
                     automargin: true
                 };
 
-                // Check for the chart elements in the DOM
-                const currentElement = document.getElementById('current-distribution-chart');
-                const targetElement = document.getElementById('target-distribution-chart');
+                // Enhanced config for better responsiveness
+                const config = {
+                    ...ChartConfig.plotlyConfig,
+                    responsive: true,
+                    displayModeBar: false
+                };
+
+                // Check for the chart elements in the DOM based on active view
+                let currentElementId, targetElementId;
+                
+                if (this.activeView === 'global') {
+                    currentElementId = 'current-distribution-chart-global';
+                    targetElementId = 'target-distribution-chart-global';
+                } else {
+                    currentElementId = 'current-distribution-chart-detail';
+                    targetElementId = 'target-distribution-chart-detail';
+                }
+                
+                // Function to pre-process the chart container (same as in initializeCharts)
+                const prepareChartContainer = (elementId) => {
+                    const container = document.getElementById(elementId);
+                    if (!container) {
+                        console.error(`Chart container not found: ${elementId}`);
+                        return null;
+                    }
+
+                    // Ensure the container is visible
+                    container.style.display = 'flex';
+                    container.style.visibility = 'visible';
+                    container.style.opacity = '1';
+                    
+                    // Force dimensions to be explicit
+                    container.style.height = '350px';
+                    container.style.minHeight = '350px';
+                    container.style.width = '100%';
+                    
+                    // Ensure parent elements are properly sized
+                    const cardContent = container.closest('.card-content');
+                    if (cardContent) {
+                        cardContent.style.height = 'auto';
+                        cardContent.style.minHeight = '350px';
+                    }
+                    
+                    // Force a reflow to ensure container dimensions are calculated
+                    void container.offsetHeight;
+                    
+                    console.log(`Chart container ${elementId} dimensions: ${container.offsetWidth}x${container.offsetHeight}`);
+                    return container;
+                };
+                
+                const currentElement = prepareChartContainer(currentElementId);
+                const targetElement = prepareChartContainer(targetElementId);
+
+                // If either container is missing, try again after a delay
+                if (!currentElement || !targetElement) {
+                    console.warn('Chart containers not ready, retrying updateChartData in 200ms');
+                    setTimeout(() => this.updateChartData(), 200);
+                    return;
+                }
 
                 // Initialize based on active view
                 if (this.activeView === 'global') {
@@ -693,7 +866,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             showlegend: false
                         }];
                         
-                        Plotly.react('current-distribution-chart', currentData, layout, ChartConfig.plotlyConfig);
+                        Plotly.react(currentElementId, currentData, layout, config);
                     }
                     
                     if (targetElement) {
@@ -724,7 +897,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             showlegend: false
                         }];
                         
-                        Plotly.react('target-distribution-chart', targetData, layout, ChartConfig.plotlyConfig);
+                        Plotly.react(targetElementId, targetData, layout, config);
                     }
                 } else {
                     // Update detail view charts (sunburst charts)
@@ -735,10 +908,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (typeof PortfolioCharts !== 'undefined' && PortfolioCharts.createSunburstChart) {
                         // Create current distribution sunburst chart
                         if (currentElement) {
-                            Plotly.purge('current-distribution-chart');
+                            Plotly.purge(currentElementId);
                             const currentPortfolio = this.preparePortfolioDataForSunburst(portfolio, 'current');
                             PortfolioCharts.createSunburstChart(
-                                'current-distribution-chart',
+                                currentElementId,
                                 currentPortfolio,
                                 this.formatCurrency,
                                 this.formatPercentage,
@@ -748,10 +921,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         
                         // Create target distribution sunburst chart
                         if (targetElement) {
-                            Plotly.purge('target-distribution-chart');
+                            Plotly.purge(targetElementId);
                             const targetPortfolio = this.preparePortfolioDataForSunburst(portfolio, 'target');
                             PortfolioCharts.createSunburstChart(
-                                'target-distribution-chart',
+                                targetElementId,
                                 targetPortfolio,
                                 this.formatCurrency,
                                 this.formatPercentage,
@@ -761,28 +934,136 @@ document.addEventListener('DOMContentLoaded', function() {
                     } else {
                         console.warn('PortfolioCharts.createSunburstChart not available, falling back to pie charts');
                         // Fallback to pie charts if sunburst not available
-                        this.initializeGlobalCharts(chartData, layout);
+                        this.initializeGlobalCharts(chartData, layout, config);
                     }
                 }
+                
+                // Force a resize event after charts are updated to ensure proper display
+                setTimeout(() => {
+                    window.dispatchEvent(new Event('resize'));
+                }, 100);
             },
-            
-            // Remaining methods like getChartData, preparePortfolioDataForSunburst, etc.
-            // remain unchanged from the original code.
             
             /**
             * Get data for charts based on active view
             */
             getChartData() {
-                // This method remains the same as in the original code
-                // but must be maintained in the component for proper functionality
+                let chartData = {
+                    current: [],
+                    target: []
+                };
+                
+                // If no portfolio data, return empty chart data
+                if (!this.portfolioData || !this.portfolioData.portfolios || this.portfolioData.portfolios.length === 0) {
+                    console.warn('No portfolio data available for chart rendering');
+                    return chartData;
+                }
+                
+                // Generate colors for visualization
+                const colors = this.generateColors(this.portfolioData.portfolios.length);
+                
+                if (this.activeView === 'global') {
+                    // Global view - shows distribution across portfolios
+                    this.portfolioData.portfolios.forEach((portfolio, index) => {
+                        // Current distribution
+                        chartData.current.push({
+                            name: portfolio.name,
+                            value: portfolio.currentValue,
+                            color: colors[index % colors.length]
+                        });
+                        
+                        // Target distribution
+                        chartData.target.push({
+                            name: portfolio.name,
+                            value: portfolio.targetValue || portfolio.currentValue,
+                            color: colors[index % colors.length]
+                        });
+                    });
+                } else if (this.activeView === 'detail' && this.selectedPortfolio) {
+                    // Detail view - shows distribution within a portfolio
+                    const portfolio = this.portfolioData.portfolios.find(p => p.name === this.selectedPortfolio);
+                    
+                    if (portfolio && portfolio.categories) {
+                        // Generate colors for categories
+                        const categoryColors = this.generateColors(portfolio.categories.length);
+                        
+                        portfolio.categories.forEach((category, index) => {
+                            // Current distribution
+                            chartData.current.push({
+                                name: category.name,
+                                value: category.currentValue,
+                                color: categoryColors[index % categoryColors.length]
+                            });
+                            
+                            // Target distribution
+                            chartData.target.push({
+                                name: category.name,
+                                value: category.targetValue || category.currentValue,
+                                color: categoryColors[index % categoryColors.length]
+                            });
+                        });
+                    }
+                }
+                
+                return chartData;
             },
             
             /**
             * Prepare portfolio data in the format required by the sunburst chart
             */
             preparePortfolioDataForSunburst(portfolio, mode) {
-                // This method remains the same as in the original code
-                // but must be maintained in the component for proper functionality
+                // Create a copy of the portfolio with only the required data
+                const result = {
+                    id: portfolio.id || portfolio.name.replace(/\s+/g, '_').toLowerCase(),
+                    name: portfolio.name,
+                    categories: []
+                };
+                
+                // Add portfolio value based on mode (current or target)
+                if (mode === 'current') {
+                    result.currentValue = portfolio.currentValue;
+                } else if (mode === 'target') {
+                    result.currentValue = portfolio.targetValue || portfolio.currentValue;
+                }
+                
+                // Process each category
+                if (portfolio.categories && portfolio.categories.length > 0) {
+                    portfolio.categories.forEach(category => {
+                        // Create category object
+                        const categoryObj = {
+                            name: category.name,
+                            percentage: mode === 'current' ? category.currentWeight : category.targetWeight,
+                            currentValue: mode === 'current' ? category.currentValue : category.targetValue,
+                            companies: []
+                        };
+                        
+                        // Process positions within the category
+                        if (category.positions && category.positions.length > 0) {
+                            category.positions.forEach(position => {
+                                // Skip placeholder positions in visualization
+                                if (position.isPlaceholder) return;
+                                
+                                // Create position/company object
+                                categoryObj.companies.push({
+                                    name: position.name,
+                                    percentage: mode === 'current' ? position.currentWeight : position.targetWeight,
+                                    currentValue: mode === 'current' ? position.currentValue : position.targetValue,
+                                    // Calculate percentage within the category
+                                    categoryPercentage: mode === 'current' 
+                                        ? (position.currentValue / category.currentValue * 100) 
+                                        : (position.targetValue / category.targetValue * 100)
+                                });
+                            });
+                        }
+                        
+                        // Only add categories with content
+                        if (categoryObj.companies.length > 0) {
+                            result.categories.push(categoryObj);
+                        }
+                    });
+                }
+                
+                return result;
             },
             
             /**
@@ -828,8 +1109,84 @@ document.addEventListener('DOMContentLoaded', function() {
             window.formatPercentage = this.formatPercentage;
             window.generateColors = this.generateColors;
             
-            // Single, debounced resize handler
-            const debouncedResize = _.debounce(() => {
+            // Ensure PortfolioCharts is available
+            if (typeof PortfolioCharts === 'undefined') {
+                console.warn('PortfolioCharts not defined, creating fallback implementation');
+                window.PortfolioCharts = {
+                    createSunburstChart: (elementId, portfolio, formatCurrency, formatPercentage, generateColors) => {
+                        const chartElement = document.getElementById(elementId);
+                        if (!chartElement) {
+                            console.error(`Chart container not found: ${elementId}`);
+                            return null;
+                        }
+                        
+                        // Check portfolio data
+                        if (!portfolio || !portfolio.categories) {
+                            console.error('Portfolio data is null or undefined');
+                            return null;
+                        }
+                        
+                        // Create a simple fallback pie chart
+                        try {
+                            // Get categories
+                            const labels = portfolio.categories.map(cat => cat.name);
+                            const values = portfolio.categories.map(cat => cat.currentValue);
+                            const colors = generateColors(labels.length);
+                            
+                            const data = [{
+                                type: 'pie',
+                                values: values,
+                                labels: labels,
+                                textinfo: 'label+percent',
+                                textposition: 'auto',
+                                hoverinfo: 'label+percent+value',
+                                marker: {
+                                    colors: colors
+                                }
+                            }];
+                            
+                            const layout = {
+                                showlegend: false,
+                                height: 350,
+                                autosize: true,
+                                margin: { l: 30, r: 30, t: 30, b: 50 },
+                                paper_bgcolor: 'transparent',
+                                plot_bgcolor: 'transparent',
+                                automargin: true
+                            };
+                            
+                            // Use the centralized chart configuration if available
+                            const config = (typeof ChartConfig !== 'undefined') 
+                                ? ChartConfig.plotlyConfig 
+                                : { responsive: true, displayModeBar: false };
+                                
+                            return Plotly.newPlot(elementId, data, layout, config)
+                                .catch(error => {
+                                    console.error(`Error in Plotly.newPlot promise:`, error);
+                                    return null;
+                                });
+                        } catch (error) {
+                            console.error('Error creating fallback pie chart:', error);
+                            return null;
+                        }
+                    }
+                };
+            }
+            
+            // Ensure ChartConfig is available
+            if (typeof ChartConfig === 'undefined') {
+                console.warn('ChartConfig not defined, creating fallback implementation');
+                window.ChartConfig = {
+                    plotlyConfig: {
+                        responsive: true,
+                        displayModeBar: false,
+                        showlegend: false
+                    }
+                };
+            }
+            
+            // Create debounced methods for template use
+            this.debouncedUpdateChartData = _.debounce(() => {
                 if (!this.isUpdating) {
                     this.isUpdating = true;
                     try {
@@ -840,8 +1197,61 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }, 250);
             
-            // Add the debounced resize handler
-            window.addEventListener('resize', debouncedResize);
+            this.debouncedCalculateTargetValuesAndActions = _.debounce(() => {
+                if (!this.isUpdating) {
+                    this.isUpdating = true;
+                    try {
+                        this.calculateTargetValuesAndActions();
+                        this.updateChartData();
+                    } finally {
+                        this.isUpdating = false;
+                    }
+                }
+            }, 250);
+            
+            // Create a dedicated resize handler that forces chart resizing
+            const handleResize = _.debounce(() => {
+                if (!this.isUpdating) {
+                    this.isUpdating = true;
+                    try {
+                        // Get the chart containers for the active view
+                        let currentChartId, targetChartId;
+                        if (this.activeView === 'global') {
+                            currentChartId = 'current-distribution-chart-global';
+                            targetChartId = 'target-distribution-chart-global';
+                        } else {
+                            currentChartId = 'current-distribution-chart-detail';
+                            targetChartId = 'target-distribution-chart-detail';
+                        }
+                        
+                        // Force Plotly to resize charts
+                        const currentElement = document.getElementById(currentChartId);
+                        const targetElement = document.getElementById(targetChartId);
+                        
+                        if (currentElement) {
+                            Plotly.relayout(currentChartId, {
+                                autosize: true
+                            });
+                        }
+                        
+                        if (targetElement) {
+                            Plotly.relayout(targetChartId, {
+                                autosize: true
+                            });
+                        }
+                        
+                        console.log('Charts resized due to window resize event');
+                    } finally {
+                        this.isUpdating = false;
+                    }
+                }
+            }, 200);
+            
+            // Add the resize handler
+            window.addEventListener('resize', handleResize);
+            
+            // Store the handler so we can remove it if needed
+            this.resizeHandler = handleResize;
             
             // Add event listeners for notification close buttons
             document.querySelectorAll('.notification .delete').forEach(button => {
