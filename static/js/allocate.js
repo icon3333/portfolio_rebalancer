@@ -654,6 +654,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         portfolio.shortfall = portfolio.idealTargetValue > portfolio.currentValue ? 
                             portfolio.idealTargetValue - portfolio.currentValue : 0;
                     }
+                    
+                    // Calculate remaining positions count for portfolio diversification
+                    this.calculateRemainingPositionsCount(portfolio);
                 });
                 
                 // For newCapitalSpecific mode, allocate the capital proportionally to shortfalls
@@ -700,6 +703,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         
                         // Process positions within the category
                         category.positions.forEach(position => {
+                            // Skip placeholder positions in calculations
+                            if (position.isPlaceholder) return;
+                            
                             // Calculate target value for this position
                             position.targetValue = Math.round(category.targetValue * position.targetWeight / 100);
                             
@@ -1190,6 +1196,56 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (value === null || value === undefined) return '0%';
                 // Ensure value is a number before calling toFixed
                 return `${parseFloat(String(value)).toFixed(1)}%`;
+            },
+            
+            /**
+            * Calculate remaining positions count for portfolio diversification
+            * This method calculates how many additional positions are needed to meet
+            * the diversification targets defined by the user in the Build page.
+            * The number of missing positions is displayed at the portfolio level,
+            * after all categories, to indicate that the user should add more positions
+            * to meet their diversification goals.
+            */
+            calculateRemainingPositionsCount(portfolio) {
+                // Use the minPositions value passed from the Build page
+                const minPositionsNeeded = portfolio.minPositions || 0;
+                
+                // Count total actual positions across all categories
+                let actualPositionsCount = 0;
+                let totalAllocatedWeight = 0;
+                
+                if (portfolio.categories && Array.isArray(portfolio.categories)) {
+                    portfolio.categories.forEach(category => {
+                        if (category.positions && Array.isArray(category.positions)) {
+                            // Only count non-placeholder positions
+                            const nonPlaceholderPositions = category.positions.filter(position => !position.isPlaceholder);
+                            actualPositionsCount += nonPlaceholderPositions.length;
+                            
+                            // Sum up the target weights of all positions
+                            totalAllocatedWeight += nonPlaceholderPositions.reduce((sum, position) => 
+                                sum + (position.targetWeight || 0), 0);
+                        }
+                    });
+                }
+                
+                // If positions total up to 100% (or very close to it), don't show missing positions
+                // Using 99.5 to account for potential rounding issues
+                if (totalAllocatedWeight >= 99.5) {
+                    portfolio.remainingPositionsCount = 0;
+                    portfolio.minPositionsNeeded = minPositionsNeeded;
+                    portfolio.actualPositionsCount = actualPositionsCount;
+                    return 0;
+                }
+                
+                // Calculate how many positions are still needed
+                const remainingPositionsCount = Math.max(0, minPositionsNeeded - actualPositionsCount);
+                
+                // Store the value on the portfolio object so it can be accessed in the template
+                portfolio.remainingPositionsCount = remainingPositionsCount;
+                portfolio.minPositionsNeeded = minPositionsNeeded;
+                portfolio.actualPositionsCount = actualPositionsCount;
+                
+                return remainingPositionsCount;
             }
         },
         mounted() {

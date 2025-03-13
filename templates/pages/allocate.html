@@ -32,6 +32,34 @@
     .chart-card {
         height: 100% !important;
     }
+    
+    /* Styling for remaining positions notification */
+    .placeholder-position {
+        background-color: rgba(50, 115, 220, 0.15) !important;
+        border-left: 5px solid #3273dc !important;
+    }
+    
+    .placeholder-position td {
+        vertical-align: middle !important;
+    }
+    
+    .remaining-positions-text {
+        font-weight: 700;
+        color: #3273dc;
+        font-size: 1em;
+        padding: 0.25rem 0;
+    }
+    
+    /* Animation for the remaining positions row */
+    @keyframes highlight-pulse {
+        0% { background-color: rgba(50, 115, 220, 0.15); }
+        50% { background-color: rgba(50, 115, 220, 0.25); }
+        100% { background-color: rgba(50, 115, 220, 0.15); }
+    }
+    
+    .placeholder-position {
+        animation: highlight-pulse 3s infinite;
+    }
 </style>
 {% endblock %}
 
@@ -300,29 +328,54 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="portfolio in portfolioData.portfolios" 
-                        :key="portfolio.name"
-                        class="is-clickable"
-                        @click="navigateToDetail(portfolio.name)">
-                        <td>
-                            <div class="media-content">
-                                ${portfolio.name}
-                            </div>
-                        </td>
-                        <td class="has-text-right">${formatCurrency(portfolio.currentValue)}</td>
-                        <td class="has-text-right">${formatPercentage(portfolio.currentWeight)}</td>
-                        <td class="has-text-right">${formatPercentage(portfolio.targetWeight)}</td>
-                        <td class="has-text-right">${formatCurrency(portfolio.targetValue)}</td>
-                        <td class="has-text-right">
-                            <span :class="{
-                                'has-text-success': portfolio.action.type === 'Buy',
-                                'has-text-danger': portfolio.action.type === 'Sell',
-                                'has-text-grey': portfolio.action.type === 'Hold'
-                            }">
-                                ${portfolio.action.type} ${formatCurrency(portfolio.action.amount)}
-                            </span>
-                        </td>
-                    </tr>
+                    <template v-for="portfolio in portfolioData.portfolios">
+                        <!-- Portfolio row -->
+                        <tr :key="portfolio.name"
+                            class="is-clickable"
+                            @click="navigateToDetail(portfolio.name)">
+                            <td>
+                                <div class="media-content">
+                                    ${portfolio.name}
+                                </div>
+                            </td>
+                            <td class="has-text-right">${formatCurrency(portfolio.currentValue)}</td>
+                            <td class="has-text-right">${formatPercentage(portfolio.currentWeight)}</td>
+                            <td class="has-text-right">${formatPercentage(portfolio.targetWeight)}</td>
+                            <td class="has-text-right">${formatCurrency(portfolio.targetValue)}</td>
+                            <td class="has-text-right">
+                                <span :class="{
+                                    'has-text-success': portfolio.action.type === 'Buy',
+                                    'has-text-danger': portfolio.action.type === 'Sell',
+                                    'has-text-grey': portfolio.action.type === 'Hold'
+                                }">
+                                    ${portfolio.action.type} ${formatCurrency(portfolio.action.amount)}
+                                </span>
+                            </td>
+                        </tr>
+                        
+                        <!-- Remaining positions notification (if needed) -->
+                        <tr v-if="portfolio.remainingPositionsCount && portfolio.remainingPositionsCount > 0" 
+                            :key="`${portfolio.name}-remaining`"
+                            class="placeholder-position">
+                            <td>
+                                <div class="remaining-positions-text">
+                                    <i class="fas fa-ellipsis-h mr-2"></i>
+                                    <span>${portfolio.remainingPositionsCount}x missing positions</span>
+                                    <span class="has-tooltip-right has-tooltip-arrow ml-2" 
+                                          data-tooltip="Add more positions in the Build page to meet your diversification target">
+                                        <i class="fas fa-question-circle"></i>
+                                    </span>
+                                </div>
+                            </td>
+                            <td class="has-text-right">-</td>
+                            <td class="has-text-right">-</td>
+                            <td class="has-text-right">-</td>
+                            <td class="has-text-right">-</td>
+                            <td class="has-text-right">
+                                <span class="has-text-info">Diversification needed</span>
+                            </td>
+                        </tr>
+                    </template>
                 </tbody>
             </table>
         </div>
@@ -379,19 +432,12 @@
                                 
                                 <!-- Position Rows (only shown when category is expanded) -->
                                 <template v-if="expandedCategories[category.name]">
-                                    <tr v-for="(position, posIndex) in category.positions" 
+                                    <tr v-for="(position, posIndex) in category.positions.filter(p => !p.isPlaceholder)" 
                                         :key="`pos-${catIndex}-${posIndex}`"
-                                        :class="{'position-row': true, 'placeholder-position': position.isPlaceholder, 'has-text-black': true}">
+                                        class="position-row has-text-black">
                                         <td class="pl-6">
                                             <div class="media-content">
-                                                <!-- For placeholder positions, show special styling -->
-                                                <span v-if="position.isPlaceholder" class="remaining-positions-text">
-                                                    <i class="fas fa-ellipsis-h mr-2"></i>
-                                                    ${position.name}
-                                                </span>
-                                                <span v-else>
-                                                    ${position.name}
-                                                </span>
+                                                ${position.name}
                                             </div>
                                         </td>
                                         <td class="has-text-right">${formatCurrency(position.currentValue)}</td>
@@ -408,14 +454,9 @@
                                             </span>
                                             
                                             <!-- Tooltips for additional information -->
-                                            <div v-if="!position.isPlaceholder" class="has-tooltip-left has-tooltip-arrow" data-tooltip="Based on category's target allocation">
+                                            <div class="has-tooltip-left has-tooltip-arrow" data-tooltip="Based on category's target allocation">
                                                 <span class="icon is-small">
                                                     <i class="fas fa-info-circle"></i>
-                                                </span>
-                                            </div>
-                                            <div v-else class="has-tooltip-left has-tooltip-arrow" data-tooltip="Placeholder for future positions">
-                                                <span class="icon is-small">
-                                                    <i class="fas fa-question-circle"></i>
                                                 </span>
                                             </div>
                                         </td>
@@ -432,6 +473,28 @@
                                         </span>
                                         <span>No categories found in this portfolio.</span>
                                     </p>
+                                </td>
+                            </tr>
+                            
+                            <!-- Portfolio remaining positions row - shown at the bottom after all categories -->
+                            <tr v-if="selectedPortfolioData.remainingPositionsCount && selectedPortfolioData.remainingPositionsCount > 0" 
+                                class="placeholder-position">
+                                <td>
+                                    <div class="remaining-positions-text">
+                                        <i class="fas fa-ellipsis-h mr-2"></i>
+                                        <span>${selectedPortfolioData.remainingPositionsCount}x missing positions</span>
+                                        <span class="has-tooltip-right has-tooltip-arrow ml-2" 
+                                              data-tooltip="Add more positions in the Build page to meet your diversification target">
+                                            <i class="fas fa-question-circle"></i>
+                                        </span>
+                                    </div>
+                                </td>
+                                <td class="has-text-right">-</td>
+                                <td class="has-text-right">-</td>
+                                <td class="has-text-right">-</td>
+                                <td class="has-text-right">-</td>
+                                <td class="has-text-right">
+                                    <span class="has-text-info">Diversification needed</span>
                                 </td>
                             </tr>
                         </tbody>

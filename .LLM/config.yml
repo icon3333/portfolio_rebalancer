@@ -2,9 +2,10 @@
 static/css/*
 static/js/*
 # config.py
-app/routes/portfolio_routes.py
+app/routes/portfolio*
 # app/utils/formatting.py
 app/utils/db_utils.py
+app/utils/portfolio_utils.py
 templates/pages/allocate.html
 templates/pages/build.html
 templates/pages/analyze.html
