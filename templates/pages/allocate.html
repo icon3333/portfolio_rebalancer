@@ -46,416 +46,404 @@
         </ul>
     </div>
 
-    <!-- Main Content Grid -->
-    <div class="columns is-multiline">
-        <!-- Current Distribution -->
+    <!-- Global View Layout - Simplified -->
+    <div v-if="activeView === 'global'" class="columns is-multiline">
+        <!-- Current Distribution - Container removed -->
         <div class="column" :class="{'is-12': $viewport.width < 768, 'is-4': $viewport.width >= 768}">
-            <div class="card">
-                <header class="card-header">
-                    <p class="card-header-title">
-                        <span class="icon-text">
-                            <span class="icon">
-                                <i class="fas fa-chart-pie"></i>
-                            </span>
-                            <span>Current Distribution</span>
-                        </span>
-                    </p>
-                </header>
-                <div class="card-content">
-                    <div v-if="activeView === 'global'" class="chart-container" id="current-distribution-chart-global" style="height: 300px; width: 100%;"></div>
-                    <div v-else class="chart-container" id="current-distribution-chart-detail" style="height: 300px; width: 100%;"></div>
-                </div>
-            </div>
+            <h3 class="is-size-6 mb-2">
+                <span class="icon-text">
+                    <span class="icon">
+                        <i class="fas fa-chart-pie"></i>
+                    </span>
+                    <span>Current Distribution</span>
+                </span>
+            </h3>
+            <div class="chart-container p-3" id="current-distribution-chart-global" style="height: 300px; width: 100%;"></div>
         </div>
 
-        <!-- Target Distribution -->
+        <!-- Target Distribution - Container removed -->
         <div class="column" :class="{'is-12': $viewport.width < 768, 'is-4': $viewport.width >= 768}">
-            <div class="card">
-                <header class="card-header">
-                    <p class="card-header-title">
-                        <span class="icon-text">
-                            <span class="icon">
-                                <i class="fas fa-bullseye"></i>
-                            </span>
-                            <span>Target Distribution</span>
-                        </span>
-                    </p>
-                </header>
-                <div class="card-content">
-                    <div v-if="activeView === 'global'" class="chart-container" id="target-distribution-chart-global" style="height: 300px; width: 100%;"></div>
-                    <div v-else class="chart-container" id="target-distribution-chart-detail" style="height: 300px; width: 100%;"></div>
-                </div>
-            </div>
+            <h3 class="is-size-6 mb-2">
+                <span class="icon-text">
+                    <span class="icon">
+                        <i class="fas fa-bullseye"></i>
+                    </span>
+                    <span>Target Distribution</span>
+                </span>
+            </h3>
+            <div class="chart-container p-3" id="target-distribution-chart-global" style="height: 300px; width: 100%;"></div>
         </div>
 
-        <!-- Rebalancing Mode with reduced height -->
+        <!-- Rebalancing Mode - Container removed -->
         <div class="column" :class="{'is-12': $viewport.width < 768, 'is-4': $viewport.width >= 768}">
-            <div class="card">
-                <header class="card-header">
-                    <p class="card-header-title">
-                        <span class="icon-text">
-                            <span class="icon">
-                                <i class="fas fa-cog"></i>
-                            </span>
-                            <span>Rebalancing Mode</span>
-                        </span>
-                    </p>
-                </header>
-                <div class="card-content rebalancing-mode">
-                    <!-- Global View Rebalancing Controls -->
-                    <div v-if="activeView === 'global'" class="field">
-                        <label class="label">Select Rebalancing Strategy</label>
-                        
-                        <div class="control mb-2">
-                            <label class="radio">
-                                <input type="radio" 
-                                    name="rebalanceMode" 
-                                    value="existingCapital" 
-                                    v-model="rebalanceMode">
-                                <span>Existing Capital</span>
-                            </label>
-                            <p class="help ml-4" :class="rebalanceMode === 'existingCapital' ? 'has-text-primary' : 'has-text-grey'">
-                                <i class="fas fa-info-circle mr-1"></i>
-                                Rebalance by buying and selling using current portfolio value only.
-                            </p>
-                        </div>
-                        
-                        <div class="control mb-1">
-                            <label class="radio">
-                                <input type="radio" 
-                                    name="rebalanceMode" 
-                                    value="newCapitalOnly" 
-                                    v-model="rebalanceMode">
-                                <span>New Capital Only</span>
-                            </label>
-                            <p class="help ml-4" :class="rebalanceMode === 'newCapitalOnly' ? 'has-text-success' : 'has-text-grey'">
-                                <i class="fas fa-info-circle mr-1"></i>
-                                Only buy assets with new capital. No selling of existing positions.
-                            </p>
-                        </div>
-                        
-                        <div class="control mb-1">
-                            <label class="radio">
-                                <input type="radio" 
-                                    name="rebalanceMode" 
-                                    value="newCapitalSpecific" 
-                                    v-model="rebalanceMode">
-                                <span>New Capital (specific amount)</span>
-                            </label>
-                        </div>
-                    </div>
-                    
-                    <div v-if="activeView === 'global' && rebalanceMode === 'newCapitalSpecific'" class="field mt-2">
-                        <label class="label is-small">New Capital Amount</label>
-                        <div class="control has-icons-left">
-                            <input class="input is-small" 
-                                type="number" 
-                                v-model.number="newCapitalAmount" 
-                                @change="debouncedCalculateTargetValuesAndActions">
-                            <span class="icon is-small is-left">
-                                <i class="fas fa-euro-sign"></i>
-                            </span>
-                        </div>
-                    </div>
-                    
-                    <!-- Detail View: Compact summary of mode -->
-                    <div v-if="activeView === 'detail'" class="notification is-light py-2 px-3" 
-                        :class="{
-                            'is-primary': rebalanceMode === 'existingCapital',
-                            'is-success': rebalanceMode === 'newCapitalOnly',
-                            'is-info': rebalanceMode === 'newCapitalSpecific'
-                        }">
-                        <p class="has-text-weight-medium is-size-7">
-                            <span class="icon-text">
-                                <span class="icon is-small"><i class="fas fa-info-circle"></i></span>
-                                <span>Active Mode: 
-                                    <strong v-if="rebalanceMode === 'existingCapital'">Existing Capital</strong>
-                                    <strong v-else-if="rebalanceMode === 'newCapitalOnly'">New Capital Only</strong>
-                                    <strong v-else-if="rebalanceMode === 'newCapitalSpecific'">New Capital (${formatCurrency(newCapitalAmount)})</strong>
-                                </span>
-                            </span>
-                        </p>
-                        
-                        <!-- Compact description -->
-                        <p class="is-size-7 mt-1">
-                            <span v-if="rebalanceMode === 'existingCapital'">
-                                Rebalancing with buy and sell actions using existing portfolio.
-                            </span>
-                            <span v-else-if="rebalanceMode === 'newCapitalOnly'">
-                                Only buy recommendations, no selling.
-                            </span>
-                            <span v-else-if="rebalanceMode === 'newCapitalSpecific'">
-                                Adding ${formatCurrency(newCapitalAmount)} of new capital.
-                            </span>
-                        </p>
-                        
-                        <!-- Compact change button -->
-                        <button class="button is-small is-primary is-light mt-2" @click="navigateToGlobal">
-                            <span class="icon is-small">
-                                <i class="fas fa-exchange-alt"></i>
-                            </span>
-                            <span>Change</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
+            <h3 class="is-size-6 mb-2">
+                <span class="icon-text">
+                    <span class="icon">
+                        <i class="fas fa-cog"></i>
+                    </span>
+                    <span>Rebalancing Mode</span>
+                </span>
+            </h3>
             
-            <!-- Portfolio Selector - Moved to below Rebalancing Mode container -->
-            <div v-if="activeView === 'detail'" class="card mt-2">
-                <header class="card-header">
-                    <p class="card-header-title is-size-6">
-                        <span class="icon-text">
-                            <span class="icon is-small">
-                                <i class="fas fa-folder"></i>
-                            </span>
-                            <span>Portfolio Selection</span>
-                        </span>
-                    </p>
-                </header>
-                <div class="card-content portfolio-selector">
-                    <div class="field is-small">
-                        <div class="control has-icons-left">
-                            <div class="select is-fullwidth is-small">
-                                <select v-model="selectedPortfolio" @change="debouncedUpdateChartData">
-                                    <option v-for="portfolio in portfolioData.portfolios" 
-                                            :key="portfolio.name" 
-                                            :value="portfolio.name">
-                                        ${portfolio.name}
-                                    </option>
-                                </select>
-                            </div>
-                            <span class="icon is-small is-left">
-                                <i class="fas fa-folder"></i>
-                            </span>
-                        </div>
-                        <!-- No data indicator -->
-                        <p v-if="portfolioData.portfolios.length === 0" class="help has-text-warning mt-1 is-size-7">
-                            <span class="icon-text">
-                                <span class="icon is-small"><i class="fas fa-exclamation-triangle"></i></span>
-                                <span>No portfolios found. Add positions in the Enrich page first.</span>
-                            </span>
+            <div class="box p-4 rebalancing-mode">
+                <div class="field">
+                    <label class="label">Select Rebalancing Strategy</label>
+                    
+                    <div class="control mb-2">
+                        <label class="radio">
+                            <input type="radio" 
+                                name="rebalanceMode" 
+                                value="existingCapital" 
+                                v-model="rebalanceMode">
+                            <span>Existing Capital</span>
+                        </label>
+                        <p class="help ml-4" :class="rebalanceMode === 'existingCapital' ? 'has-text-primary' : 'has-text-grey'">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            Rebalance by buying and selling using current portfolio value only.
                         </p>
+                    </div>
+                    
+                    <div class="control mb-1">
+                        <label class="radio">
+                            <input type="radio" 
+                                name="rebalanceMode" 
+                                value="newCapitalOnly" 
+                                v-model="rebalanceMode">
+                            <span>New Capital Only</span>
+                        </label>
+                        <p class="help ml-4" :class="rebalanceMode === 'newCapitalOnly' ? 'has-text-success' : 'has-text-grey'">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            Only buy assets with new capital. No selling of existing positions.
+                        </p>
+                    </div>
+                    
+                    <div class="control mb-1">
+                        <label class="radio">
+                            <input type="radio" 
+                                name="rebalanceMode" 
+                                value="newCapitalSpecific" 
+                                v-model="rebalanceMode">
+                            <span>New Capital (specific amount)</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div v-if="rebalanceMode === 'newCapitalSpecific'" class="field mt-2">
+                    <label class="label is-small">New Capital Amount</label>
+                    <div class="control has-icons-left">
+                        <input class="input is-small" 
+                            type="number" 
+                            v-model.number="newCapitalAmount" 
+                            @change="debouncedCalculateTargetValuesAndActions">
+                        <span class="icon is-small is-left">
+                            <i class="fas fa-euro-sign"></i>
+                        </span>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Rebalancing Table -->
-    <div class="card mt-5">
-        <header class="card-header">
-            <p class="card-header-title">
-                <span class="icon-text">
-                    <span class="icon">
-                        <i class="fas fa-exchange-alt"></i>
+    <!-- Detail View - Simplified Controls -->
+    <div v-if="activeView === 'detail'" class="mb-4">
+        <div class="columns">
+            <!-- Rebalancing Mode - Container removed -->
+            <div class="column is-6">
+                <h3 class="is-size-6 mb-2">
+                    <span class="icon-text">
+                        <span class="icon">
+                            <i class="fas fa-cog"></i>
+                        </span>
+                        <span>Rebalancing Mode</span>
                     </span>
-                    <span>Rebalancing Actions</span>
-                </span>
-            </p>
-        </header>
-        <div class="card-content">
-            <!-- Global View Table -->
-            <div v-if="activeView === 'global'" class="table-container">
-                <table class="table is-fullwidth is-hoverable">
-                    <thead>
-                        <tr>
-                            <th style="width: 20%;">Portfolio</th>
-                            <th style="width: 16%;" class="has-text-right">Current Value</th>
-                            <th style="width: 16%;" class="has-text-right">Current Weight</th>
-                            <th style="width: 16%;" class="has-text-right">Target Weight</th>
-                            <th style="width: 16%;" class="has-text-right">Target Value</th>
-                            <th style="width: 16%;" class="has-text-right">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="portfolio in portfolioData.portfolios" 
-                            :key="portfolio.name"
-                            class="is-clickable"
-                            @click="navigateToDetail(portfolio.name)">
-                            <td>
-                                <div class="media-content">
-                                    ${portfolio.name}
-                                </div>
-                            </td>
-                            <td class="has-text-right">${formatCurrency(portfolio.currentValue)}</td>
-                            <td class="has-text-right">${formatPercentage(portfolio.currentWeight)}</td>
-                            <td class="has-text-right">${formatPercentage(portfolio.targetWeight)}</td>
-                            <td class="has-text-right">${formatCurrency(portfolio.targetValue)}</td>
-                            <td class="has-text-right">
-                                <span :class="{
-                                    'has-text-success': portfolio.action.type === 'Buy',
-                                    'has-text-danger': portfolio.action.type === 'Sell',
-                                    'has-text-grey': portfolio.action.type === 'Hold'
-                                }">
-                                    ${portfolio.action.type} ${formatCurrency(portfolio.action.amount)}
-                                </span>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                </h3>
+                
+                <div class="notification is-light py-3 px-4" 
+                    :class="{
+                        'is-primary': rebalanceMode === 'existingCapital',
+                        'is-success': rebalanceMode === 'newCapitalOnly',
+                        'is-info': rebalanceMode === 'newCapitalSpecific'
+                    }">
+                    <p class="has-text-weight-medium">
+                        <span class="icon-text">
+                            <span class="icon is-small"><i class="fas fa-info-circle"></i></span>
+                            <span>Active Mode: 
+                                <strong v-if="rebalanceMode === 'existingCapital'">Existing Capital</strong>
+                                <strong v-else-if="rebalanceMode === 'newCapitalOnly'">New Capital Only</strong>
+                                <strong v-else-if="rebalanceMode === 'newCapitalSpecific'">New Capital (${formatCurrency(newCapitalAmount)})</strong>
+                            </span>
+                        </span>
+                    </p>
+                    
+                    <p class="is-size-7 mt-2">
+                        <span v-if="rebalanceMode === 'existingCapital'">
+                            Rebalancing with buy and sell actions using existing portfolio.
+                        </span>
+                        <span v-else-if="rebalanceMode === 'newCapitalOnly'">
+                            Only buy recommendations, no selling.
+                        </span>
+                        <span v-else-if="rebalanceMode === 'newCapitalSpecific'">
+                            Adding ${formatCurrency(newCapitalAmount)} of new capital.
+                        </span>
+                    </p>
+                    
+                    <button class="button is-small is-light mt-2" @click="navigateToGlobal">
+                        <span class="icon is-small">
+                            <i class="fas fa-exchange-alt"></i>
+                        </span>
+                        <span>Change</span>
+                    </button>
+                </div>
             </div>
             
-            <!-- Detail View Table -->
-            <div v-else-if="activeView === 'detail'">
-                <div v-if="selectedPortfolioData">
-                    <h3 class="subtitle">${selectedPortfolioData.name} Portfolio Detail</h3>
-                    
-                    <div class="table-container">
-                        <table class="table is-fullwidth is-hoverable">
-                            <thead>
-                                <tr>
-                                    <th style="width: 20%;">Name</th>
-                                    <th style="width: 16%;" class="has-text-right">Current Value</th>
-                                    <th style="width: 16%;" class="has-text-right">Current Weight</th>
-                                    <th style="width: 16%;" class="has-text-right">Target Weight</th>
-                                    <th style="width: 16%;" class="has-text-right">Target Value</th>
-                                    <th style="width: 16%;" class="has-text-right">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <template v-for="(category, catIndex) in selectedPortfolioData.categories">
-                                    <!-- Category Row with Toggle -->
-                                    <tr :key="`cat-${catIndex}`" class="is-selected has-background-light">
-                                        <td>
-                                            <div class="level is-mobile">
-                                                <div class="level-left">
-                                                    <div class="level-item">
-                                                        <a @click="toggleCategoryExpansion(category.name)" class="mr-2">
-                                                            <span class="icon">
-                                                                <i class="fas" :class="expandedCategories[category.name] ? 'fa-chevron-down' : 'fa-chevron-right'"></i>
-                                                            </span>
-                                                        </a>
-                                                        <span class="ml-2">${category.name}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td class="has-text-right">${formatCurrency(category.currentValue)}</td>
-                                        <td class="has-text-right">${formatPercentage(category.currentWeight)}</td>
-                                        <td class="has-text-right">${formatPercentage(category.targetWeight)}</td>
-                                        <td class="has-text-right">${formatCurrency(category.targetValue)}</td>
-                                        <td class="has-text-right">
-                                            <span :class="{
-                                                'has-text-success': category.action && category.action.type === 'Buy',
-                                                'has-text-danger': category.action && category.action.type === 'Sell',
-                                                'has-text-grey': !category.action || category.action.type === 'Hold'
-                                            }">
-                                                ${category.action ? category.action.type + ' ' + formatCurrency(category.action.amount) : 'Hold €0.00'}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                    
-                                    <!-- Position Rows (only shown when category is expanded) -->
-                                    <template v-if="expandedCategories[category.name]">
-                                        <tr v-for="(position, posIndex) in category.positions" 
-                                            :key="`pos-${catIndex}-${posIndex}`"
-                                            :class="{'position-row': true, 'placeholder-position': position.isPlaceholder}">
-                                            <td class="pl-6">
-                                                <div class="media-content">
-                                                    <!-- For placeholder positions, show special styling -->
-                                                    <span v-if="position.isPlaceholder" class="remaining-positions-text">
-                                                        <i class="fas fa-ellipsis-h mr-2"></i>
-                                                        ${position.name}
-                                                    </span>
-                                                    <span v-else>
-                                                        ${position.name}
-                                                    </span>
-                                                </div>
-                                            </td>
-                                            <td class="has-text-right">${formatCurrency(position.currentValue)}</td>
-                                            <td class="has-text-right">${formatPercentage(position.currentWeight || 0)}</td>
-                                            <td class="has-text-right">${formatPercentage(position.targetWeight)}</td>
-                                            <td class="has-text-right">${formatCurrency(position.targetValue)}</td>
-                                            <td class="has-text-right">
-                                                <span :class="{
-                                                    'has-text-success': position.action && position.action.type === 'Buy',
-                                                    'has-text-danger': position.action && position.action.type === 'Sell',
-                                                    'has-text-grey': !position.action || position.action.type === 'Hold'
-                                                }">
-                                                    ${position.action ? position.action.type + ' ' + formatCurrency(position.action.amount) : 'Hold €0.00'}
-                                                </span>
-                                                
-                                                <!-- Tooltips for additional information -->
-                                                <div v-if="!position.isPlaceholder" class="has-tooltip-left has-tooltip-arrow" data-tooltip="Based on category's target allocation">
-                                                    <span class="icon is-small">
-                                                        <i class="fas fa-info-circle"></i>
-                                                    </span>
-                                                </div>
-                                                <div v-else class="has-tooltip-left has-tooltip-arrow" data-tooltip="Placeholder for future positions">
-                                                    <span class="icon is-small">
-                                                        <i class="fas fa-question-circle"></i>
-                                                    </span>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    </template>
-                                </template>
-                                
-                                <!-- No data message -->
-                                <tr v-if="!selectedPortfolioData.categories || selectedPortfolioData.categories.length === 0">
-                                    <td colspan="6" class="has-text-centered py-5">
-                                        <p class="has-text-grey">
-                                            <span class="icon">
-                                                <i class="fas fa-info-circle"></i>
-                                            </span>
-                                            <span>No categories found in this portfolio.</span>
-                                        </p>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                
-                <!-- Fallback message when no portfolio is selected -->
-                <div v-else class="notification is-warning">
+            <!-- Portfolio Selector - Container removed -->
+            <div class="column is-6">
+                <h3 class="is-size-6 mb-2">
                     <span class="icon-text">
-                        <span class="icon"><i class="fas fa-exclamation-triangle"></i></span>
-                        <span v-if="portfolioData.portfolios.length === 0">
-                            No portfolios found. Please create a portfolio with positions in the Enrich page first.
+                        <span class="icon is-small">
+                            <i class="fas fa-folder"></i>
                         </span>
-                        <span v-else>
-                            Please select a portfolio from the dropdown above.
-                        </span>
+                        <span>Portfolio Selection</span>
                     </span>
+                </h3>
+                
+                <div class="field">
+                    <div class="control has-icons-left">
+                        <div class="select is-fullwidth">
+                            <select v-model="selectedPortfolio" @change="debouncedUpdateChartData">
+                                <option v-for="portfolio in portfolioData.portfolios" 
+                                        :key="portfolio.name" 
+                                        :value="portfolio.name">
+                                    ${portfolio.name}
+                                </option>
+                            </select>
+                        </div>
+                        <span class="icon is-small is-left">
+                            <i class="fas fa-folder"></i>
+                        </span>
+                    </div>
+                    <!-- No data indicator -->
+                    <p v-if="portfolioData.portfolios.length === 0" class="help has-text-warning mt-2">
+                        <span class="icon-text">
+                            <span class="icon is-small"><i class="fas fa-exclamation-triangle"></i></span>
+                            <span>No portfolios found. Add positions in the Enrich page first.</span>
+                        </span>
+                    </p>
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- Rebalancing Actions - Container removed -->
+    <div class="mt-4">
+        <h3 class="is-size-6 mb-3">
+            <span class="icon-text">
+                <span class="icon">
+                    <i class="fas fa-exchange-alt"></i>
+                </span>
+                <span>Rebalancing Actions</span>
+            </span>
+        </h3>
         
-        <!-- Portfolio Summary Footer -->
-        <footer class="card-footer">
-            <div class="card-footer-item">
-                <div class="level is-mobile is-justify-content-space-between w-100">
-                    <div class="level-item has-text-centered">
-                        <div>
-                            <p class="heading">Portfolio Value</p>
-                            <p class="title is-5">${formatCurrency(totalValue)}</p>
-                        </div>
+        <!-- Global View Table -->
+        <div v-if="activeView === 'global'" class="table-container">
+            <table class="table is-fullwidth is-hoverable">
+                <thead>
+                    <tr>
+                        <th style="width: 20%;">Portfolio</th>
+                        <th style="width: 16%;" class="has-text-right">Current Value</th>
+                        <th style="width: 16%;" class="has-text-right">Current Weight</th>
+                        <th style="width: 16%;" class="has-text-right">Target Weight</th>
+                        <th style="width: 16%;" class="has-text-right">Target Value</th>
+                        <th style="width: 16%;" class="has-text-right">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="portfolio in portfolioData.portfolios" 
+                        :key="portfolio.name"
+                        class="is-clickable"
+                        @click="navigateToDetail(portfolio.name)">
+                        <td>
+                            <div class="media-content">
+                                ${portfolio.name}
+                            </div>
+                        </td>
+                        <td class="has-text-right">${formatCurrency(portfolio.currentValue)}</td>
+                        <td class="has-text-right">${formatPercentage(portfolio.currentWeight)}</td>
+                        <td class="has-text-right">${formatPercentage(portfolio.targetWeight)}</td>
+                        <td class="has-text-right">${formatCurrency(portfolio.targetValue)}</td>
+                        <td class="has-text-right">
+                            <span :class="{
+                                'has-text-success': portfolio.action.type === 'Buy',
+                                'has-text-danger': portfolio.action.type === 'Sell',
+                                'has-text-grey': portfolio.action.type === 'Hold'
+                            }">
+                                ${portfolio.action.type} ${formatCurrency(portfolio.action.amount)}
+                            </span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Detail View Table with Fixed Text Color -->
+        <div v-else-if="activeView === 'detail'">
+            <div v-if="selectedPortfolioData">
+                <h3 class="subtitle">${selectedPortfolioData.name} Portfolio Detail</h3>
+                
+                <div class="table-container">
+                    <table class="table is-fullwidth is-hoverable has-text-black">
+                        <thead>
+                            <tr>
+                                <th style="width: 20%;">Name</th>
+                                <th style="width: 16%;" class="has-text-right">Current Value</th>
+                                <th style="width: 16%;" class="has-text-right">Current Weight</th>
+                                <th style="width: 16%;" class="has-text-right">Target Weight</th>
+                                <th style="width: 16%;" class="has-text-right">Target Value</th>
+                                <th style="width: 16%;" class="has-text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template v-for="(category, catIndex) in selectedPortfolioData.categories">
+                                <!-- Category Row with Toggle -->
+                                <tr :key="`cat-${catIndex}`" class="is-selected has-background-light has-text-black">
+                                    <td>
+                                        <div class="level is-mobile">
+                                            <div class="level-left">
+                                                <div class="level-item">
+                                                    <a @click="toggleCategoryExpansion(category.name)" class="mr-2">
+                                                        <span class="icon">
+                                                            <i class="fas" :class="expandedCategories[category.name] ? 'fa-chevron-down' : 'fa-chevron-right'"></i>
+                                                        </span>
+                                                    </a>
+                                                    <span class="ml-2">${category.name}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="has-text-right">${formatCurrency(category.currentValue)}</td>
+                                    <td class="has-text-right">${formatPercentage(category.currentWeight)}</td>
+                                    <td class="has-text-right">${formatPercentage(category.targetWeight)}</td>
+                                    <td class="has-text-right">${formatCurrency(category.targetValue)}</td>
+                                    <td class="has-text-right">
+                                        <span :class="{
+                                            'has-text-success': category.action && category.action.type === 'Buy',
+                                            'has-text-danger': category.action && category.action.type === 'Sell',
+                                            'has-text-grey': !category.action || category.action.type === 'Hold'
+                                        }">
+                                            ${category.action ? category.action.type + ' ' + formatCurrency(category.action.amount) : 'Hold €0.00'}
+                                        </span>
+                                    </td>
+                                </tr>
+                                
+                                <!-- Position Rows (only shown when category is expanded) -->
+                                <template v-if="expandedCategories[category.name]">
+                                    <tr v-for="(position, posIndex) in category.positions" 
+                                        :key="`pos-${catIndex}-${posIndex}`"
+                                        :class="{'position-row': true, 'placeholder-position': position.isPlaceholder, 'has-text-black': true}">
+                                        <td class="pl-6">
+                                            <div class="media-content">
+                                                <!-- For placeholder positions, show special styling -->
+                                                <span v-if="position.isPlaceholder" class="remaining-positions-text">
+                                                    <i class="fas fa-ellipsis-h mr-2"></i>
+                                                    ${position.name}
+                                                </span>
+                                                <span v-else>
+                                                    ${position.name}
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td class="has-text-right">${formatCurrency(position.currentValue)}</td>
+                                        <td class="has-text-right">${formatPercentage(position.currentWeight || 0)}</td>
+                                        <td class="has-text-right">${formatPercentage(position.targetWeight)}</td>
+                                        <td class="has-text-right">${formatCurrency(position.targetValue)}</td>
+                                        <td class="has-text-right">
+                                            <span :class="{
+                                                'has-text-success': position.action && position.action.type === 'Buy',
+                                                'has-text-danger': position.action && position.action.type === 'Sell',
+                                                'has-text-grey': !position.action || position.action.type === 'Hold'
+                                            }">
+                                                ${position.action ? position.action.type + ' ' + formatCurrency(position.action.amount) : 'Hold €0.00'}
+                                            </span>
+                                            
+                                            <!-- Tooltips for additional information -->
+                                            <div v-if="!position.isPlaceholder" class="has-tooltip-left has-tooltip-arrow" data-tooltip="Based on category's target allocation">
+                                                <span class="icon is-small">
+                                                    <i class="fas fa-info-circle"></i>
+                                                </span>
+                                            </div>
+                                            <div v-else class="has-tooltip-left has-tooltip-arrow" data-tooltip="Placeholder for future positions">
+                                                <span class="icon is-small">
+                                                    <i class="fas fa-question-circle"></i>
+                                                </span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </template>
+                            
+                            <!-- No data message -->
+                            <tr v-if="!selectedPortfolioData.categories || selectedPortfolioData.categories.length === 0">
+                                <td colspan="6" class="has-text-centered py-5">
+                                    <p class="has-text-grey">
+                                        <span class="icon">
+                                            <i class="fas fa-info-circle"></i>
+                                        </span>
+                                        <span>No categories found in this portfolio.</span>
+                                    </p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Fallback message when no portfolio is selected -->
+            <div v-else class="notification is-warning">
+                <span class="icon-text">
+                    <span class="icon"><i class="fas fa-exclamation-triangle"></i></span>
+                    <span v-if="portfolioData.portfolios.length === 0">
+                        No portfolios found. Please create a portfolio with positions in the Enrich page first.
+                    </span>
+                    <span v-else>
+                        Please select a portfolio from the dropdown above.
+                    </span>
+                </span>
+            </div>
+        </div>
+        
+        <!-- Portfolio Summary -->
+        <div class="p-4 has-background-white-bis mt-4">
+            <div class="level is-mobile is-justify-content-space-between w-100">
+                <div class="level-item has-text-centered">
+                    <div>
+                        <p class="heading">Portfolio Value</p>
+                        <p class="title is-5">${formatCurrency(totalValue)}</p>
                     </div>
-                    
-                    <div v-if="rebalanceMode === 'newCapitalOnly'" class="level-item has-text-centered">
-                        <div>
-                            <p class="heading">New Capital Required</p>
-                            <p class="title is-5">${formatCurrency(requiredCapitalForNoSales)}</p>
-                        </div>
+                </div>
+                
+                <div v-if="rebalanceMode === 'newCapitalOnly'" class="level-item has-text-centered">
+                    <div>
+                        <p class="heading">New Capital Required</p>
+                        <p class="title is-5">${formatCurrency(requiredCapitalForNoSales)}</p>
                     </div>
-                    
-                    <div v-if="rebalanceMode === 'newCapitalSpecific'" class="level-item has-text-centered">
-                        <div>
-                            <p class="heading">New Capital Added</p>
-                            <p class="title is-5">${formatCurrency(newCapitalAmount)}</p>
-                        </div>
+                </div>
+                
+                <div v-if="rebalanceMode === 'newCapitalSpecific'" class="level-item has-text-centered">
+                    <div>
+                        <p class="heading">New Capital Added</p>
+                        <p class="title is-5">${formatCurrency(newCapitalAmount)}</p>
                     </div>
-                    
-                    <div v-if="rebalanceMode !== 'existingCapital'" class="level-item has-text-centered">
-                        <div>
-                            <p class="heading">New Portfolio Value</p>
-                            <p class="title is-5">${formatCurrency(newPortfolioValue)}</p>
-                        </div>
+                </div>
+                
+                <div v-if="rebalanceMode !== 'existingCapital'" class="level-item has-text-centered">
+                    <div>
+                        <p class="heading">New Portfolio Value</p>
+                        <p class="title is-5">${formatCurrency(newPortfolioValue)}</p>
                     </div>
                 </div>
             </div>
-        </footer>
+        </div>
     </div>
     </div> <!-- End of main content wrapper (hidden during loading) -->
 </div>
