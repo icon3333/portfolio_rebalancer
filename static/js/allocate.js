@@ -1234,11 +1234,31 @@ document.addEventListener('DOMContentLoaded', function() {
                     portfolio.remainingPositionsCount = 0;
                     portfolio.minPositionsNeeded = minPositionsNeeded;
                     portfolio.actualPositionsCount = actualPositionsCount;
+                    portfolio.remainingPositionsWeight = 0;
+                    portfolio.remainingPositionsTargetValue = 0;
                     return 0;
                 }
                 
                 // Calculate how many positions are still needed
                 const remainingPositionsCount = Math.max(0, minPositionsNeeded - actualPositionsCount);
+                
+                // Calculate remaining positions weight and target value
+                if (remainingPositionsCount > 0) {
+                    // Remaining weight as percentage (assume equal weight for all missing positions)
+                    const remainingWeight = Math.max(0, 100 - totalAllocatedWeight);
+                    portfolio.remainingPositionsWeight = remainingWeight;
+                    
+                    // Calculate target value based on portfolio target value and remaining weight
+                    if (portfolio.targetValue) {
+                        portfolio.remainingPositionsTargetValue = portfolio.targetValue * remainingWeight / 100;
+                    } else {
+                        // If targetValue not calculated yet, use current value as fallback
+                        portfolio.remainingPositionsTargetValue = (portfolio.currentValue || 0) * remainingWeight / 100;
+                    }
+                } else {
+                    portfolio.remainingPositionsWeight = 0;
+                    portfolio.remainingPositionsTargetValue = 0;
+                }
                 
                 // Store the value on the portfolio object so it can be accessed in the template
                 portfolio.remainingPositionsCount = remainingPositionsCount;
