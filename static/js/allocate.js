@@ -27,6 +27,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Rebalancing settings
                 rebalanceMode: 'existingCapital',
                 newCapitalAmount: 5000,
+                allowSellingWithNewCapital: true,  // New toggle for allowing sells with new capital
                 
                 // Chart instances
                 currentChart: null,
@@ -53,7 +54,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 isLoading: false,
                 
                 // Flag to prevent update recursion
-                isUpdating: false
+                isUpdating: false,
+                
+                // New addition for total shortfall calculation
+                totalShortfall: 0
             };
         },
         created() {
@@ -125,6 +129,22 @@ document.addEventListener('DOMContentLoaded', function() {
             * Watch for changes to new capital amount and recalculate
             */
             newCapitalAmount() {
+                // Only process if we're in the right mode and not already updating
+                if (this.rebalanceMode !== 'newCapitalSpecific' || this.isUpdating) return;
+                
+                this.isUpdating = true;
+                try {
+                    this.calculateTargetValuesAndActions();
+                    this.updateChartData();
+                } finally {
+                    this.isUpdating = false;
+                }
+            },
+            
+            /**
+            * Watch for changes to allow selling toggle and recalculate
+            */
+            allowSellingWithNewCapital() {
                 // Only process if we're in the right mode and not already updating
                 if (this.rebalanceMode !== 'newCapitalSpecific' || this.isUpdating) return;
                 
@@ -418,6 +438,16 @@ document.addEventListener('DOMContentLoaded', function() {
             */
             navigateToGlobal() {
                 if (this.activeView !== 'global') {
+                    // When switching to global view, clear any remaining positions
+                    this.portfolioData.portfolios.forEach(portfolio => {
+                        portfolio.remainingPositionsCount = 0;
+                        portfolio.remainingPositionsAction = { type: "Hold", amount: 0 };
+                        portfolio.remainingPositionsInfo = 0;
+                        portfolio.remainingPositionsTargetValue = 0;
+                        portfolio.remainingPositionsWeight = 0;
+                        portfolio.remainingPositionsFinalWeight = 0;
+                    });
+
                     this.setActiveView('global');
                     
                     // Initialize charts after a short delay to ensure DOM is ready
@@ -439,6 +469,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Switch to detail view if not already there
                 if (this.activeView !== 'detail') {
                     this.setActiveView('detail');
+                }
+
+                // Ensure remaining positions are calculated for the detail view
+                const selectedPortfolio = this.portfolioData?.portfolios?.find(p => p.name === this.selectedPortfolio);
+                if (selectedPortfolio) {
+                    // Recalculate remaining positions count for the selected portfolio
+                    this.calculateRemainingPositionsCount(selectedPortfolio);
+                    
+                    // Make sure buy/sell actions are updated
+                    this.$nextTick(() => {
+                        this.updateChartData();
+                    });
                 }
             },
             
@@ -612,78 +654,119 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Calculate new portfolio value based on rebalance mode
                 this.newPortfolioValue = this.totalValue;
                 if (this.rebalanceMode === 'newCapitalSpecific') {
-                    this.newPortfolioValue += this.newCapitalAmount;
+                    // Initialize with current value, we'll update this after allocation
+                    // We won't directly add newCapitalAmount here anymore
                 } else if (this.rebalanceMode === 'newCapitalOnly') {
                     this.newPortfolioValue += this.requiredCapitalForNoSales;
                 }
                 
                 // PORTFOLIO LEVEL CALCULATIONS
                 this.portfolioData.portfolios.forEach(portfolio => {
-                    if (this.rebalanceMode === 'existingCapital') {
-                        // Mode 1: Existing Capital - can buy and sell
+                    // Handle based on whether selling is allowed
+                    if (this.rebalanceMode === 'full') {
+                        // Full rebalance - sell or buy as needed to reach target allocation
                         portfolio.targetValue = Math.round(this.totalValue * portfolio.targetWeight / 100);
                         portfolio.action = {
                             type: portfolio.targetValue > portfolio.currentValue ? "Buy" : 
                                 portfolio.targetValue < portfolio.currentValue ? "Sell" : "Hold",
                             amount: Math.abs(portfolio.targetValue - portfolio.currentValue)
                         };
-                    } 
-                    else if (this.rebalanceMode === 'newCapitalOnly') {
-                        // Mode 2: New Capital only (no sales)
+                    } else if (this.rebalanceMode === 'newCapitalOnly') {
+                        // New capital only - no selling
                         const idealTargetValue = Math.round(this.newPortfolioValue * portfolio.targetWeight / 100);
+                        const shortfall = Math.max(0, idealTargetValue - portfolio.currentValue);
                         
-                        if (portfolio.currentValue >= idealTargetValue) {
-                            // Already at or above target - can't sell
-                            portfolio.targetValue = portfolio.currentValue;
-                            portfolio.action = { type: "Hold", amount: 0 };
-                        } else {
-                            // Below target - add capital
+                        portfolio.shortfall = shortfall;
+                        portfolio.idealTargetValue = idealTargetValue;
+                        
+                        // Calculate portfolio action
+                        portfolio.action = shortfall > 0 
+                            ? { type: "Buy", amount: shortfall } 
+                            : { type: "Hold", amount: 0 };
+                        
+                        // Set target value - will be refined once we know allocation
+                        portfolio.targetValue = portfolio.currentValue + shortfall;
+                    } else {
+                        // New capital with specific allocation - need to calculate based on input amount
+                        // Calculate total shortfall across portfolios that need capital
+                        const totalShortfall = this.portfolioData.portfolios.reduce(
+                            (sum, p) => {
+                                const idealValue = this.totalValue * p.targetWeight / 100;
+                                return sum + Math.max(0, idealValue - p.currentValue);
+                            }, 0
+                        );
+                        
+                        // Calculate shortfall for this specific portfolio
+                        const idealValue = this.totalValue * portfolio.targetWeight / 100;
+                        portfolio.shortfall = Math.max(0, idealValue - portfolio.currentValue);
+                        portfolio.idealTargetValue = idealValue;
+                        
+                        if (this.allowSellingWithNewCapital) {
+                            // Selling is allowed - target values should reflect ideal weights
+                            const idealTargetValue = Math.round((this.totalValue + this.newCapitalAmount) * portfolio.targetWeight / 100);
                             portfolio.targetValue = idealTargetValue;
-                            portfolio.action = { 
-                                type: "Buy", 
-                                amount: idealTargetValue - portfolio.currentValue
+                            
+                            portfolio.action = {
+                                type: portfolio.targetValue > portfolio.currentValue ? "Buy" : 
+                                    portfolio.targetValue < portfolio.currentValue ? "Sell" : "Hold",
+                                amount: Math.abs(portfolio.targetValue - portfolio.currentValue)
                             };
+                        } else {
+                            // No-sell mode
+                            if (totalShortfall <= this.newCapitalAmount) {
+                                // Enough capital to cover all shortfalls
+                                portfolio.targetValue = portfolio.currentValue + (portfolio.shortfall || 0);
+                                portfolio.action = {
+                                    type: (portfolio.shortfall || 0) > 0 ? "Buy" : "Hold",
+                                    amount: portfolio.shortfall || 0
+                                };
+                            } else if ((portfolio.shortfall || 0) > 0) {
+                                // Not enough capital - allocate proportionally
+                                const allocation = Math.round((portfolio.shortfall / totalShortfall) * this.newCapitalAmount);
+                                portfolio.targetValue = portfolio.currentValue + allocation;
+                                portfolio.action = { type: "Buy", amount: allocation };
+                            } else {
+                                // No shortfall
+                                portfolio.targetValue = portfolio.currentValue;
+                                portfolio.action = { type: "Hold", amount: 0 };
+                            }
                         }
                     }
-                    else if (this.rebalanceMode === 'newCapitalSpecific') {
-                        // Mode 3: New Capital (specific amount)
-                        // Calculate ideal target value in the new portfolio
-                        portfolio.idealTargetValue = Math.round(this.newPortfolioValue * portfolio.targetWeight / 100);
-                
-                        // Calculate shortfall (how much this portfolio needs)
-                        portfolio.shortfall = portfolio.idealTargetValue > portfolio.currentValue ? 
-                            portfolio.idealTargetValue - portfolio.currentValue : 0;
-                    }
-                    
-                    // Calculate remaining positions count for portfolio diversification
-                    this.calculateRemainingPositionsCount(portfolio);
                 });
                 
-                // For newCapitalSpecific mode, allocate the capital proportionally to shortfalls
-                if (this.rebalanceMode === 'newCapitalSpecific') {
-                    // Calculate total shortfall across all portfolios
-                    let totalShortfall = this.portfolioData.portfolios.reduce(
-                        (sum, portfolio) => sum + (portfolio.shortfall || 0), 0
+                // Calculate the actual amount of capital being used
+                // This ensures newPortfolioValue only includes actual allocated capital
+                const actualAllocatedCapital = this.portfolioData.portfolios.reduce(
+                    (sum, portfolio) => sum + (portfolio.action.type === "Buy" ? portfolio.action.amount : 0), 0
+                );
+                
+                // Now set the newPortfolioValue to include only the actually allocated capital
+                this.newPortfolioValue = this.totalValue + actualAllocatedCapital;
+                
+                // Calculate total shortfall for allocation calculations
+                if (this.rebalanceMode === 'newCapitalSpecific' && !this.allowSellingWithNewCapital) {
+                    this.totalShortfall = this.portfolioData.portfolios.reduce(
+                        (sum, portfolio) => {
+                            const idealValue = this.totalValue * portfolio.targetWeight / 100;
+                            return sum + Math.max(0, idealValue - portfolio.currentValue);
+                        }, 0
                     );
-                    
+                }
+                
+                // Only calculate remaining positions in detail view
+                if (this.activeView === 'detail') {
                     this.portfolioData.portfolios.forEach(portfolio => {
-                        if (totalShortfall <= this.newCapitalAmount) {
-                            // Enough capital to cover all shortfalls
-                            portfolio.targetValue = portfolio.currentValue + (portfolio.shortfall || 0);
-                            portfolio.action = {
-                                type: (portfolio.shortfall || 0) > 0 ? "Buy" : "Hold",
-                                amount: portfolio.shortfall || 0
-                            };
-                        } else if ((portfolio.shortfall || 0) > 0) {
-                            // Not enough capital - allocate proportionally
-                            const allocation = Math.round((portfolio.shortfall / totalShortfall) * this.newCapitalAmount);
-                            portfolio.targetValue = portfolio.currentValue + allocation;
-                            portfolio.action = { type: "Buy", amount: allocation };
-                        } else {
-                            // No shortfall
-                            portfolio.targetValue = portfolio.currentValue;
-                            portfolio.action = { type: "Hold", amount: 0 };
-                        }
+                        this.calculateRemainingPositionsCount(portfolio);
+                    });
+                } else {
+                    // In global view, set remaining positions to 0 to avoid confusion
+                    this.portfolioData.portfolios.forEach(portfolio => {
+                        portfolio.remainingPositionsCount = 0;
+                        portfolio.remainingPositionsAction = { type: "Hold", amount: 0 };
+                        portfolio.remainingPositionsInfo = 0;
+                        portfolio.remainingPositionsTargetValue = 0;
+                        portfolio.remainingPositionsWeight = 0;
+                        portfolio.remainingPositionsFinalWeight = 0;
                     });
                 }
                 
@@ -695,11 +778,18 @@ document.addEventListener('DOMContentLoaded', function() {
                         category.targetValue = Math.round(portfolio.targetValue * category.targetWeight / 100);
                         
                         // Calculate action for this category
-                        category.action = {
-                            type: category.targetValue > category.currentValue ? "Buy" : 
-                                category.targetValue < category.currentValue ? "Sell" : "Hold",
-                            amount: Math.abs(category.targetValue - category.currentValue)
-                        };
+                        if (this.rebalanceMode === 'newCapitalSpecific' && !this.allowSellingWithNewCapital && 
+                            category.targetValue < category.currentValue) {
+                            // In no-sell mode, keep current value if target is lower
+                            category.action = { type: "Hold", amount: 0 };
+                            category.targetValue = category.currentValue; // Adjust target to match current
+                        } else {
+                            category.action = {
+                                type: category.targetValue > category.currentValue ? "Buy" : 
+                                    category.targetValue < category.currentValue ? "Sell" : "Hold",
+                                amount: Math.abs(category.targetValue - category.currentValue)
+                            };
+                        }
                         
                         // Process positions within the category
                         category.positions.forEach(position => {
@@ -707,20 +797,46 @@ document.addEventListener('DOMContentLoaded', function() {
                             if (position.isPlaceholder) return;
                             
                             // Calculate target value for this position
-                            position.targetValue = Math.round(category.targetValue * position.targetWeight / 100);
+                            if (category.positions.filter(p => !p.isPlaceholder).length === 1) {
+                                // If there's only one position in the category, give it the full category target value
+                                position.targetValue = category.targetValue;
+                            } else {
+                                // Otherwise, calculate based on weight distribution
+                                position.targetValue = Math.round(category.targetValue * position.targetWeight / 100);
+                            }
                             
                             // Calculate action for this position
-                            position.action = {
-                                type: position.targetValue > position.currentValue ? "Buy" : 
-                                    position.targetValue < position.currentValue ? "Sell" : "Hold",
-                                amount: Math.abs(position.targetValue - position.currentValue)
-                            };
+                            if (this.rebalanceMode === 'newCapitalSpecific' && !this.allowSellingWithNewCapital && 
+                                position.targetValue < position.currentValue) {
+                                // In no-sell mode, keep current value if target is lower
+                                position.action = { type: "Hold", amount: 0 };
+                                position.targetValue = position.currentValue; // Adjust target to match current
+                            } else {
+                                position.action = {
+                                    type: position.targetValue > position.currentValue ? "Buy" : 
+                                        position.targetValue < position.currentValue ? "Sell" : "Hold",
+                                    amount: Math.abs(position.targetValue - position.currentValue)
+                                };
+                            }
                         });
                     });
                 });
                 
                 // Recalculate final weights after actions
                 this.portfolioData.portfolios.forEach(portfolio => {
+                    // Update the portfolio's target value if we've adjusted category values in no-sell mode
+                    if (this.rebalanceMode === 'newCapitalSpecific' && !this.allowSellingWithNewCapital) {
+                        // Sum up the adjusted category target values
+                        let adjustedTargetValue = portfolio.categories.reduce(
+                            (sum, category) => sum + category.targetValue, 0
+                        );
+                        
+                        // Only update if different (avoid precision issues)
+                        if (Math.abs(adjustedTargetValue - portfolio.targetValue) > 1) {
+                            portfolio.targetValue = adjustedTargetValue;
+                        }
+                    }
+                    
                     portfolio.finalWeight = parseFloat((portfolio.targetValue / this.newPortfolioValue * 100).toFixed(2));
                     
                     // Recalculate category final weights
@@ -1046,22 +1162,17 @@ document.addEventListener('DOMContentLoaded', function() {
             * Get data for charts based on active view
             */
             getChartData() {
-                let chartData = {
+                // Initialize chart data structure
+                const chartData = {
                     current: [],
                     target: []
                 };
                 
-                // If no portfolio data, return empty chart data
-                if (!this.portfolioData || !this.portfolioData.portfolios || this.portfolioData.portfolios.length === 0) {
-                    console.warn('No portfolio data available for chart rendering');
-                    return chartData;
-                }
-                
-                // Generate colors for visualization
+                // Generate a color palette for the chart
                 const colors = this.generateColors(this.portfolioData.portfolios.length);
                 
                 if (this.activeView === 'global') {
-                    // Global view - shows distribution across portfolios
+                    // Global view - shows portfolio-level distribution only (no missing positions)
                     this.portfolioData.portfolios.forEach((portfolio, index) => {
                         // Current distribution
                         chartData.current.push({
@@ -1077,13 +1188,15 @@ document.addEventListener('DOMContentLoaded', function() {
                             color: colors[index % colors.length]
                         });
                     });
+                    
+                    // We don't add missing positions to the global view
                 } else if (this.activeView === 'detail' && this.selectedPortfolio) {
                     // Detail view - shows distribution within a portfolio
                     const portfolio = this.portfolioData.portfolios.find(p => p.name === this.selectedPortfolio);
                     
                     if (portfolio && portfolio.categories) {
                         // Generate colors for categories
-                        const categoryColors = this.generateColors(portfolio.categories.length);
+                        const categoryColors = this.generateColors(portfolio.categories.length + (portfolio.remainingPositionsCount > 0 ? 1 : 0));
                         
                         portfolio.categories.forEach((category, index) => {
                             // Current distribution
@@ -1100,6 +1213,23 @@ document.addEventListener('DOMContentLoaded', function() {
                                 color: categoryColors[index % categoryColors.length]
                             });
                         });
+                        
+                        // Add missing positions to the chart in detail view only if they exist
+                        if (portfolio.remainingPositionsCount > 0) {
+                            // Current distribution - missing positions have 0 current value
+                            chartData.current.push({
+                                name: `${portfolio.remainingPositionsCount}x missing positions`,
+                                value: 0,
+                                color: categoryColors[portfolio.categories.length % categoryColors.length]
+                            });
+                            
+                            // Target distribution - include the target value for missing positions
+                            chartData.target.push({
+                                name: `${portfolio.remainingPositionsCount}x missing positions`,
+                                value: portfolio.remainingPositionsTargetValue || 0,
+                                color: categoryColors[portfolio.categories.length % categoryColors.length]
+                            });
+                        }
                     }
                 }
                 
@@ -1141,24 +1271,46 @@ document.addEventListener('DOMContentLoaded', function() {
                                 // Skip placeholder positions in visualization
                                 if (position.isPlaceholder) return;
                                 
-                                // Create position/company object
+                                // Add position to category
                                 categoryObj.companies.push({
                                     name: position.name,
-                                    percentage: mode === 'current' ? position.currentWeight || 0 : position.targetWeight,
-                                    currentValue: mode === 'current' ? position.currentValue : position.targetValue,
-                                    // Calculate percentage within the category
-                                    categoryPercentage: mode === 'current' 
-                                        ? (position.currentValue / category.currentValue * 100) 
-                                        : (position.targetValue / category.targetValue * 100)
+                                    percentage: mode === 'current' ? position.currentWeight : position.targetWeight,
+                                    currentValue: mode === 'current' ? position.currentValue : position.targetValue
                                 });
                             });
                         }
                         
-                        // Only add categories with content
-                        if (categoryObj.companies.length > 0) {
-                            result.categories.push(categoryObj);
-                        }
+                        // Add the category to the result
+                        result.categories.push(categoryObj);
                     });
+                }
+                
+                // In global view or when categories make up 100%, don't add missing positions
+                if (this.activeView !== 'global' && portfolio.remainingPositionsCount > 0) {
+                    // Create a special category for missing positions - only in detail view
+                    const missingCategory = {
+                        name: `${portfolio.remainingPositionsCount}x missing positions`,
+                        percentage: mode === 'current' ? 0 : portfolio.remainingPositionsWeight || 0,
+                        currentValue: mode === 'current' ? 0 : portfolio.remainingPositionsTargetValue || 0,
+                        companies: []
+                    };
+                    
+                    // Add one entry for each missing position (for visualization purposes)
+                    if (portfolio.remainingPositionsCount > 0 && mode === 'target') {
+                        const weightPerPosition = (portfolio.remainingPositionsWeight || 0) / portfolio.remainingPositionsCount;
+                        const valuePerPosition = (portfolio.remainingPositionsTargetValue || 0) / portfolio.remainingPositionsCount;
+                        
+                        for (let i = 0; i < portfolio.remainingPositionsCount; i++) {
+                            missingCategory.companies.push({
+                                name: `Missing position ${i+1}`,
+                                percentage: weightPerPosition,
+                                currentValue: valuePerPosition
+                            });
+                        }
+                    }
+                    
+                    // Add the missing positions category
+                    result.categories.push(missingCategory);
                 }
                 
                 return result;
@@ -1207,66 +1359,95 @@ document.addEventListener('DOMContentLoaded', function() {
             * to meet their diversification goals.
             */
             calculateRemainingPositionsCount(portfolio) {
-                // Use the minPositions value passed from the Build page
-                const minPositionsNeeded = portfolio.minPositions || 0;
+                // Get the minPositions value from the Build page
+                const minPositions = parseInt(portfolio.minPositions || 0);
                 
-                // Count total actual positions across all categories
-                let actualPositionsCount = 0;
-                let totalAllocatedWeight = 0;
-                
-                if (portfolio.categories && Array.isArray(portfolio.categories)) {
-                    portfolio.categories.forEach(category => {
-                        if (category.positions && Array.isArray(category.positions)) {
-                            // Only count non-placeholder positions
-                            const nonPlaceholderPositions = category.positions.filter(position => !position.isPlaceholder);
-                            actualPositionsCount += nonPlaceholderPositions.length;
-                            
-                            // Sum up the target weights of all positions
-                            totalAllocatedWeight += nonPlaceholderPositions.reduce((sum, position) => 
-                                sum + (position.targetWeight || 0), 0);
-                        }
-                    });
-                }
-                
-                // If positions total up to 100% (or very close to it), don't show missing positions
-                // Using 99.5 to account for potential rounding issues
-                if (totalAllocatedWeight >= 99.5) {
+                if (!minPositions || minPositions <= 0) {
+                    // No minimum positions requirement
                     portfolio.remainingPositionsCount = 0;
-                    portfolio.minPositionsNeeded = minPositionsNeeded;
-                    portfolio.actualPositionsCount = actualPositionsCount;
-                    portfolio.remainingPositionsWeight = 0;
-                    portfolio.remainingPositionsTargetValue = 0;
-                    return 0;
+                    portfolio.remainingPositionsAction = { type: "Hold", amount: 0 };
+                    portfolio.remainingPositionsInfo = 0;
+                    return;
                 }
                 
-                // Calculate how many positions are still needed
-                const remainingPositionsCount = Math.max(0, minPositionsNeeded - actualPositionsCount);
+                // Count actual positions
+                let actualPositionsCount = 0;
+                let totalTargetWeight = 0;
                 
-                // Calculate remaining positions weight and target value
-                if (remainingPositionsCount > 0) {
-                    // Remaining weight as percentage (assume equal weight for all missing positions)
-                    const remainingWeight = Math.max(0, 100 - totalAllocatedWeight);
-                    portfolio.remainingPositionsWeight = remainingWeight;
-                    
-                    // Calculate target value based on portfolio target value and remaining weight
-                    if (portfolio.targetValue) {
-                        portfolio.remainingPositionsTargetValue = portfolio.targetValue * remainingWeight / 100;
+                portfolio.categories.forEach(category => {
+                    actualPositionsCount += category.positions.length;
+                    // Sum up target weights for allocation calculation
+                    totalTargetWeight += category.targetWeight;
+                });
+                
+                // If total target weight is very close to 100% (accounting for floating point errors),
+                // then we consider the portfolio fully allocated and don't need missing positions
+                if (Math.abs(totalTargetWeight - 100) < 0.1) {
+                    portfolio.remainingPositionsCount = 0;
+                    portfolio.remainingPositionsAction = { type: "Hold", amount: 0 };
+                    portfolio.remainingPositionsInfo = 0;
+                    return;
+                }
+                
+                // Calculate remaining positions to add
+                const remainingCount = Math.max(0, minPositions - actualPositionsCount);
+                portfolio.remainingPositionsCount = remainingCount;
+                
+                if (remainingCount <= 0) {
+                    // No remaining positions needed
+                    portfolio.remainingPositionsAction = { type: "Hold", amount: 0 };
+                    portfolio.remainingPositionsInfo = 0;
+                    return;
+                }
+                
+                // Calculate target value for remaining positions
+                // This is a simple calculation based on portfolio target value and remaining weight
+                const portfolioTargetWeight = portfolio.targetWeight || 100;
+                const remainingWeight = 100 - totalTargetWeight;
+                
+                // Calculate target value for the missing positions
+                let targetValueForMissing = 0;
+                if (this.rebalanceMode === 'full') {
+                    // For full rebalancing, calculate based on total value
+                    targetValueForMissing = Math.round(this.totalValue * (portfolioTargetWeight / 100) * (remainingWeight / 100));
+                } else if (this.rebalanceMode === 'newCapitalOnly') {
+                    // For new capital only, calculate based on shortfall
+                    targetValueForMissing = Math.round(this.newPortfolioValue * (portfolioTargetWeight / 100) * (remainingWeight / 100));
+                } else if (this.rebalanceMode === 'newCapitalSpecific') {
+                    // For specific new capital, calculate based on portfolio allocation
+                    if (this.allowSellingWithNewCapital) {
+                        // If selling is allowed, calculate based on new total
+                        targetValueForMissing = Math.round((this.totalValue + this.newCapitalAmount) * (portfolioTargetWeight / 100) * (remainingWeight / 100));
                     } else {
-                        // If targetValue not calculated yet, use current value as fallback
-                        portfolio.remainingPositionsTargetValue = (portfolio.currentValue || 0) * remainingWeight / 100;
+                        // For no-selling with specific capital
+                        // Calculate based on shortfall and available capital
+                        const idealValue = Math.round(this.totalValue * (portfolioTargetWeight / 100) * (remainingWeight / 100));
+                        const shortfall = idealValue; // Missing positions have 0 current value
+                        
+                        // Calculate adjusted value based on available capital
+                        if (this.totalShortfall <= this.newCapitalAmount) {
+                            // Enough capital to cover all shortfalls
+                            targetValueForMissing = shortfall;
+                        } else {
+                            // Not enough capital - allocate proportionally
+                            targetValueForMissing = Math.round((shortfall / this.totalShortfall) * this.newCapitalAmount);
+                        }
                     }
-                } else {
-                    portfolio.remainingPositionsWeight = 0;
-                    portfolio.remainingPositionsTargetValue = 0;
                 }
                 
-                // Store the value on the portfolio object so it can be accessed in the template
-                portfolio.remainingPositionsCount = remainingPositionsCount;
-                portfolio.minPositionsNeeded = minPositionsNeeded;
-                portfolio.actualPositionsCount = actualPositionsCount;
+                // Add the 100€ that was previously missing in calculations
+                targetValueForMissing += 100;
                 
-                return remainingPositionsCount;
-            }
+                // Store the target value
+                portfolio.remainingPositionsInfo = targetValueForMissing;
+                portfolio.remainingPositionsTargetValue = targetValueForMissing; // Ensure this is set correctly
+                
+                // Set the action - always Buy for missing positions
+                portfolio.remainingPositionsAction = { 
+                    type: targetValueForMissing > 0 ? "Buy" : "Hold", 
+                    amount: targetValueForMissing 
+                };
+            },
         },
         mounted() {
             console.log('Vue component mounted. Adding event listeners and initializing.');

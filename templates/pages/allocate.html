@@ -209,6 +209,24 @@
                         </span>
                     </div>
                 </div>
+                
+                <!-- New toggle for allowing sells in new capital specific mode -->
+                <div v-if="rebalanceMode === 'newCapitalSpecific'" class="field mt-3">
+                    <label class="label is-small">Rebalancing Options</label>
+                    <div class="control">
+                        <label class="checkbox">
+                            <input type="checkbox" 
+                                v-model="allowSellingWithNewCapital" 
+                                @change="debouncedCalculateTargetValuesAndActions">
+                            <span class="ml-2">Allow selling positions</span>
+                        </label>
+                        <p class="help" :class="allowSellingWithNewCapital ? 'has-text-info' : 'has-text-grey'">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            <span v-if="allowSellingWithNewCapital">Will optimize by both buying and selling.</span>
+                            <span v-else>Will only buy new positions (no selling).</span>
+                        </p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -252,7 +270,9 @@
                             Only buy recommendations, no selling.
                         </span>
                         <span v-else-if="rebalanceMode === 'newCapitalSpecific'">
-                            Adding ${formatCurrency(newCapitalAmount)} of new capital.
+                            Adding ${formatCurrency(newCapitalAmount)} of new capital
+                            <span v-if="allowSellingWithNewCapital"> with both buy and sell actions.</span>
+                            <span v-else> with buy actions only (no selling).</span>
                         </span>
                     </p>
                     
@@ -379,11 +399,11 @@
                                 ${formatPercentage(portfolio.remainingPositionsWeight || 0)}
                             </td>
                             <td class="has-text-right">
-                                ${formatCurrency(portfolio.remainingPositionsTargetValue || 0)}
+                                ${formatCurrency(portfolio.remainingPositionsInfo || 0)}
                             </td>
                             <td class="has-text-right">
-                                <span class="has-text-info">
-                                    Buy ${formatCurrency(portfolio.remainingPositionsTargetValue || 0)}
+                                <span :class="portfolio.remainingPositionsAction?.type === 'Buy' ? 'has-text-success' : 'has-text-grey'">
+                                    ${portfolio.remainingPositionsAction?.type || 'Hold'} ${formatCurrency(portfolio.remainingPositionsAction?.amount || 0)}
                                 </span>
                             </td>
                         </tr>
@@ -510,20 +530,51 @@
                                     </span>
                                 </td>
                                 <td class="has-text-right has-text-weight-bold">
-                                    ${formatPercentage(selectedPortfolioData.remainingPositionsWeight || 0)}
+                                    ${formatPercentage(0)}
+                                </td>
+                                <td class="has-text-right">
+                                    ${formatCurrency(selectedPortfolioData.remainingPositionsInfo || 0)}
                                     <span class="has-text-grey-light is-size-7" v-if="selectedPortfolioData.remainingPositionsCount > 0">
-                                        (${formatPercentage(selectedPortfolioData.remainingPositionsWeight / selectedPortfolioData.remainingPositionsCount)} each)
+                                        (${formatCurrency(selectedPortfolioData.remainingPositionsInfo / selectedPortfolioData.remainingPositionsCount)} each)
                                     </span>
                                 </td>
                                 <td class="has-text-right">
-                                    ${formatCurrency(selectedPortfolioData.remainingPositionsTargetValue || 0)}
-                                    <span class="has-text-grey-light is-size-7" v-if="selectedPortfolioData.remainingPositionsCount > 0">
-                                        (${formatCurrency(selectedPortfolioData.remainingPositionsTargetValue / selectedPortfolioData.remainingPositionsCount)} each)
+                                    <span :class="selectedPortfolioData.remainingPositionsAction?.type === 'Buy' ? 'has-text-success' : 'has-text-grey'">
+                                        ${selectedPortfolioData.remainingPositionsAction?.type || 'Hold'} ${formatCurrency(selectedPortfolioData.remainingPositionsAction?.amount || 0)}
                                     </span>
                                 </td>
+                            </tr>
+                            
+                            <!-- Portfolio Summary Row - Totals -->
+                            <tr class="is-selected has-background-grey-lighter has-text-black has-text-weight-bold">
+                                <td>
+                                    <div class="level is-mobile">
+                                        <div class="level-left">
+                                            <div class="level-item">
+                                                <span>PORTFOLIO TOTAL</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
                                 <td class="has-text-right">
-                                    <span class="has-text-info">
-                                        Buy ${formatCurrency(selectedPortfolioData.remainingPositionsTargetValue || 0)}
+                                    ${formatCurrency(selectedPortfolioData.currentValue || 0)}
+                                </td>
+                                <td class="has-text-right">
+                                    ${formatPercentage(100)}
+                                </td>
+                                <td class="has-text-right">
+                                    ${formatPercentage(100)}
+                                </td>
+                                <td class="has-text-right">
+                                    ${formatCurrency(selectedPortfolioData.targetValue || 0)}
+                                </td>
+                                <td class="has-text-right">
+                                    <span :class="{
+                                        'has-text-success': selectedPortfolioData.action && selectedPortfolioData.action.type === 'Buy' && selectedPortfolioData.action.amount > 0,
+                                        'has-text-danger': selectedPortfolioData.action && selectedPortfolioData.action.type === 'Sell' && selectedPortfolioData.action.amount > 0,
+                                        'has-text-grey': !selectedPortfolioData.action || selectedPortfolioData.action.type === 'Hold' || selectedPortfolioData.action.amount === 0
+                                    }">
+                                        ${selectedPortfolioData.action ? selectedPortfolioData.action.type + ' ' + formatCurrency(selectedPortfolioData.action.amount) : 'Hold €0.00'}
                                     </span>
                                 </td>
                             </tr>
@@ -551,7 +602,7 @@
             <div class="level is-mobile is-justify-content-space-between w-100">
                 <div class="level-item has-text-centered">
                     <div>
-                        <p class="heading">Portfolio Value</p>
+                        <p class="heading">Global Value</p>
                         <p class="title is-5">${formatCurrency(totalValue)}</p>
                     </div>
                 </div>
@@ -572,7 +623,7 @@
                 
                 <div v-if="rebalanceMode !== 'existingCapital'" class="level-item has-text-centered">
                     <div>
-                        <p class="heading">New Portfolio Value</p>
+                        <p class="heading">New Global Value</p>
                         <p class="title is-5">${formatCurrency(newPortfolioValue)}</p>
                     </div>
                 </div>

@@ -378,6 +378,14 @@ def get_allocate_portfolio_data():
                                     # Assign the per-position weight from placeholder
                                     position_target_weight = total_remaining_weight / positions_remaining
                                     logger.info(f"Position {position['name']} assigned weight {position_target_weight}% from placeholder")
+                                    
+                                    # Decrease the remaining positions count
+                                    placeholder['positionsRemaining'] -= 1
+                                    
+                                    # If this was the last remaining position, update the placeholder
+                                    if placeholder['positionsRemaining'] <= 0:
+                                        placeholder['positionsRemaining'] = 0
+                                        placeholder['totalRemainingWeight'] = 0
                     
                     # Create position entry
                     position_entry = {
