@@ -4,6 +4,35 @@
 {% block head %}
 {{ super() }}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/allocate.css') }}">
+<style>
+    /* Center chart titles */
+    .chart-card .card-header-title {
+        display: flex;
+        justify-content: center;
+        width: 100%;
+    }
+    
+    /* Prevent chart size fluctuations */
+    .chart-container {
+        height: 350px !important;
+        width: 100% !important;
+        transition: none !important;
+        position: relative !important;
+    }
+    
+    /* Chart container wrapper to maintain consistent dimensions */
+    .chart-card .card-content {
+        height: 410px !important; /* Extra space for title and padding */
+        padding: 0.75rem !important;
+        position: relative !important;
+        overflow: hidden !important;
+    }
+
+    /* Add class to chart cards */
+    .chart-card {
+        height: 100% !important;
+    }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -48,30 +77,42 @@
 
     <!-- Global View Layout - Simplified -->
     <div v-if="activeView === 'global'" class="columns is-multiline">
-        <!-- Current Distribution - Container removed -->
+        <!-- Current Distribution - With Card Structure -->
         <div class="column" :class="{'is-12': $viewport.width < 768, 'is-4': $viewport.width >= 768}">
-            <h3 class="is-size-6 mb-2">
-                <span class="icon-text">
-                    <span class="icon">
-                        <i class="fas fa-chart-pie"></i>
-                    </span>
-                    <span>Current Distribution</span>
-                </span>
-            </h3>
-            <div class="chart-container p-3" id="current-distribution-chart-global" style="height: 300px; width: 100%;"></div>
+            <div class="card chart-card">
+                <header class="card-header">
+                    <p class="card-header-title">
+                        <span class="icon-text">
+                            <span class="icon">
+                                <i class="fas fa-chart-pie"></i>
+                            </span>
+                            <span>Current Distribution</span>
+                        </span>
+                    </p>
+                </header>
+                <div class="card-content">
+                    <div class="chart-container" id="current-distribution-chart-global"></div>
+                </div>
+            </div>
         </div>
 
-        <!-- Target Distribution - Container removed -->
+        <!-- Target Distribution - With Card Structure -->
         <div class="column" :class="{'is-12': $viewport.width < 768, 'is-4': $viewport.width >= 768}">
-            <h3 class="is-size-6 mb-2">
-                <span class="icon-text">
-                    <span class="icon">
-                        <i class="fas fa-bullseye"></i>
-                    </span>
-                    <span>Target Distribution</span>
-                </span>
-            </h3>
-            <div class="chart-container p-3" id="target-distribution-chart-global" style="height: 300px; width: 100%;"></div>
+            <div class="card chart-card">
+                <header class="card-header">
+                    <p class="card-header-title">
+                        <span class="icon-text">
+                            <span class="icon">
+                                <i class="fas fa-bullseye"></i>
+                            </span>
+                            <span>Target Distribution</span>
+                        </span>
+                    </p>
+                </header>
+                <div class="card-content">
+                    <div class="chart-container" id="target-distribution-chart-global"></div>
+                </div>
+            </div>
         </div>
 
         <!-- Rebalancing Mode - Container removed -->

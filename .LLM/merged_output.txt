@@ -1,5 +1,5 @@
 This file is a merged representation of selected files from the codebase.
-Generated on: 2025-03-12T22:26:38.441809
+Generated on: 2025-03-13T19:13:25.095311
 
 ================================================================
 Purpose:
@@ -411,18 +411,18 @@ input.input {
     display: none;
 }
 
-/* Chart container styling - UNIFIED 320px HEIGHT FOR ALL CONTAINERS */
+/* Chart container styling */
 .chart-container {
-    position: relative !important;
-    height: 320px !important; /* Fixed at 320px for consistency */
-    width: 100% !important;
-    display: flex !important;
-    justify-content: center !important;
-    align-items: center !important;
-    overflow: hidden !important;
-    min-height: 320px !important; /* Fixed at 320px for consistency */
-    opacity: 1 !important;
-    visibility: visible !important;
+    position: relative;
+    height: 300px; /* Reduced from 350px for consistency */
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    min-height: 300px; /* Reduced from 350px */
+    opacity: 1;
+    transition: opacity 0.2s ease-in-out;
 }
 
 /* Make sure the Plotly chart is properly centered */
@@ -512,13 +512,14 @@ input.input {
 
 /* Fix for sticky tables */
 .table-container {
-    width: 100%;
     overflow-x: auto;
+    max-width: 100%;
+    width: 100%;
     -webkit-overflow-scrolling: touch;
 }
 
+/* Media queries for responsive layouts */
 @media screen and (max-width: 768px) {
-    /* Layout fixes */
     .columns {
         display: block !important;
         margin-left: 0 !important;
@@ -528,27 +529,16 @@ input.input {
     .column {
         width: 100% !important;
         padding: 0.75rem !important;
-        display: block !important;
     }
     
-    /* Set consistent heights for mobile */
     .chart-container {
         height: 250px !important;
         min-height: 250px !important;
     }
     
-    /* Adjust card-content for mobile */
-    .card-content {
-        min-height: 250px !important;
-        max-height: 250px !important;
-        overflow-y: auto !important; /* Allow scrolling for smaller screens */
-    }
-    
-    /* Ensure sunburst charts resize properly on mobile */
-    .js-plotly-plot .plotly, 
-    .js-plotly-plot .plotly .main-svg, 
-    .js-plotly-plot .plotly .svg-container {
-        height: 250px !important;
+    /* Stack columns on mobile */
+    .columns.is-multiline > .column {
+        margin-bottom: 0.75rem !important;
     }
 }
 
@@ -585,8 +575,6 @@ input.input {
 /* Notification styling */
 .notification {
     position: relative;
-    padding: 0.75rem 1rem !important;
-    margin-bottom: 0.75rem !important;
 }
 
 .notification .delete {
@@ -595,10 +583,76 @@ input.input {
     top: 0.5rem;
 }
 
-/* Ensure tables don't break layout */
-.table {
-    min-width: 100%;
-    width: auto;
+/* Card content sizing to match chart height */
+.card-content {
+    display: flex;
+    flex-direction: column;
+    min-height: 300px; /* Match chart height */
+    padding: 0.75rem;
+}
+
+/* Rebalancing mode card adjustments */
+.card-content.rebalancing-mode {
+    min-height: 230px !important; /* Reduced height for rebalancing mode */
+    padding-bottom: 0.5rem !important;
+}
+
+/* Portfolio selector specific styling */
+.portfolio-selector {
+    margin-top: 0.75rem !important;
+    min-height: auto !important;
+    padding-top: 0.5rem !important; 
+    padding-bottom: 0.5rem !important;
+}
+
+/* Make the notification in detail view more compact */
+.card-content.rebalancing-mode .notification {
+    padding: 0.5rem 0.75rem !important;
+    margin-bottom: 0.5rem !important;
+}
+
+.card-content.rebalancing-mode .notification p {
+    margin-bottom: 0.25rem !important;
+}
+
+/* Portfolio header styling */
+.portfolio-header-title.is-size-6 {
+    padding: 0.5rem 0.75rem !important;
+}
+
+/* Ensure consistent Plotly layout */
+#current-distribution-chart-global,
+#current-distribution-chart-detail,
+#target-distribution-chart-global,
+#target-distribution-chart-detail {
+    height: 300px !important;
+    width: 100% !important;
+}
+
+/* Ensure chart containers have the same size in both views */
+.card-content .chart-container {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Make sure all cards in the same row have equal height */
+.columns.is-multiline > .column {
+    display: flex;
+    flex-direction: column;
+}
+
+.columns.is-multiline > .column > .card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.columns.is-multiline > .column > .card > .card-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
 }
 
 /* Placeholder position styling */
@@ -616,116 +670,58 @@ input.input {
     color: #3298dc; /* Bulma info color */
 }
 
-/* Style for remaining positions text to match build-allocation.css */
+/* Style for remaining positions text */
 .remaining-positions-text {
     color: #f14668;
     font-style: italic;
     font-weight: 500;
 }
 
-/* Force the content boxes to maintain consistent dimensions */
-.card-content {
-    display: flex !important;
-    flex-direction: column !important;
-    min-height: 320px !important; /* Fixed at 320px for consistency */
-    max-height: 320px !important; /* Fixed at 320px for consistency */ 
-    overflow: visible !important; /* Allow dropdown to extend outside */
+/* Fix for Safari and mobile browsers */
+@supports (-webkit-touch-callout: none) {
+    .chart-container {
+        position: relative !important;
+        height: 300px !important;
+        width: 100% !important;
+    }
 }
 
-/* Force the content boxes to maintain consistent dimensions - more specific selector */
-.columns .column .card:not(.mt-3) .card-content {
-    display: flex !important;
-    flex-direction: column !important;
-    min-height: 320px !important; /* Reduced from 350px for consistency */
-    max-height: 320px !important; /* Reduced from 350px for consistency */ 
-    overflow: visible !important; /* Allow dropdown to extend outside */
+/* Fix for Firefox */
+@-moz-document url-prefix() {
+    .chart-container {
+        position: relative !important;
+        height: 300px !important;
+        width: 100% !important;
+    }
+}
+
+/* Force Plotly charts to maintain aspect ratio */
+.js-plotly-plot,
+.plot-container.plotly,
+.svg-container {
+    max-width: 100% !important;
+}
+
+/* Force the content boxes to maintain dimensions */
+.card-content {
+    display: flex;
+    flex-direction: column;
+    min-height: 300px; /* Match chart height */
 }
 
 /* Force column display even during initial load */
 .column {
     display: flex !important;
-    flex-direction: column !important;
+    flex-direction: column;
 }
 
 /* Make cards fill the column height */
 .card {
-    display: flex !important;
-    flex-direction: column !important;
-    flex: 1 1 auto !important;
-    height: 100% !important;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    height: 100%;
 }
-
-/* Fix for Safari and mobile browsers */
-@supports (-webkit-touch-callout: none) {
-    .chart-container {
-        position: relative !important;
-        height: 320px !important; /* Fixed at 320px for consistency */
-        width: 100% !important;
-    }
-}
-
-/* Make rebalancing mode fields more compact */
-#portfolio-rebalancer .field {
-    margin-bottom: 0.75rem !important;
-}
-
-#portfolio-rebalancer .control.mb-2 {
-    margin-bottom: 0.5rem !important;
-}
-
-#portfolio-rebalancer .help.ml-4 {
-    margin-left: 1rem !important;
-    margin-bottom: 0.35rem !important;
-}
-
-/* Portfolio Selection - more compact */
-#portfolio-rebalancer .card.mt-3 {
-    margin-top: 0.75rem !important;
-}
-
-/* Make radio controls more compact */
-#portfolio-rebalancer label.radio {
-    margin-bottom: 0.25rem !important;
-    display: flex !important;
-    align-items: center !important;
-}
-
-/* Reduce margin between mode description and change button */
-#portfolio-rebalancer .mt-2 {
-    margin-top: 0.5rem !important;
-}
-
-/* Smaller margin for action button */
-#portfolio-rebalancer .mt-3 {
-    margin-top: 0.75rem !important;
-}
-
-/* Special handling for the portfolio selector dropdown */
-#portfolio-rebalancer .card.mt-3 .card-content {
-    min-height: auto !important;
-    max-height: none !important;
-}
-
-/* Ensure charts maintain visibility */
-.chart-container[id$="-global"],
-.chart-container[id$="-detail"] {
-    opacity: 1 !important;
-    visibility: visible !important;
-}
-
-/* Rebalancing mode container specific styles using the added class */
-.rebalancing-mode-card .card-content {
-    min-height: 320px !important; /* Match the height of chart containers */
-    max-height: 320px !important; /* Match the height of chart containers */
-    overflow-y: auto !important; /* Allow scrolling if content is larger */
-    padding-bottom: 1rem !important; /* Ensure padding at the bottom */
-}
-
-/* Ensure proper spacing for the dropdown that will be placed beneath */
-.rebalancing-mode-card {
-    margin-bottom: 1.5rem !important; /* Add space for dropdown below */
-}
-
 ###END_FILE###
 
 ================================================================
@@ -2613,11 +2609,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 ================================================================
 ###START_FILE_PATH: static/js/allocate.js###
-// Modified allocate.js - Fixed duplicate watchers that caused infinite loops
+// Modified allocate.js - Fixed duplicate watchers that caused infinite loops and adjusted chart heights
 
-    // Define chart height constants to ensure consistency
-    const CHART_HEIGHT = 320; // Single source of truth for chart height
-    const CHART_HEIGHT_MOBILE = 250; // Height for mobile devices
 document.addEventListener('DOMContentLoaded', function() {
     // Add viewport size detection to Vue.js
     Vue.prototype.$viewport = {
@@ -3358,7 +3351,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Enhanced layout with consistent settings
                 const layout = {
                     showlegend: false,
-                    height: CHART_HEIGHT,
+                    height: 300, // Reduced from 350px to match container height
                     autosize: true,
                     margin: { l: 30, r: 30, t: 30, b: 50 },
                     paper_bgcolor: 'transparent',
@@ -3396,7 +3389,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Ensure the container is visible with proper dimensions
                     container.style.display = 'block';
                     container.style.visibility = 'visible';
-                    container.style.height = `${CHART_HEIGHT}px`;
+                    container.style.height = '300px'; // Reduced from 350px
                     container.style.width = '100%';
                     
                     // Force a reflow
@@ -3565,7 +3558,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     const layout = {
                         showlegend: false,
-                        height: CHART_HEIGHT,
+                        height: 300, // Reduced from 350px
                         autosize: true,
                         margin: { l: 30, r: 30, t: 30, b: 50 },
                         paper_bgcolor: 'transparent',
@@ -3589,14 +3582,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (typeof PortfolioCharts !== 'undefined' && PortfolioCharts.createSunburstChart) {
                     // Create current distribution sunburst chart
                     const currentPortfolio = this.preparePortfolioDataForSunburst(portfolio, 'current');
-                    
-                    // Ensure container has proper dimensions before creating the chart
-                    const currentContainer = document.getElementById('current-distribution-chart-detail');
-                    if (currentContainer) {
-                        currentContainer.style.height = `${CHART_HEIGHT}px`;
-                        currentContainer.style.minHeight = `${CHART_HEIGHT}px`;
-                    }
-                    
                     PortfolioCharts.createSunburstChart(
                         'current-distribution-chart-detail',
                         currentPortfolio,
@@ -3607,14 +3592,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Create target distribution sunburst chart
                     const targetPortfolio = this.preparePortfolioDataForSunburst(portfolio, 'target');
-                    
-                    // Ensure container has proper dimensions before creating the chart
-                    const targetContainer = document.getElementById('target-distribution-chart-detail');
-                    if (targetContainer) {
-                        targetContainer.style.height = `${CHART_HEIGHT}px`;
-                        targetContainer.style.minHeight = `${CHART_HEIGHT}px`;
-                    }
-                    
                     PortfolioCharts.createSunburstChart(
                         'target-distribution-chart-detail',
                         targetPortfolio,
@@ -3622,24 +3599,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         this.formatPercentage,
                         this.generateColors
                     );
-                    
-                    // Force container dimensions after charts are created
-                    setTimeout(() => {
-                        if (currentContainer) {
-                            currentContainer.style.height = `${CHART_HEIGHT}px`;
-                            currentContainer.style.minHeight = `${CHART_HEIGHT}px`;
-                        }
-                        if (targetContainer) {
-                            targetContainer.style.height = `${CHART_HEIGHT}px`;
-                            targetContainer.style.minHeight = `${CHART_HEIGHT}px`;
-                        }
-                    }, 100);
                 } else {
                     console.warn('PortfolioCharts.createSunburstChart not available, falling back to pie charts');
                     // Fallback to pie charts if sunburst not available
                     const layout = {
                         showlegend: false,
-                        height: CHART_HEIGHT,
+                        height: 300, // Reduced from 350px
                         autosize: true,
                         margin: { l: 30, r: 30, t: 30, b: 50 },
                         paper_bgcolor: 'transparent',
@@ -3673,7 +3638,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Create chart layout - ensure consistency with initialization
                 const layout = {
                     showlegend: false,
-                    height: CHART_HEIGHT,
+                    height: 300, // Reduced from 350px
                     autosize: true,
                     margin: { l: 30, r: 30, t: 30, b: 50 },
                     paper_bgcolor: 'transparent',
@@ -3713,15 +3678,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     container.style.opacity = '1';
                     
                     // Force dimensions to be explicit
-                    container.style.height = `${CHART_HEIGHT}px`;
-                    container.style.minHeight = `${CHART_HEIGHT}px`;
+                    container.style.height = '300px'; // Reduced from 350px
+                    container.style.minHeight = '300px'; // Reduced from 350px
                     container.style.width = '100%';
                     
                     // Ensure parent elements are properly sized
                     const cardContent = container.closest('.card-content');
                     if (cardContent) {
                         cardContent.style.height = 'auto';
-                        cardContent.style.minHeight = `${CHART_HEIGHT}px`;
+                        cardContent.style.minHeight = '300px'; // Reduced from 350px
                     }
                     
                     // Force a reflow to ensure container dimensions are calculated
@@ -3952,7 +3917,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 // Create position/company object
                                 categoryObj.companies.push({
                                     name: position.name,
-                                    percentage: mode === 'current' ? position.currentWeight : position.targetWeight,
+                                    percentage: mode === 'current' ? position.currentWeight || 0 : position.targetWeight,
                                     currentValue: mode === 'current' ? position.currentValue : position.targetValue,
                                     // Calculate percentage within the category
                                     categoryPercentage: mode === 'current' 
@@ -4061,7 +4026,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             
                             const layout = {
                                 showlegend: false,
-                                height: CHART_HEIGHT,
+                                height: 300, // Reduced from 350px
                                 autosize: true,
                                 margin: { l: 30, r: 30, t: 30, b: 50 },
                                 paper_bgcolor: 'transparent',
@@ -9909,422 +9874,404 @@ def calculate_portfolio_composition(portfolio_data):
         </ul>
     </div>
 
-    <!-- Portfolio Selector (for Detail View) - Moving to after the main layout -->
-    <!-- ... existing code ... -->
-
-    <!-- Main Content Grid -->
-    <div class="columns is-multiline">
-        <!-- Current Distribution -->
+    <!-- Global View Layout - Simplified -->
+    <div v-if="activeView === 'global'" class="columns is-multiline">
+        <!-- Current Distribution - Container removed -->
         <div class="column" :class="{'is-12': $viewport.width < 768, 'is-4': $viewport.width >= 768}">
-            <div class="card">
-                <header class="card-header">
-                    <p class="card-header-title">
-                        <span class="icon-text">
-                            <span class="icon">
-                                <i class="fas fa-chart-pie"></i>
-                            </span>
-                            <span>Current Distribution</span>
-                        </span>
-                    </p>
-                </header>
-                <div class="card-content">
-                    <div v-if="activeView === 'global'" class="chart-container" id="current-distribution-chart-global" style="height: 320px; width: 100%;"></div>
-                    <div v-else class="chart-container" id="current-distribution-chart-detail" style="height: 320px; width: 100%;"></div>
-                </div>
-            </div>
+            <h3 class="is-size-6 mb-2">
+                <span class="icon-text">
+                    <span class="icon">
+                        <i class="fas fa-chart-pie"></i>
+                    </span>
+                    <span>Current Distribution</span>
+                </span>
+            </h3>
+            <div class="chart-container p-3" id="current-distribution-chart-global" style="height: 300px; width: 100%;"></div>
         </div>
 
-        <!-- Target Distribution -->
+        <!-- Target Distribution - Container removed -->
         <div class="column" :class="{'is-12': $viewport.width < 768, 'is-4': $viewport.width >= 768}">
-            <div class="card">
-                <header class="card-header">
-                    <p class="card-header-title">
-                        <span class="icon-text">
-                            <span class="icon">
-                                <i class="fas fa-bullseye"></i>
-                            </span>
-                            <span>Target Distribution</span>
-                        </span>
-                    </p>
-                </header>
-                <div class="card-content">
-                    <div v-if="activeView === 'global'" class="chart-container" id="target-distribution-chart-global" style="height: 320px; width: 100%;"></div>
-                    <div v-else class="chart-container" id="target-distribution-chart-detail" style="height: 320px; width: 100%;"></div>
-                </div>
-            </div>
+            <h3 class="is-size-6 mb-2">
+                <span class="icon-text">
+                    <span class="icon">
+                        <i class="fas fa-bullseye"></i>
+                    </span>
+                    <span>Target Distribution</span>
+                </span>
+            </h3>
+            <div class="chart-container p-3" id="target-distribution-chart-global" style="height: 300px; width: 100%;"></div>
         </div>
 
-        <!-- Rebalancing Mode - Shown in both views now -->
+        <!-- Rebalancing Mode - Container removed -->
         <div class="column" :class="{'is-12': $viewport.width < 768, 'is-4': $viewport.width >= 768}">
-            <div class="card rebalancing-mode-card">
-                <header class="card-header">
-                    <p class="card-header-title">
-                        <span class="icon-text">
-                            <span class="icon">
-                                <i class="fas fa-cog"></i>
-                            </span>
-                            <span>Rebalancing Mode</span>
-                        </span>
-                    </p>
-                </header>
-                <div class="card-content">
-                    <!-- For Global View: Show full rebalancing strategy selection -->
-                    <div v-if="activeView === 'global'" class="field">
-                        <label class="label">Select Rebalancing Strategy</label>
-                        
-                        <div class="control mb-2">
-                            <label class="radio">
-                                <input type="radio" 
-                                    name="rebalanceMode" 
-                                    value="existingCapital" 
-                                    v-model="rebalanceMode">
-                                <span>Existing Capital</span>
-                            </label>
-                            <p class="help ml-4" :class="rebalanceMode === 'existingCapital' ? 'has-text-primary' : 'has-text-grey'">
-                                <i class="fas fa-info-circle mr-1"></i>
-                                Rebalance by buying and selling using current portfolio value only.
-                            </p>
-                        </div>
-                        
-                        <div class="control mb-2">
-                            <label class="radio">
-                                <input type="radio" 
-                                    name="rebalanceMode" 
-                                    value="newCapitalOnly" 
-                                    v-model="rebalanceMode">
-                                <span>New Capital Only</span>
-                            </label>
-                            <p class="help ml-4" :class="rebalanceMode === 'newCapitalOnly' ? 'has-text-success' : 'has-text-grey'">
-                                <i class="fas fa-info-circle mr-1"></i>
-                                Only buy assets with new capital. No selling of existing positions.
-                            </p>
-                        </div>
-                        
-                        <div class="control mb-2">
-                            <label class="radio">
-                                <input type="radio" 
-                                    name="rebalanceMode" 
-                                    value="newCapitalSpecific" 
-                                    v-model="rebalanceMode">
-                                <span>New Capital (specific amount)</span>
-                            </label>
-                            <p class="help ml-4" :class="rebalanceMode === 'newCapitalSpecific' ? 'has-text-info' : 'has-text-grey'">
-                                <i class="fas fa-info-circle mr-1"></i>
-                                Add a specific amount of new capital to rebalance your portfolio.
-                            </p>
-                        </div>
-                    </div>
-                    
-                    <div v-if="activeView === 'global' && rebalanceMode === 'newCapitalSpecific'" class="field mt-4">
-                        <label class="label">New Capital Amount</label>
-                        <div class="control has-icons-left">
-                            <input class="input" 
-                                type="number" 
-                                v-model.number="newCapitalAmount" 
-                                @change="debouncedCalculateTargetValuesAndActions">
-                            <span class="icon is-small is-left">
-                                <i class="fas fa-euro-sign"></i>
-                            </span>
-                        </div>
-                    </div>
-                    
-                    <!-- For Detail View: Only show active mode and change mode button -->
-                    <div v-if="activeView === 'detail'" class="notification" 
-                        :class="{
-                            'is-primary is-light': rebalanceMode === 'existingCapital',
-                            'is-success is-light': rebalanceMode === 'newCapitalOnly',
-                            'is-info is-light': rebalanceMode === 'newCapitalSpecific'
-                        }">
-                        <p class="has-text-weight-medium">
-                            <span class="icon-text">
-                                <span class="icon"><i class="fas fa-info-circle"></i></span>
-                                <span>Active Rebalancing Mode: 
-                                    <strong v-if="rebalanceMode === 'existingCapital'">Existing Capital</strong>
-                                    <strong v-else-if="rebalanceMode === 'newCapitalOnly'">New Capital Only</strong>
-                                    <strong v-else-if="rebalanceMode === 'newCapitalSpecific'">New Capital (${formatCurrency(newCapitalAmount)})</strong>
-                                </span>
-                            </span>
-                        </p>
-                        <p class="mt-2">
-                            <span v-if="rebalanceMode === 'existingCapital'">
-                                Rebalancing using only existing portfolio assets. Both buy and sell actions will be generated.
-                            </span>
-                            <span v-else-if="rebalanceMode === 'newCapitalOnly'">
-                                Only buy recommendations will be provided. No existing positions will be sold.
-                            </span>
-                            <span v-else-if="rebalanceMode === 'newCapitalSpecific'">
-                                Adding ${formatCurrency(newCapitalAmount)} of new capital to your portfolio.
-                            </span>
-                        </p>
-                        
-                        <!-- Add Change Mode button -->
-                        <button class="button is-small is-primary mt-3" @click="navigateToGlobal">
-                            <span class="icon">
-                                <i class="fas fa-exchange-alt"></i>
-                            </span>
-                            <span>Change Mode</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
+            <h3 class="is-size-6 mb-2">
+                <span class="icon-text">
+                    <span class="icon">
+                        <i class="fas fa-cog"></i>
+                    </span>
+                    <span>Rebalancing Mode</span>
+                </span>
+            </h3>
             
-            <!-- Portfolio Selector - Moved to below Rebalancing Mode container -->
-            <div v-if="activeView === 'detail'" class="card mt-3">
-                <header class="card-header">
-                    <p class="card-header-title">
-                        <span class="icon-text">
-                            <span class="icon">
-                                <i class="fas fa-folder"></i>
-                            </span>
-                            <span>Portfolio Selection</span>
-                        </span>
-                    </p>
-                </header>
-                <div class="card-content">
-                    <div class="field">
-                        <label class="label">Select Portfolio</label>
-                        <div class="control has-icons-left">
-                            <div class="select is-fullwidth">
-                                <select v-model="selectedPortfolio" @change="debouncedUpdateChartData">
-                                    <option v-for="portfolio in portfolioData.portfolios" 
-                                            :key="portfolio.name" 
-                                            :value="portfolio.name">
-                                        ${portfolio.name}
-                                    </option>
-                                </select>
-                            </div>
-                            <span class="icon is-left">
-                                <i class="fas fa-folder"></i>
-                            </span>
-                        </div>
-                        <!-- No data indicator -->
-                        <p v-if="portfolioData.portfolios.length === 0" class="help has-text-warning mt-2">
-                            <span class="icon-text">
-                                <span class="icon"><i class="fas fa-exclamation-triangle"></i></span>
-                                <span>No portfolios found. Please create a portfolio with positions in the Enrich page first.</span>
-                            </span>
+            <div class="box p-4 rebalancing-mode">
+                <div class="field">
+                    <label class="label">Select Rebalancing Strategy</label>
+                    
+                    <div class="control mb-2">
+                        <label class="radio">
+                            <input type="radio" 
+                                name="rebalanceMode" 
+                                value="existingCapital" 
+                                v-model="rebalanceMode">
+                            <span>Existing Capital</span>
+                        </label>
+                        <p class="help ml-4" :class="rebalanceMode === 'existingCapital' ? 'has-text-primary' : 'has-text-grey'">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            Rebalance by buying and selling using current portfolio value only.
                         </p>
+                    </div>
+                    
+                    <div class="control mb-1">
+                        <label class="radio">
+                            <input type="radio" 
+                                name="rebalanceMode" 
+                                value="newCapitalOnly" 
+                                v-model="rebalanceMode">
+                            <span>New Capital Only</span>
+                        </label>
+                        <p class="help ml-4" :class="rebalanceMode === 'newCapitalOnly' ? 'has-text-success' : 'has-text-grey'">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            Only buy assets with new capital. No selling of existing positions.
+                        </p>
+                    </div>
+                    
+                    <div class="control mb-1">
+                        <label class="radio">
+                            <input type="radio" 
+                                name="rebalanceMode" 
+                                value="newCapitalSpecific" 
+                                v-model="rebalanceMode">
+                            <span>New Capital (specific amount)</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div v-if="rebalanceMode === 'newCapitalSpecific'" class="field mt-2">
+                    <label class="label is-small">New Capital Amount</label>
+                    <div class="control has-icons-left">
+                        <input class="input is-small" 
+                            type="number" 
+                            v-model.number="newCapitalAmount" 
+                            @change="debouncedCalculateTargetValuesAndActions">
+                        <span class="icon is-small is-left">
+                            <i class="fas fa-euro-sign"></i>
+                        </span>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Rebalancing Table -->
-    <div class="card mt-5">
-        <header class="card-header">
-            <p class="card-header-title">
-                <span class="icon-text">
-                    <span class="icon">
-                        <i class="fas fa-exchange-alt"></i>
+    <!-- Detail View - Simplified Controls -->
+    <div v-if="activeView === 'detail'" class="mb-4">
+        <div class="columns">
+            <!-- Rebalancing Mode - Container removed -->
+            <div class="column is-6">
+                <h3 class="is-size-6 mb-2">
+                    <span class="icon-text">
+                        <span class="icon">
+                            <i class="fas fa-cog"></i>
+                        </span>
+                        <span>Rebalancing Mode</span>
                     </span>
-                    <span>Rebalancing Actions</span>
-                </span>
-            </p>
-        </header>
-        <div class="card-content">
-            <!-- Global View Table -->
-            <div v-if="activeView === 'global'" class="table-container">
-                <table class="table is-fullwidth is-hoverable">
-                    <thead>
-                        <tr>
-                            <th style="width: 20%;">Portfolio</th>
-                            <th style="width: 16%;" class="has-text-right">Current Value</th>
-                            <th style="width: 16%;" class="has-text-right">Current Weight</th>
-                            <th style="width: 16%;" class="has-text-right">Target Weight</th>
-                            <th style="width: 16%;" class="has-text-right">Target Value</th>
-                            <th style="width: 16%;" class="has-text-right">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="portfolio in portfolioData.portfolios" 
-                            :key="portfolio.name"
-                            class="is-clickable"
-                            @click="navigateToDetail(portfolio.name)">
-                            <td>
-                                <div class="media-content">
-                                    ${portfolio.name}
-                                </div>
-                            </td>
-                            <td class="has-text-right">${formatCurrency(portfolio.currentValue)}</td>
-                            <td class="has-text-right">${formatPercentage(portfolio.currentWeight)}</td>
-                            <td class="has-text-right">${formatPercentage(portfolio.targetWeight)}</td>
-                            <td class="has-text-right">${formatCurrency(portfolio.targetValue)}</td>
-                            <td class="has-text-right">
-                                <span :class="{
-                                    'has-text-success': portfolio.action.type === 'Buy',
-                                    'has-text-danger': portfolio.action.type === 'Sell',
-                                    'has-text-grey': portfolio.action.type === 'Hold'
-                                }">
-                                    ${portfolio.action.type} ${formatCurrency(portfolio.action.amount)}
-                                </span>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                </h3>
+                
+                <div class="notification is-light py-3 px-4" 
+                    :class="{
+                        'is-primary': rebalanceMode === 'existingCapital',
+                        'is-success': rebalanceMode === 'newCapitalOnly',
+                        'is-info': rebalanceMode === 'newCapitalSpecific'
+                    }">
+                    <p class="has-text-weight-medium">
+                        <span class="icon-text">
+                            <span class="icon is-small"><i class="fas fa-info-circle"></i></span>
+                            <span>Active Mode: 
+                                <strong v-if="rebalanceMode === 'existingCapital'">Existing Capital</strong>
+                                <strong v-else-if="rebalanceMode === 'newCapitalOnly'">New Capital Only</strong>
+                                <strong v-else-if="rebalanceMode === 'newCapitalSpecific'">New Capital (${formatCurrency(newCapitalAmount)})</strong>
+                            </span>
+                        </span>
+                    </p>
+                    
+                    <p class="is-size-7 mt-2">
+                        <span v-if="rebalanceMode === 'existingCapital'">
+                            Rebalancing with buy and sell actions using existing portfolio.
+                        </span>
+                        <span v-else-if="rebalanceMode === 'newCapitalOnly'">
+                            Only buy recommendations, no selling.
+                        </span>
+                        <span v-else-if="rebalanceMode === 'newCapitalSpecific'">
+                            Adding ${formatCurrency(newCapitalAmount)} of new capital.
+                        </span>
+                    </p>
+                    
+                    <button class="button is-small is-light mt-2" @click="navigateToGlobal">
+                        <span class="icon is-small">
+                            <i class="fas fa-exchange-alt"></i>
+                        </span>
+                        <span>Change</span>
+                    </button>
+                </div>
             </div>
             
-            <!-- Detail View Table -->
-            <div v-else-if="activeView === 'detail'">
-                <div v-if="selectedPortfolioData">
-                    <h3 class="subtitle">${selectedPortfolioData.name} Portfolio Detail</h3>
-                    
-                    <div class="table-container">
-                        <table class="table is-fullwidth is-hoverable">
-                            <thead>
-                                <tr>
-                                    <th style="width: 20%;">Name</th>
-                                    <th style="width: 16%;" class="has-text-right">Current Value</th>
-                                    <th style="width: 16%;" class="has-text-right">Current Weight</th>
-                                    <th style="width: 16%;" class="has-text-right">Target Weight</th>
-                                    <th style="width: 16%;" class="has-text-right">Target Value</th>
-                                    <th style="width: 16%;" class="has-text-right">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <template v-for="(category, catIndex) in selectedPortfolioData.categories">
-                                    <!-- Category Row with Toggle -->
-                                    <tr :key="`cat-${catIndex}`" class="is-selected has-background-light">
-                                        <td>
-                                            <div class="level is-mobile">
-                                                <div class="level-left">
-                                                    <div class="level-item">
-                                                        <a @click="toggleCategoryExpansion(category.name)" class="mr-2">
-                                                            <span class="icon">
-                                                                <i class="fas" :class="expandedCategories[category.name] ? 'fa-chevron-down' : 'fa-chevron-right'"></i>
-                                                            </span>
-                                                        </a>
-                                                        <span class="ml-2">${category.name}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td class="has-text-right">${formatCurrency(category.currentValue)}</td>
-                                        <td class="has-text-right">${formatPercentage(category.currentWeight)}</td>
-                                        <td class="has-text-right">${formatPercentage(category.targetWeight)}</td>
-                                        <td class="has-text-right">${formatCurrency(category.targetValue)}</td>
-                                        <td class="has-text-right">
-                                            <span :class="{
-                                                'has-text-success': category.action && category.action.type === 'Buy',
-                                                'has-text-danger': category.action && category.action.type === 'Sell',
-                                                'has-text-grey': !category.action || category.action.type === 'Hold'
-                                            }">
-                                                ${category.action ? category.action.type + ' ' + formatCurrency(category.action.amount) : 'Hold €0.00'}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                    
-                                    <!-- Position Rows (only shown when category is expanded) -->
-                                    <template v-if="expandedCategories[category.name]">
-                                        <tr v-for="(position, posIndex) in category.positions" 
-                                            :key="`pos-${catIndex}-${posIndex}`"
-                                            :class="{'position-row': true, 'placeholder-position': position.isPlaceholder}">
-                                            <td class="pl-6">
-                                                <div class="media-content">
-                                                    <!-- For placeholder positions, show special styling -->
-                                                    <span v-if="position.isPlaceholder" class="remaining-positions-text">
-                                                        <i class="fas fa-ellipsis-h mr-2"></i>
-                                                        ${position.name}
-                                                    </span>
-                                                    <span v-else>
-                                                        ${position.name}
-                                                    </span>
-                                                </div>
-                                            </td>
-                                            <td class="has-text-right">${formatCurrency(position.currentValue)}</td>
-                                            <td class="has-text-right">${formatPercentage(position.currentWeight || 0)}</td>
-                                            <td class="has-text-right">${formatPercentage(position.targetWeight)}</td>
-                                            <td class="has-text-right">${formatCurrency(position.targetValue)}</td>
-                                            <td class="has-text-right">
-                                                <span :class="{
-                                                    'has-text-success': position.action && position.action.type === 'Buy',
-                                                    'has-text-danger': position.action && position.action.type === 'Sell',
-                                                    'has-text-grey': !position.action || position.action.type === 'Hold'
-                                                }">
-                                                    ${position.action ? position.action.type + ' ' + formatCurrency(position.action.amount) : 'Hold €0.00'}
-                                                </span>
-                                                
-                                                <!-- Tooltips for additional information -->
-                                                <div v-if="!position.isPlaceholder" class="has-tooltip-left has-tooltip-arrow" data-tooltip="Based on category's target allocation">
-                                                    <span class="icon is-small">
-                                                        <i class="fas fa-info-circle"></i>
-                                                    </span>
-                                                </div>
-                                                <div v-else class="has-tooltip-left has-tooltip-arrow" data-tooltip="Placeholder for future positions">
-                                                    <span class="icon is-small">
-                                                        <i class="fas fa-question-circle"></i>
-                                                    </span>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    </template>
-                                </template>
-                                
-                                <!-- No data message -->
-                                <tr v-if="!selectedPortfolioData.categories || selectedPortfolioData.categories.length === 0">
-                                    <td colspan="6" class="has-text-centered py-5">
-                                        <p class="has-text-grey">
-                                            <span class="icon">
-                                                <i class="fas fa-info-circle"></i>
-                                            </span>
-                                            <span>No categories found in this portfolio.</span>
-                                        </p>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                
-                <!-- Fallback message when no portfolio is selected -->
-                <div v-else class="notification is-warning">
+            <!-- Portfolio Selector - Container removed -->
+            <div class="column is-6">
+                <h3 class="is-size-6 mb-2">
                     <span class="icon-text">
-                        <span class="icon"><i class="fas fa-exclamation-triangle"></i></span>
-                        <span v-if="portfolioData.portfolios.length === 0">
-                            No portfolios found. Please create a portfolio with positions in the Enrich page first.
+                        <span class="icon is-small">
+                            <i class="fas fa-folder"></i>
                         </span>
-                        <span v-else>
-                            Please select a portfolio from the dropdown above.
-                        </span>
+                        <span>Portfolio Selection</span>
                     </span>
+                </h3>
+                
+                <div class="field">
+                    <div class="control has-icons-left">
+                        <div class="select is-fullwidth">
+                            <select v-model="selectedPortfolio" @change="debouncedUpdateChartData">
+                                <option v-for="portfolio in portfolioData.portfolios" 
+                                        :key="portfolio.name" 
+                                        :value="portfolio.name">
+                                    ${portfolio.name}
+                                </option>
+                            </select>
+                        </div>
+                        <span class="icon is-small is-left">
+                            <i class="fas fa-folder"></i>
+                        </span>
+                    </div>
+                    <!-- No data indicator -->
+                    <p v-if="portfolioData.portfolios.length === 0" class="help has-text-warning mt-2">
+                        <span class="icon-text">
+                            <span class="icon is-small"><i class="fas fa-exclamation-triangle"></i></span>
+                            <span>No portfolios found. Add positions in the Enrich page first.</span>
+                        </span>
+                    </p>
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- Rebalancing Actions - Container removed -->
+    <div class="mt-4">
+        <h3 class="is-size-6 mb-3">
+            <span class="icon-text">
+                <span class="icon">
+                    <i class="fas fa-exchange-alt"></i>
+                </span>
+                <span>Rebalancing Actions</span>
+            </span>
+        </h3>
         
-        <!-- Portfolio Summary Footer -->
-        <footer class="card-footer">
-            <div class="card-footer-item">
-                <div class="level is-mobile is-justify-content-space-between w-100">
-                    <div class="level-item has-text-centered">
-                        <div>
-                            <p class="heading">Portfolio Value</p>
-                            <p class="title is-5">${formatCurrency(totalValue)}</p>
-                        </div>
+        <!-- Global View Table -->
+        <div v-if="activeView === 'global'" class="table-container">
+            <table class="table is-fullwidth is-hoverable">
+                <thead>
+                    <tr>
+                        <th style="width: 20%;">Portfolio</th>
+                        <th style="width: 16%;" class="has-text-right">Current Value</th>
+                        <th style="width: 16%;" class="has-text-right">Current Weight</th>
+                        <th style="width: 16%;" class="has-text-right">Target Weight</th>
+                        <th style="width: 16%;" class="has-text-right">Target Value</th>
+                        <th style="width: 16%;" class="has-text-right">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="portfolio in portfolioData.portfolios" 
+                        :key="portfolio.name"
+                        class="is-clickable"
+                        @click="navigateToDetail(portfolio.name)">
+                        <td>
+                            <div class="media-content">
+                                ${portfolio.name}
+                            </div>
+                        </td>
+                        <td class="has-text-right">${formatCurrency(portfolio.currentValue)}</td>
+                        <td class="has-text-right">${formatPercentage(portfolio.currentWeight)}</td>
+                        <td class="has-text-right">${formatPercentage(portfolio.targetWeight)}</td>
+                        <td class="has-text-right">${formatCurrency(portfolio.targetValue)}</td>
+                        <td class="has-text-right">
+                            <span :class="{
+                                'has-text-success': portfolio.action.type === 'Buy',
+                                'has-text-danger': portfolio.action.type === 'Sell',
+                                'has-text-grey': portfolio.action.type === 'Hold'
+                            }">
+                                ${portfolio.action.type} ${formatCurrency(portfolio.action.amount)}
+                            </span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Detail View Table with Fixed Text Color -->
+        <div v-else-if="activeView === 'detail'">
+            <div v-if="selectedPortfolioData">
+                <h3 class="subtitle">${selectedPortfolioData.name} Portfolio Detail</h3>
+                
+                <div class="table-container">
+                    <table class="table is-fullwidth is-hoverable has-text-black">
+                        <thead>
+                            <tr>
+                                <th style="width: 20%;">Name</th>
+                                <th style="width: 16%;" class="has-text-right">Current Value</th>
+                                <th style="width: 16%;" class="has-text-right">Current Weight</th>
+                                <th style="width: 16%;" class="has-text-right">Target Weight</th>
+                                <th style="width: 16%;" class="has-text-right">Target Value</th>
+                                <th style="width: 16%;" class="has-text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template v-for="(category, catIndex) in selectedPortfolioData.categories">
+                                <!-- Category Row with Toggle -->
+                                <tr :key="`cat-${catIndex}`" class="is-selected has-background-light has-text-black">
+                                    <td>
+                                        <div class="level is-mobile">
+                                            <div class="level-left">
+                                                <div class="level-item">
+                                                    <a @click="toggleCategoryExpansion(category.name)" class="mr-2">
+                                                        <span class="icon">
+                                                            <i class="fas" :class="expandedCategories[category.name] ? 'fa-chevron-down' : 'fa-chevron-right'"></i>
+                                                        </span>
+                                                    </a>
+                                                    <span class="ml-2">${category.name}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="has-text-right">${formatCurrency(category.currentValue)}</td>
+                                    <td class="has-text-right">${formatPercentage(category.currentWeight)}</td>
+                                    <td class="has-text-right">${formatPercentage(category.targetWeight)}</td>
+                                    <td class="has-text-right">${formatCurrency(category.targetValue)}</td>
+                                    <td class="has-text-right">
+                                        <span :class="{
+                                            'has-text-success': category.action && category.action.type === 'Buy',
+                                            'has-text-danger': category.action && category.action.type === 'Sell',
+                                            'has-text-grey': !category.action || category.action.type === 'Hold'
+                                        }">
+                                            ${category.action ? category.action.type + ' ' + formatCurrency(category.action.amount) : 'Hold €0.00'}
+                                        </span>
+                                    </td>
+                                </tr>
+                                
+                                <!-- Position Rows (only shown when category is expanded) -->
+                                <template v-if="expandedCategories[category.name]">
+                                    <tr v-for="(position, posIndex) in category.positions" 
+                                        :key="`pos-${catIndex}-${posIndex}`"
+                                        :class="{'position-row': true, 'placeholder-position': position.isPlaceholder, 'has-text-black': true}">
+                                        <td class="pl-6">
+                                            <div class="media-content">
+                                                <!-- For placeholder positions, show special styling -->
+                                                <span v-if="position.isPlaceholder" class="remaining-positions-text">
+                                                    <i class="fas fa-ellipsis-h mr-2"></i>
+                                                    ${position.name}
+                                                </span>
+                                                <span v-else>
+                                                    ${position.name}
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td class="has-text-right">${formatCurrency(position.currentValue)}</td>
+                                        <td class="has-text-right">${formatPercentage(position.currentWeight || 0)}</td>
+                                        <td class="has-text-right">${formatPercentage(position.targetWeight)}</td>
+                                        <td class="has-text-right">${formatCurrency(position.targetValue)}</td>
+                                        <td class="has-text-right">
+                                            <span :class="{
+                                                'has-text-success': position.action && position.action.type === 'Buy',
+                                                'has-text-danger': position.action && position.action.type === 'Sell',
+                                                'has-text-grey': !position.action || position.action.type === 'Hold'
+                                            }">
+                                                ${position.action ? position.action.type + ' ' + formatCurrency(position.action.amount) : 'Hold €0.00'}
+                                            </span>
+                                            
+                                            <!-- Tooltips for additional information -->
+                                            <div v-if="!position.isPlaceholder" class="has-tooltip-left has-tooltip-arrow" data-tooltip="Based on category's target allocation">
+                                                <span class="icon is-small">
+                                                    <i class="fas fa-info-circle"></i>
+                                                </span>
+                                            </div>
+                                            <div v-else class="has-tooltip-left has-tooltip-arrow" data-tooltip="Placeholder for future positions">
+                                                <span class="icon is-small">
+                                                    <i class="fas fa-question-circle"></i>
+                                                </span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </template>
+                            
+                            <!-- No data message -->
+                            <tr v-if="!selectedPortfolioData.categories || selectedPortfolioData.categories.length === 0">
+                                <td colspan="6" class="has-text-centered py-5">
+                                    <p class="has-text-grey">
+                                        <span class="icon">
+                                            <i class="fas fa-info-circle"></i>
+                                        </span>
+                                        <span>No categories found in this portfolio.</span>
+                                    </p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Fallback message when no portfolio is selected -->
+            <div v-else class="notification is-warning">
+                <span class="icon-text">
+                    <span class="icon"><i class="fas fa-exclamation-triangle"></i></span>
+                    <span v-if="portfolioData.portfolios.length === 0">
+                        No portfolios found. Please create a portfolio with positions in the Enrich page first.
+                    </span>
+                    <span v-else>
+                        Please select a portfolio from the dropdown above.
+                    </span>
+                </span>
+            </div>
+        </div>
+        
+        <!-- Portfolio Summary -->
+        <div class="p-4 has-background-white-bis mt-4">
+            <div class="level is-mobile is-justify-content-space-between w-100">
+                <div class="level-item has-text-centered">
+                    <div>
+                        <p class="heading">Portfolio Value</p>
+                        <p class="title is-5">${formatCurrency(totalValue)}</p>
                     </div>
-                    
-                    <div v-if="rebalanceMode === 'newCapitalOnly'" class="level-item has-text-centered">
-                        <div>
-                            <p class="heading">New Capital Required</p>
-                            <p class="title is-5">${formatCurrency(requiredCapitalForNoSales)}</p>
-                        </div>
+                </div>
+                
+                <div v-if="rebalanceMode === 'newCapitalOnly'" class="level-item has-text-centered">
+                    <div>
+                        <p class="heading">New Capital Required</p>
+                        <p class="title is-5">${formatCurrency(requiredCapitalForNoSales)}</p>
                     </div>
-                    
-                    <div v-if="rebalanceMode === 'newCapitalSpecific'" class="level-item has-text-centered">
-                        <div>
-                            <p class="heading">New Capital Added</p>
-                            <p class="title is-5">${formatCurrency(newCapitalAmount)}</p>
-                        </div>
+                </div>
+                
+                <div v-if="rebalanceMode === 'newCapitalSpecific'" class="level-item has-text-centered">
+                    <div>
+                        <p class="heading">New Capital Added</p>
+                        <p class="title is-5">${formatCurrency(newCapitalAmount)}</p>
                     </div>
-                    
-                    <div v-if="rebalanceMode !== 'existingCapital'" class="level-item has-text-centered">
-                        <div>
-                            <p class="heading">New Portfolio Value</p>
-                            <p class="title is-5">${formatCurrency(newPortfolioValue)}</p>
-                        </div>
+                </div>
+                
+                <div v-if="rebalanceMode !== 'existingCapital'" class="level-item has-text-centered">
+                    <div>
+                        <p class="heading">New Portfolio Value</p>
+                        <p class="title is-5">${formatCurrency(newPortfolioValue)}</p>
                     </div>
                 </div>
             </div>
-        </footer>
+        </div>
     </div>
     </div> <!-- End of main content wrapper (hidden during loading) -->
 </div>
