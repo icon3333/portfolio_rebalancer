@@ -434,10 +434,9 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <template v-for="(category, catIndex) in selectedPortfolioData.categories">
+                            <template v-for="(category, catIndex) in selectedPortfolioData.categories ? (selectedPortfolioData.categories.filter(c => c.name !== 'Missing Positions')) : []">
                                 <!-- Category Row with Toggle - Hide if name is "Missing Positions" -->
-                                <tr v-if="category.name !== 'Missing Positions'" 
-                                    :key="`cat-${catIndex}`" 
+                                <tr :key="`cat-${catIndex}`" 
                                     class="is-selected has-background-light has-text-black">
                                     <td>
                                         <div class="level is-mobile">
@@ -472,7 +471,7 @@
                                 </tr>
                                 
                                 <!-- Position Rows (only shown when category is expanded) -->
-                                <template v-if="expandedCategories[category.name] && category.name !== 'Missing Positions'">
+                                <template v-if="expandedCategories[category.name]">
                                     <tr v-for="(position, posIndex) in category.positions.filter(p => !p.isPlaceholder)" 
                                         :key="`pos-${catIndex}-${posIndex}`"
                                         class="position-row has-text-black">

@@ -1376,7 +1376,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         // Generate colors for categories
                         const categoryColors = this.generateColors(portfolio.categories.length + (portfolio.remainingPositionsCount > 0 ? 1 : 0));
                         
-                        portfolio.categories.forEach((category, index) => {
+                        // Skip the Missing Positions category
+                        portfolio.categories.filter(c => c.name !== 'Missing Positions').forEach((category, index) => {
                             // Current distribution
                             chartData.current.push({
                                 name: category.name,
