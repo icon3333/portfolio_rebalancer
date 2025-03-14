@@ -130,74 +130,6 @@ def manage_state():
             return jsonify({'error': str(e)}), 500
 
 # API endpoint to get companies for a specific portfolio
-def get_portfolio_companies(portfolio_id):
-    """Get companies for a specific portfolio"""
-    if 'account_id' not in session:
-        return jsonify({'error': 'Not authenticated'}), 401
-    
-    account_id = session['account_id']
-    
-    try:
-        # Verify portfolio belongs to account
-        portfolio = query_db(
-            'SELECT id FROM portfolios WHERE id = ? AND account_id = ?',
-            [portfolio_id, account_id],
-            one=True
-        )
-        
-        if not portfolio:
-            return jsonify({'error': 'Portfolio not found or access denied'}), 404
-        
-        # Get companies for this portfolio
-        companies = query_db('''
-            SELECT c.id, c.name, c.identifier, c.category, c.total_invested,
-                   COALESCE(cs.shares, 0) as shares
-            FROM companies c
-            LEFT JOIN company_shares cs ON c.id = cs.company_id
-            WHERE c.portfolio_id = ? AND c.account_id = ?
-            ORDER BY c.name
-        ''', [portfolio_id, account_id])
-        
-        return jsonify(companies)
-        
-    except Exception as e:
-        logger.error(f"Error getting portfolio companies: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-def get_portfolio_data_api():
-    """Get portfolio data from the database"""
-    try:
-        # Check if account_id exists in session
-        if 'account_id' not in session:
-            logger.error("No account_id in session when calling portfolio_data API")
-            return jsonify({'error': 'Not authenticated - account_id missing'}), 401
-            
-        account_id = session['account_id']
-        if not account_id:
-            logger.error("Empty account_id in session when calling portfolio_data API")
-            return jsonify({'error': 'Not authenticated - empty account_id'}), 401
-
-        # Log the attempt to fetch data
-        logger.info(f"Fetching portfolio data for account_id: {account_id}")
-        
-        # Get data from database without triggering any yfinance updates
-        portfolio_data = get_portfolio_data(account_id)
-        
-        # Detailed logging of result
-        if not portfolio_data:
-            logger.warning(f"No portfolio data found for account_id: {account_id}")
-            return jsonify({'error': 'Portfolio data could not be loaded. It may have been deleted or is missing from the database.'}), 404
-        else:
-            logger.info(f"Successfully retrieved {len(portfolio_data)} portfolio items")
-
-        return jsonify(portfolio_data)
-    except KeyError as ke:
-        logger.error(f"KeyError accessing portfolio data: {str(ke)}", exc_info=True)
-        return jsonify({'error': f'Session key error: {str(ke)}'}), 401
-    except Exception as e:
-        logger.error(f"Error getting portfolio data: {str(e)}", exc_info=True)
-        return jsonify({'error': f'Portfolio data could not be loaded: {str(e)}'}), 500
-
 def get_allocate_portfolio_data():
     """API endpoint to get structured portfolio data for the rebalancing feature"""
     logger.info("API request for allocate portfolio data")
@@ -238,6 +170,26 @@ def get_allocate_portfolio_data():
             except json.JSONDecodeError:
                 logger.error("Failed to parse target allocations JSON")
         
+        # CRITICAL FIX - STEP 1: Count total positions across all portfolios
+        total_positions = 0
+        portfolio_positions_count = {}
+        
+        # First pass: Count all positions (real + placeholder) across ALL portfolios
+        for portfolio in target_allocations:
+            real_positions = [p for p in portfolio.get('positions', []) if not p.get('isPlaceholder', False)]
+            placeholder = next((p for p in portfolio.get('positions', []) if p.get('isPlaceholder', False)), None)
+            
+            positions_count = len(real_positions)
+            if placeholder:
+                positions_count += placeholder.get('positionsRemaining', 0)
+            
+            portfolio_positions_count[portfolio.get('id')] = positions_count
+            total_positions += positions_count
+        
+        # CRITICAL FIX - STEP 2: Calculate uniform global weight
+        flat_position_weight = 100.0 / total_positions if total_positions > 0 else 0
+        logger.info(f"FLAT DISTRIBUTION: {total_positions} total positions with {flat_position_weight:.2f}% each")
+        
         result = {'portfolios': []}
         
         # Process each portfolio
@@ -264,31 +216,25 @@ def get_allocate_portfolio_data():
             
             portfolio_value = portfolio_value_result['total_value'] if portfolio_value_result['total_value'] else 0
             
-            # Find target allocation for this portfolio from the expanded_state data
-            target_weight = 0
+            # Find target allocation for this portfolio
+            portfolio_target_weight = 0
             target_portfolio = next((p for p in target_allocations if p.get('id') == portfolio_id), None)
+            
             if target_portfolio:
-                target_weight = target_portfolio.get('allocation', 0)
-                logger.info(f"Found target weight for portfolio {portfolio_name}: {target_weight}%")
-                
-                # Add minPositions value from target allocations if available
-                if 'minPositions' in target_portfolio:
-                    min_positions = target_portfolio.get('minPositions')
-                    logger.info(f"Found minPositions for portfolio {portfolio_name}: {min_positions}")
+                portfolio_target_weight = target_portfolio.get('allocation', 0)
+                logger.info(f"Found target weight for portfolio {portfolio_name}: {portfolio_target_weight}%")
+            
+            # Get position count for this portfolio from our earlier calculation
+            positions_in_portfolio = portfolio_positions_count.get(portfolio_id, 0)
             
             # Create portfolio entry
             portfolio_entry = {
                 'name': portfolio_name,
                 'currentValue': portfolio_value,
-                'targetWeight': target_weight,
+                'targetWeight': portfolio_target_weight,
                 'color': '',
                 'categories': []
             }
-            
-            # Add minPositions to portfolio entry if it was found
-            if target_portfolio and 'minPositions' in target_portfolio:
-                portfolio_entry['minPositions'] = target_portfolio.get('minPositions')
-                logger.info(f"Added minPositions {portfolio_entry['minPositions']} to portfolio {portfolio_name}")
             
             # Process each category
             for category_item in categories_data:
@@ -304,84 +250,35 @@ def get_allocate_portfolio_data():
                     ORDER BY c.name
                 ''', [account_id, portfolio_id, category_name])
                 
+                # Count positions in this category for weight calculation
+                positions_in_category = len(positions_data)
+                
                 # Calculate category value
                 category_value = sum(pos['price_eur'] * pos['shares'] for pos in positions_data if pos['price_eur'])
                 
-                # Find placeholder for this portfolio
-                placeholder = None
-                if target_portfolio and target_portfolio.get('positions'):
-                    placeholder = next((p for p in target_portfolio.get('positions', []) if p.get('isPlaceholder', False)), None)
-                
-                # Track explicitly defined weights
-                known_weight = 0
-                known_position_ids = set()
-                
-                # Check which positions have explicit weights defined
-                for position in positions_data:
-                    position_id = position['id']
-                    if target_portfolio and target_portfolio.get('positions'):
-                        target_position = next((p for p in target_portfolio.get('positions', []) 
-                                              if p.get('companyId') == position_id and not p.get('isPlaceholder', False)), None)
-                        if target_position:
-                            known_weight += target_position.get('weight', 0)
-                            known_position_ids.add(position_id)
-                
-                # Calculate number of positions without explicit weights
-                positions_without_weights = sum(1 for pos in positions_data if pos['id'] not in known_position_ids)
-                
-                # Calculate remaining weight to distribute
-                remaining_weight = 0
-                weight_per_remaining_position = 0
-                
-                if placeholder and positions_without_weights > 0:
-                    # Method 1: Use placeholder data if available
-                    if placeholder.get('totalRemainingWeight') is not None:
-                        remaining_weight = placeholder.get('totalRemainingWeight', 0)
-                    else:
-                        # Method 2: Calculate from minimum positions
-                        remaining_weight = 100 - known_weight
-                    
-                    # Calculate per-position weight
-                    if positions_without_weights > 0:
-                        weight_per_remaining_position = remaining_weight / positions_without_weights
-                
-                # Set default category target weight (will be recalculated from positions)
-                category_target_weight = 100  # Default to 100% of category
+                # CRITICAL FIX - STEP 3: Category weight as sum of position weights
+                category_total_weight = positions_in_category * flat_position_weight
                 
                 # Create category entry
                 category_entry = {
                     'name': category_name,
                     'currentValue': category_value,
-                    'targetWeight': category_target_weight,
+                    'targetWeight': category_total_weight,  # Sum of positions' weights
                     'color': '',
                     'positions': []
                 }
                 
-                # Process each position
+                # Process each position with FLAT weight distribution
                 for position in positions_data:
                     position_value = 0
                     if position['price_eur'] and position['shares']:
                         position_value = position['price_eur'] * position['shares']
                     
-                    # Find target allocation for this position
-                    position_target_weight = 0
-                    position_id = position['id']
-                    
-                    if position_id in known_position_ids and target_portfolio and target_portfolio.get('positions'):
-                        # Position has explicit weight in expanded_state
-                        target_position = next((p for p in target_portfolio.get('positions', []) 
-                                             if p.get('companyId') == position_id), None)
-                        if target_position:
-                            position_target_weight = target_position.get('weight', 0)
-                    else:
-                        # Position doesn't have explicit weight - use calculated weight per remaining position
-                        position_target_weight = weight_per_remaining_position
-                    
-                    # Create position entry
+                    # CRITICAL FIX - STEP 4: All positions get same weight
                     position_entry = {
                         'name': position['name'],
                         'currentValue': position_value,
-                        'targetWeight': position_target_weight,
+                        'targetWeight': flat_position_weight,  # Every position gets same weight
                         'color': ''
                     }
                     
@@ -391,32 +288,92 @@ def get_allocate_portfolio_data():
                 if category_entry['positions']:
                     portfolio_entry['categories'].append(category_entry)
             
-            # After all categories have been added to portfolio_entry
-            
-            # Ensure category target weights sum to 100% within each portfolio
-            total_category_weight = sum(c.get('targetWeight', 0) for c in portfolio_entry['categories'])
-            if abs(total_category_weight - 100) > 0.01 and total_category_weight > 0:
-                # Normalize weights
-                scale_factor = 100.0 / total_category_weight
-                logger.info(f"Normalizing category weights in portfolio {portfolio_name} from {total_category_weight}% to 100%")
-                for category in portfolio_entry['categories']:
-                    # Store original weight as localTargetWeight
-                    category['localTargetWeight'] = category['targetWeight']
-                    # Normalize the target weight
-                    category['targetWeight'] = round(category['targetWeight'] * scale_factor, 2)
-                    # Store portfolio percentage for clarity
-                    category['portfolioPercentage'] = category['targetWeight']
+            # Calculate remaining positions count for portfolio diversification
+            # We need to handle placeholders consistently with the flat weight model
+            if target_portfolio:
+                real_positions_count = sum(len(category['positions']) for category in portfolio_entry['categories'])
+                total_expected_positions = positions_in_portfolio
+                remaining_positions_count = max(0, total_expected_positions - real_positions_count)
+                
+                if remaining_positions_count > 0:
+                    # Add a placeholder entry at the portfolio level for missing positions
+                    portfolio_entry['remainingPositionsCount'] = remaining_positions_count
+                    logger.info(f"Portfolio {portfolio_name} needs {remaining_positions_count} more positions")
+                    
+                    # Calculate total weight for all remaining positions
+                    remaining_total_weight = remaining_positions_count * flat_position_weight
+                    
+                    # CRITICAL FIX - STEP 5: Add missing positions as a special category
+                    # Create a hidden category to hold missing positions
+                    placeholder_category = {
+                        'name': 'Missing Positions',
+                        'currentValue': 0,
+                        'targetWeight': remaining_total_weight,
+                        'color': '',
+                        'positions': [{
+                            'name': f"{remaining_positions_count}x missing positions",
+                            'currentValue': 0,
+                            'currentWeight': 0,
+                            'targetWeight': flat_position_weight,  # Per-position weight
+                            'color': '',
+                            'isPlaceholder': True,
+                            'positionsRemaining': remaining_positions_count,
+                            'weight_per_position': flat_position_weight
+                        }]
+                    }
+                    
+                    # Add metadata for UI display
+                    placeholder_category['positions'][0]['total_weight'] = remaining_total_weight
+                    
+                    # CRITICAL FIX - STEP 6: Add placeholder category to categories array
+                    # The UI looks for this to display the missing positions row
+                    portfolio_entry['categories'].append(placeholder_category)
             
             # Only add portfolios with categories
             if portfolio_entry['categories']:
                 result['portfolios'].append(portfolio_entry)
         
-        logger.info(f"Returning {len(result['portfolios'])} portfolios for rebalancing")
+        logger.info(f"Returning {len(result['portfolios'])} portfolios with flat {flat_position_weight:.2f}% weight per position")
         return jsonify(result)
     
     except Exception as e:
         logger.error(f"Error getting portfolio data for rebalancing: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+# Ensure this function exists to prevent import errors
+def get_portfolio_data_api():
+    """Get portfolio data from the database"""
+    try:
+        # Check if account_id exists in session
+        if 'account_id' not in session:
+            logger.error("No account_id in session when calling portfolio_data API")
+            return jsonify({'error': 'Not authenticated - account_id missing'}), 401
+            
+        account_id = session['account_id']
+        if not account_id:
+            logger.error("Empty account_id in session when calling portfolio_data API")
+            return jsonify({'error': 'Not authenticated - empty account_id'}), 401
+
+        # Log the attempt to fetch data
+        logger.info(f"Fetching portfolio data for account_id: {account_id}")
+        
+        # Get data from database without triggering any yfinance updates
+        portfolio_data = get_portfolio_data(account_id)
+        
+        # Detailed logging of result
+        if not portfolio_data:
+            logger.warning(f"No portfolio data found for account_id: {account_id}")
+            return jsonify({'error': 'Portfolio data could not be loaded. It may have been deleted or is missing from the database.'}), 404
+        else:
+            logger.info(f"Successfully retrieved {len(portfolio_data)} portfolio items")
+
+        return jsonify(portfolio_data)
+    except KeyError as ke:
+        logger.error(f"KeyError accessing portfolio data: {str(ke)}", exc_info=True)
+        return jsonify({'error': f'Session key error: {str(ke)}'}), 401
+    except Exception as e:
+        logger.error(f"Error getting portfolio data: {str(e)}", exc_info=True)
+        return jsonify({'error': f'Portfolio data could not be loaded: {str(e)}'}), 500
 
 def get_portfolios_api():
     """API endpoint to get portfolios for an account"""
@@ -974,4 +931,45 @@ def bulk_update():
         
     except Exception as e:
         logger.error(f"Error in bulk update: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+def get_portfolio_companies():
+    """API endpoint to get all companies for a portfolio"""
+    if 'account_id' not in session:
+        return jsonify({'error': 'Not authenticated. Please select an account from the home page.'}), 401
+    
+    try:
+        account_id = session['account_id']
+        portfolio_id = request.args.get('portfolio_id')
+        
+        if not portfolio_id:
+            return jsonify({'error': 'No portfolio ID provided'}), 400
+        
+        # Get all companies for this portfolio
+        companies = query_db('''
+            SELECT c.id, c.name, c.identifier, c.category, cs.shares, mp.price_eur
+            FROM companies c
+            LEFT JOIN company_shares cs ON c.id = cs.company_id
+            LEFT JOIN market_prices mp ON c.identifier = mp.identifier
+            WHERE c.account_id = ? AND c.portfolio_id = ?
+            ORDER BY c.name
+        ''', [account_id, portfolio_id])
+        
+        # Format the results
+        result = []
+        for company in companies:
+            result.append({
+                'id': company['id'],
+                'name': company['name'],
+                'identifier': company['identifier'],
+                'category': company['category'],
+                'shares': company['shares'],
+                'price_eur': company['price_eur'],
+                'value_eur': company['price_eur'] * company['shares'] if company['price_eur'] and company['shares'] else 0
+            })
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Error getting companies for portfolio: {str(e)}")
         return jsonify({'error': str(e)}), 500

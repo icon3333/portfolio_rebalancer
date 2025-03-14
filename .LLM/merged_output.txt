@@ -1,5 +1,5 @@
 This file is a merged representation of selected files from the codebase.
-Generated on: 2025-03-14T15:25:34.454185
+Generated on: 2025-03-14T15:49:15.182398
 
 ================================================================
 Purpose:
@@ -3383,28 +3383,81 @@ document.addEventListener('DOMContentLoaded', function() {
                     this.portfolioData.portfolios.forEach(portfolio => {
                         // Calculate remaining positions count
                         this.calculateRemainingPositionsCount(portfolio);
-                        
-                        // Set additional properties for remaining positions display
+
+                        // Process missing positions if they exist
                         if (portfolio.remainingPositionsCount > 0) {
-                            portfolio.remainingPositionsAction = { type: "Buy", amount: 0 };
-                            portfolio.remainingPositionsInfo = 0;
-                            portfolio.remainingPositionsTargetValue = 0;
-                            portfolio.remainingPositionsWeight = 0;
-                            portfolio.remainingPositionsFinalWeight = 0;
+                            // Calculate ideal weight per position (based on diversification rules)
+                            const idealPositionCount = portfolio.minPositionsNeeded;
+                            const idealWeightPerPosition = 100 / idealPositionCount;
+                            
+                            // Calculate total target weight that should be allocated to missing positions
+                            const totalMissingWeight = portfolio.remainingPositionsCount * idealWeightPerPosition;
+                            
+                            // Calculate weight per missing position
+                            const weightPerMissingPosition = totalMissingWeight / portfolio.remainingPositionsCount;
+                            
+                            // Set target value for missing positions
+                            const missingPositionsTargetValue = Math.round(portfolio.targetValue * totalMissingWeight / 100);
+                            
+                            // Store these calculations on the portfolio object for access in the template
+                            portfolio.missingPositionsTargetWeight = totalMissingWeight;
+                            portfolio.missingPositionsTargetValue = missingPositionsTargetValue;
+                            portfolio.missingPositionsWeightEach = weightPerMissingPosition;
+                            portfolio.missingPositionsValueEach = Math.round(missingPositionsTargetValue / portfolio.remainingPositionsCount);
+                            
+                            // Calculate action for missing positions
+                            portfolio.missingPositionsAction = {
+                                type: "Buy", // Always "Buy" for missing positions
+                                amount: missingPositionsTargetValue
+                            };
+                            
+                            // Set for backwards compatibility
+                            portfolio.remainingPositionsAction = { type: "Buy", amount: missingPositionsTargetValue };
+                            portfolio.remainingPositionsInfo = missingPositionsTargetValue;
+                            portfolio.remainingPositionsWeight = totalMissingWeight;
                             
                             // Log for debugging
-                            console.log(`Set up missing positions display for ${portfolio.name}: ${portfolio.remainingPositionsCount} missing`);
+                            console.log(`Set up missing positions for ${portfolio.name}: ${portfolio.remainingPositionsCount} missing, target weight: ${totalMissingWeight.toFixed(2)}%, target value: ${missingPositionsTargetValue}`);
                         }
                     });
                 } else {
-                    // In global view, set remaining positions to 0 to avoid confusion
+                    // In global view, set up the missing positions the same way
                     this.portfolioData.portfolios.forEach(portfolio => {
-                        portfolio.remainingPositionsCount = 0;
-                        portfolio.remainingPositionsAction = { type: "Hold", amount: 0 };
-                        portfolio.remainingPositionsInfo = 0;
-                        portfolio.remainingPositionsTargetValue = 0;
-                        portfolio.remainingPositionsWeight = 0;
-                        portfolio.remainingPositionsFinalWeight = 0;
+                        // Calculate remaining positions count
+                        this.calculateRemainingPositionsCount(portfolio);
+
+                        // Process missing positions if they exist
+                        if (portfolio.remainingPositionsCount > 0) {
+                            // Calculate ideal weight per position (based on diversification rules)
+                            const idealPositionCount = portfolio.minPositionsNeeded;
+                            const idealWeightPerPosition = 100 / idealPositionCount;
+                            
+                            // Calculate total target weight that should be allocated to missing positions
+                            const totalMissingWeight = portfolio.remainingPositionsCount * idealWeightPerPosition;
+                            
+                            // Calculate weight per missing position
+                            const weightPerMissingPosition = totalMissingWeight / portfolio.remainingPositionsCount;
+                            
+                            // Set target value for missing positions
+                            const missingPositionsTargetValue = Math.round(portfolio.targetValue * totalMissingWeight / 100);
+                            
+                            // Store these calculations on the portfolio object for access in the template
+                            portfolio.missingPositionsTargetWeight = totalMissingWeight;
+                            portfolio.missingPositionsTargetValue = missingPositionsTargetValue;
+                            portfolio.missingPositionsWeightEach = weightPerMissingPosition;
+                            portfolio.missingPositionsValueEach = Math.round(missingPositionsTargetValue / portfolio.remainingPositionsCount);
+                            
+                            // Calculate action for missing positions
+                            portfolio.missingPositionsAction = {
+                                type: "Buy", // Always "Buy" for missing positions
+                                amount: missingPositionsTargetValue
+                            };
+                            
+                            // Set for backwards compatibility
+                            portfolio.remainingPositionsAction = { type: "Buy", amount: missingPositionsTargetValue };
+                            portfolio.remainingPositionsInfo = missingPositionsTargetValue;
+                            portfolio.remainingPositionsWeight = totalMissingWeight;
+                        }
                     });
                 }
                 
@@ -3413,10 +3466,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Track portfolio action total for consistency check
                     let totalPortfolioAction = 0;
                     
+                    // If we have missing positions, we need to adjust the category target values
+                    // to account for the weight that will be allocated to missing positions
+                    const hasMissingPositions = portfolio.remainingPositionsCount > 0;
+                    const missingPositionsWeight = hasMissingPositions ? portfolio.missingPositionsTargetWeight : 0;
+                    
+                    // Calculate adjustment factor for categories to account for missing positions
+                    const categoryAdjustmentFactor = hasMissingPositions ? (100 - missingPositionsWeight) / 100 : 1;
+                    
                     // Process categories within each portfolio
                     portfolio.categories.forEach(category => {
-                        // Calculate target value for this category - using normalized weights
-                        category.targetValue = Math.round(portfolio.targetValue * category.targetWeight / 100);
+                        // Calculate target value for this category - using normalized weights and adjustment factor
+                        // to account for missing positions
+                        category.targetValue = Math.round(portfolio.targetValue * category.targetWeight / 100 * categoryAdjustmentFactor);
                         
                         // Calculate action for this category
                         if (this.rebalanceMode === 'newCapitalSpecific' && !this.allowSellingWithNewCapital && 
@@ -3512,16 +3574,24 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Calculate total weights
                     portfolio.finalWeight = parseFloat((portfolio.targetValue / this.newPortfolioValue * 100).toFixed(2));
                     
-                    // Also update remaining positions target weight if it exists
-                    if (portfolio.remainingPositionsCount > 0 && portfolio.remainingPositionsTargetValue) {
-                        portfolio.remainingPositionsTargetWeight = parseFloat(
-                            (portfolio.remainingPositionsTargetValue / portfolio.targetValue * 100).toFixed(2)
+                    // Calculate the total target value including missing positions
+                    const totalTargetValue = portfolio.targetValue;
+                    
+                    // If we have missing positions with a target value, update the remaining positions final weight
+                    if (portfolio.hasRemainingPositions && portfolio.missingPositionsTargetValue) {
+                        // Calculate the percentage of the portfolio that should go to missing positions
+                        portfolio.missingPositionsFinalWeight = parseFloat(
+                            (portfolio.missingPositionsTargetValue / totalTargetValue * 100).toFixed(2)
                         );
+                        
+                        // For backward compatibility
+                        portfolio.remainingPositionsFinalWeight = portfolio.missingPositionsFinalWeight;
                     }
                     
                     // Recalculate category final weights
                     portfolio.categories.forEach(category => {
-                        category.finalWeight = parseFloat((category.targetValue / portfolio.targetValue * 100).toFixed(2));
+                        // Calculate category's percentage of the total portfolio value (including missing positions)
+                        category.finalWeight = parseFloat((category.targetValue / totalTargetValue * 100).toFixed(2));
                         
                         // Recalculate position final weights - both local (category) and global (portfolio)
                         category.positions.forEach(position => {
@@ -3529,7 +3599,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 // Local weight (relative to category)
                                 position.finalWeight = parseFloat((position.targetValue / category.targetValue * 100).toFixed(2));
                                 // Global weight (relative to portfolio)
-                                position.finalGlobalWeight = parseFloat((position.targetValue / portfolio.targetValue * 100).toFixed(2));
+                                position.finalGlobalWeight = parseFloat((position.targetValue / totalTargetValue * 100).toFixed(2));
                             }
                         });
                     });
@@ -9688,20 +9758,6 @@ def process_csv_data(account_id, file_content):
         </div>
     </div>
 
-    <!-- Add this debug section right before the table in Detail View -->
-    <div v-if="activeView === 'detail'" class="notification is-info is-light">
-        <p>Debug Info:</p>
-        <p>Selected Portfolio: ${selectedPortfolio}</p>
-        <p v-if="selectedPortfolioData">Remaining Positions Count: ${selectedPortfolioData.remainingPositionsCount}</p>
-        <p v-if="selectedPortfolioData">Min Positions Needed: ${selectedPortfolioData.minPositionsNeeded}</p>
-        <p v-if="selectedPortfolioData">Actual Positions Count: ${selectedPortfolioData.actualPositionsCount}</p>
-        <p v-if="selectedPortfolioData">Original MinPositions: ${selectedPortfolioData.minPositions}</p>
-        <p v-if="selectedPortfolioData">Target Weight: ${selectedPortfolioData.targetWeight}%</p>
-        <p v-if="selectedPortfolioData">MaxPerPosition: ${selectedPortfolioData.maxPerPosition || 5}%</p>
-        <p v-if="selectedPortfolioData">Total Attributed Weight: ${selectedPortfolioData.totalAttributedWeight?.toFixed(2) || 0}%</p>
-        <p v-if="selectedPortfolioData">Should Show Missing Positions: ${selectedPortfolioData.hasRemainingPositions}</p>
-    </div>
-
     <!-- Rebalancing Actions - Container removed -->
     <div class="mt-4">
         <h3 class="is-size-6 mb-3">
@@ -9767,22 +9823,26 @@ def process_csv_data(account_id, file_content):
                                 </div>
                             </td>
                             <td class="has-text-right">
+                                ${formatCurrency(0)}
+                            </td>
+                            <td class="has-text-right">
                                 ${formatPercentage(0)}
                             </td>
                             <td class="has-text-right">
-                                <span class="has-text-grey-light">
-                                    ${formatCurrency(0)}
+                                ${formatPercentage(portfolio.missingPositionsTargetWeight || 0)}
+                            </td>
+                            <td class="has-text-right">
+                                ${formatCurrency(portfolio.missingPositionsTargetValue || 0)}
+                                <small v-if="portfolio.missingPositionsValueEach" class="is-size-7 has-text-grey">
+                                    (${formatCurrency(portfolio.missingPositionsValueEach)} each)
+                                </small>
+                            </td>
+                            <td class="has-text-right">
+                                <span class="has-text-success" v-if="portfolio.missingPositionsAction">
+                                    ${portfolio.missingPositionsAction.type || 'Buy'} ${formatCurrency(portfolio.missingPositionsAction.amount || 0)}
                                 </span>
-                            </td>
-                            <td class="has-text-right has-text-weight-bold">
-                                ${formatPercentage(portfolio.remainingPositionsWeight || 0)}
-                            </td>
-                            <td class="has-text-right">
-                                ${formatCurrency(portfolio.remainingPositionsInfo || 0)}
-                            </td>
-                            <td class="has-text-right">
-                                <span :class="portfolio.remainingPositionsAction?.type === 'Buy' ? 'has-text-success' : 'has-text-grey'">
-                                    ${portfolio.remainingPositionsAction?.type || 'Hold'} ${formatCurrency(portfolio.remainingPositionsAction?.amount || 0)}
+                                <span class="has-text-grey" v-else>
+                                    Hold ${formatCurrency(0)}
                                 </span>
                             </td>
                         </tr>
@@ -9897,29 +9957,34 @@ def process_csv_data(account_id, file_content):
                                               data-tooltip="Add more positions in the Build page to meet your diversification target">
                                             <i class="fas fa-question-circle"></i>
                                         </span>
-                                        <span class="tag is-info is-light ml-2">Debug: count=${selectedPortfolioData.remainingPositionsCount}</span>
                                     </div>
                                 </td>
                                 <td class="has-text-right">
-                                    ${formatPercentage(selectedPortfolioData.remainingPositionsTargetWeight || selectedPortfolioData.remainingPositionsWeight || 0)}
+                                    ${formatCurrency(0)}
                                 </td>
                                 <td class="has-text-right">
-                                    <span class="has-text-grey-light">
-                                        ${formatCurrency(selectedPortfolioData.remainingPositionsInfo || 0)}
-                                    </span>
+                                    ${formatPercentage(0)}
                                 </td>
                                 <td class="has-text-right has-text-weight-bold">
-                                    ${formatPercentage(selectedPortfolioData.remainingPositionsWeight || 0)}
+                                    ${formatPercentage(selectedPortfolioData.missingPositionsTargetWeight || 0)}
+                                    <br v-if="selectedPortfolioData.missingPositionsWeightEach">
+                                    <small v-if="selectedPortfolioData.missingPositionsWeightEach" class="has-text-grey">
+                                        (${formatPercentage(selectedPortfolioData.missingPositionsWeightEach)} each)
+                                    </small>
                                 </td>
                                 <td class="has-text-right">
-                                    ${formatCurrency(selectedPortfolioData.remainingPositionsInfo || 0)}
-                                    <span class="has-text-grey-light is-size-7" v-if="selectedPortfolioData.remainingPositionsCount > 0">
-                                        (${formatCurrency(selectedPortfolioData.remainingPositionsInfo / selectedPortfolioData.remainingPositionsCount)} each)
+                                    ${formatCurrency(selectedPortfolioData.missingPositionsTargetValue || 0)}
+                                    <br v-if="selectedPortfolioData.missingPositionsValueEach">
+                                    <small v-if="selectedPortfolioData.missingPositionsValueEach" class="has-text-grey">
+                                        (${formatCurrency(selectedPortfolioData.missingPositionsValueEach)} each)
+                                    </small>
+                                </td>
+                                <td class="has-text-right">
+                                    <span class="has-text-success" v-if="selectedPortfolioData.missingPositionsAction">
+                                        ${selectedPortfolioData.missingPositionsAction.type || 'Buy'} ${formatCurrency(selectedPortfolioData.missingPositionsAction.amount || 0)}
                                     </span>
-                                </td>
-                                <td class="has-text-right">
-                                    <span :class="selectedPortfolioData.remainingPositionsAction?.type === 'Buy' ? 'has-text-success' : 'has-text-grey'">
-                                        ${selectedPortfolioData.remainingPositionsAction?.type || 'Hold'} ${formatCurrency(selectedPortfolioData.remainingPositionsAction?.amount || 0)}
+                                    <span class="has-text-grey" v-else>
+                                        Hold ${formatCurrency(0)}
                                     </span>
                                 </td>
                             </tr>

@@ -957,7 +957,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (placeholderPosition && placeholderPosition.positionsRemaining > 0) {
           result.push({
             companyName: `Remaining positions (${placeholderPosition.positionsRemaining})`,
-            weight: placeholderPosition.weight,
+            weight: placeholderPosition.totalRemainingWeight,
             count: placeholderPosition.positionsRemaining,
             isPlaceholder: true
           });
