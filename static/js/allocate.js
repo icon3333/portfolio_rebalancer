@@ -507,6 +507,21 @@ document.addEventListener('DOMContentLoaded', function() {
                     this.calculateRemainingPositionsCount(selectedPortfolio);
                     console.warn(`After recalculation: hasRemainingPositions=${selectedPortfolio.hasRemainingPositions}, remainingPositionsCount=${selectedPortfolio.remainingPositionsCount}`);
                     
+                    // Disable hasRemainingPositions flag for all portfolios in detail view table
+                    // This ensures only the second missing positions row at the portfolio level is shown
+                    this.portfolioData.portfolios.forEach(p => {
+                        // Only keep hasRemainingPositions true for the selected portfolio's detail row
+                        // This disables the first missing positions row in the detail view
+                        if (p.name !== selectedPortfolio.name) {
+                            p.hasRemainingPositions = false;
+                        }
+                        
+                        // Also filter out any "Missing Positions" category from displaying in the detail view
+                        if (p.categories) {
+                            p.visibleCategories = p.categories.filter(cat => cat.name !== 'Missing Positions');
+                        }
+                    });
+                    
                     // Update chart data after next tick to ensure the DOM has updated
                     this.$nextTick(() => {
                         // Update charts with the new data

@@ -374,7 +374,7 @@
                         </tr>
                         
                         <!-- Remaining positions notification (if needed) -->
-                        <tr v-if="portfolio.hasRemainingPositions" 
+                        <tr v-if="portfolio.hasRemainingPositions && activeView !== 'global'" 
                             :key="`${portfolio.name}-remaining`"
                             class="placeholder-position">
                             <td>
@@ -435,8 +435,10 @@
                         </thead>
                         <tbody>
                             <template v-for="(category, catIndex) in selectedPortfolioData.categories">
-                                <!-- Category Row with Toggle -->
-                                <tr :key="`cat-${catIndex}`" class="is-selected has-background-light has-text-black">
+                                <!-- Category Row with Toggle - Hide if name is "Missing Positions" -->
+                                <tr v-if="category.name !== 'Missing Positions'" 
+                                    :key="`cat-${catIndex}`" 
+                                    class="is-selected has-background-light has-text-black">
                                     <td>
                                         <div class="level is-mobile">
                                             <div class="level-left">
@@ -470,7 +472,7 @@
                                 </tr>
                                 
                                 <!-- Position Rows (only shown when category is expanded) -->
-                                <template v-if="expandedCategories[category.name]">
+                                <template v-if="expandedCategories[category.name] && category.name !== 'Missing Positions'">
                                     <tr v-for="(position, posIndex) in category.positions.filter(p => !p.isPlaceholder)" 
                                         :key="`pos-${catIndex}-${posIndex}`"
                                         class="position-row has-text-black">
