@@ -427,7 +427,10 @@
                             <tr>
                                 <th style="width: 20%;">Name</th>
                                 <th style="width: 16%;" class="has-text-right">Current Value</th>
-                                <th style="width: 16%;" class="has-text-right">Current Weight</th>
+                                <th style="width: 16%;" class="has-text-right">
+                                    Current Weight
+                                    <span class="is-size-7 has-text-grey">(Allocation in Category)</span>
+                                </th>
                                 <th style="width: 16%;" class="has-text-right">Target Weight</th>
                                 <th style="width: 16%;" class="has-text-right">Target Value</th>
                                 <th style="width: 16%;" class="has-text-right">Action</th>
@@ -453,7 +456,10 @@
                                         </div>
                                     </td>
                                     <td class="has-text-right">${formatCurrency(category.currentValue)}</td>
-                                    <td class="has-text-right">${formatPercentage(category.currentWeight)}</td>
+                                    <td class="has-text-right">
+                                        ${formatPercentage(category.currentWeight)}
+                                        <span class="is-size-7 has-text-grey">(of portfolio)</span>
+                                    </td>
                                     <td class="has-text-right">
                                         ${formatPercentage(category.targetWeight)}
                                         <span class="is-size-7 has-text-grey">(of portfolio)</span>
@@ -481,10 +487,17 @@
                                             </div>
                                         </td>
                                         <td class="has-text-right">${formatCurrency(position.currentValue)}</td>
-                                        <td class="has-text-right">${formatPercentage(position.currentWeight)}</td>
                                         <td class="has-text-right">
-                                            ${formatPercentage(position.localTargetWeight || 0)}
-                                            <span class="is-size-7 has-text-grey">(${formatPercentage(position.globalTargetWeight)} of portfolio)</span>
+                                            <span class="has-text-weight-bold">${formatPercentage(position.portfolioCurrentWeight)}</span>
+                                            <div class="tag is-info is-light is-size-7 mt-1">
+                                                ${formatPercentage(position.currentWeight)} of category
+                                            </div>
+                                        </td>
+                                        <td class="has-text-right">
+                                            <span class="has-text-weight-bold">${formatPercentage(position.localTargetWeight || 0)}</span>
+                                            <div class="tag is-info is-light is-size-7 mt-1">
+                                                ${formatPercentage(((position.localTargetWeight || 0) / (category.targetWeight || 1)) * 100)} of category
+                                            </div>
                                         </td>
                                         <td class="has-text-right">${formatCurrency(position.targetValue)}</td>
                                         <td class="has-text-right">
