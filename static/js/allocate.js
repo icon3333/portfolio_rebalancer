@@ -487,47 +487,29 @@ document.addEventListener('DOMContentLoaded', function() {
             * Navigate to detail view for a specific portfolio
             */
             navigateToDetail(portfolioName) {
-                // Set the selected portfolio
-                if (portfolioName && portfolioName !== this.selectedPortfolio) {
+                console.log(`Navigating to detail view for portfolio: ${portfolioName}`);
+                this.setActiveView('detail');
+                
+                // If portfolio name is provided, select that portfolio
+                if (portfolioName) {
                     this.selectedPortfolio = portfolioName;
+                } else if (this.portfolioData.portfolios.length > 0) {
+                    // Fallback to first portfolio if none selected
+                    this.selectedPortfolio = this.portfolioData.portfolios[0].name;
                 }
                 
-                // If it's dividend portfolio, add special handling for debug
-                if (portfolioName === 'dividend') {
-                    console.warn(`EXPLICIT navigation to dividend portfolio`);
-                    this.selectedPortfolio = 'dividend';
-                    
-                    // Force setting up missing positions correctly
-                    const dividendPortfolio = this.portfolioData.portfolios.find(p => p.name === 'dividend');
-                    if (dividendPortfolio) {
-                        console.warn(`Recalculating dividend portfolio missing positions`);
-                        this.calculateRemainingPositionsCount(dividendPortfolio);
-                        
-                        // Ensure remaining positions count is correct
-                        if (dividendPortfolio.remainingPositionsCount <= 0) {
-                            console.warn(`Forcing dividend portfolio remainingPositionsCount to be 12`);
-                            dividendPortfolio.remainingPositionsCount = 12;
-                            dividendPortfolio.hasRemainingPositions = true;
-                        }
-                        
-                        console.warn(`After navigation: dividend.remainingPositionsCount = ${dividendPortfolio.remainingPositionsCount}`);
-                    }
-                }
+                // Find the selected portfolio data
+                const selectedPortfolio = this.portfolioData.portfolios.find(p => p.name === this.selectedPortfolio);
                 
-                // Switch to detail view if not already there
-                if (this.activeView !== 'detail') {
-                    this.setActiveView('detail');
-                }
-                
-                // Ensure remaining positions are calculated for the detail view (restore this for general case)
-                const selectedPortfolio = this.portfolioData?.portfolios?.find(p => p.name === this.selectedPortfolio);
                 if (selectedPortfolio) {
-                    // Recalculate remaining positions count for the selected portfolio
-                    console.log('Recalculating remaining positions on navigate to detail...');
+                    console.warn(`Navigating to detail view for portfolio: ${selectedPortfolio.name}`);
+                    // Ensure we calculate the remaining positions count for the selected portfolio
                     this.calculateRemainingPositionsCount(selectedPortfolio);
+                    console.warn(`After recalculation: hasRemainingPositions=${selectedPortfolio.hasRemainingPositions}, remainingPositionsCount=${selectedPortfolio.remainingPositionsCount}`);
                     
-                    // Make sure buy/sell actions are updated
+                    // Update chart data after next tick to ensure the DOM has updated
                     this.$nextTick(() => {
+                        // Update charts with the new data
                         this.updateChartData();
                     });
                 }
@@ -537,80 +519,11 @@ document.addEventListener('DOMContentLoaded', function() {
             * Handle click on Detail View tab with proper feedback
             */
             handleDetailViewClick() {
-                // Always log the attempt for debugging
-                console.log('Detail View tab clicked');
-                
-                // Explicitly reset the updating flag to ensure reactivity works
+                console.log('Detail view clicked');
                 this.isUpdating = false;
-                
-                // Store current view for debugging
-                const previousView = this.activeView;
-                
-                try {
-                    // Check if we have portfolios to display
-                    if (this.portfolioData && this.portfolioData.portfolios && this.portfolioData.portfolios.length > 0) {
-                        // We have data, proceed with navigation
-                        const firstPortfolio = this.portfolioData.portfolios[0].name;
-                        console.log(`Selecting first portfolio: ${firstPortfolio}`);
-                        
-                        // Set the selected portfolio first
-                        this.selectedPortfolio = firstPortfolio;
-                        
-                        // Calculate remaining positions for the selected portfolio
-                        const selectedPortfolioData = this.portfolioData.portfolios[0];
-                        if (selectedPortfolioData) {
-                            console.warn(`MANUALLY recalculating remaining positions for ${selectedPortfolioData.name}`);
-                            this.calculateRemainingPositionsCount(selectedPortfolioData);
-                        }
-                        
-                        // Add an explicit call to the dividend portfolio if it exists
-                        const dividendPortfolio = this.portfolioData.portfolios.find(p => p.name === 'dividend');
-                        if (dividendPortfolio) {
-                            console.warn(`EXPLICITLY recalculating remaining positions for dividend portfolio`);
-                            this.calculateRemainingPositionsCount(dividendPortfolio);
-                            // Force the remainingPositionsCount to be greater than 0 for testing
-                            dividendPortfolio.remainingPositionsCount = Math.max(12, dividendPortfolio.remainingPositionsCount);
-                            console.warn(`AFTER recalculation: dividend.remainingPositionsCount = ${dividendPortfolio.remainingPositionsCount}`);
-                        }
-                        
-                        // Then update the view
-                        this.activeView = 'detail';
-                        
-                        // Force an immediate DOM update
-                        this.$forceUpdate();
-                    } else {
-                        // No portfolios available - still switch the view for consistency
-                        console.warn('No portfolios available for Detail View');
-                        this.activeView = 'detail';
-                        this.$forceUpdate();
-                    }
-                } catch (error) {
-                    console.error('Error during Detail View navigation:', error);
-                    // Fallback: directly set the view
-                    this.activeView = 'detail';
-                    this.$forceUpdate();
-                }
-                
-                // Verify the view changed
-                console.log(`View change attempt: ${previousView} -> ${this.activeView}`);
-                
-                // Force view update and reinitialize charts
-                this.$nextTick(() => {
-                    try {
-                        // Force a reflow to ensure container dimensions are calculated
-                        document.body.offsetHeight;
-                        
-                        console.log('Reinitializing charts for detail view');
-                        this.initializeCharts();
-                        
-                        // Also trigger a window resize event to ensure charts render correctly
-                        setTimeout(() => {
-                            window.dispatchEvent(new Event('resize'));
-                        }, 200);
-                    } catch (chartError) {
-                        console.error('Error initializing charts:', chartError);
-                    }
-                });
+
+                // Navigate to the detail view (will use the first portfolio by default)
+                this.navigateToDetail();
             },
             
             /**
@@ -857,28 +770,81 @@ document.addEventListener('DOMContentLoaded', function() {
                     this.portfolioData.portfolios.forEach(portfolio => {
                         // Calculate remaining positions count
                         this.calculateRemainingPositionsCount(portfolio);
-                        
-                        // Set additional properties for remaining positions display
+
+                        // Process missing positions if they exist
                         if (portfolio.remainingPositionsCount > 0) {
-                            portfolio.remainingPositionsAction = { type: "Buy", amount: 0 };
-                            portfolio.remainingPositionsInfo = 0;
-                            portfolio.remainingPositionsTargetValue = 0;
-                            portfolio.remainingPositionsWeight = 0;
-                            portfolio.remainingPositionsFinalWeight = 0;
+                            // Calculate ideal weight per position (based on diversification rules)
+                            const idealPositionCount = portfolio.minPositionsNeeded;
+                            const idealWeightPerPosition = 100 / idealPositionCount;
+                            
+                            // Calculate total target weight that should be allocated to missing positions
+                            const totalMissingWeight = portfolio.remainingPositionsCount * idealWeightPerPosition;
+                            
+                            // Calculate weight per missing position
+                            const weightPerMissingPosition = totalMissingWeight / portfolio.remainingPositionsCount;
+                            
+                            // Set target value for missing positions
+                            const missingPositionsTargetValue = Math.round(portfolio.targetValue * totalMissingWeight / 100);
+                            
+                            // Store these calculations on the portfolio object for access in the template
+                            portfolio.missingPositionsTargetWeight = totalMissingWeight;
+                            portfolio.missingPositionsTargetValue = missingPositionsTargetValue;
+                            portfolio.missingPositionsWeightEach = weightPerMissingPosition;
+                            portfolio.missingPositionsValueEach = Math.round(missingPositionsTargetValue / portfolio.remainingPositionsCount);
+                            
+                            // Calculate action for missing positions
+                            portfolio.missingPositionsAction = {
+                                type: "Buy", // Always "Buy" for missing positions
+                                amount: missingPositionsTargetValue
+                            };
+                            
+                            // Set for backwards compatibility
+                            portfolio.remainingPositionsAction = { type: "Buy", amount: missingPositionsTargetValue };
+                            portfolio.remainingPositionsInfo = missingPositionsTargetValue;
+                            portfolio.remainingPositionsWeight = totalMissingWeight;
                             
                             // Log for debugging
-                            console.log(`Set up missing positions display for ${portfolio.name}: ${portfolio.remainingPositionsCount} missing`);
+                            console.log(`Set up missing positions for ${portfolio.name}: ${portfolio.remainingPositionsCount} missing, target weight: ${totalMissingWeight.toFixed(2)}%, target value: ${missingPositionsTargetValue}`);
                         }
                     });
                 } else {
-                    // In global view, set remaining positions to 0 to avoid confusion
+                    // In global view, set up the missing positions the same way
                     this.portfolioData.portfolios.forEach(portfolio => {
-                        portfolio.remainingPositionsCount = 0;
-                        portfolio.remainingPositionsAction = { type: "Hold", amount: 0 };
-                        portfolio.remainingPositionsInfo = 0;
-                        portfolio.remainingPositionsTargetValue = 0;
-                        portfolio.remainingPositionsWeight = 0;
-                        portfolio.remainingPositionsFinalWeight = 0;
+                        // Calculate remaining positions count
+                        this.calculateRemainingPositionsCount(portfolio);
+
+                        // Process missing positions if they exist
+                        if (portfolio.remainingPositionsCount > 0) {
+                            // Calculate ideal weight per position (based on diversification rules)
+                            const idealPositionCount = portfolio.minPositionsNeeded;
+                            const idealWeightPerPosition = 100 / idealPositionCount;
+                            
+                            // Calculate total target weight that should be allocated to missing positions
+                            const totalMissingWeight = portfolio.remainingPositionsCount * idealWeightPerPosition;
+                            
+                            // Calculate weight per missing position
+                            const weightPerMissingPosition = totalMissingWeight / portfolio.remainingPositionsCount;
+                            
+                            // Set target value for missing positions
+                            const missingPositionsTargetValue = Math.round(portfolio.targetValue * totalMissingWeight / 100);
+                            
+                            // Store these calculations on the portfolio object for access in the template
+                            portfolio.missingPositionsTargetWeight = totalMissingWeight;
+                            portfolio.missingPositionsTargetValue = missingPositionsTargetValue;
+                            portfolio.missingPositionsWeightEach = weightPerMissingPosition;
+                            portfolio.missingPositionsValueEach = Math.round(missingPositionsTargetValue / portfolio.remainingPositionsCount);
+                            
+                            // Calculate action for missing positions
+                            portfolio.missingPositionsAction = {
+                                type: "Buy", // Always "Buy" for missing positions
+                                amount: missingPositionsTargetValue
+                            };
+                            
+                            // Set for backwards compatibility
+                            portfolio.remainingPositionsAction = { type: "Buy", amount: missingPositionsTargetValue };
+                            portfolio.remainingPositionsInfo = missingPositionsTargetValue;
+                            portfolio.remainingPositionsWeight = totalMissingWeight;
+                        }
                     });
                 }
                 
@@ -887,10 +853,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Track portfolio action total for consistency check
                     let totalPortfolioAction = 0;
                     
+                    // If we have missing positions, we need to adjust the category target values
+                    // to account for the weight that will be allocated to missing positions
+                    const hasMissingPositions = portfolio.remainingPositionsCount > 0;
+                    const missingPositionsWeight = hasMissingPositions ? portfolio.missingPositionsTargetWeight : 0;
+                    
+                    // Calculate adjustment factor for categories to account for missing positions
+                    const categoryAdjustmentFactor = hasMissingPositions ? (100 - missingPositionsWeight) / 100 : 1;
+                    
                     // Process categories within each portfolio
                     portfolio.categories.forEach(category => {
-                        // Calculate target value for this category - using normalized weights
-                        category.targetValue = Math.round(portfolio.targetValue * category.targetWeight / 100);
+                        // Calculate target value for this category - using normalized weights and adjustment factor
+                        // to account for missing positions
+                        category.targetValue = Math.round(portfolio.targetValue * category.targetWeight / 100 * categoryAdjustmentFactor);
                         
                         // Calculate action for this category
                         if (this.rebalanceMode === 'newCapitalSpecific' && !this.allowSellingWithNewCapital && 
@@ -986,16 +961,24 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Calculate total weights
                     portfolio.finalWeight = parseFloat((portfolio.targetValue / this.newPortfolioValue * 100).toFixed(2));
                     
-                    // Also update remaining positions target weight if it exists
-                    if (portfolio.remainingPositionsCount > 0 && portfolio.remainingPositionsTargetValue) {
-                        portfolio.remainingPositionsTargetWeight = parseFloat(
-                            (portfolio.remainingPositionsTargetValue / portfolio.targetValue * 100).toFixed(2)
+                    // Calculate the total target value including missing positions
+                    const totalTargetValue = portfolio.targetValue;
+                    
+                    // If we have missing positions with a target value, update the remaining positions final weight
+                    if (portfolio.hasRemainingPositions && portfolio.missingPositionsTargetValue) {
+                        // Calculate the percentage of the portfolio that should go to missing positions
+                        portfolio.missingPositionsFinalWeight = parseFloat(
+                            (portfolio.missingPositionsTargetValue / totalTargetValue * 100).toFixed(2)
                         );
+                        
+                        // For backward compatibility
+                        portfolio.remainingPositionsFinalWeight = portfolio.missingPositionsFinalWeight;
                     }
                     
                     // Recalculate category final weights
                     portfolio.categories.forEach(category => {
-                        category.finalWeight = parseFloat((category.targetValue / portfolio.targetValue * 100).toFixed(2));
+                        // Calculate category's percentage of the total portfolio value (including missing positions)
+                        category.finalWeight = parseFloat((category.targetValue / totalTargetValue * 100).toFixed(2));
                         
                         // Recalculate position final weights - both local (category) and global (portfolio)
                         category.positions.forEach(position => {
@@ -1003,7 +986,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 // Local weight (relative to category)
                                 position.finalWeight = parseFloat((position.targetValue / category.targetValue * 100).toFixed(2));
                                 // Global weight (relative to portfolio)
-                                position.finalGlobalWeight = parseFloat((position.targetValue / portfolio.targetValue * 100).toFixed(2));
+                                position.finalGlobalWeight = parseFloat((position.targetValue / totalTargetValue * 100).toFixed(2));
                             }
                         });
                     });
@@ -1549,10 +1532,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Get the maximum percentage per position
                 const maxPerPosition = portfolio.maxPerPosition || defaultMaxPerPosition;
                 
-                // CRITICAL FIX: Use portfolio's target weight instead of fixed value (100)
-                // This aligns with the builder.js calculation approach
-                const portfolioPercentage = portfolio.targetWeight || 0;
-                
                 // CRITICAL UPDATE: Prioritize minPositions from the server if available
                 let minPositionsNeeded;
                 
@@ -1562,6 +1541,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.warn(`Using minPositions=${minPositionsNeeded} from server data for ${portfolio.name}`);
                 } else {
                     // Calculate minimum positions needed using the formula
+                    const portfolioPercentage = portfolio.targetWeight || 0;
                     minPositionsNeeded = Math.ceil(portfolioPercentage / maxPerPosition);
                     // Ensure at least 1 position (matching builder.js behavior)
                     minPositionsNeeded = Math.max(1, minPositionsNeeded);
@@ -1570,26 +1550,63 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Count actual positions (non-placeholder only)
                 let actualPositionsCount = 0;
+                let totalAttributedWeight = 0;  // Track the total weight attributed to positions
+                
                 if (portfolio.categories && Array.isArray(portfolio.categories)) {
                     portfolio.categories.forEach(category => {
                         if (category.positions && Array.isArray(category.positions)) {
                             const categoryPositionCount = category.positions.filter(position => !position.isPlaceholder).length;
                             actualPositionsCount += categoryPositionCount;
+                            
+                            // Sum up the weights of all positions in this category
+                            category.positions.forEach(position => {
+                                if (!position.isPlaceholder) {
+                                    totalAttributedWeight += position.targetWeight || 0;
+                                }
+                            });
+                            
                             console.log(`Category ${category.name}: ${categoryPositionCount} positions`);
                         }
                     });
                 }
                 
-                // Calculate remaining positions needed
-                const remainingPositionsCount = Math.max(0, minPositionsNeeded - actualPositionsCount);
+                // IMPROVED LOGIC: Calculate remaining positions count based on new rules
+                let remainingPositionsCount = 0;
+                let shouldShowMissingPositions = false;
+                
+                // Condition 1: Check if we have fewer positions than required minimum
+                if (actualPositionsCount < minPositionsNeeded) {
+                    remainingPositionsCount = minPositionsNeeded - actualPositionsCount;
+                    shouldShowMissingPositions = true;
+                }
+                
+                // Condition 2: Check if the total attributed weight is less than 100%
+                // We add a small tolerance for floating point comparisons (e.g., 99.99% should be considered as 100%)
+                const isFullyAttributed = Math.abs(totalAttributedWeight - 100) < 0.1;
+                
+                // If weight is not fully attributed, show missing positions unless we already have enough positions
+                if (!isFullyAttributed && actualPositionsCount < minPositionsNeeded) {
+                    shouldShowMissingPositions = true;
+                } else if (isFullyAttributed) {
+                    // If 100% of the portfolio is attributed, don't show missing positions
+                    shouldShowMissingPositions = false;
+                }
+                
+                // If we should not show missing positions, set remaining count to 0
+                if (!shouldShowMissingPositions) {
+                    remainingPositionsCount = 0;
+                }
                 
                 // Add additional debugging for dividend portfolio specifically
                 if (portfolio.name === 'dividend') {
                     console.warn(`DIVIDEND PORTFOLIO DETAILS:`);
                     console.warn(`maxPerPosition: ${maxPerPosition}`);
-                    console.warn(`portfolioPercentage: ${portfolioPercentage}`);
+                    console.warn(`portfolioPercentage: ${portfolio.targetWeight || 0}`);
                     console.warn(`minPositionsNeeded: ${minPositionsNeeded}`);
                     console.warn(`actualPositionsCount: ${actualPositionsCount}`);
+                    console.warn(`totalAttributedWeight: ${totalAttributedWeight.toFixed(2)}%`);
+                    console.warn(`isFullyAttributed: ${isFullyAttributed}`);
+                    console.warn(`shouldShowMissingPositions: ${shouldShowMissingPositions}`);
                     console.warn(`remainingPositionsCount: ${remainingPositionsCount}`);
                     console.warn(`categories:`, JSON.stringify(portfolio.categories.map(c => ({
                         name: c.name,
@@ -1598,17 +1615,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 
                 // Add verification logging
-                console.log(`Portfolio ${portfolio.name}: targetWeight=${portfolioPercentage}, maxPerPosition=${maxPerPosition}, minPositionsNeeded=${minPositionsNeeded}, actualPositions=${actualPositionsCount}, remainingPositions=${remainingPositionsCount}`);
+                console.log(`Portfolio ${portfolio.name}: minPositionsNeeded=${minPositionsNeeded}, actualPositions=${actualPositionsCount}, totalAttributedWeight=${totalAttributedWeight.toFixed(2)}%, remainingPositions=${remainingPositionsCount}, shouldShow=${shouldShowMissingPositions}`);
                 
                 // Store values on portfolio object
                 portfolio.remainingPositionsCount = remainingPositionsCount;
                 portfolio.minPositionsNeeded = minPositionsNeeded;
                 portfolio.actualPositionsCount = actualPositionsCount;
+                portfolio.totalAttributedWeight = totalAttributedWeight;
+                portfolio.hasRemainingPositions = shouldShowMissingPositions && remainingPositionsCount > 0;
                 
                 // Add additional information for display
-                if (remainingPositionsCount > 0) {
-                    // Even if weight is 0, still show the missing positions row
-                    portfolio.hasRemainingPositions = true;
+                if (portfolio.hasRemainingPositions) {
                     console.log(`Set hasRemainingPositions=true for ${portfolio.name}`);
                 }
                 

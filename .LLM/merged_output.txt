@@ -1,5 +1,5 @@
 This file is a merged representation of selected files from the codebase.
-Generated on: 2025-03-14T14:14:47.458330
+Generated on: 2025-03-14T15:25:34.454185
 
 ================================================================
 Purpose:
@@ -3100,25 +3100,29 @@ document.addEventListener('DOMContentLoaded', function() {
             * Navigate to detail view for a specific portfolio
             */
             navigateToDetail(portfolioName) {
-                // Set the selected portfolio
-                if (portfolioName && portfolioName !== this.selectedPortfolio) {
+                console.log(`Navigating to detail view for portfolio: ${portfolioName}`);
+                this.setActiveView('detail');
+                
+                // If portfolio name is provided, select that portfolio
+                if (portfolioName) {
                     this.selectedPortfolio = portfolioName;
+                } else if (this.portfolioData.portfolios.length > 0) {
+                    // Fallback to first portfolio if none selected
+                    this.selectedPortfolio = this.portfolioData.portfolios[0].name;
                 }
                 
-                // Switch to detail view if not already there
-                if (this.activeView !== 'detail') {
-                    this.setActiveView('detail');
-                }
-
-                // Ensure remaining positions are calculated for the detail view
-                const selectedPortfolio = this.portfolioData?.portfolios?.find(p => p.name === this.selectedPortfolio);
+                // Find the selected portfolio data
+                const selectedPortfolio = this.portfolioData.portfolios.find(p => p.name === this.selectedPortfolio);
+                
                 if (selectedPortfolio) {
-                    // Recalculate remaining positions count for the selected portfolio
-                    console.log('Recalculating remaining positions on navigate to detail...');
+                    console.warn(`Navigating to detail view for portfolio: ${selectedPortfolio.name}`);
+                    // Ensure we calculate the remaining positions count for the selected portfolio
                     this.calculateRemainingPositionsCount(selectedPortfolio);
+                    console.warn(`After recalculation: hasRemainingPositions=${selectedPortfolio.hasRemainingPositions}, remainingPositionsCount=${selectedPortfolio.remainingPositionsCount}`);
                     
-                    // Make sure buy/sell actions are updated
+                    // Update chart data after next tick to ensure the DOM has updated
                     this.$nextTick(() => {
+                        // Update charts with the new data
                         this.updateChartData();
                     });
                 }
@@ -3128,69 +3132,11 @@ document.addEventListener('DOMContentLoaded', function() {
             * Handle click on Detail View tab with proper feedback
             */
             handleDetailViewClick() {
-                // Always log the attempt for debugging
-                console.log('Detail View tab clicked');
-                
-                // Explicitly reset the updating flag to ensure reactivity works
+                console.log('Detail view clicked');
                 this.isUpdating = false;
-                
-                // Store current view for debugging
-                const previousView = this.activeView;
-                
-                try {
-                    // Check if we have portfolios to display
-                    if (this.portfolioData && this.portfolioData.portfolios && this.portfolioData.portfolios.length > 0) {
-                        // We have data, proceed with navigation
-                        const firstPortfolio = this.portfolioData.portfolios[0].name;
-                        console.log(`Selecting first portfolio: ${firstPortfolio}`);
-                        
-                        // Set the selected portfolio first
-                        this.selectedPortfolio = firstPortfolio;
-                        
-                        // Calculate remaining positions for the selected portfolio
-                        const selectedPortfolioData = this.portfolioData.portfolios[0];
-                        if (selectedPortfolioData) {
-                            this.calculateRemainingPositionsCount(selectedPortfolioData);
-                        }
-                        
-                        // Then update the view
-                        this.activeView = 'detail';
-                        
-                        // Force an immediate DOM update
-                        this.$forceUpdate();
-                    } else {
-                        // No portfolios available - still switch the view for consistency
-                        console.warn('No portfolios available for Detail View');
-                        this.activeView = 'detail';
-                        this.$forceUpdate();
-                    }
-                } catch (error) {
-                    console.error('Error during Detail View navigation:', error);
-                    // Fallback: directly set the view
-                    this.activeView = 'detail';
-                    this.$forceUpdate();
-                }
-                
-                // Verify the view changed
-                console.log(`View change attempt: ${previousView} -> ${this.activeView}`);
-                
-                // Force view update and reinitialize charts
-                this.$nextTick(() => {
-                    try {
-                        // Force a reflow to ensure container dimensions are calculated
-                        document.body.offsetHeight;
-                        
-                        console.log('Reinitializing charts for detail view');
-                        this.initializeCharts();
-                        
-                        // Also trigger a window resize event to ensure charts render correctly
-                        setTimeout(() => {
-                            window.dispatchEvent(new Event('resize'));
-                        }, 200);
-                    } catch (chartError) {
-                        console.error('Error initializing charts:', chartError);
-                    }
-                });
+
+                // Navigate to the detail view (will use the first portfolio by default)
+                this.navigateToDetail();
             },
             
             /**
@@ -3435,7 +3381,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Only calculate remaining positions in detail view
                 if (this.activeView === 'detail') {
                     this.portfolioData.portfolios.forEach(portfolio => {
+                        // Calculate remaining positions count
                         this.calculateRemainingPositionsCount(portfolio);
+                        
+                        // Set additional properties for remaining positions display
+                        if (portfolio.remainingPositionsCount > 0) {
+                            portfolio.remainingPositionsAction = { type: "Buy", amount: 0 };
+                            portfolio.remainingPositionsInfo = 0;
+                            portfolio.remainingPositionsTargetValue = 0;
+                            portfolio.remainingPositionsWeight = 0;
+                            portfolio.remainingPositionsFinalWeight = 0;
+                            
+                            // Log for debugging
+                            console.log(`Set up missing positions display for ${portfolio.name}: ${portfolio.remainingPositionsCount} missing`);
+                        }
                     });
                 } else {
                     // In global view, set remaining positions to 0 to avoid confusion
@@ -4116,36 +4075,102 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Get the maximum percentage per position
                 const maxPerPosition = portfolio.maxPerPosition || defaultMaxPerPosition;
                 
-                // CRITICAL FIX: Use portfolio's target weight instead of fixed value (100)
-                // This aligns with the builder.js calculation approach
-                const portfolioPercentage = portfolio.targetWeight || 0;
+                // CRITICAL UPDATE: Prioritize minPositions from the server if available
+                let minPositionsNeeded;
                 
-                // Calculate minimum positions needed using the SAME formula as builder.js
-                let minPositionsNeeded = Math.ceil(portfolioPercentage / maxPerPosition);
-                
-                // Ensure at least 1 position (matching builder.js behavior)
-                minPositionsNeeded = Math.max(1, minPositionsNeeded);
+                if (portfolio.minPositions !== undefined) {
+                    // Use the minPositions value that comes from the server (builder data)
+                    minPositionsNeeded = portfolio.minPositions;
+                    console.warn(`Using minPositions=${minPositionsNeeded} from server data for ${portfolio.name}`);
+                } else {
+                    // Calculate minimum positions needed using the formula
+                    const portfolioPercentage = portfolio.targetWeight || 0;
+                    minPositionsNeeded = Math.ceil(portfolioPercentage / maxPerPosition);
+                    // Ensure at least 1 position (matching builder.js behavior)
+                    minPositionsNeeded = Math.max(1, minPositionsNeeded);
+                    console.warn(`Calculated minPositions=${minPositionsNeeded} for ${portfolio.name}`);
+                }
                 
                 // Count actual positions (non-placeholder only)
                 let actualPositionsCount = 0;
+                let totalAttributedWeight = 0;  // Track the total weight attributed to positions
+                
                 if (portfolio.categories && Array.isArray(portfolio.categories)) {
                     portfolio.categories.forEach(category => {
                         if (category.positions && Array.isArray(category.positions)) {
-                            actualPositionsCount += category.positions.filter(position => !position.isPlaceholder).length;
+                            const categoryPositionCount = category.positions.filter(position => !position.isPlaceholder).length;
+                            actualPositionsCount += categoryPositionCount;
+                            
+                            // Sum up the weights of all positions in this category
+                            category.positions.forEach(position => {
+                                if (!position.isPlaceholder) {
+                                    totalAttributedWeight += position.targetWeight || 0;
+                                }
+                            });
+                            
+                            console.log(`Category ${category.name}: ${categoryPositionCount} positions`);
                         }
                     });
                 }
                 
-                // Calculate remaining positions needed
-                const remainingPositionsCount = Math.max(0, minPositionsNeeded - actualPositionsCount);
+                // IMPROVED LOGIC: Calculate remaining positions count based on new rules
+                let remainingPositionsCount = 0;
+                let shouldShowMissingPositions = false;
+                
+                // Condition 1: Check if we have fewer positions than required minimum
+                if (actualPositionsCount < minPositionsNeeded) {
+                    remainingPositionsCount = minPositionsNeeded - actualPositionsCount;
+                    shouldShowMissingPositions = true;
+                }
+                
+                // Condition 2: Check if the total attributed weight is less than 100%
+                // We add a small tolerance for floating point comparisons (e.g., 99.99% should be considered as 100%)
+                const isFullyAttributed = Math.abs(totalAttributedWeight - 100) < 0.1;
+                
+                // If weight is not fully attributed, show missing positions unless we already have enough positions
+                if (!isFullyAttributed && actualPositionsCount < minPositionsNeeded) {
+                    shouldShowMissingPositions = true;
+                } else if (isFullyAttributed) {
+                    // If 100% of the portfolio is attributed, don't show missing positions
+                    shouldShowMissingPositions = false;
+                }
+                
+                // If we should not show missing positions, set remaining count to 0
+                if (!shouldShowMissingPositions) {
+                    remainingPositionsCount = 0;
+                }
+                
+                // Add additional debugging for dividend portfolio specifically
+                if (portfolio.name === 'dividend') {
+                    console.warn(`DIVIDEND PORTFOLIO DETAILS:`);
+                    console.warn(`maxPerPosition: ${maxPerPosition}`);
+                    console.warn(`portfolioPercentage: ${portfolio.targetWeight || 0}`);
+                    console.warn(`minPositionsNeeded: ${minPositionsNeeded}`);
+                    console.warn(`actualPositionsCount: ${actualPositionsCount}`);
+                    console.warn(`totalAttributedWeight: ${totalAttributedWeight.toFixed(2)}%`);
+                    console.warn(`isFullyAttributed: ${isFullyAttributed}`);
+                    console.warn(`shouldShowMissingPositions: ${shouldShowMissingPositions}`);
+                    console.warn(`remainingPositionsCount: ${remainingPositionsCount}`);
+                    console.warn(`categories:`, JSON.stringify(portfolio.categories.map(c => ({
+                        name: c.name,
+                        positionCount: c.positions ? c.positions.filter(p => !p.isPlaceholder).length : 0
+                    }))));
+                }
                 
                 // Add verification logging
-                console.log(`Portfolio ${portfolio.name}: targetWeight=${portfolioPercentage}, maxPerPosition=${maxPerPosition}, minPositionsNeeded=${minPositionsNeeded}, actualPositions=${actualPositionsCount}, remainingPositions=${remainingPositionsCount}`);
+                console.log(`Portfolio ${portfolio.name}: minPositionsNeeded=${minPositionsNeeded}, actualPositions=${actualPositionsCount}, totalAttributedWeight=${totalAttributedWeight.toFixed(2)}%, remainingPositions=${remainingPositionsCount}, shouldShow=${shouldShowMissingPositions}`);
                 
                 // Store values on portfolio object
                 portfolio.remainingPositionsCount = remainingPositionsCount;
                 portfolio.minPositionsNeeded = minPositionsNeeded;
                 portfolio.actualPositionsCount = actualPositionsCount;
+                portfolio.totalAttributedWeight = totalAttributedWeight;
+                portfolio.hasRemainingPositions = shouldShowMissingPositions && remainingPositionsCount > 0;
+                
+                // Add additional information for display
+                if (portfolio.hasRemainingPositions) {
+                    console.log(`Set hasRemainingPositions=true for ${portfolio.name}`);
+                }
                 
                 return remainingPositionsCount;
             },
@@ -7166,22 +7191,6 @@ def get_allocate_portfolio_data():
             except json.JSONDecodeError:
                 logger.error("Failed to parse target allocations JSON")
         
-        # Get diversification rules from expanded_state
-        rules_data = query_db('''
-            SELECT variable_value
-            FROM expanded_state
-            WHERE account_id = ? AND page_name = ? AND variable_name = ?
-        ''', [account_id, 'build', 'rules'], one=True)
-        
-        # Parse rules if available
-        rules = {'maxPerStock': 5}  # Default if not found
-        if rules_data and rules_data['variable_value']:
-            try:
-                rules = json.loads(rules_data['variable_value'])
-                logger.info(f"Found diversification rules in expanded_state: {rules}")
-            except json.JSONDecodeError:
-                logger.error("Failed to parse rules JSON")
-        
         result = {'portfolios': []}
         
         # Process each portfolio
@@ -7211,18 +7220,14 @@ def get_allocate_portfolio_data():
             # Find target allocation for this portfolio from the expanded_state data
             target_weight = 0
             target_portfolio = next((p for p in target_allocations if p.get('id') == portfolio_id), None)
-            
-            # Get maxPerPosition from target allocations or use default from rules
-            max_per_position = rules.get('maxPerStock', 5)  # Default to 5% if not found
-            
             if target_portfolio:
                 target_weight = target_portfolio.get('allocation', 0)
-                # Get individual portfolio's min positions if available
-                min_positions = target_portfolio.get('minPositions')
-                if min_positions:
-                    # If min_positions is explicitly set, we can derive the max per position
-                    max_per_position = 100 / min_positions
                 logger.info(f"Found target weight for portfolio {portfolio_name}: {target_weight}%")
+                
+                # Add minPositions value from target allocations if available
+                if 'minPositions' in target_portfolio:
+                    min_positions = target_portfolio.get('minPositions')
+                    logger.info(f"Found minPositions for portfolio {portfolio_name}: {min_positions}")
             
             # Create portfolio entry
             portfolio_entry = {
@@ -7230,9 +7235,13 @@ def get_allocate_portfolio_data():
                 'currentValue': portfolio_value,
                 'targetWeight': target_weight,
                 'color': '',
-                'categories': [],
-                'maxPerPosition': max_per_position  # Add this field with the correct value
+                'categories': []
             }
+            
+            # Add minPositions to portfolio entry if it was found
+            if target_portfolio and 'minPositions' in target_portfolio:
+                portfolio_entry['minPositions'] = target_portfolio.get('minPositions')
+                logger.info(f"Added minPositions {portfolio_entry['minPositions']} to portfolio {portfolio_name}")
             
             # Process each category
             for category_item in categories_data:
@@ -9679,6 +9688,20 @@ def process_csv_data(account_id, file_content):
         </div>
     </div>
 
+    <!-- Add this debug section right before the table in Detail View -->
+    <div v-if="activeView === 'detail'" class="notification is-info is-light">
+        <p>Debug Info:</p>
+        <p>Selected Portfolio: ${selectedPortfolio}</p>
+        <p v-if="selectedPortfolioData">Remaining Positions Count: ${selectedPortfolioData.remainingPositionsCount}</p>
+        <p v-if="selectedPortfolioData">Min Positions Needed: ${selectedPortfolioData.minPositionsNeeded}</p>
+        <p v-if="selectedPortfolioData">Actual Positions Count: ${selectedPortfolioData.actualPositionsCount}</p>
+        <p v-if="selectedPortfolioData">Original MinPositions: ${selectedPortfolioData.minPositions}</p>
+        <p v-if="selectedPortfolioData">Target Weight: ${selectedPortfolioData.targetWeight}%</p>
+        <p v-if="selectedPortfolioData">MaxPerPosition: ${selectedPortfolioData.maxPerPosition || 5}%</p>
+        <p v-if="selectedPortfolioData">Total Attributed Weight: ${selectedPortfolioData.totalAttributedWeight?.toFixed(2) || 0}%</p>
+        <p v-if="selectedPortfolioData">Should Show Missing Positions: ${selectedPortfolioData.hasRemainingPositions}</p>
+    </div>
+
     <!-- Rebalancing Actions - Container removed -->
     <div class="mt-4">
         <h3 class="is-size-6 mb-3">
@@ -9730,15 +9753,7 @@ def process_csv_data(account_id, file_content):
                         </tr>
                         
                         <!-- Remaining positions notification (if needed) -->
-                        <tr v-if="portfolio.remainingPositionsCount && 
-                                 portfolio.remainingPositionsCount > 0 && 
-                                 portfolio.categories && 
-                                 portfolio.categories.some(category => 
-                                   category.positions && 
-                                   category.positions.some(position => 
-                                     position.isPlaceholder && position.totalRemainingWeight > 0
-                                   )
-                                 )" 
+                        <tr v-if="portfolio.hasRemainingPositions" 
                             :key="`${portfolio.name}-remaining`"
                             class="placeholder-position">
                             <td>
@@ -9872,14 +9887,7 @@ def process_csv_data(account_id, file_content):
                             </tr>
                             
                             <!-- Portfolio remaining positions row - shown at the bottom after all categories -->
-                            <tr v-if="selectedPortfolioData && selectedPortfolioData.remainingPositionsCount > 0 && 
-                                    selectedPortfolioData.categories && 
-                                    selectedPortfolioData.categories.some(category => 
-                                        category.positions && 
-                                        category.positions.some(position => 
-                                            position.isPlaceholder && position.totalRemainingWeight > 0
-                                        )
-                                    )" 
+                            <tr v-if="selectedPortfolioData && selectedPortfolioData.hasRemainingPositions" 
                                 class="placeholder-position">
                                 <td>
                                     <div class="remaining-positions-text">
@@ -9889,6 +9897,7 @@ def process_csv_data(account_id, file_content):
                                               data-tooltip="Add more positions in the Build page to meet your diversification target">
                                             <i class="fas fa-question-circle"></i>
                                         </span>
+                                        <span class="tag is-info is-light ml-2">Debug: count=${selectedPortfolioData.remainingPositionsCount}</span>
                                     </div>
                                 </td>
                                 <td class="has-text-right">

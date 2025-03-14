@@ -323,18 +323,6 @@
         </div>
     </div>
 
-    <!-- Add this debug section right before the table in Detail View -->
-    <div v-if="activeView === 'detail'" class="notification is-info is-light">
-        <p>Debug Info:</p>
-        <p>Selected Portfolio: ${selectedPortfolio}</p>
-        <p v-if="selectedPortfolioData">Remaining Positions Count: ${selectedPortfolioData.remainingPositionsCount}</p>
-        <p v-if="selectedPortfolioData">Min Positions Needed: ${selectedPortfolioData.minPositionsNeeded}</p>
-        <p v-if="selectedPortfolioData">Actual Positions Count: ${selectedPortfolioData.actualPositionsCount}</p>
-        <p v-if="selectedPortfolioData">Original MinPositions: ${selectedPortfolioData.minPositions}</p>
-        <p v-if="selectedPortfolioData">Target Weight: ${selectedPortfolioData.targetWeight}%</p>
-        <p v-if="selectedPortfolioData">MaxPerPosition: ${selectedPortfolioData.maxPerPosition || 5}%</p>
-    </div>
-
     <!-- Rebalancing Actions - Container removed -->
     <div class="mt-4">
         <h3 class="is-size-6 mb-3">
@@ -386,7 +374,7 @@
                         </tr>
                         
                         <!-- Remaining positions notification (if needed) -->
-                        <tr v-if="portfolio.remainingPositionsCount && portfolio.remainingPositionsCount > 0" 
+                        <tr v-if="portfolio.hasRemainingPositions" 
                             :key="`${portfolio.name}-remaining`"
                             class="placeholder-position">
                             <td>
@@ -400,22 +388,26 @@
                                 </div>
                             </td>
                             <td class="has-text-right">
+                                ${formatCurrency(0)}
+                            </td>
+                            <td class="has-text-right">
                                 ${formatPercentage(0)}
                             </td>
                             <td class="has-text-right">
-                                <span class="has-text-grey-light">
-                                    ${formatCurrency(0)}
+                                ${formatPercentage(portfolio.missingPositionsTargetWeight || 0)}
+                            </td>
+                            <td class="has-text-right">
+                                ${formatCurrency(portfolio.missingPositionsTargetValue || 0)}
+                                <small v-if="portfolio.missingPositionsValueEach" class="is-size-7 has-text-grey">
+                                    (${formatCurrency(portfolio.missingPositionsValueEach)} each)
+                                </small>
+                            </td>
+                            <td class="has-text-right">
+                                <span class="has-text-success" v-if="portfolio.missingPositionsAction">
+                                    ${portfolio.missingPositionsAction.type || 'Buy'} ${formatCurrency(portfolio.missingPositionsAction.amount || 0)}
                                 </span>
-                            </td>
-                            <td class="has-text-right has-text-weight-bold">
-                                ${formatPercentage(portfolio.remainingPositionsWeight || 0)}
-                            </td>
-                            <td class="has-text-right">
-                                ${formatCurrency(portfolio.remainingPositionsInfo || 0)}
-                            </td>
-                            <td class="has-text-right">
-                                <span :class="portfolio.remainingPositionsAction?.type === 'Buy' ? 'has-text-success' : 'has-text-grey'">
-                                    ${portfolio.remainingPositionsAction?.type || 'Hold'} ${formatCurrency(portfolio.remainingPositionsAction?.amount || 0)}
+                                <span class="has-text-grey" v-else>
+                                    Hold ${formatCurrency(0)}
                                 </span>
                             </td>
                         </tr>
@@ -520,7 +512,7 @@
                             </tr>
                             
                             <!-- Portfolio remaining positions row - shown at the bottom after all categories -->
-                            <tr v-if="selectedPortfolioData && selectedPortfolioData.remainingPositionsCount > 0" 
+                            <tr v-if="selectedPortfolioData && selectedPortfolioData.hasRemainingPositions" 
                                 class="placeholder-position">
                                 <td>
                                     <div class="remaining-positions-text">
@@ -530,29 +522,34 @@
                                               data-tooltip="Add more positions in the Build page to meet your diversification target">
                                             <i class="fas fa-question-circle"></i>
                                         </span>
-                                        <span class="tag is-info is-light ml-2">Debug: count=${selectedPortfolioData.remainingPositionsCount}</span>
                                     </div>
                                 </td>
                                 <td class="has-text-right">
-                                    ${formatPercentage(selectedPortfolioData.remainingPositionsTargetWeight || selectedPortfolioData.remainingPositionsWeight || 0)}
+                                    ${formatCurrency(0)}
                                 </td>
                                 <td class="has-text-right">
-                                    <span class="has-text-grey-light">
-                                        ${formatCurrency(selectedPortfolioData.remainingPositionsInfo || 0)}
-                                    </span>
+                                    ${formatPercentage(0)}
                                 </td>
                                 <td class="has-text-right has-text-weight-bold">
-                                    ${formatPercentage(selectedPortfolioData.remainingPositionsWeight || 0)}
+                                    ${formatPercentage(selectedPortfolioData.missingPositionsTargetWeight || 0)}
+                                    <br v-if="selectedPortfolioData.missingPositionsWeightEach">
+                                    <small v-if="selectedPortfolioData.missingPositionsWeightEach" class="has-text-grey">
+                                        (${formatPercentage(selectedPortfolioData.missingPositionsWeightEach)} each)
+                                    </small>
                                 </td>
                                 <td class="has-text-right">
-                                    ${formatCurrency(selectedPortfolioData.remainingPositionsInfo || 0)}
-                                    <span class="has-text-grey-light is-size-7" v-if="selectedPortfolioData.remainingPositionsCount > 0">
-                                        (${formatCurrency(selectedPortfolioData.remainingPositionsInfo / selectedPortfolioData.remainingPositionsCount)} each)
+                                    ${formatCurrency(selectedPortfolioData.missingPositionsTargetValue || 0)}
+                                    <br v-if="selectedPortfolioData.missingPositionsValueEach">
+                                    <small v-if="selectedPortfolioData.missingPositionsValueEach" class="has-text-grey">
+                                        (${formatCurrency(selectedPortfolioData.missingPositionsValueEach)} each)
+                                    </small>
+                                </td>
+                                <td class="has-text-right">
+                                    <span class="has-text-success" v-if="selectedPortfolioData.missingPositionsAction">
+                                        ${selectedPortfolioData.missingPositionsAction.type || 'Buy'} ${formatCurrency(selectedPortfolioData.missingPositionsAction.amount || 0)}
                                     </span>
-                                </td>
-                                <td class="has-text-right">
-                                    <span :class="selectedPortfolioData.remainingPositionsAction?.type === 'Buy' ? 'has-text-success' : 'has-text-grey'">
-                                        ${selectedPortfolioData.remainingPositionsAction?.type || 'Hold'} ${formatCurrency(selectedPortfolioData.remainingPositionsAction?.amount || 0)}
+                                    <span class="has-text-grey" v-else>
+                                        Hold ${formatCurrency(0)}
                                     </span>
                                 </td>
                             </tr>
