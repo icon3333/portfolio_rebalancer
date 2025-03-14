@@ -933,14 +933,13 @@ def bulk_update():
         logger.error(f"Error in bulk update: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-def get_portfolio_companies():
+def get_portfolio_companies(portfolio_id):
     """API endpoint to get all companies for a portfolio"""
     if 'account_id' not in session:
         return jsonify({'error': 'Not authenticated. Please select an account from the home page.'}), 401
     
     try:
         account_id = session['account_id']
-        portfolio_id = request.args.get('portfolio_id')
         
         if not portfolio_id:
             return jsonify({'error': 'No portfolio ID provided'}), 400
