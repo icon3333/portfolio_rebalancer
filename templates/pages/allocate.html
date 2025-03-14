@@ -480,10 +480,10 @@
                                             </div>
                                         </td>
                                         <td class="has-text-right">${formatCurrency(position.currentValue)}</td>
-                                        <td class="has-text-right">${formatPercentage(position.portfolioCurrentWeight || 0)}</td>
+                                        <td class="has-text-right">${formatPercentage(position.currentWeight)}</td>
                                         <td class="has-text-right">
-                                            ${formatPercentage(position.globalTargetWeight || 0)}
-                                            <span class="is-size-7 has-text-grey">(${formatPercentage(position.localTargetWeight)} of category)</span>
+                                            ${formatPercentage(position.localTargetWeight || 0)}
+                                            <span class="is-size-7 has-text-grey">(${formatPercentage(position.globalTargetWeight)} of portfolio)</span>
                                         </td>
                                         <td class="has-text-right">${formatCurrency(position.targetValue)}</td>
                                         <td class="has-text-right">

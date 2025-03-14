@@ -955,20 +955,26 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Add placeholder position if it exists and has remaining positions
         if (placeholderPosition && placeholderPosition.positionsRemaining > 0) {
-          result.push({
-            companyName: `Remaining positions (${placeholderPosition.positionsRemaining})`,
-            weight: placeholderPosition.totalRemainingWeight,
-            count: placeholderPosition.positionsRemaining,
-            isPlaceholder: true
-          });
+          // Only show the placeholder if we don't have enough real positions
+          const realPositionCount = realPositions.length;
+          const minPositions = Math.ceil(portfolio.minPositions);
+          
+          if (realPositionCount < minPositions) {
+            // Individual position weight (what each actual position would get)
+            const individualWeight = parseFloat(placeholderPosition.weight);
+            
+            result.push({
+              companyName: `Remaining positions (${placeholderPosition.positionsRemaining})`,
+              weight: individualWeight,  // Use weight per position for display
+              count: placeholderPosition.positionsRemaining,
+              isPlaceholder: true
+            });
+          }
         }
         
         // Sort by weight (descending)
         return result.sort((a, b) => b.weight - a.weight);
       },
-      
-      // These functions were removed as part of removing expand/collapse functionality
-      // from the Allocation Summary section
       
       // Save allocation state
       async saveAllocation() {

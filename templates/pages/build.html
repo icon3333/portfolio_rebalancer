@@ -455,12 +455,27 @@
                                 ${ group.companyName }
                             </td>
                             <td>
-                                <span class="global-allocation">${ ((portfolio.allocation * group.weight) / 100).toFixed(1) }%</span>
+                                <span class="global-allocation" v-if="group.isPlaceholder">
+                                    ${ ((portfolio.allocation * group.weight * group.count) / 100).toFixed(1) }%
+                                </span>
+                                <span class="global-allocation" v-else>
+                                    ${ ((portfolio.allocation * group.weight) / 100).toFixed(1) }%
+                                </span>
                             </td>
                             <td>
-                                <span class="portfolio-allocation">${ parseFloat(group.weight).toFixed(1) }%</span>
+                                <span class="portfolio-allocation" v-if="group.isPlaceholder">
+                                    ${ (parseFloat(group.weight) * group.count).toFixed(1) }%
+                                </span>
+                                <span class="portfolio-allocation" v-else>
+                                    ${ parseFloat(group.weight).toFixed(1) }%
+                                </span>
                             </td>
-                            <td>${ formatCurrency(calculateAllocationAmount(portfolio.allocation) * group.weight / 100) }</td>
+                            <td v-if="group.isPlaceholder">
+                                ${ formatCurrency(calculateAllocationAmount(portfolio.allocation) * group.weight * group.count / 100) }
+                            </td>
+                            <td v-else>
+                                ${ formatCurrency(calculateAllocationAmount(portfolio.allocation) * group.weight / 100) }
+                            </td>
                         </tr>
                     </template>
                     <tr v-if="portfolios.length === 0">
