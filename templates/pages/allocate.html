@@ -449,7 +449,10 @@
                                     </td>
                                     <td class="has-text-right">${formatCurrency(category.currentValue)}</td>
                                     <td class="has-text-right">${formatPercentage(category.currentWeight)}</td>
-                                    <td class="has-text-right">${formatPercentage(category.targetWeight)}</td>
+                                    <td class="has-text-right">
+                                        ${formatPercentage(category.targetWeight)}
+                                        <span class="is-size-7 has-text-grey">(of portfolio)</span>
+                                    </td>
                                     <td class="has-text-right">${formatCurrency(category.targetValue)}</td>
                                     <td class="has-text-right">
                                         <span :class="{
@@ -473,8 +476,11 @@
                                             </div>
                                         </td>
                                         <td class="has-text-right">${formatCurrency(position.currentValue)}</td>
-                                        <td class="has-text-right">${formatPercentage(position.currentWeight || 0)}</td>
-                                        <td class="has-text-right">${formatPercentage(position.targetWeight)}</td>
+                                        <td class="has-text-right">${formatPercentage(position.portfolioCurrentWeight || 0)}</td>
+                                        <td class="has-text-right">
+                                            ${formatPercentage(position.globalTargetWeight || 0)}
+                                            <span class="is-size-7 has-text-grey">(${formatPercentage(position.localTargetWeight)} of category)</span>
+                                        </td>
                                         <td class="has-text-right">${formatCurrency(position.targetValue)}</td>
                                         <td class="has-text-right">
                                             <span :class="{
@@ -484,13 +490,6 @@
                                             }">
                                                 ${position.action ? position.action.type + ' ' + formatCurrency(position.action.amount) : 'Hold €0.00'}
                                             </span>
-                                            
-                                            <!-- Tooltips for additional information -->
-                                            <div class="has-tooltip-left has-tooltip-arrow" data-tooltip="Based on category's target allocation">
-                                                <span class="icon is-small">
-                                                    <i class="fas fa-info-circle"></i>
-                                                </span>
-                                            </div>
                                         </td>
                                     </tr>
                                 </template>
@@ -522,15 +521,15 @@
                                     </div>
                                 </td>
                                 <td class="has-text-right">
-                                    ${formatPercentage(0)}
+                                    ${formatPercentage(selectedPortfolioData.remainingPositionsTargetWeight || selectedPortfolioData.remainingPositionsWeight || 0)}
                                 </td>
                                 <td class="has-text-right">
                                     <span class="has-text-grey-light">
-                                        ${formatCurrency(0)}
+                                        ${formatCurrency(selectedPortfolioData.remainingPositionsInfo || 0)}
                                     </span>
                                 </td>
                                 <td class="has-text-right has-text-weight-bold">
-                                    ${formatPercentage(0)}
+                                    ${formatPercentage(selectedPortfolioData.remainingPositionsWeight || 0)}
                                 </td>
                                 <td class="has-text-right">
                                     ${formatCurrency(selectedPortfolioData.remainingPositionsInfo || 0)}

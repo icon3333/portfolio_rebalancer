@@ -234,6 +234,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 this.isUpdating = true;
                 try {
+                    // Ensure remaining positions are calculated when portfolio selection changes
+                    const selectedPortfolio = this.portfolioData?.portfolios?.find(p => p.name === this.selectedPortfolio);
+                    if (selectedPortfolio) {
+                        // Recalculate remaining positions count for the selected portfolio
+                        this.calculateRemainingPositionsCount(selectedPortfolio);
+                    }
+                    
                     this.$nextTick(() => {
                         this.updateChartData();
                     });
@@ -507,6 +514,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         // Set the selected portfolio first
                         this.selectedPortfolio = firstPortfolio;
                         
+                        // Calculate remaining positions for the selected portfolio
+                        const selectedPortfolioData = this.portfolioData.portfolios[0];
+                        if (selectedPortfolioData) {
+                            this.calculateRemainingPositionsCount(selectedPortfolioData);
+                        }
+                        
                         // Then update the view
                         this.activeView = 'detail';
                         
@@ -663,7 +676,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // PORTFOLIO LEVEL CALCULATIONS
                 this.portfolioData.portfolios.forEach(portfolio => {
                     // Handle based on whether selling is allowed
-                    if (this.rebalanceMode === 'full') {
+                    if (this.rebalanceMode === 'existingCapital') {
                         // Full rebalance - sell or buy as needed to reach target allocation
                         portfolio.targetValue = Math.round(this.totalValue * portfolio.targetWeight / 100);
                         portfolio.action = {
@@ -732,6 +745,39 @@ document.addEventListener('DOMContentLoaded', function() {
                             }
                         }
                     }
+                    
+                    // NORMALIZE CATEGORY WEIGHTS TO SUM TO 100%
+                    // This is the key fix - ensure category weights properly sum to 100%
+                    let totalCategoryWeight = 0;
+                    portfolio.categories.forEach(category => {
+                        totalCategoryWeight += parseFloat(category.targetWeight || 0);
+                    });
+                    
+                    // If total is not 100% (with small tolerance for floating point errors)
+                    if (Math.abs(totalCategoryWeight - 100) > 0.01 && totalCategoryWeight > 0) {
+                        console.log(`Normalizing category weights from ${totalCategoryWeight}% to 100%`);
+                        
+                        // Scale factor to normalize to 100%
+                        const scaleFactor = 100 / totalCategoryWeight;
+                        
+                        // Apply scaling to each category
+                        portfolio.categories.forEach(category => {
+                            // Store original weight as localTargetWeight (relative to category)
+                            category.localTargetWeight = category.targetWeight;
+                            
+                            // Normalize target weight
+                            category.targetWeight = parseFloat((category.targetWeight * scaleFactor).toFixed(2));
+                            
+                            // Store percentage of portfolio for clarity
+                            category.portfolioPercentage = category.targetWeight;
+                        });
+                    } else {
+                        // Weights already sum to 100%, just store local copies
+                        portfolio.categories.forEach(category => {
+                            category.localTargetWeight = category.targetWeight;
+                            category.portfolioPercentage = category.targetWeight;
+                        });
+                    }
                 });
                 
                 // Calculate the actual amount of capital being used
@@ -772,9 +818,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // CATEGORY AND POSITION LEVEL CALCULATIONS
                 this.portfolioData.portfolios.forEach(portfolio => {
+                    // Track portfolio action total for consistency check
+                    let totalPortfolioAction = 0;
+                    
                     // Process categories within each portfolio
                     portfolio.categories.forEach(category => {
-                        // Calculate target value for this category
+                        // Calculate target value for this category - using normalized weights
                         category.targetValue = Math.round(portfolio.targetValue * category.targetWeight / 100);
                         
                         // Calculate action for this category
@@ -791,10 +840,19 @@ document.addEventListener('DOMContentLoaded', function() {
                             };
                         }
                         
+                        // Track category action amount for consistency check
+                        let categoryActionTotal = 0;
+                        
                         // Process positions within the category
                         category.positions.forEach(position => {
                             // Skip placeholder positions in calculations
                             if (position.isPlaceholder) return;
+                            
+                            // Store original weight as localTargetWeight (% of category)
+                            position.localTargetWeight = position.targetWeight;
+                            
+                            // Calculate position's global weight (% of total portfolio)
+                            position.globalTargetWeight = (category.targetWeight * position.targetWeight) / 100;
                             
                             // Calculate target value for this position
                             if (category.positions.filter(p => !p.isPlaceholder).length === 1) {
@@ -818,34 +876,69 @@ document.addEventListener('DOMContentLoaded', function() {
                                     amount: Math.abs(position.targetValue - position.currentValue)
                                 };
                             }
+                            
+                            // Sum action amounts for category total
+                            categoryActionTotal += position.action.type === "Buy" ? position.action.amount : 
+                                              position.action.type === "Sell" ? -position.action.amount : 0;
+                            
+                            // Calculate position weights relative to portfolio instead of category
+                            // Local weight (category relative) - store the original targetWeight for reference
+                            // position.localWeight = position.targetWeight;  // This is already done earlier
+                            // Global weight (portfolio relative)
+                            position.globalWeight = (position.targetValue / portfolio.targetValue) * 100;
+                            // Also keep the portfolio weights for backward compatibility
+                            position.portfolioCurrentWeight = (position.currentValue / portfolio.currentValue) * 100;
+                            position.portfolioTargetWeight = position.globalWeight;
                         });
+                        
+                        // Verify category action consistency with position actions
+                        let categoryActionAmount = category.action.type === "Buy" ? category.action.amount : 
+                                               category.action.type === "Sell" ? -category.action.amount : 0;
+                        
+                        // If there's a meaningful difference between category action and sum of position actions
+                        if (Math.abs(categoryActionAmount - categoryActionTotal) > 1) {
+                            console.warn(`Category "${category.name}" action inconsistency detected: Category action: ${categoryActionAmount}, Sum of position actions: ${categoryActionTotal}`);
+                        }
+                        
+                        // Sum category actions for portfolio total
+                        totalPortfolioAction += category.action.type === "Buy" ? category.action.amount : 
+                                             category.action.type === "Sell" ? -category.action.amount : 0;
                     });
+                    
+                    // Verify portfolio action consistency
+                    let portfolioActionAmount = portfolio.action.type === "Buy" ? portfolio.action.amount : 
+                                             portfolio.action.type === "Sell" ? -portfolio.action.amount : 0;
+                                             
+                    // If there's a meaningful difference between portfolio action and sum of category actions
+                    if (Math.abs(portfolioActionAmount - totalPortfolioAction) > 1) {
+                        console.warn(`Portfolio "${portfolio.name}" action inconsistency detected: Portfolio action: ${portfolioActionAmount}, Sum of category actions: ${totalPortfolioAction}`);
+                    }
                 });
                 
-                // Recalculate final weights after actions
+                // Recalculate final weights
                 this.portfolioData.portfolios.forEach(portfolio => {
-                    // Update the portfolio's target value if we've adjusted category values in no-sell mode
-                    if (this.rebalanceMode === 'newCapitalSpecific' && !this.allowSellingWithNewCapital) {
-                        // Sum up the adjusted category target values
-                        let adjustedTargetValue = portfolio.categories.reduce(
-                            (sum, category) => sum + category.targetValue, 0
-                        );
-                        
-                        // Only update if different (avoid precision issues)
-                        if (Math.abs(adjustedTargetValue - portfolio.targetValue) > 1) {
-                            portfolio.targetValue = adjustedTargetValue;
-                        }
-                    }
-                    
+                    // Calculate total weights
                     portfolio.finalWeight = parseFloat((portfolio.targetValue / this.newPortfolioValue * 100).toFixed(2));
+                    
+                    // Also update remaining positions target weight if it exists
+                    if (portfolio.remainingPositionsCount > 0 && portfolio.remainingPositionsTargetValue) {
+                        portfolio.remainingPositionsTargetWeight = parseFloat(
+                            (portfolio.remainingPositionsTargetValue / portfolio.targetValue * 100).toFixed(2)
+                        );
+                    }
                     
                     // Recalculate category final weights
                     portfolio.categories.forEach(category => {
                         category.finalWeight = parseFloat((category.targetValue / portfolio.targetValue * 100).toFixed(2));
                         
-                        // Recalculate position final weights
+                        // Recalculate position final weights - both local (category) and global (portfolio)
                         category.positions.forEach(position => {
-                            position.finalWeight = parseFloat((position.targetValue / category.targetValue * 100).toFixed(2));
+                            if (!position.isPlaceholder) {
+                                // Local weight (relative to category)
+                                position.finalWeight = parseFloat((position.targetValue / category.targetValue * 100).toFixed(2));
+                                // Global weight (relative to portfolio)
+                                position.finalGlobalWeight = parseFloat((position.targetValue / portfolio.targetValue * 100).toFixed(2));
+                            }
                         });
                     });
                 });
@@ -1330,24 +1423,49 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             
             /**
-            * Format currency values with Euro symbol
+            * Format a currency value with the locale currency symbol
             */
             formatCurrency(value) {
-                if (value === null || value === undefined) return '€0';
-                return new Intl.NumberFormat('de-DE', { 
-                    style: 'currency', 
-                    currency: 'EUR',
-                    maximumFractionDigits: 0
-                }).format(value);
+                if (value === undefined || value === null) return '€0.00';
+                return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(value);
             },
             
             /**
-            * Format percentage values
+            * Format a percentage value with the % symbol
             */
             formatPercentage(value) {
-                if (value === null || value === undefined) return '0%';
-                // Ensure value is a number before calling toFixed
-                return `${parseFloat(String(value)).toFixed(1)}%`;
+                if (value === undefined || value === null) return '0.00%';
+                // Round to 2 decimal places and ensure it's a string
+                return parseFloat(value).toFixed(2) + '%';
+            },
+            
+            /**
+            * Format weight percentage showing both global and local weight values
+            * @param {number} globalValue - The global weight (relative to portfolio)
+            * @param {number} localValue - The local weight (relative to category)
+            * @param {boolean} showBoth - Whether to show both values or just the global
+            */
+            formatWeightPercentage(globalValue, localValue, showBoth = true) {
+                if (globalValue === undefined || globalValue === null) {
+                    globalValue = 0;
+                }
+                if (localValue === undefined || localValue === null) {
+                    localValue = 0;
+                }
+                
+                // Format the global value
+                const globalFormatted = parseFloat(globalValue).toFixed(2) + '%';
+                
+                // If we don't need to show both, just return the global value
+                if (!showBoth) {
+                    return globalFormatted;
+                }
+                
+                // Format the local value
+                const localFormatted = parseFloat(localValue).toFixed(2) + '%';
+                
+                // Return both values with the local one in parentheses with a smaller font
+                return `${globalFormatted} <span class="is-size-7 has-text-grey">(${localFormatted} of category)</span>`;
             },
             
             /**
@@ -1405,9 +1523,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 const portfolioTargetWeight = portfolio.targetWeight || 100;
                 const remainingWeight = 100 - totalTargetWeight;
                 
+                // Store the remaining weight for display in the UI
+                portfolio.remainingPositionsWeight = remainingWeight;
+                
                 // Calculate target value for the missing positions
                 let targetValueForMissing = 0;
-                if (this.rebalanceMode === 'full') {
+                if (this.rebalanceMode === 'existingCapital') {
                     // For full rebalancing, calculate based on total value
                     targetValueForMissing = Math.round(this.totalValue * (portfolioTargetWeight / 100) * (remainingWeight / 100));
                 } else if (this.rebalanceMode === 'newCapitalOnly') {
@@ -1447,6 +1568,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     type: targetValueForMissing > 0 ? "Buy" : "Hold", 
                     amount: targetValueForMissing 
                 };
+                
+                // Calculate the portfolio-relative target weight of the missing positions
+                if (portfolio.targetValue > 0) {
+                    portfolio.remainingPositionsTargetWeight = (targetValueForMissing / portfolio.targetValue) * 100;
+                } else {
+                    portfolio.remainingPositionsTargetWeight = remainingWeight;
+                }
             },
         },
         mounted() {
