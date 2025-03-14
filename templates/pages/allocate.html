@@ -323,6 +323,18 @@
         </div>
     </div>
 
+    <!-- Add this debug section right before the table in Detail View -->
+    <div v-if="activeView === 'detail'" class="notification is-info is-light">
+        <p>Debug Info:</p>
+        <p>Selected Portfolio: ${selectedPortfolio}</p>
+        <p v-if="selectedPortfolioData">Remaining Positions Count: ${selectedPortfolioData.remainingPositionsCount}</p>
+        <p v-if="selectedPortfolioData">Min Positions Needed: ${selectedPortfolioData.minPositionsNeeded}</p>
+        <p v-if="selectedPortfolioData">Actual Positions Count: ${selectedPortfolioData.actualPositionsCount}</p>
+        <p v-if="selectedPortfolioData">Original MinPositions: ${selectedPortfolioData.minPositions}</p>
+        <p v-if="selectedPortfolioData">Target Weight: ${selectedPortfolioData.targetWeight}%</p>
+        <p v-if="selectedPortfolioData">MaxPerPosition: ${selectedPortfolioData.maxPerPosition || 5}%</p>
+    </div>
+
     <!-- Rebalancing Actions - Container removed -->
     <div class="mt-4">
         <h3 class="is-size-6 mb-3">
@@ -508,7 +520,7 @@
                             </tr>
                             
                             <!-- Portfolio remaining positions row - shown at the bottom after all categories -->
-                            <tr v-if="selectedPortfolioData.remainingPositionsCount && selectedPortfolioData.remainingPositionsCount > 0" 
+                            <tr v-if="selectedPortfolioData && selectedPortfolioData.remainingPositionsCount > 0" 
                                 class="placeholder-position">
                                 <td>
                                     <div class="remaining-positions-text">
@@ -518,6 +530,7 @@
                                               data-tooltip="Add more positions in the Build page to meet your diversification target">
                                             <i class="fas fa-question-circle"></i>
                                         </span>
+                                        <span class="tag is-info is-light ml-2">Debug: count=${selectedPortfolioData.remainingPositionsCount}</span>
                                     </div>
                                 </td>
                                 <td class="has-text-right">

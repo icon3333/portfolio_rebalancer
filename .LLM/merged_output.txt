@@ -1,5 +1,5 @@
 This file is a merged representation of selected files from the codebase.
-Generated on: 2025-03-14T10:43:03.629620
+Generated on: 2025-03-14T14:14:47.458330
 
 ================================================================
 Purpose:
@@ -2885,6 +2885,17 @@ document.addEventListener('DOMContentLoaded', function() {
                                         targetWeight: p.targetWeight
                                     }))
                                 );
+                                
+                                // Add debug info: Check for minPositions in each portfolio
+                                this.portfolioData.portfolios.forEach(portfolio => {
+                                    console.log(`Portfolio ${portfolio.name} minPositions:`, portfolio.minPositions);
+                                    
+                                    // Don't set default minPositions anymore - it will be calculated in calculateRemainingPositionsCount
+                                    // if (!portfolio.minPositions && portfolio.minPositions !== 0) {
+                                    //    console.log(`Setting default minPositions for ${portfolio.name}`);
+                                    //    portfolio.minPositions = 10; // Default value
+                                    // }
+                                });
                             }
                             
                             // If we received no portfolios or they have no data, fall back to mock data
@@ -3014,6 +3025,14 @@ document.addEventListener('DOMContentLoaded', function() {
                             this.selectedPortfolio = this.portfolioData.portfolios[0].name;
                         }
                         
+                        // Ensure remaining positions are calculated for the selected portfolio
+                        const selectedPortfolio = this.portfolioData?.portfolios?.find(p => p.name === this.selectedPortfolio);
+                        if (selectedPortfolio) {
+                            console.log('Calculating remaining positions when switching to detail view');
+                            // Force recalculation of remaining positions
+                            this.calculateRemainingPositionsCount(selectedPortfolio);
+                        }
+                        
                         // Check if we need to show an empty state message
                         const hasPortfolios = this.portfolioData && this.portfolioData.portfolios && this.portfolioData.portfolios.length > 0;
                         console.log(`Detail view has portfolios: ${hasPortfolios}`);
@@ -3095,6 +3114,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const selectedPortfolio = this.portfolioData?.portfolios?.find(p => p.name === this.selectedPortfolio);
                 if (selectedPortfolio) {
                     // Recalculate remaining positions count for the selected portfolio
+                    console.log('Recalculating remaining positions on navigate to detail...');
                     this.calculateRemainingPositionsCount(selectedPortfolio);
                     
                     // Make sure buy/sell actions are updated
@@ -3358,6 +3378,39 @@ document.addEventListener('DOMContentLoaded', function() {
                             }
                         }
                     }
+                    
+                    // NORMALIZE CATEGORY WEIGHTS TO SUM TO 100%
+                    // This is the key fix - ensure category weights properly sum to 100%
+                    let totalCategoryWeight = 0;
+                    portfolio.categories.forEach(category => {
+                        totalCategoryWeight += parseFloat(category.targetWeight || 0);
+                    });
+                    
+                    // If total is not 100% (with small tolerance for floating point errors)
+                    if (Math.abs(totalCategoryWeight - 100) > 0.01 && totalCategoryWeight > 0) {
+                        console.log(`Normalizing category weights from ${totalCategoryWeight}% to 100%`);
+                        
+                        // Scale factor to normalize to 100%
+                        const scaleFactor = 100 / totalCategoryWeight;
+                        
+                        // Apply scaling to each category
+                        portfolio.categories.forEach(category => {
+                            // Store original weight as localTargetWeight (relative to category)
+                            category.localTargetWeight = category.targetWeight;
+                            
+                            // Normalize target weight
+                            category.targetWeight = parseFloat((category.targetWeight * scaleFactor).toFixed(2));
+                            
+                            // Store percentage of portfolio for clarity
+                            category.portfolioPercentage = category.targetWeight;
+                        });
+                    } else {
+                        // Weights already sum to 100%, just store local copies
+                        portfolio.categories.forEach(category => {
+                            category.localTargetWeight = category.targetWeight;
+                            category.portfolioPercentage = category.targetWeight;
+                        });
+                    }
                 });
                 
                 // Calculate the actual amount of capital being used
@@ -3398,9 +3451,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // CATEGORY AND POSITION LEVEL CALCULATIONS
                 this.portfolioData.portfolios.forEach(portfolio => {
+                    // Track portfolio action total for consistency check
+                    let totalPortfolioAction = 0;
+                    
                     // Process categories within each portfolio
                     portfolio.categories.forEach(category => {
-                        // Calculate target value for this category
+                        // Calculate target value for this category - using normalized weights
                         category.targetValue = Math.round(portfolio.targetValue * category.targetWeight / 100);
                         
                         // Calculate action for this category
@@ -3417,10 +3473,19 @@ document.addEventListener('DOMContentLoaded', function() {
                             };
                         }
                         
+                        // Track category action amount for consistency check
+                        let categoryActionTotal = 0;
+                        
                         // Process positions within the category
                         category.positions.forEach(position => {
                             // Skip placeholder positions in calculations
                             if (position.isPlaceholder) return;
+                            
+                            // Store original weight as localTargetWeight (% of category)
+                            position.localTargetWeight = position.targetWeight;
+                            
+                            // Calculate position's global weight (% of total portfolio)
+                            position.globalTargetWeight = (category.targetWeight * position.targetWeight) / 100;
                             
                             // Calculate target value for this position
                             if (category.positions.filter(p => !p.isPlaceholder).length === 1) {
@@ -3445,11 +3510,42 @@ document.addEventListener('DOMContentLoaded', function() {
                                 };
                             }
                             
+                            // Sum action amounts for category total
+                            categoryActionTotal += position.action.type === "Buy" ? position.action.amount : 
+                                              position.action.type === "Sell" ? -position.action.amount : 0;
+                            
                             // Calculate position weights relative to portfolio instead of category
+                            // Local weight (category relative) - store the original targetWeight for reference
+                            // position.localWeight = position.targetWeight;  // This is already done earlier
+                            // Global weight (portfolio relative)
+                            position.globalWeight = (position.targetValue / portfolio.targetValue) * 100;
+                            // Also keep the portfolio weights for backward compatibility
                             position.portfolioCurrentWeight = (position.currentValue / portfolio.currentValue) * 100;
-                            position.portfolioTargetWeight = (position.targetValue / portfolio.targetValue) * 100;
+                            position.portfolioTargetWeight = position.globalWeight;
                         });
+                        
+                        // Verify category action consistency with position actions
+                        let categoryActionAmount = category.action.type === "Buy" ? category.action.amount : 
+                                               category.action.type === "Sell" ? -category.action.amount : 0;
+                        
+                        // If there's a meaningful difference between category action and sum of position actions
+                        if (Math.abs(categoryActionAmount - categoryActionTotal) > 1) {
+                            console.warn(`Category "${category.name}" action inconsistency detected: Category action: ${categoryActionAmount}, Sum of position actions: ${categoryActionTotal}`);
+                        }
+                        
+                        // Sum category actions for portfolio total
+                        totalPortfolioAction += category.action.type === "Buy" ? category.action.amount : 
+                                             category.action.type === "Sell" ? -category.action.amount : 0;
                     });
+                    
+                    // Verify portfolio action consistency
+                    let portfolioActionAmount = portfolio.action.type === "Buy" ? portfolio.action.amount : 
+                                             portfolio.action.type === "Sell" ? -portfolio.action.amount : 0;
+                                             
+                    // If there's a meaningful difference between portfolio action and sum of category actions
+                    if (Math.abs(portfolioActionAmount - totalPortfolioAction) > 1) {
+                        console.warn(`Portfolio "${portfolio.name}" action inconsistency detected: Portfolio action: ${portfolioActionAmount}, Sum of category actions: ${totalPortfolioAction}`);
+                    }
                 });
                 
                 // Recalculate final weights
@@ -3468,10 +3564,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     portfolio.categories.forEach(category => {
                         category.finalWeight = parseFloat((category.targetValue / portfolio.targetValue * 100).toFixed(2));
                         
-                        // Recalculate position final weights
+                        // Recalculate position final weights - both local (category) and global (portfolio)
                         category.positions.forEach(position => {
                             if (!position.isPlaceholder) {
+                                // Local weight (relative to category)
                                 position.finalWeight = parseFloat((position.targetValue / category.targetValue * 100).toFixed(2));
+                                // Global weight (relative to portfolio)
+                                position.finalGlobalWeight = parseFloat((position.targetValue / portfolio.targetValue * 100).toFixed(2));
                             }
                         });
                     });
@@ -3957,24 +4056,49 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             
             /**
-            * Format currency values with Euro symbol
+            * Format a currency value with the locale currency symbol
             */
             formatCurrency(value) {
-                if (value === null || value === undefined) return '€0';
-                return new Intl.NumberFormat('de-DE', { 
-                    style: 'currency', 
-                    currency: 'EUR',
-                    maximumFractionDigits: 0
-                }).format(value);
+                if (value === undefined || value === null) return '€0.00';
+                return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(value);
             },
             
             /**
-            * Format percentage values
+            * Format a percentage value with the % symbol
             */
             formatPercentage(value) {
-                if (value === null || value === undefined) return '0%';
-                // Ensure value is a number before calling toFixed
-                return `${parseFloat(String(value)).toFixed(1)}%`;
+                if (value === undefined || value === null) return '0.00%';
+                // Round to 2 decimal places and ensure it's a string
+                return parseFloat(value).toFixed(2) + '%';
+            },
+            
+            /**
+            * Format weight percentage showing both global and local weight values
+            * @param {number} globalValue - The global weight (relative to portfolio)
+            * @param {number} localValue - The local weight (relative to category)
+            * @param {boolean} showBoth - Whether to show both values or just the global
+            */
+            formatWeightPercentage(globalValue, localValue, showBoth = true) {
+                if (globalValue === undefined || globalValue === null) {
+                    globalValue = 0;
+                }
+                if (localValue === undefined || localValue === null) {
+                    localValue = 0;
+                }
+                
+                // Format the global value
+                const globalFormatted = parseFloat(globalValue).toFixed(2) + '%';
+                
+                // If we don't need to show both, just return the global value
+                if (!showBoth) {
+                    return globalFormatted;
+                }
+                
+                // Format the local value
+                const localFormatted = parseFloat(localValue).toFixed(2) + '%';
+                
+                // Return both values with the local one in parentheses with a smaller font
+                return `${globalFormatted} <span class="is-size-7 has-text-grey">(${localFormatted} of category)</span>`;
             },
             
             /**
@@ -3986,104 +4110,44 @@ document.addEventListener('DOMContentLoaded', function() {
             * to meet their diversification goals.
             */
             calculateRemainingPositionsCount(portfolio) {
-                // Get the minPositions value from the Build page
-                const minPositions = parseInt(portfolio.minPositions || 0);
+                // Default value for diversification settings
+                const defaultMaxPerPosition = 5; // Default maximum percentage per position
                 
-                if (!minPositions || minPositions <= 0) {
-                    // No minimum positions requirement
-                    portfolio.remainingPositionsCount = 0;
-                    portfolio.remainingPositionsAction = { type: "Hold", amount: 0 };
-                    portfolio.remainingPositionsInfo = 0;
-                    return;
-                }
+                // Get the maximum percentage per position
+                const maxPerPosition = portfolio.maxPerPosition || defaultMaxPerPosition;
                 
-                // Count actual positions
+                // CRITICAL FIX: Use portfolio's target weight instead of fixed value (100)
+                // This aligns with the builder.js calculation approach
+                const portfolioPercentage = portfolio.targetWeight || 0;
+                
+                // Calculate minimum positions needed using the SAME formula as builder.js
+                let minPositionsNeeded = Math.ceil(portfolioPercentage / maxPerPosition);
+                
+                // Ensure at least 1 position (matching builder.js behavior)
+                minPositionsNeeded = Math.max(1, minPositionsNeeded);
+                
+                // Count actual positions (non-placeholder only)
                 let actualPositionsCount = 0;
-                let totalTargetWeight = 0;
-                
-                portfolio.categories.forEach(category => {
-                    actualPositionsCount += category.positions.length;
-                    // Sum up target weights for allocation calculation
-                    totalTargetWeight += category.targetWeight;
-                });
-                
-                // If total target weight is very close to 100% (accounting for floating point errors),
-                // then we consider the portfolio fully allocated and don't need missing positions
-                if (Math.abs(totalTargetWeight - 100) < 0.1) {
-                    portfolio.remainingPositionsCount = 0;
-                    portfolio.remainingPositionsAction = { type: "Hold", amount: 0 };
-                    portfolio.remainingPositionsInfo = 0;
-                    return;
-                }
-                
-                // Calculate remaining positions to add
-                const remainingCount = Math.max(0, minPositions - actualPositionsCount);
-                portfolio.remainingPositionsCount = remainingCount;
-                
-                if (remainingCount <= 0) {
-                    // No remaining positions needed
-                    portfolio.remainingPositionsAction = { type: "Hold", amount: 0 };
-                    portfolio.remainingPositionsInfo = 0;
-                    return;
-                }
-                
-                // Calculate target value for remaining positions
-                // This is a simple calculation based on portfolio target value and remaining weight
-                const portfolioTargetWeight = portfolio.targetWeight || 100;
-                const remainingWeight = 100 - totalTargetWeight;
-                
-                // Store the remaining weight for display in the UI
-                portfolio.remainingPositionsWeight = remainingWeight;
-                
-                // Calculate target value for the missing positions
-                let targetValueForMissing = 0;
-                if (this.rebalanceMode === 'existingCapital') {
-                    // For full rebalancing, calculate based on total value
-                    targetValueForMissing = Math.round(this.totalValue * (portfolioTargetWeight / 100) * (remainingWeight / 100));
-                } else if (this.rebalanceMode === 'newCapitalOnly') {
-                    // For new capital only, calculate based on shortfall
-                    targetValueForMissing = Math.round(this.newPortfolioValue * (portfolioTargetWeight / 100) * (remainingWeight / 100));
-                } else if (this.rebalanceMode === 'newCapitalSpecific') {
-                    // For specific new capital, calculate based on portfolio allocation
-                    if (this.allowSellingWithNewCapital) {
-                        // If selling is allowed, calculate based on new total
-                        targetValueForMissing = Math.round((this.totalValue + this.newCapitalAmount) * (portfolioTargetWeight / 100) * (remainingWeight / 100));
-                    } else {
-                        // For no-selling with specific capital
-                        // Calculate based on shortfall and available capital
-                        const idealValue = Math.round(this.totalValue * (portfolioTargetWeight / 100) * (remainingWeight / 100));
-                        const shortfall = idealValue; // Missing positions have 0 current value
-                        
-                        // Calculate adjusted value based on available capital
-                        if (this.totalShortfall <= this.newCapitalAmount) {
-                            // Enough capital to cover all shortfalls
-                            targetValueForMissing = shortfall;
-                        } else {
-                            // Not enough capital - allocate proportionally
-                            targetValueForMissing = Math.round((shortfall / this.totalShortfall) * this.newCapitalAmount);
+                if (portfolio.categories && Array.isArray(portfolio.categories)) {
+                    portfolio.categories.forEach(category => {
+                        if (category.positions && Array.isArray(category.positions)) {
+                            actualPositionsCount += category.positions.filter(position => !position.isPlaceholder).length;
                         }
-                    }
+                    });
                 }
                 
-                // Add the 100€ that was previously missing in calculations
-                targetValueForMissing += 100;
+                // Calculate remaining positions needed
+                const remainingPositionsCount = Math.max(0, minPositionsNeeded - actualPositionsCount);
                 
-                // Store the target value
-                portfolio.remainingPositionsInfo = targetValueForMissing;
-                portfolio.remainingPositionsTargetValue = targetValueForMissing; // Ensure this is set correctly
+                // Add verification logging
+                console.log(`Portfolio ${portfolio.name}: targetWeight=${portfolioPercentage}, maxPerPosition=${maxPerPosition}, minPositionsNeeded=${minPositionsNeeded}, actualPositions=${actualPositionsCount}, remainingPositions=${remainingPositionsCount}`);
                 
-                // Set the action - always Buy for missing positions
-                portfolio.remainingPositionsAction = { 
-                    type: targetValueForMissing > 0 ? "Buy" : "Hold", 
-                    amount: targetValueForMissing 
-                };
+                // Store values on portfolio object
+                portfolio.remainingPositionsCount = remainingPositionsCount;
+                portfolio.minPositionsNeeded = minPositionsNeeded;
+                portfolio.actualPositionsCount = actualPositionsCount;
                 
-                // Calculate the portfolio-relative target weight of the missing positions
-                if (portfolio.targetValue > 0) {
-                    portfolio.remainingPositionsTargetWeight = (targetValueForMissing / portfolio.targetValue) * 100;
-                } else {
-                    portfolio.remainingPositionsTargetWeight = remainingWeight;
-                }
+                return remainingPositionsCount;
             },
         },
         mounted() {
@@ -4109,6 +4173,13 @@ document.addEventListener('DOMContentLoaded', function() {
             setTimeout(() => {
                 if (this.activeView === 'global') {
                     this.debouncedInitializeCharts();
+                } else if (this.activeView === 'detail' && this.selectedPortfolio) {
+                    // For detail view, recalculate remaining positions
+                    const selectedPortfolio = this.portfolioData?.portfolios?.find(p => p.name === this.selectedPortfolio);
+                    if (selectedPortfolio) {
+                        console.log('Recalculating remaining positions on initial mount...');
+                        this.calculateRemainingPositionsCount(selectedPortfolio);
+                    }
                 }
             }, 500);
             
@@ -7095,6 +7166,22 @@ def get_allocate_portfolio_data():
             except json.JSONDecodeError:
                 logger.error("Failed to parse target allocations JSON")
         
+        # Get diversification rules from expanded_state
+        rules_data = query_db('''
+            SELECT variable_value
+            FROM expanded_state
+            WHERE account_id = ? AND page_name = ? AND variable_name = ?
+        ''', [account_id, 'build', 'rules'], one=True)
+        
+        # Parse rules if available
+        rules = {'maxPerStock': 5}  # Default if not found
+        if rules_data and rules_data['variable_value']:
+            try:
+                rules = json.loads(rules_data['variable_value'])
+                logger.info(f"Found diversification rules in expanded_state: {rules}")
+            except json.JSONDecodeError:
+                logger.error("Failed to parse rules JSON")
+        
         result = {'portfolios': []}
         
         # Process each portfolio
@@ -7124,8 +7211,17 @@ def get_allocate_portfolio_data():
             # Find target allocation for this portfolio from the expanded_state data
             target_weight = 0
             target_portfolio = next((p for p in target_allocations if p.get('id') == portfolio_id), None)
+            
+            # Get maxPerPosition from target allocations or use default from rules
+            max_per_position = rules.get('maxPerStock', 5)  # Default to 5% if not found
+            
             if target_portfolio:
                 target_weight = target_portfolio.get('allocation', 0)
+                # Get individual portfolio's min positions if available
+                min_positions = target_portfolio.get('minPositions')
+                if min_positions:
+                    # If min_positions is explicitly set, we can derive the max per position
+                    max_per_position = 100 / min_positions
                 logger.info(f"Found target weight for portfolio {portfolio_name}: {target_weight}%")
             
             # Create portfolio entry
@@ -7134,7 +7230,8 @@ def get_allocate_portfolio_data():
                 'currentValue': portfolio_value,
                 'targetWeight': target_weight,
                 'color': '',
-                'categories': []
+                'categories': [],
+                'maxPerPosition': max_per_position  # Add this field with the correct value
             }
             
             # Process each category
@@ -7237,6 +7334,22 @@ def get_allocate_portfolio_data():
                 # Only add categories with positions
                 if category_entry['positions']:
                     portfolio_entry['categories'].append(category_entry)
+            
+            # After all categories have been added to portfolio_entry
+            
+            # Ensure category target weights sum to 100% within each portfolio
+            total_category_weight = sum(c.get('targetWeight', 0) for c in portfolio_entry['categories'])
+            if abs(total_category_weight - 100) > 0.01 and total_category_weight > 0:
+                # Normalize weights
+                scale_factor = 100.0 / total_category_weight
+                logger.info(f"Normalizing category weights in portfolio {portfolio_name} from {total_category_weight}% to 100%")
+                for category in portfolio_entry['categories']:
+                    # Store original weight as localTargetWeight
+                    category['localTargetWeight'] = category['targetWeight']
+                    # Normalize the target weight
+                    category['targetWeight'] = round(category['targetWeight'] * scale_factor, 2)
+                    # Store portfolio percentage for clarity
+                    category['portfolioPercentage'] = category['targetWeight']
             
             # Only add portfolios with categories
             if portfolio_entry['categories']:
@@ -9617,7 +9730,15 @@ def process_csv_data(account_id, file_content):
                         </tr>
                         
                         <!-- Remaining positions notification (if needed) -->
-                        <tr v-if="portfolio.remainingPositionsCount && portfolio.remainingPositionsCount > 0" 
+                        <tr v-if="portfolio.remainingPositionsCount && 
+                                 portfolio.remainingPositionsCount > 0 && 
+                                 portfolio.categories && 
+                                 portfolio.categories.some(category => 
+                                   category.positions && 
+                                   category.positions.some(position => 
+                                     position.isPlaceholder && position.totalRemainingWeight > 0
+                                   )
+                                 )" 
                             :key="`${portfolio.name}-remaining`"
                             class="placeholder-position">
                             <td>
@@ -9692,7 +9813,10 @@ def process_csv_data(account_id, file_content):
                                     </td>
                                     <td class="has-text-right">${formatCurrency(category.currentValue)}</td>
                                     <td class="has-text-right">${formatPercentage(category.currentWeight)}</td>
-                                    <td class="has-text-right">${formatPercentage(category.targetWeight)}</td>
+                                    <td class="has-text-right">
+                                        ${formatPercentage(category.targetWeight)}
+                                        <span class="is-size-7 has-text-grey">(of portfolio)</span>
+                                    </td>
                                     <td class="has-text-right">${formatCurrency(category.targetValue)}</td>
                                     <td class="has-text-right">
                                         <span :class="{
@@ -9717,7 +9841,10 @@ def process_csv_data(account_id, file_content):
                                         </td>
                                         <td class="has-text-right">${formatCurrency(position.currentValue)}</td>
                                         <td class="has-text-right">${formatPercentage(position.portfolioCurrentWeight || 0)}</td>
-                                        <td class="has-text-right">${formatPercentage(position.portfolioTargetWeight || 0)}</td>
+                                        <td class="has-text-right">
+                                            ${formatPercentage(position.globalTargetWeight || 0)}
+                                            <span class="is-size-7 has-text-grey">(${formatPercentage(position.localTargetWeight)} of category)</span>
+                                        </td>
                                         <td class="has-text-right">${formatCurrency(position.targetValue)}</td>
                                         <td class="has-text-right">
                                             <span :class="{
@@ -9727,13 +9854,6 @@ def process_csv_data(account_id, file_content):
                                             }">
                                                 ${position.action ? position.action.type + ' ' + formatCurrency(position.action.amount) : 'Hold €0.00'}
                                             </span>
-                                            
-                                            <!-- Tooltips for additional information -->
-                                            <div class="has-tooltip-left has-tooltip-arrow" data-tooltip="Weights shown are relative to total portfolio value">
-                                                <span class="icon is-small">
-                                                    <i class="fas fa-info-circle"></i>
-                                                </span>
-                                            </div>
                                         </td>
                                     </tr>
                                 </template>
@@ -9752,7 +9872,14 @@ def process_csv_data(account_id, file_content):
                             </tr>
                             
                             <!-- Portfolio remaining positions row - shown at the bottom after all categories -->
-                            <tr v-if="selectedPortfolioData.remainingPositionsCount && selectedPortfolioData.remainingPositionsCount > 0" 
+                            <tr v-if="selectedPortfolioData && selectedPortfolioData.remainingPositionsCount > 0 && 
+                                    selectedPortfolioData.categories && 
+                                    selectedPortfolioData.categories.some(category => 
+                                        category.positions && 
+                                        category.positions.some(position => 
+                                            position.isPlaceholder && position.totalRemainingWeight > 0
+                                        )
+                                    )" 
                                 class="placeholder-position">
                                 <td>
                                     <div class="remaining-positions-text">

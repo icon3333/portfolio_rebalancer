@@ -270,6 +270,11 @@ def get_allocate_portfolio_data():
             if target_portfolio:
                 target_weight = target_portfolio.get('allocation', 0)
                 logger.info(f"Found target weight for portfolio {portfolio_name}: {target_weight}%")
+                
+                # Add minPositions value from target allocations if available
+                if 'minPositions' in target_portfolio:
+                    min_positions = target_portfolio.get('minPositions')
+                    logger.info(f"Found minPositions for portfolio {portfolio_name}: {min_positions}")
             
             # Create portfolio entry
             portfolio_entry = {
@@ -279,6 +284,11 @@ def get_allocate_portfolio_data():
                 'color': '',
                 'categories': []
             }
+            
+            # Add minPositions to portfolio entry if it was found
+            if target_portfolio and 'minPositions' in target_portfolio:
+                portfolio_entry['minPositions'] = target_portfolio.get('minPositions')
+                logger.info(f"Added minPositions {portfolio_entry['minPositions']} to portfolio {portfolio_name}")
             
             # Process each category
             for category_item in categories_data:
