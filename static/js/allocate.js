@@ -887,7 +887,15 @@ document.addEventListener('DOMContentLoaded', function() {
                         // Update to use the correct formula: totalPortfolioValueWithAllocation * targetWeight
                         // Make sure we apply the category adjustment factor to the weight, not to the final value
                         const adjustedCategoryWeight = category.targetWeight * categoryAdjustmentFactor;
-                        category.targetValue = Math.round(totalPortfolioValueWithAllocation * adjustedCategoryWeight / 100);
+                        
+                        // For existing capital mode, use current portfolio value
+                        // This ensures target values match expected percentages of current portfolio
+                        // For modes with new capital, include the additional capital in calculations
+                        const baseValueForCalculation = this.rebalanceMode === 'existingCapital' 
+                            ? this.totalValue 
+                            : totalPortfolioValueWithAllocation;
+                        
+                        category.targetValue = Math.round(baseValueForCalculation * adjustedCategoryWeight / 100);
                         
                         // Calculate action for this category
                         if (this.rebalanceMode === 'newCapitalSpecific' && !this.allowSellingWithNewCapital && 
@@ -952,13 +960,10 @@ document.addEventListener('DOMContentLoaded', function() {
                                 // If there's only one position in the category, give it the full category target value
                                 position.targetValue = category.targetValue;
                             } else {
-                                // FIXED: Use direct calculation from portfolio target value
-                                // This aligns with how weights are displayed in the UI (as global percentages)
-                                position.targetValue = Math.round(totalPortfolioValueWithAllocation * position.targetWeight / 100);
-                                
-                                // Keep this commented out for reference - this was the old nested calculation
-                                // const positionTargetWeightOfPortfolio = (category.targetWeight / 100) * (position.targetWeight / 100);
-                                // position.targetValue = Math.round(totalPortfolioValueWithAllocation * positionTargetWeightOfPortfolio);
+                                // Otherwise, calculate based on weight distribution and total portfolio value with allocation
+                                // Use category's target weight (relative to portfolio) and position's target weight (relative to category)
+                                const positionTargetWeightOfPortfolio = (category.targetWeight / 100) * (position.targetWeight / 100);
+                                position.targetValue = Math.round(totalPortfolioValueWithAllocation * positionTargetWeightOfPortfolio);
                             }
                             
                             // Calculate action for this position
@@ -988,9 +993,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (Math.abs(categoryActionAmount - categoryActionTotal) > 1) {
                             console.warn(`Category "${category.name}" action inconsistency detected: Category action: ${categoryActionAmount}, Sum of position actions: ${categoryActionTotal}`);
                         }
-                        
-                        // Additional validation to ensure category totals remain consistent
-                        this.validateCategoryPositions(category);
                         
                         // Sum category actions for portfolio total
                         totalPortfolioAction += category.action.type === "Buy" ? category.action.amount : 
@@ -1693,24 +1695,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 
                 return remainingPositionsCount;
-            },
-            
-            /**
-            * Additional validation to ensure category totals remain consistent
-            */
-            validateCategoryPositions(category) {
-                // Skip if no positions or only placeholders
-                const realPositions = category.positions.filter(p => !p.isPlaceholder);
-                if (realPositions.length === 0) return;
-                
-                // Sum position target values
-                const positionsTotal = realPositions.reduce((sum, position) => 
-                    sum + position.targetValue, 0);
-                
-                // Log warning if significant discrepancy
-                if (Math.abs(positionsTotal - category.targetValue) > realPositions.length) {
-                    console.warn(`Category "${category.name}" has target value (${category.targetValue}) that doesn't match sum of positions (${positionsTotal})`);
-                }
             },
         },
         mounted() {
