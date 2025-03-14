@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Rebalancing settings
                 rebalanceMode: 'existingCapital',
                 newCapitalAmount: 5000,
-                allowSellingWithNewCapital: true,  // New toggle for allowing sells with new capital
+                allowSellingWithNewCapital: false,  // New toggle for allowing sells with new capital
                 
                 // Chart instances
                 currentChart: null,
