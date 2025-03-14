@@ -561,60 +561,76 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             
             /**
-            * Calculate current weights for all items
+            * Calculate current weights for all portfolios, categories and positions
             */
             calculateCurrentWeights() {
+                console.log('Calculating current weights...');
+                
+                if (!this.portfolioData.portfolios || !Array.isArray(this.portfolioData.portfolios)) {
+                    console.error('Invalid portfolioData structure in calculateCurrentWeights');
+                    return;
+                }
+                
                 // Calculate total portfolio value
                 this.totalValue = this.portfolioData.portfolios.reduce(
-                    (sum, portfolio) => sum + portfolio.currentValue, 0
+                    (sum, portfolio) => sum + (portfolio.currentValue || 0), 0
                 );
                 
-                // Calculate portfolio weights
+                console.log(`Total portfolio value: ${this.totalValue.toFixed(2)}`);
+                
+                // For each portfolio, calculate current weight
                 this.portfolioData.portfolios.forEach(portfolio => {
-                    portfolio.currentWeight = this.totalValue ? 
-                        parseFloat((portfolio.currentValue / this.totalValue * 100).toFixed(2)) : 0;
-                        
-                    // Make sure each portfolio has a target weight (use current if missing)
-                    // Don't overwrite target weights that came from the server
-                    if (!portfolio.targetWeight && portfolio.targetWeight !== 0) {
-                        portfolio.targetWeight = parseFloat(String(portfolio.currentWeight));
+                    // Calculate portfolio weight as percentage of total value
+                    if (this.totalValue > 0) {
+                        portfolio.currentWeight = (portfolio.currentValue / this.totalValue) * 100;
+                    } else {
+                        portfolio.currentWeight = 0;
                     }
                     
-                    // Calculate category weights within each portfolio
-                    let portfolioCategoryTotal = portfolio.categories.reduce(
-                        (sum, category) => sum + category.currentValue, 0
-                    );
-                    
+                    // For each category, calculate current weight relative to portfolio
                     portfolio.categories.forEach(category => {
-                        category.currentWeight = portfolioCategoryTotal ? 
-                            parseFloat((category.currentValue / portfolioCategoryTotal * 100).toFixed(2)) : 0;
-                            
-                        // Make sure each category has a target weight (use current if missing)
-                        // Don't overwrite target weights that came from the server
-                        if (!category.targetWeight && category.targetWeight !== 0) {
-                            category.targetWeight = parseFloat(String(category.currentWeight));
+                        // Calculate category current weight as percentage of portfolio value
+                        if (portfolio.currentValue > 0) {
+                            category.currentWeight = (category.currentValue / portfolio.currentValue) * 100;
+                        } else {
+                            category.currentWeight = 0;
                         }
                         
-                        // Calculate position weights within each category
-                        let categoryPositionTotal = category.positions.reduce(
-                            (sum, position) => sum + position.currentValue, 0
-                        );
-                        
+                        // For each position, calculate current weight relative to category and portfolio
                         category.positions.forEach(position => {
-                            position.currentWeight = categoryPositionTotal ? 
-                                parseFloat((position.currentValue / categoryPositionTotal * 100).toFixed(2)) : 0;
-                                
-                            // Make sure each position has a target weight (use current if missing)
-                            // Don't overwrite target weights that came from the server
-                                    if (!position.targetWeight && position.targetWeight !== 0) {
-                                        position.targetWeight = parseFloat(String(position.currentWeight));
-                                    } else {
-                                        // Ensure target weight is properly formatted as a number
-                                        position.targetWeight = parseFloat(position.targetWeight.toFixed(2));
-                                    }
+                            // Skip placeholders
+                            if (position.isPlaceholder) return;
+                            
+                            // Calculate position weight as percentage of category value
+                            if (category.currentValue > 0) {
+                                position.currentWeight = (position.currentValue / category.currentValue) * 100;
+                            } else {
+                                position.currentWeight = 0;
+                            }
+                            
+                            // Calculate position weight as percentage of portfolio value (for UI display)
+                            if (portfolio.currentValue > 0) {
+                                position.portfolioCurrentWeight = (position.currentValue / portfolio.currentValue) * 100;
+                            } else {
+                                position.portfolioCurrentWeight = 0;
+                            }
+                            
+                            // Also set the localTargetWeight for this position based on flat weight distribution
+                            if (!position.localTargetWeight) {
+                                // Count number of positions in this category for equal division
+                                const positionCount = category.positions.filter(p => !p.isPlaceholder).length;
+                                if (positionCount > 0) {
+                                    position.localTargetWeight = 100 / positionCount;
+                                } else {
+                                    position.localTargetWeight = 0;
+                                }
+                            }
                         });
                     });
                 });
+                
+                // Update newPortfolioValue based on totalValue
+                this.newPortfolioValue = this.totalValue;
             },
             
             /**
@@ -645,8 +661,16 @@ document.addEventListener('DOMContentLoaded', function() {
             * Calculate target values and actions for all portfolios and positions
             */
             calculateTargetValuesAndActions() {
-                // Calculate new portfolio value based on rebalance mode
+                console.log('Starting calculateTargetValuesAndActions()');
+                
+                // ALWAYS preserve values from backend for existingCapital mode
+                // ⭐ CRITICAL FIX: Always preserve the backend values for existingCapital mode
+                const preserveValues = this.rebalanceMode === 'existingCapital';
+                console.log('Preserve backend values?', preserveValues);
+                
+                // Reset new portfolio value
                 this.newPortfolioValue = this.totalValue;
+                
                 if (this.rebalanceMode === 'newCapitalSpecific') {
                     // Initialize with current value, we'll update this after allocation
                     // We won't directly add newCapitalAmount here anymore
@@ -657,52 +681,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Calculate the total portfolio value (current + allocated)
                 const totalPortfolioValueWithAllocation = this.totalValue + (this.newCapitalAmount || 0);
                 
+                // ⭐ IMPORTANT: Log the entire portfolio data before calculations to check
+                // what's coming from the backend
+                console.log('⭐ PORTFOLIO DATA BEFORE CALCULATIONS:', JSON.parse(JSON.stringify(this.portfolioData)));
+                
                 // PORTFOLIO LEVEL CALCULATIONS
                 this.portfolioData.portfolios.forEach(portfolio => {
-                    // Handle based on whether selling is allowed
-                    if (this.rebalanceMode === 'existingCapital') {
-                        // Full rebalance - sell or buy as needed to reach target allocation
-                        portfolio.targetValue = Math.round(this.totalValue * portfolio.targetWeight / 100);
-                        portfolio.action = {
-                            type: portfolio.targetValue > portfolio.currentValue ? "Buy" : 
-                                portfolio.targetValue < portfolio.currentValue ? "Sell" : "Hold",
-                            amount: Math.abs(portfolio.targetValue - portfolio.currentValue)
-                        };
-                    } else if (this.rebalanceMode === 'newCapitalOnly') {
-                        // New capital only - no selling
-                        const idealTargetValue = Math.round(this.newPortfolioValue * portfolio.targetWeight / 100);
-                        const shortfall = Math.max(0, idealTargetValue - portfolio.currentValue);
-                        
-                        portfolio.shortfall = shortfall;
-                        portfolio.idealTargetValue = idealTargetValue;
-                        
-                        // Calculate portfolio action
-                        portfolio.action = shortfall > 0 
-                            ? { type: "Buy", amount: shortfall } 
-                            : { type: "Hold", amount: 0 };
-                        
-                        // Set target value - will be refined once we know allocation
-                        portfolio.targetValue = portfolio.currentValue + shortfall;
-                    } else {
-                        // New capital with specific allocation - need to calculate based on input amount
-                        // Calculate total shortfall across portfolios that need capital
-                        const totalShortfall = this.portfolioData.portfolios.reduce(
-                            (sum, p) => {
-                                const idealValue = this.totalValue * p.targetWeight / 100;
-                                return sum + Math.max(0, idealValue - p.currentValue);
-                            }, 0
-                        );
-                        
-                        // Calculate shortfall for this specific portfolio
-                        const idealValue = this.totalValue * portfolio.targetWeight / 100;
-                        portfolio.shortfall = Math.max(0, idealValue - portfolio.currentValue);
-                        portfolio.idealTargetValue = idealValue;
-                        
-                        if (this.allowSellingWithNewCapital) {
-                            // Selling is allowed - target values should reflect ideal weights
-                            // Update to use totalPortfolioValueWithAllocation
-                            const idealTargetValue = Math.round(totalPortfolioValueWithAllocation * portfolio.targetWeight / 100);
-                            portfolio.targetValue = idealTargetValue;
+                    console.log(`Processing portfolio: ${portfolio.name}`);
+                    console.log(`- Original target value from API: ${portfolio.targetValue || 'Not set'}`);
+                    
+                    // For existingCapital mode, preserve backend values and only calculate actions
+                    if (preserveValues) {
+                        // Only calculate action based on the existing target value
+                        if (portfolio.targetValue !== undefined) {
+                            console.log(`- Preserving target value: ${portfolio.targetValue}`);
                             
                             portfolio.action = {
                                 type: portfolio.targetValue > portfolio.currentValue ? "Buy" : 
@@ -710,60 +702,238 @@ document.addEventListener('DOMContentLoaded', function() {
                                 amount: Math.abs(portfolio.targetValue - portfolio.currentValue)
                             };
                         } else {
-                            // No-sell mode
-                            if (totalShortfall <= this.newCapitalAmount) {
-                                // Enough capital to cover all shortfalls
-                                portfolio.targetValue = portfolio.currentValue + (portfolio.shortfall || 0);
+                            console.warn(`- No target value from backend for ${portfolio.name}, calculating...`);
+                            portfolio.targetValue = Math.round(this.totalValue * portfolio.targetWeight / 100);
+                            
+                            portfolio.action = {
+                                type: portfolio.targetValue > portfolio.currentValue ? "Buy" : 
+                                    portfolio.targetValue < portfolio.currentValue ? "Sell" : "Hold",
+                                amount: Math.abs(portfolio.targetValue - portfolio.currentValue)
+                            };
+                        }
+                    }
+                    // For other modes, recalculate target values
+                    else {
+                        // Handle based on whether selling is allowed
+                        if (this.rebalanceMode === 'existingCapital') {
+                            // Full rebalance - sell or buy as needed to reach target allocation
+                            portfolio.targetValue = Math.round(this.totalValue * portfolio.targetWeight / 100);
+                            portfolio.action = {
+                                type: portfolio.targetValue > portfolio.currentValue ? "Buy" : 
+                                    portfolio.targetValue < portfolio.currentValue ? "Sell" : "Hold",
+                                amount: Math.abs(portfolio.targetValue - portfolio.currentValue)
+                            };
+                        } else if (this.rebalanceMode === 'newCapitalOnly') {
+                            // New capital only - no selling
+                            const idealTargetValue = Math.round(this.newPortfolioValue * portfolio.targetWeight / 100);
+                            const shortfall = Math.max(0, idealTargetValue - portfolio.currentValue);
+                            
+                            portfolio.shortfall = shortfall;
+                            portfolio.idealTargetValue = idealTargetValue;
+                            
+                            // Calculate portfolio action
+                            portfolio.action = shortfall > 0 
+                                ? { type: "Buy", amount: shortfall } 
+                                : { type: "Hold", amount: 0 };
+                            
+                            // Set target value - will be refined once we know allocation
+                            portfolio.targetValue = portfolio.currentValue + shortfall;
+                        } else {
+                            // New capital with specific allocation - need to calculate based on input amount
+                            // Calculate total shortfall across portfolios that need capital
+                            const totalShortfall = this.portfolioData.portfolios.reduce(
+                                (sum, p) => {
+                                    const idealValue = this.totalValue * p.targetWeight / 100;
+                                    return sum + Math.max(0, idealValue - p.currentValue);
+                                }, 0
+                            );
+                            
+                            // Calculate shortfall for this specific portfolio
+                            const idealValue = this.totalValue * portfolio.targetWeight / 100;
+                            portfolio.shortfall = Math.max(0, idealValue - portfolio.currentValue);
+                            portfolio.idealTargetValue = idealValue;
+                            
+                            if (this.allowSellingWithNewCapital) {
+                                // Selling is allowed - target values should reflect ideal weights
+                                // Update to use totalPortfolioValueWithAllocation
+                                const idealTargetValue = Math.round(totalPortfolioValueWithAllocation * portfolio.targetWeight / 100);
+                                portfolio.targetValue = idealTargetValue;
+                                
                                 portfolio.action = {
-                                    type: (portfolio.shortfall || 0) > 0 ? "Buy" : "Hold",
-                                    amount: portfolio.shortfall || 0
+                                    type: portfolio.targetValue > portfolio.currentValue ? "Buy" : 
+                                        portfolio.targetValue < portfolio.currentValue ? "Sell" : "Hold",
+                                    amount: Math.abs(portfolio.targetValue - portfolio.currentValue)
                                 };
-                            } else if ((portfolio.shortfall || 0) > 0) {
-                                // Not enough capital - allocate proportionally
-                                const allocation = Math.round((portfolio.shortfall / totalShortfall) * this.newCapitalAmount);
-                                portfolio.targetValue = portfolio.currentValue + allocation;
-                                portfolio.action = { type: "Buy", amount: allocation };
                             } else {
-                                // No shortfall
-                                portfolio.targetValue = portfolio.currentValue;
-                                portfolio.action = { type: "Hold", amount: 0 };
+                                // No-sell mode
+                                if (totalShortfall <= this.newCapitalAmount) {
+                                    // Enough capital to cover all shortfalls
+                                    portfolio.targetValue = portfolio.currentValue + (portfolio.shortfall || 0);
+                                    portfolio.action = {
+                                        type: (portfolio.shortfall || 0) > 0 ? "Buy" : "Hold",
+                                        amount: portfolio.shortfall || 0
+                                    };
+                                } else if ((portfolio.shortfall || 0) > 0) {
+                                    // Not enough capital - allocate proportionally
+                                    const allocation = Math.round((portfolio.shortfall / totalShortfall) * this.newCapitalAmount);
+                                    portfolio.targetValue = portfolio.currentValue + allocation;
+                                    portfolio.action = { type: "Buy", amount: allocation };
+                                } else {
+                                    // No shortfall
+                                    portfolio.targetValue = portfolio.currentValue;
+                                    portfolio.action = { type: "Hold", amount: 0 };
+                                }
                             }
                         }
                     }
                     
-                    // NORMALIZE CATEGORY WEIGHTS TO SUM TO 100%
-                    // This is the key fix - ensure category weights properly sum to 100%
-                    let totalCategoryWeight = 0;
-                    portfolio.categories.forEach(category => {
-                        totalCategoryWeight += parseFloat(category.targetWeight || 0);
-                    });
-                    
-                    // If total is not 100% (with small tolerance for floating point errors)
-                    if (Math.abs(totalCategoryWeight - 100) > 0.01 && totalCategoryWeight > 0) {
-                        console.log(`Normalizing category weights from ${totalCategoryWeight}% to 100%`);
-                        
-                        // Scale factor to normalize to 100%
-                        const scaleFactor = 100 / totalCategoryWeight;
-                        
-                        // Apply scaling to each category
+                    // ⭐ PRESERVE ALL CATEGORY AND POSITION TARGET VALUES FROM BACKEND IF AVAILABLE
+                    if (preserveValues) {
+                        // For categories, only calculate actions using original target values
                         portfolio.categories.forEach(category => {
-                            // Store original weight as localTargetWeight (relative to category)
-                            category.localTargetWeight = category.targetWeight;
+                            console.log(`  Processing category: ${category.name}`);
+                            console.log(`  - Original target value from API: ${category.targetValue || 'Not set'}`);
                             
-                            // Normalize target weight
-                            category.targetWeight = parseFloat((category.targetWeight * scaleFactor).toFixed(2));
-                            
-                            // Store percentage of portfolio for clarity
-                            category.portfolioPercentage = category.targetWeight;
+                            // Only calculate action if target value exists
+                            if (category.targetValue !== undefined) {
+                                console.log(`  - Preserving target value: ${category.targetValue}`);
+                                
+                                category.action = {
+                                    type: category.targetValue > category.currentValue ? "Buy" : 
+                                        category.targetValue < category.currentValue ? "Sell" : "Hold",
+                                    amount: Math.abs(category.targetValue - category.currentValue)
+                                };
+                                
+                                // For positions, only calculate actions using original target values
+                                category.positions.forEach(position => {
+                                    // Skip placeholders
+                                    if (position.isPlaceholder) return;
+                                    
+                                    console.log(`    Processing position: ${position.name}`);
+                                    console.log(`    - Original target value from API: ${position.targetValue || 'Not set'}`);
+                                    
+                                    // Only calculate action if target value exists
+                                    if (position.targetValue !== undefined) {
+                                        console.log(`    - Preserving target value: ${position.targetValue}`);
+                                        
+                                        position.action = {
+                                            type: position.targetValue > position.currentValue ? "Buy" : 
+                                                position.targetValue < position.currentValue ? "Sell" : "Hold",
+                                            amount: Math.abs(position.targetValue - position.currentValue)
+                                        };
+                                    } else {
+                                        console.warn(`    - No target value from backend for position ${position.name}, calculating...`);
+                                        
+                                        // Calculate position target value based on positions in category
+                                        const positionsInCategory = category.positions.filter(p => !p.isPlaceholder).length;
+                                        position.targetValue = category.targetValue / positionsInCategory;
+                                        
+                                        position.action = {
+                                            type: position.targetValue > position.currentValue ? "Buy" : 
+                                                position.targetValue < position.currentValue ? "Sell" : "Hold",
+                                            amount: Math.abs(position.targetValue - position.currentValue)
+                                        };
+                                    }
+                                });
+                            } else {
+                                console.warn(`  - No target value from backend for category ${category.name}, calculating...`);
+                                
+                                // Calculate category target value based on portfolio target
+                                category.targetValue = portfolio.targetValue * (category.targetWeight / 100);
+                                
+                                category.action = {
+                                    type: category.targetValue > category.currentValue ? "Buy" : 
+                                        category.targetValue < category.currentValue ? "Sell" : "Hold",
+                                    amount: Math.abs(category.targetValue - category.currentValue)
+                                };
+                                
+                                // Calculate position target values
+                                const positionsInCategory = category.positions.filter(p => !p.isPlaceholder).length;
+                                
+                                category.positions.forEach(position => {
+                                    // Skip placeholders
+                                    if (position.isPlaceholder) return;
+                                    
+                                    position.targetValue = category.targetValue / positionsInCategory;
+                                    
+                                    position.action = {
+                                        type: position.targetValue > position.currentValue ? "Buy" : 
+                                            position.targetValue < position.currentValue ? "Sell" : "Hold",
+                                        amount: Math.abs(position.targetValue - position.currentValue)
+                                    };
+                                });
+                            }
                         });
-                    } else {
-                        // Weights already sum to 100%, just store local copies
+                    }
+                    // For other modes, proceed with weight calculations
+                    else {
+                        // NORMALIZE CATEGORY WEIGHTS TO SUM TO 100%
+                        let totalCategoryWeight = 0;
                         portfolio.categories.forEach(category => {
-                            category.localTargetWeight = category.targetWeight;
-                            category.portfolioPercentage = category.targetWeight;
+                            totalCategoryWeight += parseFloat(category.targetWeight || 0);
+                        });
+                        
+                        // If total is not 100% (with small tolerance for floating point errors)
+                        if (Math.abs(totalCategoryWeight - 100) > 0.01 && totalCategoryWeight > 0) {
+                            console.log(`Normalizing category weights from ${totalCategoryWeight}% to 100%`);
+                            
+                            // Scale factor to normalize to 100%
+                            const scaleFactor = 100 / totalCategoryWeight;
+                            
+                            // Apply scaling to each category
+                            portfolio.categories.forEach(category => {
+                                // Store original weight as localTargetWeight (relative to category)
+                                category.localTargetWeight = category.targetWeight;
+                                
+                                // Normalize target weight
+                                category.targetWeight = parseFloat((category.targetWeight * scaleFactor).toFixed(2));
+                                
+                                // Store percentage of portfolio for clarity
+                                category.portfolioPercentage = category.targetWeight;
+                            });
+                        } else {
+                            // Weights already sum to 100%, just store local copies
+                            portfolio.categories.forEach(category => {
+                                category.localTargetWeight = category.targetWeight;
+                                category.portfolioPercentage = category.targetWeight;
+                            });
+                        }
+                        
+                        // Process each category
+                        portfolio.categories.forEach(category => {
+                            // Calculate category target value based on portfolio weight
+                            category.targetValue = portfolio.targetValue * (category.targetWeight / 100);
+                            
+                            // Calculate action
+                            category.action = {
+                                type: category.targetValue > category.currentValue ? "Buy" : 
+                                    category.targetValue < category.currentValue ? "Sell" : "Hold",
+                                amount: Math.abs(category.targetValue - category.currentValue)
+                            };
+                            
+                            // Process each position
+                            category.positions.forEach(position => {
+                                // Skip placeholders
+                                if (position.isPlaceholder) return;
+                                
+                                // Calculate position's target value based on category weight
+                                const positionCount = category.positions.filter(p => !p.isPlaceholder).length;
+                                position.targetValue = category.targetValue / positionCount;
+                                
+                                // Calculate action
+                                position.action = {
+                                    type: position.targetValue > position.currentValue ? "Buy" : 
+                                        position.targetValue < position.currentValue ? "Sell" : "Hold",
+                                    amount: Math.abs(position.targetValue - position.currentValue)
+                                };
+                            });
                         });
                     }
                 });
+                
+                // ⭐ IMPORTANT: Log the entire portfolio data after calculations to check
+                // what's being displayed
+                console.log('⭐ PORTFOLIO DATA AFTER CALCULATIONS:', JSON.parse(JSON.stringify(this.portfolioData)));
                 
                 // Calculate the actual amount of capital being used
                 // This ensures newPortfolioValue only includes actual allocated capital
@@ -866,148 +1036,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     });
                 }
-                
-                // CATEGORY AND POSITION LEVEL CALCULATIONS
-                this.portfolioData.portfolios.forEach(portfolio => {
-                    // Track portfolio action total for consistency check
-                    let totalPortfolioAction = 0;
-                    
-                    // If we have missing positions, we need to adjust the category target values
-                    // to account for the weight that will be allocated to missing positions
-                    const hasMissingPositions = portfolio.remainingPositionsCount > 0;
-                    const missingPositionsWeight = hasMissingPositions ? portfolio.missingPositionsTargetWeight : 0;
-                    
-                    // Calculate adjustment factor for categories to account for missing positions
-                    const categoryAdjustmentFactor = hasMissingPositions ? (100 - missingPositionsWeight) / 100 : 1;
-                    
-                    // Process categories within each portfolio
-                    portfolio.categories.forEach(category => {
-                        // Calculate target value for this category - using normalized weights and adjustment factor
-                        // to account for missing positions
-                        // Update to use the correct formula: totalPortfolioValueWithAllocation * targetWeight
-                        // Make sure we apply the category adjustment factor to the weight, not to the final value
-                        const adjustedCategoryWeight = category.targetWeight * categoryAdjustmentFactor;
-                        
-                        // For existing capital mode, use current portfolio value
-                        // This ensures target values match expected percentages of current portfolio
-                        // For modes with new capital, include the additional capital in calculations
-                        const baseValueForCalculation = this.rebalanceMode === 'existingCapital' 
-                            ? this.totalValue 
-                            : totalPortfolioValueWithAllocation;
-                        
-                        category.targetValue = Math.round(baseValueForCalculation * adjustedCategoryWeight / 100);
-                        
-                        // Calculate action for this category
-                        if (this.rebalanceMode === 'newCapitalSpecific' && !this.allowSellingWithNewCapital && 
-                            category.targetValue < category.currentValue) {
-                            // In no-sell mode, keep current value if target is lower
-                            category.action = { type: "Hold", amount: 0 };
-                            category.targetValue = category.currentValue; // Adjust target to match current
-                        } else {
-                            category.action = {
-                                type: category.targetValue > category.currentValue ? "Buy" : 
-                                    category.targetValue < category.currentValue ? "Sell" : "Hold",
-                                amount: Math.abs(category.targetValue - category.currentValue)
-                            };
-                        }
-                        
-                        // Track category action amount for consistency check
-                        let categoryActionTotal = 0;
-                        
-                        // Process positions within the category
-                        category.positions.forEach(position => {
-                            // Skip placeholder positions in calculations
-                            if (position.isPlaceholder) return;
-                            
-                            // Calculate position weights relative to portfolio instead of category
-                            // Local weight (category relative) - store the original targetWeight for reference
-                            position.localTargetWeight = position.targetWeight; // This is relative to the category
-                            
-                            // Global weight (portfolio relative)
-                            position.globalTargetWeight = (position.targetValue / this.newPortfolioValue) * 100;
-                            position.globalWeight = position.globalTargetWeight; // For consistency
-                            
-                            // IMPORTANT: Calculate the portfolio-relative weight (weight within the portfolio)
-                            // For each dividend position, this should be 5% in the example case
-                            // This is the weight relative to the PORTFOLIO (not category, not global)
-                            // ALWAYS use the higher number between actual positions and minimum positions
-                            const actualPositionsInPortfolio = portfolio.actualPositionsCount || 0;
-                            const minPositionsRequired = portfolio.minPositionsNeeded || 1;
-                            
-                            // Use the MAXIMUM of actual positions and minimum positions for calculation
-                            // This ensures we get 5% for dividend portfolio with 20 min positions, even if there are only 8 actual positions
-                            const positionsCountForCalculation = Math.max(actualPositionsInPortfolio, minPositionsRequired);
-                            position.portfolioRelativeWeight = 100 / positionsCountForCalculation;
-                            
-                            // Add detailed logging for the portfolio-relative weight calculation
-                            if (portfolio.name === 'dividend') {
-                                console.warn(`POSITION WEIGHT CALCULATION for ${position.name || 'unknown'} in ${portfolio.name}:`);
-                                console.warn(`- actualPositionsInPortfolio: ${actualPositionsInPortfolio}`);
-                                console.warn(`- minPositionsRequired: ${minPositionsRequired}`);
-                                console.warn(`- positionsCountForCalculation: ${positionsCountForCalculation}`);
-                                console.warn(`- portfolioRelativeWeight: ${position.portfolioRelativeWeight.toFixed(2)}%`);
-                            }
-                            
-                            // Also keep the portfolio weights for backward compatibility
-                            position.portfolioCurrentWeight = (position.currentValue / portfolio.currentValue) * 100;
-                            position.portfolioTargetWeight = position.portfolioRelativeWeight;
-                            
-                            // Update localTargetWeight to be the portfolio-relative weight (what the user wants as primary display)
-                            position.localTargetWeight = position.portfolioRelativeWeight;
-                            
-                            // Calculate target value for this position
-                            if (category.positions.filter(p => !p.isPlaceholder).length === 1) {
-                                // If there's only one position in the category, give it the full category target value
-                                position.targetValue = category.targetValue;
-                            } else {
-                                // Otherwise, calculate based on weight distribution and total portfolio value with allocation
-                                // Use category's target weight (relative to portfolio) and position's target weight (relative to category)
-                                const positionTargetWeightOfPortfolio = (category.targetWeight / 100) * (position.targetWeight / 100);
-                                position.targetValue = Math.round(totalPortfolioValueWithAllocation * positionTargetWeightOfPortfolio);
-                            }
-                            
-                            // Calculate action for this position
-                            if (this.rebalanceMode === 'newCapitalSpecific' && !this.allowSellingWithNewCapital && 
-                                position.targetValue < position.currentValue) {
-                                // In no-sell mode, keep current value if target is lower
-                                position.action = { type: "Hold", amount: 0 };
-                                position.targetValue = position.currentValue; // Adjust target to match current
-                            } else {
-                                position.action = {
-                                    type: position.targetValue > position.currentValue ? "Buy" : 
-                                        position.targetValue < position.currentValue ? "Sell" : "Hold",
-                                    amount: Math.abs(position.targetValue - position.currentValue)
-                                };
-                            }
-                            
-                            // Sum action amounts for category total
-                            categoryActionTotal += position.action.type === "Buy" ? position.action.amount : 
-                                              position.action.type === "Sell" ? -position.action.amount : 0;
-                        });
-                        
-                        // Verify category action consistency with position actions
-                        let categoryActionAmount = category.action.type === "Buy" ? category.action.amount : 
-                                               category.action.type === "Sell" ? -category.action.amount : 0;
-                        
-                        // If there's a meaningful difference between category action and sum of position actions
-                        if (Math.abs(categoryActionAmount - categoryActionTotal) > 1) {
-                            console.warn(`Category "${category.name}" action inconsistency detected: Category action: ${categoryActionAmount}, Sum of position actions: ${categoryActionTotal}`);
-                        }
-                        
-                        // Sum category actions for portfolio total
-                        totalPortfolioAction += category.action.type === "Buy" ? category.action.amount : 
-                                             category.action.type === "Sell" ? -category.action.amount : 0;
-                    });
-                    
-                    // Verify portfolio action consistency
-                    let portfolioActionAmount = portfolio.action.type === "Buy" ? portfolio.action.amount : 
-                                             portfolio.action.type === "Sell" ? -portfolio.action.amount : 0;
-                                             
-                    // If there's a meaningful difference between portfolio action and sum of category actions
-                    if (Math.abs(portfolioActionAmount - totalPortfolioAction) > 1) {
-                        console.warn(`Portfolio "${portfolio.name}" action inconsistency detected: Portfolio action: ${portfolioActionAmount}, Sum of category actions: ${totalPortfolioAction}`);
-                    }
-                });
                 
                 // Recalculate final weights
                 this.portfolioData.portfolios.forEach(portfolio => {
