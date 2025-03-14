@@ -606,12 +606,12 @@ document.addEventListener('DOMContentLoaded', function() {
                                 
                             // Make sure each position has a target weight (use current if missing)
                             // Don't overwrite target weights that came from the server
-                            if (!position.targetWeight && position.targetWeight !== 0) {
-                                position.targetWeight = parseFloat(String(position.currentWeight));
-                            } else {
-                                // Ensure target weight is properly formatted as a number
-                                position.targetWeight = parseFloat(position.targetWeight.toFixed(2));
-                            }
+                                    if (!position.targetWeight && position.targetWeight !== 0) {
+                                        position.targetWeight = parseFloat(String(position.currentWeight));
+                                    } else {
+                                        // Ensure target weight is properly formatted as a number
+                                        position.targetWeight = parseFloat(position.targetWeight.toFixed(2));
+                                    }
                         });
                     });
                 });
@@ -653,6 +653,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 } else if (this.rebalanceMode === 'newCapitalOnly') {
                     this.newPortfolioValue += this.requiredCapitalForNoSales;
                 }
+                
+                // Calculate the total portfolio value (current + allocated)
+                const totalPortfolioValueWithAllocation = this.totalValue + (this.newCapitalAmount || 0);
                 
                 // PORTFOLIO LEVEL CALCULATIONS
                 this.portfolioData.portfolios.forEach(portfolio => {
@@ -697,7 +700,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         
                         if (this.allowSellingWithNewCapital) {
                             // Selling is allowed - target values should reflect ideal weights
-                            const idealTargetValue = Math.round((this.totalValue + this.newCapitalAmount) * portfolio.targetWeight / 100);
+                            // Update to use totalPortfolioValueWithAllocation
+                            const idealTargetValue = Math.round(totalPortfolioValueWithAllocation * portfolio.targetWeight / 100);
                             portfolio.targetValue = idealTargetValue;
                             
                             portfolio.action = {
@@ -880,7 +884,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     portfolio.categories.forEach(category => {
                         // Calculate target value for this category - using normalized weights and adjustment factor
                         // to account for missing positions
-                        category.targetValue = Math.round(portfolio.targetValue * category.targetWeight / 100 * categoryAdjustmentFactor);
+                        // Update to use the correct formula: totalPortfolioValueWithAllocation * targetWeight
+                        // Make sure we apply the category adjustment factor to the weight, not to the final value
+                        const adjustedCategoryWeight = category.targetWeight * categoryAdjustmentFactor;
+                        category.targetValue = Math.round(totalPortfolioValueWithAllocation * adjustedCategoryWeight / 100);
                         
                         // Calculate action for this category
                         if (this.rebalanceMode === 'newCapitalSpecific' && !this.allowSellingWithNewCapital && 
@@ -945,8 +952,13 @@ document.addEventListener('DOMContentLoaded', function() {
                                 // If there's only one position in the category, give it the full category target value
                                 position.targetValue = category.targetValue;
                             } else {
-                                // Otherwise, calculate based on weight distribution
-                                position.targetValue = Math.round(category.targetValue * position.targetWeight / 100);
+                                // FIXED: Use direct calculation from portfolio target value
+                                // This aligns with how weights are displayed in the UI (as global percentages)
+                                position.targetValue = Math.round(totalPortfolioValueWithAllocation * position.targetWeight / 100);
+                                
+                                // Keep this commented out for reference - this was the old nested calculation
+                                // const positionTargetWeightOfPortfolio = (category.targetWeight / 100) * (position.targetWeight / 100);
+                                // position.targetValue = Math.round(totalPortfolioValueWithAllocation * positionTargetWeightOfPortfolio);
                             }
                             
                             // Calculate action for this position
@@ -976,6 +988,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (Math.abs(categoryActionAmount - categoryActionTotal) > 1) {
                             console.warn(`Category "${category.name}" action inconsistency detected: Category action: ${categoryActionAmount}, Sum of position actions: ${categoryActionTotal}`);
                         }
+                        
+                        // Additional validation to ensure category totals remain consistent
+                        this.validateCategoryPositions(category);
                         
                         // Sum category actions for portfolio total
                         totalPortfolioAction += category.action.type === "Buy" ? category.action.amount : 
@@ -1678,6 +1693,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 
                 return remainingPositionsCount;
+            },
+            
+            /**
+            * Additional validation to ensure category totals remain consistent
+            */
+            validateCategoryPositions(category) {
+                // Skip if no positions or only placeholders
+                const realPositions = category.positions.filter(p => !p.isPlaceholder);
+                if (realPositions.length === 0) return;
+                
+                // Sum position target values
+                const positionsTotal = realPositions.reduce((sum, position) => 
+                    sum + position.targetValue, 0);
+                
+                // Log warning if significant discrepancy
+                if (Math.abs(positionsTotal - category.targetValue) > realPositions.length) {
+                    console.warn(`Category "${category.name}" has target value (${category.targetValue}) that doesn't match sum of positions (${positionsTotal})`);
+                }
             },
         },
         mounted() {
