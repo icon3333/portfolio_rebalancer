@@ -38,6 +38,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     portfolios: []
                 },
                 
+                // Original backend data for restoration when switching modes
+                originalBackendData: null,
+                
                 // Mock data for initial rendering - will be replaced with API data
                 mockData: {
                     portfolios: [
@@ -108,12 +111,19 @@ document.addEventListener('DOMContentLoaded', function() {
             /**
             * Watch for changes to rebalance mode and recalculate
             */
-            rebalanceMode() {
+            rebalanceMode(newMode, oldMode) {
                 // Prevent infinite loops by checking the isUpdating flag
                 if (this.isUpdating) return;
                 
                 this.isUpdating = true;
                 try {
+                    // When switching back to existingCapital, restore original values 
+                    if (newMode === 'existingCapital' && oldMode !== 'existingCapital' && this.originalBackendData) {
+                        console.log('Restoring original backend data for existingCapital mode');
+                        // Restore portfolio data from cached original copy
+                        this.portfolioData = JSON.parse(JSON.stringify(this.originalBackendData));
+                    }
+                    
                     this.calculateTargetValuesAndActions();
                     
                     // Only update charts in global view
@@ -264,6 +274,10 @@ document.addEventListener('DOMContentLoaded', function() {
                             this.portfolioData = response.data;
                             console.log('Portfolio data loaded:', this.portfolioData);
                             
+                            // Store original backend data for mode switching restoration
+                            this.originalBackendData = JSON.parse(JSON.stringify(response.data));
+                            console.log('Original backend data cached for restoration');
+                            
                             // Log target weights received from the server
                             if (this.portfolioData.portfolios.length > 0) {
                                 console.log('Target weights from server:', 
@@ -289,6 +303,8 @@ document.addEventListener('DOMContentLoaded', function() {
                             if (this.portfolioData.portfolios.length === 0) {
                                 console.warn('No portfolio data found, using mock data for demo purposes');
                                 this.portfolioData = JSON.parse(JSON.stringify(this.mockData));
+                                // Also store mock data as original data
+                                this.originalBackendData = JSON.parse(JSON.stringify(this.mockData));
                             }
                             
                             this.isUpdating = true;
@@ -340,6 +356,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         
                         // Fall back to mock data if API fails
                         this.portfolioData = JSON.parse(JSON.stringify(this.mockData));
+                        // Also store mock data as original data
+                        this.originalBackendData = JSON.parse(JSON.stringify(this.mockData));
                         
                         // Show notification that we're using demo data
                         const notification = document.querySelector('.notification.is-info');
