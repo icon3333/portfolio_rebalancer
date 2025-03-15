@@ -698,7 +698,8 @@ document.addEventListener('DOMContentLoaded', function() {
                             
                             portfolio.action = {
                                 type: portfolio.targetValue > portfolio.currentValue ? "Buy" : 
-                                    portfolio.targetValue < portfolio.currentValue ? "Sell" : "Hold",
+                                    (portfolio.targetValue < portfolio.currentValue && 
+                                     (this.rebalanceMode !== 'newCapitalSpecific' || this.allowSellingWithNewCapital)) ? "Sell" : "Hold",
                                 amount: Math.abs(portfolio.targetValue - portfolio.currentValue)
                             };
                         } else {
@@ -707,7 +708,8 @@ document.addEventListener('DOMContentLoaded', function() {
                             
                             portfolio.action = {
                                 type: portfolio.targetValue > portfolio.currentValue ? "Buy" : 
-                                    portfolio.targetValue < portfolio.currentValue ? "Sell" : "Hold",
+                                    (portfolio.targetValue < portfolio.currentValue && 
+                                     (this.rebalanceMode !== 'newCapitalSpecific' || this.allowSellingWithNewCapital)) ? "Sell" : "Hold",
                                 amount: Math.abs(portfolio.targetValue - portfolio.currentValue)
                             };
                         }
@@ -720,7 +722,8 @@ document.addEventListener('DOMContentLoaded', function() {
                             portfolio.targetValue = Math.round(this.totalValue * portfolio.targetWeight / 100);
                             portfolio.action = {
                                 type: portfolio.targetValue > portfolio.currentValue ? "Buy" : 
-                                    portfolio.targetValue < portfolio.currentValue ? "Sell" : "Hold",
+                                    (portfolio.targetValue < portfolio.currentValue && 
+                                     (this.rebalanceMode !== 'newCapitalSpecific' || this.allowSellingWithNewCapital)) ? "Sell" : "Hold",
                                 amount: Math.abs(portfolio.targetValue - portfolio.currentValue)
                             };
                         } else if (this.rebalanceMode === 'newCapitalOnly') {
@@ -761,7 +764,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 
                                 portfolio.action = {
                                     type: portfolio.targetValue > portfolio.currentValue ? "Buy" : 
-                                        portfolio.targetValue < portfolio.currentValue ? "Sell" : "Hold",
+                                        (portfolio.targetValue < portfolio.currentValue) ? "Sell" : "Hold",
                                     amount: Math.abs(portfolio.targetValue - portfolio.currentValue)
                                 };
                             } else {
@@ -800,7 +803,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                 
                                 category.action = {
                                     type: category.targetValue > category.currentValue ? "Buy" : 
-                                        category.targetValue < category.currentValue ? "Sell" : "Hold",
+                                        (category.targetValue < category.currentValue && 
+                                         (this.rebalanceMode !== 'newCapitalSpecific' || this.allowSellingWithNewCapital)) ? "Sell" : "Hold",
                                     amount: Math.abs(category.targetValue - category.currentValue)
                                 };
                                 
@@ -818,7 +822,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                         
                                         position.action = {
                                             type: position.targetValue > position.currentValue ? "Buy" : 
-                                                position.targetValue < position.currentValue ? "Sell" : "Hold",
+                                                (position.targetValue < position.currentValue && 
+                                                 (this.rebalanceMode !== 'newCapitalSpecific' || this.allowSellingWithNewCapital)) ? "Sell" : "Hold",
                                             amount: Math.abs(position.targetValue - position.currentValue)
                                         };
                                     } else {
@@ -830,7 +835,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                         
                                         position.action = {
                                             type: position.targetValue > position.currentValue ? "Buy" : 
-                                                position.targetValue < position.currentValue ? "Sell" : "Hold",
+                                                (position.targetValue < position.currentValue && 
+                                                 (this.rebalanceMode !== 'newCapitalSpecific' || this.allowSellingWithNewCapital)) ? "Sell" : "Hold",
                                             amount: Math.abs(position.targetValue - position.currentValue)
                                         };
                                     }
@@ -843,7 +849,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                 
                                 category.action = {
                                     type: category.targetValue > category.currentValue ? "Buy" : 
-                                        category.targetValue < category.currentValue ? "Sell" : "Hold",
+                                        (category.targetValue < category.currentValue && 
+                                         (this.rebalanceMode !== 'newCapitalSpecific' || this.allowSellingWithNewCapital)) ? "Sell" : "Hold",
                                     amount: Math.abs(category.targetValue - category.currentValue)
                                 };
                                 
@@ -858,7 +865,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                     
                                     position.action = {
                                         type: position.targetValue > position.currentValue ? "Buy" : 
-                                            position.targetValue < position.currentValue ? "Sell" : "Hold",
+                                            (position.targetValue < position.currentValue && 
+                                             (this.rebalanceMode !== 'newCapitalSpecific' || this.allowSellingWithNewCapital)) ? "Sell" : "Hold",
                                         amount: Math.abs(position.targetValue - position.currentValue)
                                     };
                                 });
@@ -907,7 +915,8 @@ document.addEventListener('DOMContentLoaded', function() {
                             // Calculate action
                             category.action = {
                                 type: category.targetValue > category.currentValue ? "Buy" : 
-                                    category.targetValue < category.currentValue ? "Sell" : "Hold",
+                                    (category.targetValue < category.currentValue && 
+                                     (this.rebalanceMode !== 'newCapitalSpecific' || this.allowSellingWithNewCapital)) ? "Sell" : "Hold",
                                 amount: Math.abs(category.targetValue - category.currentValue)
                             };
                             
@@ -923,7 +932,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                 // Calculate action
                                 position.action = {
                                     type: position.targetValue > position.currentValue ? "Buy" : 
-                                        position.targetValue < position.currentValue ? "Sell" : "Hold",
+                                        (position.targetValue < position.currentValue && 
+                                         (this.rebalanceMode !== 'newCapitalSpecific' || this.allowSellingWithNewCapital)) ? "Sell" : "Hold",
                                     amount: Math.abs(position.targetValue - position.currentValue)
                                 };
                             });
@@ -962,21 +972,29 @@ document.addEventListener('DOMContentLoaded', function() {
 
                         // Process missing positions if they exist
                         if (portfolio.remainingPositionsCount > 0) {
-                            // Calculate ideal weight per position (based on diversification rules)
-                            const idealPositionCount = portfolio.minPositionsNeeded;
-                            const idealWeightPerPosition = 100 / idealPositionCount;
+                            // Calculate the available capital for this portfolio
+                            // This is the difference between target and current value
+                            const availableCapital = Math.max(0, portfolio.targetValue - portfolio.currentValue);
                             
-                            // Calculate total target weight that should be allocated to missing positions
-                            const totalMissingWeight = portfolio.remainingPositionsCount * idealWeightPerPosition;
+                            // Calculate the remaining weight not allocated to existing positions
+                            const allocatedWeight = portfolio.totalAttributedWeight || 0;
+                            const remainingWeight = Math.max(0, 100 - allocatedWeight);
                             
-                            // Calculate weight per missing position
-                            const weightPerMissingPosition = totalMissingWeight / portfolio.remainingPositionsCount;
+                            // Calculate weight per missing position based on the remaining available weight
+                            const weightPerMissingPosition = remainingWeight / portfolio.remainingPositionsCount;
                             
-                            // Set target value for missing positions
-                            const missingPositionsTargetValue = Math.round(portfolio.targetValue * totalMissingWeight / 100);
+                            // The theoretical target value based on weight (this could exceed available capital)
+                            const theoreticalTargetValue = portfolio.targetValue * remainingWeight / 100;
+                            
+                            // Limit the missing positions target value to the available capital
+                            // This ensures we don't allocate more than what's available
+                            const missingPositionsTargetValue = Math.min(
+                                Math.round(theoreticalTargetValue),
+                                availableCapital
+                            );
                             
                             // Store these calculations on the portfolio object for access in the template
-                            portfolio.missingPositionsTargetWeight = totalMissingWeight;
+                            portfolio.missingPositionsTargetWeight = remainingWeight;
                             portfolio.missingPositionsTargetValue = missingPositionsTargetValue;
                             portfolio.missingPositionsWeightEach = weightPerMissingPosition;
                             portfolio.missingPositionsValueEach = Math.round(missingPositionsTargetValue / portfolio.remainingPositionsCount);
@@ -990,10 +1008,10 @@ document.addEventListener('DOMContentLoaded', function() {
                             // Set for backwards compatibility
                             portfolio.remainingPositionsAction = { type: "Buy", amount: missingPositionsTargetValue };
                             portfolio.remainingPositionsInfo = missingPositionsTargetValue;
-                            portfolio.remainingPositionsWeight = totalMissingWeight;
+                            portfolio.remainingPositionsWeight = remainingWeight;
                             
                             // Log for debugging
-                            console.log(`Set up missing positions for ${portfolio.name}: ${portfolio.remainingPositionsCount} missing, target weight: ${totalMissingWeight.toFixed(2)}%, target value: ${missingPositionsTargetValue}`);
+                            console.log(`Set up missing positions for ${portfolio.name}: ${portfolio.remainingPositionsCount} missing, target weight: ${remainingWeight.toFixed(2)}%, target value: ${missingPositionsTargetValue}, available capital: ${availableCapital}`);
                         }
                     });
                 } else {
@@ -1004,21 +1022,27 @@ document.addEventListener('DOMContentLoaded', function() {
 
                         // Process missing positions if they exist
                         if (portfolio.remainingPositionsCount > 0) {
-                            // Calculate ideal weight per position (based on diversification rules)
-                            const idealPositionCount = portfolio.minPositionsNeeded;
-                            const idealWeightPerPosition = 100 / idealPositionCount;
+                            // Calculate the available capital for this portfolio
+                            const availableCapital = Math.max(0, portfolio.targetValue - portfolio.currentValue);
                             
-                            // Calculate total target weight that should be allocated to missing positions
-                            const totalMissingWeight = portfolio.remainingPositionsCount * idealWeightPerPosition;
+                            // Calculate the remaining weight not allocated to existing positions
+                            const allocatedWeight = portfolio.totalAttributedWeight || 0;
+                            const remainingWeight = Math.max(0, 100 - allocatedWeight);
                             
-                            // Calculate weight per missing position
-                            const weightPerMissingPosition = totalMissingWeight / portfolio.remainingPositionsCount;
+                            // Calculate weight per missing position based on the remaining available weight
+                            const weightPerMissingPosition = remainingWeight / portfolio.remainingPositionsCount;
                             
-                            // Set target value for missing positions
-                            const missingPositionsTargetValue = Math.round(portfolio.targetValue * totalMissingWeight / 100);
+                            // The theoretical target value based on weight
+                            const theoreticalTargetValue = portfolio.targetValue * remainingWeight / 100;
+                            
+                            // Limit the missing positions target value to the available capital
+                            const missingPositionsTargetValue = Math.min(
+                                Math.round(theoreticalTargetValue),
+                                availableCapital
+                            );
                             
                             // Store these calculations on the portfolio object for access in the template
-                            portfolio.missingPositionsTargetWeight = totalMissingWeight;
+                            portfolio.missingPositionsTargetWeight = remainingWeight;
                             portfolio.missingPositionsTargetValue = missingPositionsTargetValue;
                             portfolio.missingPositionsWeightEach = weightPerMissingPosition;
                             portfolio.missingPositionsValueEach = Math.round(missingPositionsTargetValue / portfolio.remainingPositionsCount);
@@ -1032,7 +1056,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             // Set for backwards compatibility
                             portfolio.remainingPositionsAction = { type: "Buy", amount: missingPositionsTargetValue };
                             portfolio.remainingPositionsInfo = missingPositionsTargetValue;
-                            portfolio.remainingPositionsWeight = totalMissingWeight;
+                            portfolio.remainingPositionsWeight = remainingWeight;
                         }
                     });
                 }

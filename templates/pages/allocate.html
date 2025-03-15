@@ -209,24 +209,6 @@
                         </span>
                     </div>
                 </div>
-                
-                <!-- New toggle for allowing sells in new capital specific mode -->
-                <div v-if="rebalanceMode === 'newCapitalSpecific'" class="field mt-3">
-                    <label class="label is-small">Rebalancing Options</label>
-                    <div class="control">
-                        <label class="checkbox">
-                            <input type="checkbox" 
-                                v-model="allowSellingWithNewCapital" 
-                                @change="debouncedCalculateTargetValuesAndActions">
-                            <span class="ml-2">Allow selling positions</span>
-                        </label>
-                        <p class="help" :class="allowSellingWithNewCapital ? 'has-text-info' : 'has-text-grey'">
-                            <i class="fas fa-info-circle mr-1"></i>
-                            <span v-if="allowSellingWithNewCapital">Will optimize by both buying and selling.</span>
-                            <span v-else>Will only buy new positions (no selling).</span>
-                        </p>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
