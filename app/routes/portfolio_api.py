@@ -262,41 +262,43 @@ def get_allocate_portfolio_data():
                     ORDER BY c.name
                 ''', [account_id, portfolio_id, category_name])
                 
-                # Count positions in this category for weight calculation
+                # Count positions in this category
                 positions_in_category = len(positions_data)
                 
                 # Calculate category value
                 category_value = sum(pos['price_eur'] * pos['shares'] for pos in positions_data if pos['price_eur'])
                 
-                # CRITICAL FIX - STEP 3: Use portfolio-specific position weight
-                # Calculate weight per position based on minimum positions for this portfolio
+                # Get the portfolio's minimum positions setting
                 min_positions_for_portfolio = portfolio_min_positions.get(portfolio_id, positions_in_portfolio)
-                position_weight_in_portfolio = 100.0 / min_positions_for_portfolio if min_positions_for_portfolio > 0 else 0
                 
-                # Each position gets equal weight based on portfolio min positions
-                # For dividend portfolio with 20 min positions, each position gets 5%
-                category_total_weight = positions_in_category * position_weight_in_portfolio
+                # Calculate per-position weight (equal for all positions in portfolio)
+                position_weight = 100.0 / min_positions_for_portfolio if min_positions_for_portfolio > 0 else 0
                 
-                # Create category entry
+                # STEP 1: Calculate category weight as percentage of positions in portfolio
+                # This is simply: (positions in category / min positions) × 100%
+                category_weight = (positions_in_category / min_positions_for_portfolio) * 100 if min_positions_for_portfolio > 0 else 0
+                
+                # Create category entry with position-based weight
                 category_entry = {
                     'name': category_name,
                     'currentValue': category_value,
-                    'targetWeight': category_total_weight,  # Sum of positions' weights
+                    'targetWeight': category_weight,  # Percentage of portfolio based on position count
+                    'positionCount': positions_in_category,  # Store position count for reference
                     'color': '',
                     'positions': []
                 }
                 
-                # Process each position with portfolio-specific weight
+                # Process each position with consistent position weight
                 for position in positions_data:
                     position_value = 0
                     if position['price_eur'] and position['shares']:
                         position_value = position['price_eur'] * position['shares']
                     
-                    # CRITICAL FIX - STEP 4: Each position gets weight based on portfolio min positions
+                    # Each position gets the same weight (e.g., 5% for 20 positions)
                     position_entry = {
                         'name': position['name'],
                         'currentValue': position_value,
-                        'targetWeight': position_weight_in_portfolio,  # Based on min positions in portfolio
+                        'targetWeight': position_weight,  # Each position gets same weight within portfolio
                         'color': ''
                     }
                     
@@ -307,7 +309,6 @@ def get_allocate_portfolio_data():
                     portfolio_entry['categories'].append(category_entry)
             
             # Calculate remaining positions count for portfolio diversification
-            # We need to handle placeholders consistently with the flat weight model
             if target_portfolio:
                 real_positions_count = sum(len(category['positions']) for category in portfolio_entry['categories'])
                 total_expected_positions = positions_in_portfolio
@@ -318,36 +319,54 @@ def get_allocate_portfolio_data():
                     portfolio_entry['remainingPositionsCount'] = remaining_positions_count
                     logger.info(f"Portfolio {portfolio_name} needs {remaining_positions_count} more positions")
                     
-                    # Calculate total weight for all remaining positions
-                    remaining_total_weight = remaining_positions_count * flat_position_weight
+                    # Get the portfolio's minimum positions setting
+                    min_positions_for_portfolio = portfolio_min_positions.get(portfolio_id, positions_in_portfolio)
                     
-                    # CRITICAL FIX - STEP 5: Add missing positions as a special category
+                    # Calculate per-position weight (equal for all positions in portfolio)
+                    position_weight = 100.0 / min_positions_for_portfolio if min_positions_for_portfolio > 0 else 0
+                    
+                    # STEP 2: Calculate missing positions weight (same formula as category weight)
+                    missing_positions_weight = (remaining_positions_count / min_positions_for_portfolio) * 100 if min_positions_for_portfolio > 0 else 0
+                    
                     # Create a hidden category to hold missing positions
                     placeholder_category = {
                         'name': 'Missing Positions',
                         'currentValue': 0,
-                        'targetWeight': remaining_total_weight,
+                        'targetWeight': missing_positions_weight,  # Percentage of portfolio based on position count
+                        'positionCount': remaining_positions_count,  # Store position count for reference
                         'color': '',
                         'positions': [{
                             'name': f"{remaining_positions_count}x missing positions",
                             'currentValue': 0,
                             'currentWeight': 0,
-                            'targetWeight': flat_position_weight,  # Per-position weight
+                            'targetWeight': position_weight,  # Per-position weight
                             'color': '',
                             'isPlaceholder': True,
                             'positionsRemaining': remaining_positions_count,
-                            'weight_per_position': flat_position_weight
+                            'weight_per_position': position_weight
                         }]
                     }
                     
-                    # Add metadata for UI display
-                    placeholder_category['positions'][0]['total_weight'] = remaining_total_weight
+                    # Add position count metadata for UI display
+                    placeholder_category['positions'][0]['total_weight'] = missing_positions_weight
                     
-                    # CRITICAL FIX - STEP 6: Add placeholder category to categories array
-                    # The UI looks for this to display the missing positions row
+                    # Add placeholder category to categories array
                     portfolio_entry['categories'].append(placeholder_category)
             
-            # Only add portfolios with categories
+            # STEP 3: Log total category weight - should be very close to 100%
+            total_category_weight = sum(cat['targetWeight'] for cat in portfolio_entry['categories'])
+            if total_category_weight > 0:  # Avoid division by zero
+                # Log all weights without normalizing
+                logger.info(f"Portfolio {portfolio_name} total category weight: {total_category_weight:.2f}% (should be 100%)")
+                
+                # Log all category weights for debugging
+                for cat in portfolio_entry['categories']:
+                    logger.info(f"  Category {cat['name']} weight: {cat['targetWeight']:.2f}% ({cat['positionCount']} positions out of {min_positions_for_portfolio} min positions)")
+            
+            # Initialize portfolio_target_value with a default value
+            portfolio_target_value = 0
+
+            # Only continue with target value calculations if we have categories
             if portfolio_entry['categories']:
                 # NEW: Compute target values for portfolio and category modes
                 # Determine target portfolio value from query parameter if provided; otherwise use current portfolio value
@@ -382,37 +401,32 @@ def get_allocate_portfolio_data():
                 min_positions = portfolio_min_positions.get(portfolio_id, positions_in_portfolio)
                 logger.info(f"Portfolio {portfolio_name} uses {min_positions} minimum positions for weight calculation")
                 
+                # STEP 4: Calculate per-position value
+                position_value = portfolio_target_value / min_positions if min_positions > 0 else 0
+                
                 # For each category, compute target values:
                 for cat in portfolio_entry['categories']:
                     # Number of positions in this category
-                    n_cat = len(cat['positions'])
+                    n_cat = cat['positionCount']
                     
-                    # Get position weight based on minimum positions in portfolio
-                    position_weight = 100.0 / min_positions if min_positions > 0 else 0
-                    
-                    # Calculate per-position and category weights
-                    cat_weight_from_positions = n_cat * position_weight
-                    
-                    # Use previously calculated weight if it exists (from above)
-                    cat_weight = cat['targetWeight'] if 'targetWeight' in cat else cat_weight_from_positions
-                    
-                    # Category target value is its proportion of the portfolio target value
-                    # We use cat['targetWeight'] which is % of THIS PORTFOLIO that this category represents
-                    cat_target_value = (cat_weight / 100) * portfolio_target_value
+                    # STEP 5: Calculate category target value based on position count × position value
+                    cat_target_value = position_value * n_cat
                     cat['targetValue'] = cat_target_value
-                    logger.info(f"  Category {cat['name']} target value: {cat_target_value:.2f} (weight: {cat_weight}% of portfolio {portfolio_target_value:.2f})")
+                    
+                    # Log the target values with position-based weight
+                    category_weight = cat['targetWeight']
+                    logger.info(f"  Category {cat['name']} target value: {cat_target_value:.2f} ({category_weight:.2f}% of portfolio, {n_cat} positions × {position_value:.2f})")
                     
                     # For each position in this category
                     for pos in cat['positions']:
-                        # Position target value is its proportion of category target value
-                        # All positions within a category get equal weight
-                        pos_target_value = cat_target_value / n_cat if n_cat > 0 else 0
-                        pos['targetValue'] = pos_target_value
-                        logger.info(f"    Position {pos['name']} target value: {pos_target_value:.2f} (1/{n_cat} of category {cat_target_value:.2f})")
-                
-                # Keep old properties for backwards compatibility
-                portfolio_entry['targetAllocation_portfolio'] = portfolio_target_value
+                        # Each position gets the same value
+                        pos['targetValue'] = position_value
+                        logger.info(f"    Position {pos['name']} target value: {position_value:.2f}")
             
+            # Keep old properties for backwards compatibility - always set this regardless of categories
+            portfolio_entry['targetAllocation_portfolio'] = portfolio_target_value
+            
+            # Now add the portfolio entry to the result
             result['portfolios'].append(portfolio_entry)
         
         logger.info(f"Returning {len(result['portfolios'])} portfolios with flat {flat_position_weight:.2f}% weight per position")
