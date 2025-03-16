@@ -150,57 +150,15 @@
                     <span class="icon">
                         <i class="fas fa-cog"></i>
                     </span>
-                    <span>Rebalancing Mode</span>
+                    <span>New Capital Amount</span>
                 </span>
             </h3>
             
             <div class="box p-4 rebalancing-mode">
                 <div class="field">
-                    <label class="label">Select Rebalancing Strategy</label>
-                    
-                    <div class="control mb-2">
-                        <label class="radio">
-                            <input type="radio" 
-                                name="rebalanceMode" 
-                                value="existingCapital" 
-                                v-model="rebalanceMode">
-                            <span>Existing Capital</span>
-                        </label>
-                        <p class="help ml-4" :class="rebalanceMode === 'existingCapital' ? 'has-text-primary' : 'has-text-grey'">
-                            <i class="fas fa-info-circle mr-1"></i>
-                            Rebalance by buying and selling using current portfolio value only.
-                        </p>
-                    </div>
-                    
-                    <div class="control mb-1">
-                        <label class="radio">
-                            <input type="radio" 
-                                name="rebalanceMode" 
-                                value="newCapitalOnly" 
-                                v-model="rebalanceMode">
-                            <span>New Capital Only</span>
-                        </label>
-                        <p class="help ml-4" :class="rebalanceMode === 'newCapitalOnly' ? 'has-text-success' : 'has-text-grey'">
-                            <i class="fas fa-info-circle mr-1"></i>
-                            Only buy assets with new capital. No selling of existing positions.
-                        </p>
-                    </div>
-                    
-                    <div class="control mb-1">
-                        <label class="radio">
-                            <input type="radio" 
-                                name="rebalanceMode" 
-                                value="newCapitalSpecific" 
-                                v-model="rebalanceMode">
-                            <span>New Capital (specific amount)</span>
-                        </label>
-                    </div>
-                </div>
-                
-                <div v-if="rebalanceMode === 'newCapitalSpecific'" class="field mt-2">
-                    <label class="label is-small">New Capital Amount</label>
+                    <label class="label">Enter New Capital Amount</label>
                     <div class="control has-icons-left">
-                        <input class="input is-small" 
+                        <input class="input" 
                             type="number" 
                             v-model.number="newCapitalAmount" 
                             @change="debouncedCalculateTargetValuesAndActions">
@@ -208,6 +166,10 @@
                             <i class="fas fa-euro-sign"></i>
                         </span>
                     </div>
+                    <p class="help mt-2 has-text-success">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Only buy recommendations, no selling of existing positions.
+                    </p>
                 </div>
             </div>
         </div>
@@ -223,47 +185,21 @@
                         <span class="icon">
                             <i class="fas fa-cog"></i>
                         </span>
-                        <span>Rebalancing Mode</span>
+                        <span>New Capital Settings</span>
                     </span>
                 </h3>
                 
-                <div class="notification is-light py-3 px-4" 
-                    :class="{
-                        'is-primary': rebalanceMode === 'existingCapital',
-                        'is-success': rebalanceMode === 'newCapitalOnly',
-                        'is-info': rebalanceMode === 'newCapitalSpecific'
-                    }">
+                <div class="notification is-success is-light py-3 px-4">
                     <p class="has-text-weight-medium">
                         <span class="icon-text">
                             <span class="icon is-small"><i class="fas fa-info-circle"></i></span>
-                            <span>Active Mode: 
-                                <strong v-if="rebalanceMode === 'existingCapital'">Existing Capital</strong>
-                                <strong v-else-if="rebalanceMode === 'newCapitalOnly'">New Capital Only</strong>
-                                <strong v-else-if="rebalanceMode === 'newCapitalSpecific'">New Capital (${formatCurrency(newCapitalAmount)})</strong>
-                            </span>
+                            <span>New Capital: ${formatCurrency(newCapitalAmount)}</span>
                         </span>
                     </p>
                     
                     <p class="is-size-7 mt-2">
-                        <span v-if="rebalanceMode === 'existingCapital'">
-                            Rebalancing with buy and sell actions using existing portfolio.
-                        </span>
-                        <span v-else-if="rebalanceMode === 'newCapitalOnly'">
-                            Only buy recommendations, no selling.
-                        </span>
-                        <span v-else-if="rebalanceMode === 'newCapitalSpecific'">
-                            Adding ${formatCurrency(newCapitalAmount)} of new capital
-                            <span v-if="allowSellingWithNewCapital"> with both buy and sell actions.</span>
-                            <span v-else> with buy actions only (no selling).</span>
-                        </span>
+                        Adding ${formatCurrency(newCapitalAmount)} of new capital with buy actions only (no selling).
                     </p>
-                    
-                    <button class="button is-small is-light mt-2" @click="navigateToGlobal">
-                        <span class="icon is-small">
-                            <i class="fas fa-exchange-alt"></i>
-                        </span>
-                        <span>Change</span>
-                    </button>
                 </div>
             </div>
             
@@ -347,10 +283,9 @@
                             <td class="has-text-right">
                                 <span :class="{
                                     'has-text-success': portfolio.action.type === 'Buy',
-                                    'has-text-danger': portfolio.action.type === 'Sell',
                                     'has-text-grey': portfolio.action.type === 'Hold'
                                 }">
-                                    ${portfolio.action.type} ${formatCurrency(portfolio.action.amount)}
+                                    ${portfolio.action.type === 'Buy' ? 'Buy ' + formatCurrency(portfolio.action.amount) : 'Hold ' + formatCurrency(0)}
                                 </span>
                             </td>
                         </tr>
@@ -450,10 +385,9 @@
                                     <td class="has-text-right">
                                         <span :class="{
                                             'has-text-success': category.action && category.action.type === 'Buy',
-                                            'has-text-danger': category.action && category.action.type === 'Sell',
                                             'has-text-grey': !category.action || category.action.type === 'Hold'
                                         }">
-                                            ${category.action ? category.action.type + ' ' + formatCurrency(category.action.amount) : 'Hold €0.00'}
+                                            ${category.action && category.action.type === 'Buy' ? 'Buy ' + formatCurrency(category.action.amount) : 'Hold ' + formatCurrency(0)}
                                         </span>
                                     </td>
                                 </tr>
@@ -485,10 +419,9 @@
                                         <td class="has-text-right">
                                             <span :class="{
                                                 'has-text-success': position.action && position.action.type === 'Buy',
-                                                'has-text-danger': position.action && position.action.type === 'Sell',
                                                 'has-text-grey': !position.action || position.action.type === 'Hold'
                                             }">
-                                                ${position.action ? position.action.type + ' ' + formatCurrency(position.action.amount) : 'Hold €0.00'}
+                                                ${position.action && position.action.type === 'Buy' ? 'Buy ' + formatCurrency(position.action.amount) : 'Hold ' + formatCurrency(0)}
                                             </span>
                                         </td>
                                     </tr>
@@ -576,10 +509,9 @@
                                 <td class="has-text-right">
                                     <span :class="{
                                         'has-text-success': selectedPortfolioData.action && selectedPortfolioData.action.type === 'Buy' && selectedPortfolioData.action.amount > 0,
-                                        'has-text-danger': selectedPortfolioData.action && selectedPortfolioData.action.type === 'Sell' && selectedPortfolioData.action.amount > 0,
                                         'has-text-grey': !selectedPortfolioData.action || selectedPortfolioData.action.type === 'Hold' || selectedPortfolioData.action.amount === 0
                                     }">
-                                        ${selectedPortfolioData.action ? selectedPortfolioData.action.type + ' ' + formatCurrency(selectedPortfolioData.action.amount) : 'Hold €0.00'}
+                                        ${selectedPortfolioData.action && selectedPortfolioData.action.type === 'Buy' ? 'Buy ' + formatCurrency(selectedPortfolioData.action.amount) : 'Hold ' + formatCurrency(0)}
                                     </span>
                                 </td>
                             </tr>
@@ -612,21 +544,14 @@
                     </div>
                 </div>
                 
-                <div v-if="rebalanceMode === 'newCapitalOnly'" class="level-item has-text-centered">
-                    <div>
-                        <p class="heading">New Capital Required</p>
-                        <p class="title is-5">${formatCurrency(requiredCapitalForNoSales)}</p>
-                    </div>
-                </div>
-                
-                <div v-if="rebalanceMode === 'newCapitalSpecific'" class="level-item has-text-centered">
+                <div class="level-item has-text-centered">
                     <div>
                         <p class="heading">New Capital Added</p>
                         <p class="title is-5">${formatCurrency(newCapitalAmount)}</p>
                     </div>
                 </div>
                 
-                <div v-if="rebalanceMode !== 'existingCapital'" class="level-item has-text-centered">
+                <div class="level-item has-text-centered">
                     <div>
                         <p class="heading">New Global Value</p>
                         <p class="title is-5">${formatCurrency(newPortfolioValue)}</p>
