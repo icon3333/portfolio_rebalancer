@@ -111,8 +111,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 this.isUpdating = true;
                 try {
+                    console.log(`New capital amount changed to: ${this.newCapitalAmount}`);
+                    
+                    // First calculate the target values and actions with the new capital amount
                     this.calculateTargetValuesAndActions();
-                    this.updateChartData();
+                    
+                    // Then update chart data to reflect the new state
+                    this.$nextTick(() => {
+                        this.updateChartData();
+                        
+                        // Force a refresh of the UI to ensure actions are updated
+                        if (this.activeView === 'global') {
+                            console.log('Ensuring Global View actions are refreshed');
+                            // Trigger a small UI update to force reactivity
+                            this.portfolioData = {...this.portfolioData};
+                        }
+                    });
                 } catch (error) {
                     console.error('Error updating calculations after newCapitalAmount change:', error);
                 } finally {
@@ -559,7 +573,25 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Log the entire portfolio data before calculations
                     console.log('⭐ PORTFOLIO DATA BEFORE CALCULATIONS:', JSON.parse(JSON.stringify(this.portfolioData)));
                     
-                    // Process each portfolio
+                    // Calculate total shortfall across all portfolios
+                    let totalShortfall = 0;
+                    
+                    // First pass - calculate shortfalls for each portfolio
+                    this.portfolioData.portfolios.forEach(portfolio => {
+                        // Calculate ideal target value based on target weight
+                        const idealTargetValue = Math.round(this.newPortfolioValue * portfolio.targetWeight / 100);
+                        portfolio.shortfall = Math.max(0, idealTargetValue - portfolio.currentValue);
+                        totalShortfall += portfolio.shortfall;
+                    });
+                    
+                    console.log(`Total shortfall across all portfolios: ${totalShortfall}`);
+                    
+                    // Calculate total target weight of all portfolios
+                    const totalTargetWeight = this.portfolioData.portfolios.reduce(
+                        (sum, portfolio) => sum + portfolio.targetWeight, 0
+                    );
+                    
+                    // Second pass - calculate target values and actions
                     this.portfolioData.portfolios.forEach(portfolio => {
                         try {
                             console.log(`Processing portfolio: ${portfolio.name}`);
@@ -571,17 +603,38 @@ document.addEventListener('DOMContentLoaded', function() {
                                     : 0;
                             }
                             
-                            // Calculate target values with new capital only (no selling)
-                            const idealTargetValue = Math.round(this.newPortfolioValue * portfolio.targetWeight / 100);
-                            const shortfall = Math.max(0, idealTargetValue - portfolio.currentValue);
-                            
-                            // Calculate portfolio action - only buy or hold
-                            portfolio.action = shortfall > 0 
-                                ? { type: "Buy", amount: shortfall } 
-                                : { type: "Hold", amount: 0 };
-                            
-                            // Set target value
-                            portfolio.targetValue = portfolio.currentValue + shortfall;
+                            // Handle allocation based on available capital and shortfall
+                            if (totalShortfall <= this.newCapitalAmount) {
+                                // We have enough or excess capital
+                                
+                                // First allocate the shortfall amount
+                                let allocationAmount = portfolio.shortfall || 0;
+                                
+                                // If we have excess capital, distribute it proportionally based on target weights
+                                if (this.newCapitalAmount > totalShortfall && totalTargetWeight > 0) {
+                                    const remainingCapital = this.newCapitalAmount - totalShortfall;
+                                    const additionalAllocation = Math.round((portfolio.targetWeight / totalTargetWeight) * remainingCapital);
+                                    allocationAmount += additionalAllocation;
+                                }
+                                
+                                // Set target value and action
+                                portfolio.targetValue = portfolio.currentValue + allocationAmount;
+                                portfolio.action = {
+                                    type: allocationAmount > 0 ? "Buy" : "Hold",
+                                    amount: allocationAmount
+                                };
+                            } else {
+                                // Not enough capital to cover all shortfalls
+                                // Proportionally allocate available capital based on shortfall ratios
+                                const shortfallRatio = portfolio.shortfall / totalShortfall;
+                                const allocationAmount = Math.round(shortfallRatio * this.newCapitalAmount);
+                                
+                                portfolio.targetValue = portfolio.currentValue + allocationAmount;
+                                portfolio.action = {
+                                    type: allocationAmount > 0 ? "Buy" : "Hold",
+                                    amount: allocationAmount
+                                };
+                            }
                             
                             // Skip if no categories
                             if (!portfolio.categories || portfolio.categories.length === 0) {
@@ -601,15 +654,16 @@ document.addEventListener('DOMContentLoaded', function() {
                                             : 0;
                                     }
                                     
-                                    // Get the target value based on portfolio's target
+                                    // Get the target value based on portfolio's target value (which now includes any excess allocation)
                                     const idealCategoryValue = Math.round(portfolio.targetValue * (category.targetWeight / 100));
-                                    const categoryShortfall = Math.max(0, idealCategoryValue - category.currentValue);
+                                    category.targetValue = idealCategoryValue;
                                     
-                                    category.targetValue = category.currentValue + categoryShortfall;
+                                    // Calculate the allocation amount (can be more than shortfall if excess capital is distributed)
+                                    const categoryAllocationAmount = category.targetValue - category.currentValue;
                                     
-                                    // Calculate action - only buy or hold
-                                    category.action = categoryShortfall > 0 
-                                        ? { type: "Buy", amount: categoryShortfall } 
+                                    // Calculate action - buy or hold
+                                    category.action = categoryAllocationAmount > 0 
+                                        ? { type: "Buy", amount: categoryAllocationAmount } 
                                         : { type: "Hold", amount: 0 };
                                     
                                     // Skip if no positions
@@ -638,15 +692,16 @@ document.addEventListener('DOMContentLoaded', function() {
                                                 ? (position.currentValue / portfolio.currentValue * 100) 
                                                 : 0;
                                             
-                                            // Get target value
+                                            // Get target value based on category's target
                                             const idealPositionValue = Math.round(category.targetValue * (position.targetWeight / category.targetWeight));
-                                            const positionShortfall = Math.max(0, idealPositionValue - position.currentValue);
+                                            position.targetValue = idealPositionValue;
                                             
-                                            position.targetValue = position.currentValue + positionShortfall;
+                                            // Calculate the allocation amount
+                                            const positionAllocationAmount = position.targetValue - position.currentValue;
                                             
-                                            // Calculate action - only buy or hold
-                                            position.action = positionShortfall > 0 
-                                                ? { type: "Buy", amount: positionShortfall } 
+                                            // Calculate action - buy or hold
+                                            position.action = positionAllocationAmount > 0 
+                                                ? { type: "Buy", amount: positionAllocationAmount } 
                                                 : { type: "Hold", amount: 0 };
                                         } catch (error) {
                                             console.error(`Error processing position ${position.name}:`, error);

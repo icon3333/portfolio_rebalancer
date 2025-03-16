@@ -161,7 +161,9 @@
                         <input class="input" 
                             type="number" 
                             v-model.number="newCapitalAmount" 
-                            @change="debouncedCalculateTargetValuesAndActions">
+                            @input="debouncedCalculateTargetValuesAndActions"
+                            @change="debouncedCalculateTargetValuesAndActions"
+                            placeholder="Enter amount...">
                         <span class="icon is-small is-left">
                             <i class="fas fa-euro-sign"></i>
                         </span>
