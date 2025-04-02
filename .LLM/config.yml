@@ -1,6 +1,6 @@
 # Focus
 #static/css/*
-static/js/*
+static/js/allocate.js
 # config.py
 app/routes/portfolio*
 # app/utils/formatting.py
