@@ -1,5 +1,5 @@
 This file is a merged representation of selected files from the codebase.
-Generated on: 2025-04-02T19:24:52.866580
+Generated on: 2025-04-03T18:44:53.338694
 
 ================================================================
 Purpose:
@@ -39,6 +39,62 @@ Repository Structure
 
 ================================================================
 ###START_FILE_PATH: static/js/allocate.js###
+document.addEventListener('DOMContentLoaded', function() {
+    // Get tab elements
+    const globalTab = document.getElementById('global-tab');
+    const detailedTab = document.getElementById('detailed-tab');
+    const globalContent = document.getElementById('global');
+    const detailedContent = document.getElementById('detailed');
+
+    // Function to handle tab switching
+    function switchTab(tabId) {
+        // Remove active class from all tabs and content
+        [globalTab, detailedTab].forEach(tab => tab.classList.remove('active'));
+        [globalContent, detailedContent].forEach(content => {
+            content.classList.remove('active');
+            content.style.display = 'none';
+        });
+
+        // Add active class to selected tab and content
+        if (tabId === 'global') {
+            globalTab.classList.add('active');
+            globalContent.classList.add('active');
+            globalContent.style.display = 'block';
+        } else {
+            detailedTab.classList.add('active');
+            detailedContent.classList.add('active');
+            detailedContent.style.display = 'block';
+        }
+
+        // Add smooth transition effect
+        const activeContent = tabId === 'global' ? globalContent : detailedContent;
+        activeContent.style.transition = 'opacity 0.3s ease-in-out';
+        activeContent.style.opacity = '0';
+        
+        setTimeout(() => {
+            activeContent.style.opacity = '1';
+        }, 50);
+    }
+
+    // Add click event listeners to tabs
+    globalTab.addEventListener('click', () => switchTab('global'));
+    detailedTab.addEventListener('click', () => switchTab('detailed'));
+
+    // Add hover effect to tabs
+    [globalTab, detailedTab].forEach(tab => {
+        tab.addEventListener('mouseenter', () => {
+            if (!tab.classList.contains('active')) {
+                tab.style.backgroundColor = '#f8f9fa';
+            }
+        });
+        
+        tab.addEventListener('mouseleave', () => {
+            if (!tab.classList.contains('active')) {
+                tab.style.backgroundColor = '';
+            }
+        });
+    });
+});
 
 
 ###END_FILE###
@@ -2550,6 +2606,113 @@ def process_csv_data(account_id, file_content):
 
 ================================================================
 ###START_FILE_PATH: templates/pages/allocate.html###
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .nav-tabs {
+        border-bottom: 2px solid #dee2e6;
+        display: flex;
+        gap: 0;
+    }
+    
+    .nav-tabs .nav-item {
+        flex: 1;
+        text-align: center;
+    }
+    
+    .nav-tabs .nav-link {
+        border: none;
+        color: #6c757d;
+        padding: 1rem;
+        transition: all 0.3s ease;
+        width: 100%;
+        text-align: center;
+    }
+    
+    .nav-tabs .nav-link.active {
+        color: #0d6efd;
+        border-bottom: 2px solid #0d6efd;
+        background: none;
+    }
+    
+    .tab-content {
+        padding-top: 1rem;
+    }
+    
+    .tab-pane {
+        display: none;
+        opacity: 0;
+        transition: opacity 0.3s ease-in-out;
+    }
+    
+    .tab-pane.active {
+        display: block;
+        opacity: 1;
+    }
+    
+    .card {
+        border: none;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        transition: transform 0.3s ease;
+    }
+    
+    .card:hover {
+        transform: translateY(-2px);
+    }
+</style>
+
+<div class="container mt-4">
+    <h2 class="mb-4">Portfolio Allocation</h2>
+    
+    <!-- Tab Navigation -->
+    <ul class="nav nav-tabs" id="allocationTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="global-tab" type="button" role="tab">
+                <i class="fas fa-globe me-2"></i>Global Overview
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="detailed-tab" type="button" role="tab">
+                <i class="fas fa-chart-pie me-2"></i>Detailed Overview
+            </button>
+        </li>
+    </ul>
+
+    <!-- Tab Content -->
+    <div class="tab-content" id="allocationTabsContent">
+        <!-- Global Overview Tab -->
+        <div class="tab-pane active" id="global" role="tabpanel">
+            <div class="card mt-3">
+                <div class="card-body">
+                    <h5 class="card-title">Portfolio Allocation Overview</h5>
+                    <div id="globalChart" style="height: 400px;">
+                        <!-- Chart will be rendered here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detailed Overview Tab -->
+        <div class="tab-pane" id="detailed" role="tabpanel">
+            <div class="card mt-3">
+                <div class="card-body">
+                    <h5 class="card-title">Detailed Portfolio Analysis</h5>
+                    <div id="detailedChart" style="height: 400px;">
+                        <!-- Chart will be rendered here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Include necessary JavaScript -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://kit.fontawesome.com/your-font-awesome-kit.js"></script>
+<script src="{{ url_for('static', filename='js/allocate.js') }}"></script>
+{% endblock %}
+
 
 ###END_FILE###
 

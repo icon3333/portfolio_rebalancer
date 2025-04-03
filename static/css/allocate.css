@@ -1,321 +1,399 @@
 /**
- * Portfolio Rebalancer Styles
- * This file contains styles for the portfolio rebalancer component.
+ * Portfolio Allocation Styles
+ * This file contains styles for the portfolio allocation component.
  */
 
-/* Ensure Vue cloak works properly */
-[v-cloak] {
-    display: none;
+/* Dark Theme Variables */
+:root {
+    --dark-bg: #1e1e1e;
+    --darker-bg: #121212;
+    --card-bg: #242424;
+    --border-color: #333;
+    --text-color: #e0e0e0;
+    --text-muted: #a0a0a0;
+    --primary-color: #0d6efd;
+    --primary-hover: #0b5ed7;
+    --success-color: #28a745;
+    --warning-color: #ffc107;
+    --danger-color: #dc3545;
+    --chart-blue: rgba(54, 162, 235, 0.8);
+    --chart-red: rgba(255, 99, 132, 0.8);
+    --input-bg: #2a2a2a;
 }
 
-/* Chart container styling */
-.chart-container {
-    position: relative;
-    height: 300px; /* Reduced from 350px for consistency */
-    width: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    overflow: hidden;
-    min-height: 300px; /* Reduced from 350px */
-    opacity: 1;
-    transition: opacity 0.2s ease-in-out;
+/* Global Styles */
+body {
+    background-color: var(--dark-bg);
+    color: var(--text-color);
 }
 
-/* Make sure the Plotly chart is properly centered */
-.chart-container .js-plotly-plot {
-    width: 100% !important;
+/* Container Styling */
+.container {
+    max-width: 1200px;
     margin: 0 auto;
-    opacity: 1;
-    transition: opacity 0.2s ease-in-out;
+    padding: 2rem;
 }
 
-/* Additional styles to ensure charts render properly */
-.js-plotly-plot .plotly .main-svg {
-    width: 100% !important;
-    height: 100% !important;
+/* Card Styling */
+.card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 0.25rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    margin-bottom: 1.5rem;
+    border: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.08);
 }
 
-.js-plotly-plot .plotly .svg-container {
-    width: 100% !important;
-    height: 100% !important;
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
 }
 
-/* Fix for Plotly sizing issues */
-.plotly, .plot-container {
-    width: 100% !important;
-    height: 100% !important;
+.card-body {
+    padding: 1.5rem;
 }
 
-/* Ensure charts maintain aspect ratio */
-.js-plotly-plot, .plot-container.plotly {
-    position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
+.card-header {
+    background: none;
+    border-bottom: none;
+    padding: 1.5rem;
+    background-color: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid var(--border-color);
 }
 
-/* Ensure pie charts are centered in their containers */
-.chart-container[id$="-global"] .js-plotly-plot,
-.chart-container[id$="-detail"] .js-plotly-plot {
-    display: flex !important;
-    justify-content: center !important;
-    align-items: center !important;
-}
-
-/* Portfolio icon styling */
-.portfolio-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    color: white;
-    font-weight: bold;
-}
-
-/* Category icon styling */
-.category-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    color: white;
-    font-weight: bold;
-}
-
-/* Position icon styling */
-.position-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    color: white;
-    font-weight: bold;
-}
-
-/* Position row styling */
-.position-row td {
-    padding-left: 2rem;
-}
-
-/* Fix for sticky tables */
-.table-container {
-    overflow-x: auto;
-    max-width: 100%;
-    width: 100%;
-    -webkit-overflow-scrolling: touch;
-}
-
-/* Media queries for responsive layouts */
-@media screen and (max-width: 768px) {
-    .columns {
-        display: block !important;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-    }
-    
-    .column {
-        width: 100% !important;
-        padding: 0.75rem !important;
-    }
-    
-    .chart-container {
-        height: 250px !important;
-        min-height: 250px !important;
-    }
-    
-    /* Stack columns on mobile */
-    .columns.is-multiline > .column {
-        margin-bottom: 0.75rem !important;
-    }
-}
-
-/* Responsive action buttons */
-.action-buttons {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.5rem;
-}
-
-/* Action type styling */
-.has-text-success {
-    color: #48c774 !important;
-}
-
-.has-text-danger {
-    color: #f14668 !important;
-}
-
-.has-text-grey {
-    color: #7a7a7a !important;
-}
-
-/* Utility for full width */
-.w-100 {
-    width: 100%;
-}
-
-/* Tooltip styling */
-.has-tooltip-left[data-tooltip]:not(.is-loading)::after {
-    font-size: 0.75rem;
-}
-
-/* Notification styling */
-.notification {
-    position: relative;
-}
-
-.notification .delete {
-    position: absolute;
-    right: 0.5rem;
-    top: 0.5rem;
-}
-
-/* Card content sizing to match chart height */
-.card-content {
-    display: flex;
-    flex-direction: column;
-    min-height: 300px; /* Match chart height */
-    padding: 0.75rem;
-}
-
-/* Rebalancing mode card adjustments */
-.card-content.rebalancing-mode {
-    min-height: 230px !important; /* Reduced height for rebalancing mode */
-    padding-bottom: 0.5rem !important;
-}
-
-/* Portfolio selector specific styling */
-.portfolio-selector {
-    margin-top: 0.75rem !important;
-    min-height: auto !important;
-    padding-top: 0.5rem !important; 
-    padding-bottom: 0.5rem !important;
-}
-
-/* Make the notification in detail view more compact */
-.card-content.rebalancing-mode .notification {
-    padding: 0.5rem 0.75rem !important;
-    margin-bottom: 0.5rem !important;
-}
-
-.card-content.rebalancing-mode .notification p {
-    margin-bottom: 0.25rem !important;
-}
-
-/* Portfolio header styling */
-.portfolio-header-title.is-size-6 {
-    padding: 0.5rem 0.75rem !important;
-}
-
-/* Ensure consistent Plotly layout */
-#current-distribution-chart-global,
-#current-distribution-chart-detail,
-#target-distribution-chart-global,
-#target-distribution-chart-detail {
-    height: 300px !important;
-    width: 100% !important;
-}
-
-/* Ensure chart containers have the same size in both views */
-.card-content .chart-container {
-    flex: 1;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-/* Make sure all cards in the same row have equal height */
-.columns.is-multiline > .column {
-    display: flex;
-    flex-direction: column;
-}
-
-.columns.is-multiline > .column > .card {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-
-.columns.is-multiline > .column > .card > .card-content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-
-/* Placeholder position styling */
-.placeholder-position {
-    background-color: rgba(0, 0, 0, 0.02);
-    font-style: italic;
-}
-
-.placeholder-position td {
-    color: #666;
-}
-
-/* Add subtle visual indicator for placeholders */
-.placeholder-position .fa-plus-circle {
-    color: #3298dc; /* Bulma info color */
-}
-
-/* Style for remaining positions text */
-.remaining-positions-text {
-    color: #f14668;
-    font-style: italic;
+.card-title {
+    color: var(--text-color);
+    margin-bottom: 1.25rem;
     font-weight: 500;
 }
 
-/* Fix for Safari and mobile browsers */
-@supports (-webkit-touch-callout: none) {
-    .chart-container {
-        position: relative !important;
-        height: 300px !important;
-        width: 100% !important;
-    }
+/* Investment Section */
+.investment-section {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    padding: 1.5rem;
+    border-radius: 0.25rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
-/* Fix for Firefox */
-@-moz-document url-prefix() {
-    .chart-container {
-        position: relative !important;
-        height: 300px !important;
-        width: 100% !important;
-    }
+.investment-section .card-title {
+    color: var(--text-color);
+    font-weight: 500;
+    margin-bottom: 1rem;
 }
 
-/* Force Plotly charts to maintain aspect ratio */
-.js-plotly-plot,
-.plot-container.plotly,
-.svg-container {
-    max-width: 100% !important;
-}
-
-/* Force the content boxes to maintain dimensions */
-.card-content {
+/* Header Content Layout */
+.header-content {
     display: flex;
-    flex-direction: column;
-    min-height: 300px; /* Match chart height */
+    align-items: center;
+    justify-content: space-between;
+    padding: 2rem 0;
+    margin-bottom: 1rem;
+    gap: 2rem;
 }
 
-/* Force column display even during initial load */
-.column {
-    display: flex !important;
-    flex-direction: column;
-}
-
-/* Make cards fill the column height */
-.card {
+/* Investment Input Styling */
+.investment-input {
     display: flex;
-    flex-direction: column;
+    align-items: center;
+    gap: 2rem;
+    padding: 1.5rem;
+    background: transparent;
+    transition: all 0.3s ease;
     flex: 1;
-    height: 100%;
+    min-width: 0;
+}
+
+.investment-input label {
+    margin: 0;
+    color: var(--text-color);
+    font-weight: 500;
+    font-size: 1.1rem;
+    white-space: nowrap;
+    opacity: 0.9;
+}
+
+.investment-input .input-group {
+    flex: 1;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+
+.input-group-text {
+    background: transparent;
+    color: var(--text-color);
+    border: none;
+    padding: 0.75rem 0.5rem 0.75rem 0;
+    font-weight: 500;
+    font-size: 1.1rem;
+    opacity: 0.9;
+}
+
+.input-group input {
+    border: none;
+    border-bottom: 2px solid var(--border-color);
+    padding: 0.75rem;
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--primary-color);
+    background-color: transparent;
+    transition: all 0.2s ease;
+    border-radius: 0;
+    width: 100%;
+}
+
+.input-group input:focus {
+    box-shadow: none;
+    border-color: var(--primary-color);
+    outline: none;
+}
+
+.input-group input::placeholder {
+    color: var(--text-muted);
+    font-weight: normal;
+    opacity: 0.7;
+}
+
+/* Tab Navigation */
+.nav-tabs {
+    border-bottom: 2px solid var(--border-color);
+    display: flex;
+    gap: 0;
+    background-color: var(--darker-bg);
+    border-radius: 4px 4px 0 0;
+    overflow: hidden;
+    border: none;
+    margin-bottom: 0;
+}
+
+.nav-tabs .nav-item {
+    flex: 1;
+    text-align: center;
+}
+
+.nav-tabs .nav-link {
+    border: none;
+    color: var(--text-muted);
+    padding: 1rem;
+    transition: all 0.3s ease;
+    width: 100%;
+    text-align: center;
+    background-color: var(--darker-bg);
+    color: #4a4a4a;
+    padding: 0.75rem 1.5rem;
+    margin-right: 0.5rem;
+    border-radius: 4px;
+}
+
+.nav-tabs .nav-link:hover {
+    color: var(--text-color);
+    background-color: rgba(13, 110, 253, 0.1);
+}
+
+.nav-tabs .nav-link.active {
+    color: var(--primary-color);
+    border-bottom: 2px solid var(--primary-color);
+    background-color: var(--card-bg);
+    color: #3273dc;
+    background-color: rgba(50, 115, 220, 0.1);
+}
+
+.tab-content {
+    padding-top: 1rem;
+}
+
+.tab-pane {
+    display: none;
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+}
+
+.tab-pane.active {
+    display: block;
+    opacity: 1;
+}
+
+/* Table Styling */
+.table {
+    width: 100%;
+    margin-bottom: 1rem;
+    color: var(--text-color);
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.table th,
+.table td {
+    padding: 0.75rem;
+    vertical-align: middle;
+    border-top: 1px solid var(--border-color);
+    border: none;
+    padding: 1rem;
+}
+
+.table thead th {
+    vertical-align: bottom;
+    border-bottom: 2px solid var(--border-color);
+    background-color: rgba(0, 0, 0, 0.2);
+    color: var(--text-muted);
+    font-weight: 500;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 0.5px;
+    background: #f8f9fa;
+    border-bottom: 2px solid #dee2e6;
+    font-weight: 600;
+}
+
+.table tbody + tbody {
+    border-top: 2px solid var(--border-color);
+}
+
+.table-striped tbody tr:nth-of-type(odd) {
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(13, 110, 253, 0.1);
+    background-color: #f8f9fa;
+}
+
+/* Total Row Styling */
+.total-row {
+    background-color: #f8f9fa !important;
+    font-weight: 600;
+    color: #3273dc;
+    border-top: 2px solid #3273dc;
+}
+
+.total-row td {
+    padding: 1rem !important;
+}
+
+/* Action Colors */
+.actions-positive {
+    color: var(--success-color);
+    font-weight: 500;
+}
+
+.actions-neutral {
+    color: var(--text-muted);
+}
+
+.actions-negative {
+    color: var(--danger-color);
+    font-weight: 500;
+}
+
+/* Chart Container */
+#globalChart,
+#detailedChart {
+    width: 100%;
+    height: 400px;
+    background-color: var(--card-bg);
+    border-radius: 0.25rem;
+    padding: 1rem;
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Table Container */
+.table-container {
+    overflow-x: auto;
+    width: 100%;
+    background-color: var(--card-bg);
+    border-radius: 0.25rem;
+}
+
+/* Loading Spinner */
+.spinner-border {
+    width: 3rem;
+    height: 3rem;
+    margin: 2rem auto;
+    display: block;
+    color: var(--primary-color);
+}
+
+/* Value Formatting */
+.current-value,
+.target-value,
+.value-after {
+    font-weight: 500;
+}
+
+.current-value {
+    color: var(--chart-blue);
+}
+
+.target-value {
+    color: var(--chart-red);
+}
+
+.value-after {
+    color: var(--success-color);
+}
+
+.allocation-percentage {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    font-weight: 400;
+}
+
+/* Table Active Row */
+.table-active {
+    background-color: rgba(13, 110, 253, 0.05) !important;
+}
+
+/* Button Styling */
+.btn-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+    padding: 0.5rem 1.25rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.btn-primary:hover {
+    background-color: var(--primary-hover);
+    border-color: var(--primary-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .investment-section .row {
+        flex-direction: column;
+    }
+    
+    .investment-section .col-md-6 {
+        width: 100%;
+        text-align: left !important;
+        margin-bottom: 1rem;
+    }
+    
+    .nav-tabs .nav-link {
+        padding: 0.75rem 0.5rem;
+        font-size: 0.9rem;
+    }
+    
+    .header-content {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 1rem 0;
+    }
+    
+    .investment-input {
+        padding: 1rem 0;
+        gap: 1rem;
+    }
+    
+    .investment-input .input-group {
+        flex: 1;
+    }
 }
