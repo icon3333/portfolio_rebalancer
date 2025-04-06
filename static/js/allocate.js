@@ -380,14 +380,37 @@ document.addEventListener('DOMContentLoaded', function() {
                 `;
                 return;
             }
+            
+            // Calculate the specific action amount for this portfolio from the global view
+            let portfolioActionAmount = 0;
+            
+            if (this.investmentAmount > 0) {
+                // Filter out portfolios with current value of 0
+                const filteredPortfolios = this.portfolioData.portfolios.filter(p => 
+                    p.currentValue !== 0 && p.currentValue !== null
+                );
+                
+                // Calculate total positive discrepancy across all portfolios
+                const totalPositiveDiscrepancy = filteredPortfolios
+                    .filter(p => (p.targetValue || 0) - p.currentValue > 0)
+                    .reduce((sum, p) => sum + ((p.targetValue || 0) - p.currentValue), 0);
+                
+                if (totalPositiveDiscrepancy > 0) {
+                    const portfolioDiscrepancy = (portfolio.targetValue || 0) - portfolio.currentValue;
+                    if (portfolioDiscrepancy > 0) {
+                        portfolioActionAmount = (portfolioDiscrepancy / totalPositiveDiscrepancy) * this.investmentAmount;
+                    }
+                }
+            }
 
-            // Display the investment amount at the top of the detailed view
+            // Display the action amount for this portfolio at the top of the detailed view
             const investmentInfo = document.createElement('div');
             investmentInfo.className = 'investment-info mb-4';
             investmentInfo.innerHTML = `
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle me-2"></i>
-                    Investment amount: ${this.formatCurrency(this.investmentAmount)}
+                    Portfolio allocation amount: ${this.formatCurrency(portfolioActionAmount)}
+                    <span class="text-muted ms-2">(from total investment: ${this.formatCurrency(this.investmentAmount)})</span>
                 </div>
             `;
             detailedContainer.appendChild(investmentInfo);
@@ -418,7 +441,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Track totals for portfolio summary
             let totalCurrentValue = portfolio.currentValue || 0;
-            let portfolioTargetValue = totalCurrentValue + this.investmentAmount;
+            let portfolioTargetValue = totalCurrentValue + portfolioActionAmount;
             let totalAction = 0;
             let totalValueAfter = 0;
             
@@ -550,8 +573,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         const discrepancy = targetValue - (position.currentValue || 0);
                         let positionAction = 0;
                         
-                        if (discrepancy > 0 && this.investmentAmount > 0 && totalPositiveDiscrepancy > 0) {
-                            positionAction = (discrepancy / totalPositiveDiscrepancy) * this.investmentAmount;
+                        if (discrepancy > 0 && portfolioActionAmount > 0 && totalPositiveDiscrepancy > 0) {
+                            positionAction = (discrepancy / totalPositiveDiscrepancy) * portfolioActionAmount;
                         }
                         
                         position.action = positionAction;
@@ -653,8 +676,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         
                         // Calculate action for missing positions
                         let missingAction = 0;
-                        if (this.investmentAmount > 0 && totalPositiveDiscrepancy > 0) {
-                            missingAction = (missingPositionsCategory.calculatedTargetValue / totalPositiveDiscrepancy) * this.investmentAmount;
+                        if (portfolioActionAmount > 0 && totalPositiveDiscrepancy > 0) {
+                            missingAction = (missingPositionsCategory.calculatedTargetValue / totalPositiveDiscrepancy) * portfolioActionAmount;
                         }
                         
                         // Missing Positions row (special styling)
