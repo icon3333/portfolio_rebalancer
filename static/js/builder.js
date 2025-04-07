@@ -425,8 +425,13 @@ document.addEventListener('DOMContentLoaded', function() {
         const realPositions = portfolio.positions;
         const realPositionCount = realPositions.length;
         
-        // If we already have enough real positions, we don't need placeholders
-        if (realPositionCount >= minPositions) {
+        // Calculate total weight of real positions
+        const realPositionsWeight = realPositions.reduce((total, position) => {
+          return total + parseFloat(position.weight || 0);
+        }, 0);
+        
+        // If we already have enough real positions OR real positions sum to 100%, we don't need placeholders
+        if (realPositionCount >= minPositions || realPositionsWeight >= 100) {
           return;
         }
         
@@ -436,10 +441,6 @@ document.addEventListener('DOMContentLoaded', function() {
         // Add a placeholder position that represents ALL remaining positions
         // The companyName shows total remaining for user information
         // Calculate weight based on real positions for immediate display
-        // Calculate total weight of real positions
-        const realPositionsWeight = realPositions.reduce((total, position) => {
-          return total + parseFloat(position.weight || 0);
-        }, 0);
         
         // Calculate total remaining weight and per-position weight
         const totalRemainingWeight = Math.max(0, parseFloat((100 - realPositionsWeight).toFixed(2)));
@@ -565,8 +566,19 @@ document.addEventListener('DOMContentLoaded', function() {
       // Get the number of remaining positions needed
       getRemainingPositionsCount(portfolioIndex) {
         const portfolio = this.portfolios[portfolioIndex];
-        const realPositionsCount = portfolio.positions.filter(p => !p.isPlaceholder).length;
+        const realPositions = portfolio.positions.filter(p => !p.isPlaceholder);
+        const realPositionsCount = realPositions.length;
         const minPositions = Math.ceil(portfolio.minPositions);
+        
+        // Calculate total weight of real positions
+        const realPositionsWeight = realPositions.reduce((total, position) => {
+          return total + parseFloat(position.weight || 0);
+        }, 0);
+        
+        // If real positions sum to 100%, return 0 remaining positions needed
+        if (realPositionsWeight >= 100) {
+          return 0;
+        }
         
         return Math.max(0, minPositions - realPositionsCount);
       },
@@ -704,38 +716,49 @@ document.addEventListener('DOMContentLoaded', function() {
           positionsRemaining: placeholder ? placeholder.positionsRemaining : 0
         });
         
-        if (placeholder && placeholder.positionsRemaining > 0) {
+        if (placeholder) {
           // Calculate total weight of real positions
           const realPositionsWeight = realPositions.reduce((total, position) => {
             return total + parseFloat(position.weight || 0);
           }, 0);
           
-          // Calculate total remaining weight (100% - already allocated weight)
-          // Never allow negative weight
-          const totalRemainingWeight = Math.max(0, parseFloat((100 - realPositionsWeight).toFixed(2)));
+          // If real positions already sum to 100%, set placeholder weight to 0
+          if (realPositionsWeight >= 100) {
+            placeholder.weight = 0;
+            placeholder.totalRemainingWeight = 0;
+            console.log('Set placeholder weight to 0 (real positions sum to 100%)');
+            return;
+          }
           
-          // Calculate weight per remaining position
-          const weightPerPosition = parseFloat((totalRemainingWeight / placeholder.positionsRemaining).toFixed(2));
-          
-          console.log('Weight calculation:', {
-            realPositionsWeight,
-            totalRemainingWeight,
-            weightPerPosition,
-            positionsRemaining: placeholder.positionsRemaining
-          });
-          
-          // Update the placeholder weight to show weight PER POSITION (not total remaining)
-          placeholder.weight = weightPerPosition;
-          
-          // Store the total remaining weight for calculations
-          placeholder.totalRemainingWeight = totalRemainingWeight;
-          
-          console.log('Updated placeholder weight to:', placeholder.weight);
-        } else if (placeholder) {
-          // If no positions remaining, set weight to 0
-          placeholder.weight = 0;
-          placeholder.totalRemainingWeight = 0;
-          console.log('Set placeholder weight to 0 (no positions remaining)');
+          // Only continue if we have positions remaining
+          if (placeholder.positionsRemaining > 0) {
+            // Calculate total remaining weight (100% - already allocated weight)
+            // Never allow negative weight
+            const totalRemainingWeight = Math.max(0, parseFloat((100 - realPositionsWeight).toFixed(2)));
+            
+            // Calculate weight per remaining position
+            const weightPerPosition = parseFloat((totalRemainingWeight / placeholder.positionsRemaining).toFixed(2));
+            
+            console.log('Weight calculation:', {
+              realPositionsWeight,
+              totalRemainingWeight,
+              weightPerPosition,
+              positionsRemaining: placeholder.positionsRemaining
+            });
+            
+            // Update the placeholder weight to show weight PER POSITION (not total remaining)
+            placeholder.weight = weightPerPosition;
+            
+            // Store the total remaining weight for calculations
+            placeholder.totalRemainingWeight = totalRemainingWeight;
+            
+            console.log('Updated placeholder weight to:', placeholder.weight);
+          } else {
+            // If no positions remaining, set weight to 0
+            placeholder.weight = 0;
+            placeholder.totalRemainingWeight = 0;
+            console.log('Set placeholder weight to 0 (no positions remaining)');
+          }
         }
       },
       
@@ -953,8 +976,12 @@ document.addEventListener('DOMContentLoaded', function() {
           });
         });
         
+        // Calculate total weight of real positions
+        const totalRealWeight = realPositions.reduce((sum, pos) => sum + parseFloat(pos.weight || 0), 0);
+        
         // Add placeholder position if it exists and has remaining positions
-        if (placeholderPosition && placeholderPosition.positionsRemaining > 0) {
+        // BUT ONLY if the real positions don't sum to 100%
+        if (placeholderPosition && placeholderPosition.positionsRemaining > 0 && totalRealWeight < 100) {
           // Only show the placeholder if we don't have enough real positions
           const realPositionCount = realPositions.length;
           const minPositions = Math.ceil(portfolio.minPositions);

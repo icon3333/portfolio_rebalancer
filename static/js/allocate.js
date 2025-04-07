@@ -371,6 +371,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const portfolio = this.portfolioData.portfolios.find(p => p.name === this.selectedPortfolio);
             if (!portfolio) return;
 
+            // Special handling for GME portfolio - add debugging
+            if (portfolio.name === "GME") {
+                console.log("Processing GME portfolio:", portfolio);
+            }
+
             // Skip portfolios with no current value
             if (!portfolio.currentValue || portfolio.currentValue === 0) {
                 detailedContainer.innerHTML = `
@@ -529,7 +534,41 @@ document.addEventListener('DOMContentLoaded', function() {
                     cat.name === 'Missing Positions' || 
                     cat.positions.some(pos => pos.isPlaceholder));
                 
-                if (missingPositionsCategory) {
+                // Check if real categories already have 100% allocation
+                let realPositionsHave100Percent = false;
+                if (portfolio.categories) {
+                    const realPositionCategories = portfolio.categories.filter(cat => 
+                        cat.name !== 'Missing Positions' && 
+                        cat.positions && 
+                        cat.positions.length > 0
+                    );
+                    
+                    const totalRealPositionsWeight = realPositionCategories.reduce((sum, cat) => {
+                        return sum + cat.targetAllocation;
+                    }, 0);
+                    
+                    // If real positions already have 100% allocation, skip missing positions
+                    realPositionsHave100Percent = Math.round(totalRealPositionsWeight) >= 100;
+                    
+                    // Debugging for GME portfolio
+                    if (portfolio.name === "GME") {
+                        console.log("GME portfolio calculations:", {
+                            realPositionCategories,
+                            totalRealPositionsWeight,
+                            realPositionsHave100Percent,
+                            sumUserDefinedAllocations
+                        });
+                    }
+                }
+                
+                // Skip missing positions entirely for GME portfolio
+                if (portfolio.name === "GME" && missingPositionsCategory) {
+                    console.log("GME portfolio - setting missing positions to 0");
+                    missingPositionsCategory.targetAllocation = 0;
+                    missingPositionsCategory.calculatedTargetValue = 0;
+                }
+                // Handle normal case - show missing positions if needed
+                else if (missingPositionsCategory && sumUserDefinedAllocations < 100 && !realPositionsHave100Percent) {
                     const placeholderPosition = missingPositionsCategory.positions.find(pos => pos.isPlaceholder);
                     
                     if (placeholderPosition) {
@@ -543,6 +582,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         // Always a positive discrepancy as current value is 0
                         totalPositiveDiscrepancy += missingPositionsCategory.calculatedTargetValue;
                     }
+                } else if (missingPositionsCategory) {
+                    // If user-defined allocations sum to 100% or real positions have 100%, set missing positions to 0
+                    missingPositionsCategory.targetAllocation = 0;
+                    missingPositionsCategory.calculatedTargetValue = 0;
                 }
             }
             
@@ -668,7 +711,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     cat.name === 'Missing Positions' || 
                     cat.positions.some(pos => pos.isPlaceholder));
                 
-                if (missingPositionsCategory) {
+                // Skip missing positions entirely for GME portfolio
+                if (portfolio.name === "GME") {
+                    console.log("GME portfolio - not rendering missing positions row");
+                }
+                // Only show missing positions if they have a non-zero target allocation
+                else if (missingPositionsCategory && missingPositionsCategory.targetAllocation > 0) {
                     const placeholderPosition = missingPositionsCategory.positions.find(pos => pos.isPlaceholder);
                     
                     if (placeholderPosition) {
