@@ -728,6 +728,9 @@ document.addEventListener('DOMContentLoaded', function() {
                             missingAction = (missingPositionsCategory.calculatedTargetValue / totalPositiveDiscrepancy) * portfolioActionAmount;
                         }
                         
+                        // Calculate per position investment amount
+                        const perPositionAmount = positionsRemaining > 0 ? missingAction / positionsRemaining : 0;
+                        
                         // Missing Positions row (special styling)
                         const missingRow = document.createElement('tr');
                         missingRow.className = 'table-warning missing-positions-row';
@@ -741,7 +744,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <td>${this.formatPercentage(0)}</td>
                             <td>${this.formatPercentage(missingPositionsCategory.targetAllocation)}</td>
                             <td class="target-value">${this.formatCurrency(missingPositionsCategory.calculatedTargetValue)}</td>
-                            <td class="actions-positive">Buy ${this.formatCurrency(missingAction)}</td>
+                            <td class="actions-positive">Buy ${this.formatCurrency(perPositionAmount)} × ${positionsRemaining}</td>
                             <td class="value-after">${this.formatCurrency(missingAction)}</td>
                         `;
                         
