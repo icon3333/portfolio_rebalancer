@@ -1,222 +1,305 @@
-/* Improved Allocation Builder Specific Styles */
+/**
+ * Portfolio Allocation Builder Styles
+ * Redesigned to match the clean, elegant design of allocate.css
+ */
 
-/* General Styles */
-.vue-loading {
-  text-align: center;
-  padding: 2rem;
+/* Light Theme Variables */
+:root {
+    --bg: #ffffff;
+    --darker-bg: #f5f5f5;
+    --card-bg: #ffffff;
+    --border-color: #dee2e6;
+    --text-color: #212529;
+    --text-muted: #6c757d;
+    --primary-color: #0d6efd;
+    --primary-hover: #0b5ed7;
+    --success-color: #198754;
+    --warning-color: #ffc107;
+    --danger-color: #dc3545;
+    --input-bg: #ffffff;
+    --table-header-bg: rgba(0, 0, 0, 0.03);
+    --category-row-bg: rgba(0, 0, 0, 0.02);
+    --position-row-bg: rgba(0, 0, 0, 0.01);
+    --missing-positions-bg: rgba(255, 193, 7, 0.1);
+    --hover-bg: rgba(13, 110, 253, 0.08);
+    --active-bg: rgba(13, 110, 253, 0.12);
+    --placeholder-bg: rgba(13, 110, 253, 0.05);
+    --placeholder-border: #0d6efd;
 }
 
+/* Dark Theme Variables */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #1e1e1e;
+        --darker-bg: #121212;
+        --card-bg: #242424;
+        --border-color: #333;
+        --text-color: #e0e0e0;
+        --text-muted: #a0a0a0;
+        --primary-color: #3a8eff;
+        --primary-hover: #1e7eff;
+        --success-color: #28a745;
+        --warning-color: #ffc107;
+        --danger-color: #dc3545;
+        --input-bg: #2a2a2a;
+        --table-header-bg: rgba(0, 0, 0, 0.2);
+        --category-row-bg: rgba(0, 0, 0, 0.1);
+        --position-row-bg: rgba(0, 0, 0, 0.05);
+        --missing-positions-bg: rgba(255, 193, 7, 0.1);
+        --hover-bg: rgba(58, 142, 255, 0.2);
+        --active-bg: rgba(58, 142, 255, 0.3);
+        --placeholder-bg: rgba(58, 142, 255, 0.1);
+        --placeholder-border: #3a8eff;
+    }
+}
+
+/* General Styles */
 [v-cloak] {
   display: none;
 }
 
-/* Budget Management - Improved layout */
+/* Card Styling - Updated for minimal design */
+.card {
+    background-color: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    margin-bottom: 2rem;
+}
+
+.card-header {
+    background-color: transparent;
+    border-bottom: none;
+    padding: 0.5rem 0;
+    margin-bottom: 0.5rem;
+}
+
+.card-header-title {
+    color: var(--text-color);
+    font-weight: 600;
+    font-size: 1.5rem;
+    padding-left: 0;
+}
+
+.card-content {
+    padding: 1rem 0;
+    border-top: none;
+    border: none;
+}
+
+/* Budget Section */
 .budget-row {
   display: flex;
-  flex-direction: row;
-  flex-wrap: nowrap; /* Keep inputs in one row */
-  align-items: flex-start;
-  gap: 1.5rem;
-  width: 100%;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.field {
+    margin-bottom: 1rem;
+}
+
+.label {
+    color: var(--text-muted);
+    font-weight: 500;
+    font-size: 0.9rem;
   margin-bottom: 0.5rem;
 }
 
-@media (max-width: 768px) {
-  .budget-row {
-    flex-wrap: wrap; /* Allow wrapping on smaller screens */
-  }
+.input {
+    background-color: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 0.25rem;
+    color: var(--text-color);
+    padding: 0.5rem 0.75rem;
+    transition: border-color 0.2s ease;
 }
 
-.budget-item {
-  flex: 1;
-  min-width: 180px;
-  max-width: 30%;
+.input:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+    outline: none;
+}
+
+.input[readonly] {
+    background-color: var(--darker-bg);
 }
 
 /* Fixed value display styling */
-.fixed-value-display {
-  background-color: #f5f8fa;
-  border-radius: 5px;
+.fixed-value-display, .available-invest {
+    background-color: var(--darker-bg);
+    border-radius: 0.25rem;
   padding: 0.75rem 1rem;
-  font-weight: 600;
-  border-left: 4px solid #3273dc;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    font-weight: 500;
   text-align: right;
-}
-
-/* Tag styling for fixed labels */
-.tag.is-info.is-light {
-  margin-left: 0.5rem;
-  font-size: 0.7rem;
-  vertical-align: middle;
-  font-weight: normal;
+    border-left: 3px solid var(--primary-color);
 }
 
 .available-invest {
-  background-color: #f5f8fa;
-  border-radius: 5px;
-  padding: 0.75rem 1rem;
-  font-weight: 600;
-  border-left: 4px solid #48c774;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-  transition: all 0.3s ease;
-  text-align: right;
-}
-
-.available-invest.has-background-success-light {
-  background-color: #effaf3;
-  border-left-color: #4caf50;
+    border-left-color: var(--success-color);
 }
 
 .available-percentage {
   font-size: 0.85rem;
-  color: #6c757d;
+    color: var(--text-muted);
   margin-left: 0.5rem;
-  font-weight: 500;
 }
 
 /* Portfolio Section */
-div.columns.is-vcentered.portfolio-header {
-  display: none !important; /* Hide the portfolio banner container completely */
+.compact-box {
+    border-radius: 0.25rem;
+    border: 1px solid var(--border-color);
+    margin-bottom: 0.75rem;
+    padding: 1rem;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.compact-box:hover {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.portfolio-header {
+    align-items: center;
+    margin-bottom: 0.5rem;
 }
 
 .portfolio-toggle {
-  color: #3273dc;
-  transition: transform 0.3s ease;
+    cursor: pointer;
+    color: var(--primary-color);
+    transition: transform 0.2s ease;
 }
 
-.is-expanded .portfolio-toggle {
-  transform: rotate(180deg);
+/* Table Styling */
+.table {
+    width: 100%;
+    margin-bottom: 1rem;
+    color: var(--text-color);
+    border-collapse: separate;
+    border-spacing: 0;
 }
 
-/* Position Table */
-.position-table th.is-sortable {
-  cursor: pointer;
-  user-select: none;
+.table th {
+    background-color: var(--table-header-bg);
+    color: var(--text-muted);
+    font-weight: 500;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+    padding: 0.75rem 1rem;
 }
 
-.position-table th.is-sortable:hover {
-  background-color: rgba(0, 0, 0, 0.03);
+.table td {
+    padding: 0.75rem 1rem;
+    vertical-align: middle;
 }
 
-.sort-icon {
-  margin-left: 5px;
-  font-size: 0.8rem;
+.table.is-hoverable tbody tr:hover {
+    background-color: var(--hover-bg);
 }
 
+/* Placeholder Positions */
 .placeholder-position {
-  background-color: rgba(0, 0, 0, 0.02);
-  font-style: italic;
+    background-color: var(--placeholder-bg);
+}
+
+.placeholder-position td {
+    border-left: 3px solid var(--placeholder-border);
 }
 
 .remaining-positions-text {
-  color: #f14668;
-  font-style: italic;
+    color: var(--primary-color);
   font-weight: 500;
 }
 
-.weight-exceeded {
-  color: #dc3545;
-  font-weight: bold;
+/* Add Position Section */
+.add-position-section {
+    background-color: var(--darker-bg);
+    padding: 1rem;
+    border-radius: 0.25rem;
+    margin-bottom: 1rem;
 }
 
-/* Allocation Summary - improved hierarchy and clarity */
-.allocation-row.is-portfolio-row {
-  background-color: #f8f9fa;
-  border-bottom: 1px solid #e9ecef;
+.select select {
+    background-color: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 0.25rem;
+    color: var(--text-color);
+    padding: 0.5rem 2rem 0.5rem 0.75rem;
+    transition: border-color 0.2s ease;
 }
 
-.position-row {
-  background-color: #ffffff;
-  border-bottom: 1px solid #f8f9fa;
+.select select:focus {
+    border-color: var(--primary-color);
+    outline: none;
 }
 
-/* Improved position indentation */
-.position-name {
-  padding-left: 1.5rem !important;
-  position: relative;
+.button {
+    background-color: var(--primary-color);
+    border: none;
+    border-radius: 0.25rem;
+    color: white;
+    cursor: pointer;
+    padding: 0.5rem 1rem;
+    transition: background-color 0.2s ease;
 }
 
-.position-indent {
-  color: #6c757d;
-  margin-right: 8px;
-  font-family: monospace;
+.button:hover {
+    background-color: var(--primary-hover);
 }
 
-/* Allocation percentage labels */
-.allocation-label {
-  display: inline-block;
-  font-size: 0.75rem;
-  color: #6c757d;
-  margin-left: 6px;
-  vertical-align: middle;
-  font-style: italic;
+.button.is-info {
+    background-color: var(--primary-color);
 }
 
-.global-allocation {
-  color: #3273dc;
-  font-weight: bold;
+.button.is-info:hover {
+    background-color: var(--primary-hover);
 }
 
-.portfolio-allocation {
-  color: #555;
+.button.is-danger {
+    background-color: var(--danger-color);
 }
 
-/* Table header with subtitle */
-.th-with-subtitle {
-  display: block;
-  margin-bottom: 2px;
+.button.is-small {
+    font-size: 0.85rem;
+    padding: 0.25rem 0.5rem;
 }
 
-.th-subtitle {
-  font-size: 0.75rem;
-  display: block;
-  font-weight: normal;
-  color: #6c757d;
-  font-style: italic;
+/* Allocation Status */
+.notification {
+    border-radius: 0.25rem;
+    padding: 1rem;
+    position: relative;
 }
 
-/* Custom text color classes */
-.has-text-mint {
-  color: #90EE90 !important;
+.notification.is-success {
+    background-color: rgba(25, 135, 84, 0.1);
+    color: var(--success-color);
 }
 
-/* Improved auto-save indicator */
-.auto-save-indicator {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  padding: 8px 16px;
-  background-color: rgba(50, 115, 220, 0.9);
-  color: white;
-  border-radius: 4px;
-  font-size: 0.8rem;
-  z-index: 1000;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+.notification.is-warning {
+    background-color: rgba(255, 193, 7, 0.1);
+    color: var(--warning-color);
 }
 
-.auto-save-indicator.is-visible {
-  opacity: 1;
+.notification.is-danger {
+    background-color: rgba(220, 53, 69, 0.1);
+    color: var(--danger-color);
 }
 
-/* Animation utilities */
-.fade-enter-active, .fade-leave-active {
-  transition: opacity 0.5s;
-}
-
-.fade-enter, .fade-leave-to {
-  opacity: 0;
-}
-
-.collapse-enter-active, .collapse-leave-active {
-  transition: max-height 0.3s ease;
-  overflow: hidden;
-}
-
-.collapse-enter, .collapse-leave-to {
-  max-height: 0;
+/* Responsive adjustments */
+@media screen and (max-width: 768px) {
+    .columns {
+        display: block;
+    }
+    
+    .column {
+        width: 100%;
+        padding: 0.75rem;
+    }
+    
+    .budget-row {
+        flex-direction: column;
+    }
 }
 
 /* Input formatting for percentages and numbers */
@@ -224,126 +307,22 @@ input[type="text"], input[type="number"] {
   text-align: right;
 }
 
-/* More compact layout for allocation boxes */
-.box.compact-box {
-  margin-bottom: 0.25rem !important;
-  padding: 0.5rem !important;
-  box-shadow: none !important;
-  border: 1px solid #f0f0f0 !important;
+/* Utility Classes */
+.has-text-weight-bold {
+    font-weight: bold;
 }
 
-/* More minimal card styling */
-.card.mb-4 {
-  box-shadow: none !important;
-  border: none !important;
+.has-text-centered {
+    text-align: center;
 }
 
-.card.mb-4 > header.card-header {
-  background: none !important;
-  border-bottom: none !important;
-  padding: 0.25rem 1rem !important; /* reduce top/bottom padding */
+.is-vcentered {
+    align-items: center;
 }
 
-.card.mb-4 > header.card-header .card-header-title {
-  font-size: 1rem;
-  font-weight: 500;
-  margin-bottom: 0 !important;
-}
-
-/* Compact field styling */
-.field.is-horizontal .field-label.is-small {
-  text-align: left;
-}
-
-.field.is-horizontal .field-body .field {
-  margin-bottom: 0;
-}
-
-/* Consistent font styling for portfolio allocation */
-.box.compact-box {
-  font-size: 0.9rem;
-}
-
-.box.compact-box .label {
-  font-size: 0.9rem;
-  font-weight: normal;
-}
-
-.box.compact-box .has-text-weight-bold {
-  font-size: 0.9rem;
-}
-
-/* Ensure all inputs have consistent styling */
-input.input {
-  font-size: 0.9rem !important;
-  height: 2.25em !important;
-  font-family: inherit !important;
-}
-
-/* Portfolio toggle styling */
-.portfolio-toggle {
-  cursor: pointer;
-}
-
-/* Even weight position display */
-.even-weight-positions {
-  font-style: italic;
-  color: #555;
-}
-
-/* Add Position Section */
-.add-position-section {
-  background-color: #f9f9f9;
-  padding: 1rem;
-  border-radius: 4px;
-  border: 1px solid #f0f0f0;
-}
-
-/* Smaller warning notification for remaining positions */
-.notification.is-small {
-  padding: 0.5rem 0.75rem;
-  font-size: 0.85rem;
-}
-
-/* Style the remove button */
-.button.is-small.is-danger.is-light {
-  padding: 0;
-  height: 28px;
-  width: 28px;
-}
-
-/* Position dropdown styling */
-.add-position-section .select:not(.is-multiple):not(.is-loading)::after {
-  border-color: #3273dc;
-}
-
-.add-position-section .select select {
-  border-color: #dbdbdb;
-}
-
-.add-position-section .select select:focus {
-  border-color: #3273dc;
-}
-
-/* Make the position remaining warning more prominent */
-.remaining-positions-notification {
+.is-mobile {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  margin-bottom: 0;
+    flex-wrap: wrap;
 }
 
-/* Add to allocate.css */
-@media screen and (max-width: 768px) {
-  .columns {
-    display: block !important;
-    margin-left: 0 !important;
-    margin-right: 0 !important;
-  }
-  
-  .column {
-    width: 100% !important;
-    padding: 0.75rem !important;
-  }
-}
+/* Remove all the excessive animation that was in the old file */
