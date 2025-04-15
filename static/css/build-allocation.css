@@ -1,6 +1,6 @@
 /**
- * Portfolio Allocation Builder Styles
- * Redesigned to match the clean, elegant design of allocate.css
+ * Build Portfolio Styles
+ * This file contains styles for the portfolio builder component.
  */
 
 /* Light Theme Variables */
@@ -16,6 +16,8 @@
     --success-color: #198754;
     --warning-color: #ffc107;
     --danger-color: #dc3545;
+    --chart-blue: rgba(54, 162, 235, 0.8);
+    --chart-red: rgba(255, 99, 132, 0.8);
     --input-bg: #ffffff;
     --table-header-bg: rgba(0, 0, 0, 0.03);
     --category-row-bg: rgba(0, 0, 0, 0.02);
@@ -23,8 +25,6 @@
     --missing-positions-bg: rgba(255, 193, 7, 0.1);
     --hover-bg: rgba(13, 110, 253, 0.08);
     --active-bg: rgba(13, 110, 253, 0.12);
-    --placeholder-bg: rgba(13, 110, 253, 0.05);
-    --placeholder-border: #0d6efd;
 }
 
 /* Dark Theme Variables */
@@ -41,6 +41,8 @@
         --success-color: #28a745;
         --warning-color: #ffc107;
         --danger-color: #dc3545;
+        --chart-blue: rgba(54, 162, 235, 0.8);
+        --chart-red: rgba(255, 99, 132, 0.8);
         --input-bg: #2a2a2a;
         --table-header-bg: rgba(0, 0, 0, 0.2);
         --category-row-bg: rgba(0, 0, 0, 0.1);
@@ -48,281 +50,242 @@
         --missing-positions-bg: rgba(255, 193, 7, 0.1);
         --hover-bg: rgba(58, 142, 255, 0.2);
         --active-bg: rgba(58, 142, 255, 0.3);
-        --placeholder-bg: rgba(58, 142, 255, 0.1);
-        --placeholder-border: #3a8eff;
     }
 }
 
-/* General Styles */
-[v-cloak] {
-  display: none;
+/* Container Styling */
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
 }
 
-/* Card Styling - Updated for minimal design */
+/* Card Styling */
 .card {
-    background-color: transparent;
-    border: none;
-    border-radius: 0;
-    box-shadow: none;
-    margin-bottom: 2rem;
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.08);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    margin-bottom: 1.5rem;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.12);
 }
 
 .card-header {
-    background-color: transparent;
-    border-bottom: none;
-    padding: 0.5rem 0;
-    margin-bottom: 0.5rem;
+    background-color: var(--darker-bg);
+    border-bottom: 1px solid var(--border-color);
+    padding: 1.25rem;
+    border-radius: 0.5rem 0.5rem 0 0;
 }
 
-.card-header-title {
+.card-title {
     color: var(--text-color);
-    font-weight: 600;
-    font-size: 1.5rem;
-    padding-left: 0;
-}
-
-.card-content {
-    padding: 1rem 0;
-    border-top: none;
-    border: none;
-}
-
-/* Budget Section */
-.budget-row {
-  display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
-    margin-bottom: 1rem;
-}
-
-.field {
-    margin-bottom: 1rem;
-}
-
-.label {
-    color: var(--text-muted);
+    margin: 0;
     font-weight: 500;
+    font-size: 1.25rem;
+}
+
+.card-body {
+    padding: 1.5rem;
+}
+
+/* Budget Management Styling */
+.budget-card {
+    background-color: var(--card-bg);
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.budget-results {
+    background-color: var(--darker-bg);
+    padding: 1.25rem;
+    border-radius: 0.375rem;
+    margin-top: 1.5rem;
+}
+
+.result-item {
+    /* No specific styles needed here as columns handle layout */
+}
+
+.result-label {
+    display: block;
     font-size: 0.9rem;
-  margin-bottom: 0.5rem;
-}
-
-.input {
-    background-color: var(--input-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 0.25rem;
-    color: var(--text-color);
-    padding: 0.5rem 0.75rem;
-    transition: border-color 0.2s ease;
-}
-
-.input:focus {
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
-    outline: none;
-}
-
-.input[readonly] {
-    background-color: var(--darker-bg);
-}
-
-/* Fixed value display styling */
-.fixed-value-display, .available-invest {
-    background-color: var(--darker-bg);
-    border-radius: 0.25rem;
-  padding: 0.75rem 1rem;
     font-weight: 500;
-  text-align: right;
-    border-left: 3px solid var(--primary-color);
+    color: var(--text-muted);
+    margin-bottom: 0.25rem;
 }
 
-.available-invest {
-    border-left-color: var(--success-color);
+.result-value {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-color);
 }
 
 .available-percentage {
-  font-size: 0.85rem;
+    font-size: 0.85rem;
+    font-weight: normal;
     color: var(--text-muted);
-  margin-left: 0.5rem;
+    margin-left: 0.5rem;
 }
 
-/* Portfolio Section */
-.compact-box {
-    border-radius: 0.25rem;
-    border: 1px solid var(--border-color);
-    margin-bottom: 0.75rem;
-    padding: 1rem;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+@media (max-width: 767.98px) {
+    .budget-card .columns {
+        flex-direction: column;
+    }
+    .budget-results {
+        padding: 1rem;
+    }
+    .result-item {
+        margin-bottom: 1rem;
+    }
+    .result-item:last-child {
+        margin-bottom: 0;
+    }
 }
 
-.compact-box:hover {
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.portfolio-header {
-    align-items: center;
+/* Form Elements */
+.form-label {
+    color: var(--text-color);
+    font-weight: 500;
     margin-bottom: 0.5rem;
 }
 
-.portfolio-toggle {
-    cursor: pointer;
-    color: var(--primary-color);
-    transition: transform 0.2s ease;
-}
-
-/* Table Styling */
-.table {
-    width: 100%;
-    margin-bottom: 1rem;
+.form-control {
+    background-color: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
     color: var(--text-color);
-    border-collapse: separate;
-    border-spacing: 0;
+    padding: 0.75rem 1rem;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.table th {
-    background-color: var(--table-header-bg);
-    color: var(--text-muted);
+.form-control:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+/* Asset Categories Section */
+.asset-categories {
+    margin-top: 1.5rem;
+}
+
+.section-title {
+    color: var(--text-color);
+    font-size: 1.1rem;
     font-weight: 500;
-    text-transform: uppercase;
-    font-size: 0.85rem;
-    letter-spacing: 0.5px;
-    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
 }
 
-.table td {
-    padding: 0.75rem 1rem;
-    vertical-align: middle;
+.categories-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
 }
 
-.table.is-hoverable tbody tr:hover {
+/* Category Item Styling */
+.category-item {
+    background-color: var(--category-row-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    padding: 1rem;
+    transition: all 0.2s ease;
+}
+
+.category-item:hover {
     background-color: var(--hover-bg);
 }
 
-/* Placeholder Positions */
-.placeholder-position {
-    background-color: var(--placeholder-bg);
-}
-
-.placeholder-position td {
-    border-left: 3px solid var(--placeholder-border);
-}
-
-.remaining-positions-text {
-    color: var(--primary-color);
-  font-weight: 500;
-}
-
-/* Add Position Section */
-.add-position-section {
-    background-color: var(--darker-bg);
-    padding: 1rem;
-    border-radius: 0.25rem;
-    margin-bottom: 1rem;
-}
-
-.select select {
-    background-color: var(--input-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 0.25rem;
-    color: var(--text-color);
-    padding: 0.5rem 2rem 0.5rem 0.75rem;
-    transition: border-color 0.2s ease;
-}
-
-.select select:focus {
-    border-color: var(--primary-color);
-    outline: none;
-}
-
-.button {
-    background-color: var(--primary-color);
-    border: none;
-    border-radius: 0.25rem;
-    color: white;
-    cursor: pointer;
-    padding: 0.5rem 1rem;
-    transition: background-color 0.2s ease;
-}
-
-.button:hover {
-    background-color: var(--primary-hover);
-}
-
-.button.is-info {
-    background-color: var(--primary-color);
-}
-
-.button.is-info:hover {
-    background-color: var(--primary-hover);
-}
-
-.button.is-danger {
-    background-color: var(--danger-color);
-}
-
-.button.is-small {
-    font-size: 0.85rem;
-    padding: 0.25rem 0.5rem;
-}
-
-/* Allocation Status */
-.notification {
-    border-radius: 0.25rem;
-    padding: 1rem;
-    position: relative;
-}
-
-.notification.is-success {
-    background-color: rgba(25, 135, 84, 0.1);
-    color: var(--success-color);
-}
-
-.notification.is-warning {
-    background-color: rgba(255, 193, 7, 0.1);
-    color: var(--warning-color);
-}
-
-.notification.is-danger {
-    background-color: rgba(220, 53, 69, 0.1);
-    color: var(--danger-color);
-}
-
-/* Responsive adjustments */
-@media screen and (max-width: 768px) {
-    .columns {
-        display: block;
-    }
-    
-    .column {
-        width: 100%;
-        padding: 0.75rem;
-    }
-    
-    .budget-row {
-        flex-direction: column;
-    }
-}
-
-/* Input formatting for percentages and numbers */
-input[type="text"], input[type="number"] {
-  text-align: right;
-}
-
-/* Utility Classes */
-.has-text-weight-bold {
-    font-weight: bold;
-}
-
-.has-text-centered {
-    text-align: center;
-}
-
-.is-vcentered {
+.category-header {
+    display: flex;
+    justify-content: space-between;
     align-items: center;
+    margin-bottom: 0.75rem;
 }
 
-.is-mobile {
-  display: flex;
-    flex-wrap: wrap;
+.category-name {
+    font-weight: 500;
+    color: var(--text-color);
 }
 
-/* Remove all the excessive animation that was in the old file */
+.category-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* Button Styling */
+.btn {
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.btn-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: var(--primary-hover);
+    border-color: var(--primary-hover);
+    transform: translateY(-1px);
+}
+
+.btn-outline-secondary {
+    border-color: var(--border-color);
+    color: var(--text-color);
+}
+
+.btn-outline-secondary:hover {
+    background-color: var(--darker-bg);
+    border-color: var(--border-color);
+    color: var(--text-color);
+}
+
+/* Preview Section */
+.preview-card {
+    position: sticky;
+    top: 2rem;
+}
+
+.empty-preview {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    color: var(--text-muted);
+}
+
+.empty-preview i {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    color: var(--text-muted);
+}
+
+.empty-preview p {
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 767.98px) {
+    .container {
+        padding: 1rem;
+    }
+    
+    .card {
+        margin-bottom: 1rem;
+    }
+    
+    .preview-card {
+        position: static;
+    }
+}
