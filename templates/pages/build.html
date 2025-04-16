@@ -2,115 +2,17 @@
 
 {% block title %}Allocation Builder{% endblock %}
 
-{% block head %}
-{{ super() }}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/build-allocation.css') }}">
-<style>
-    /* Custom styling for Portfolio Allocation section */
-    .no-lines tbody tr td {
-        border: none;
-    }
-    .no-lines tfoot tr th {
-        border: none;
-    }
-    /* Keep the lines for title row */
-    .no-lines thead tr th {
-        border-bottom: 1px solid #dbdbdb;
-    }
-    
-    /* Highlighting for placeholder positions - MUCH MORE VISIBLE NOW */
-    .placeholder-position {
-        background-color: rgba(50, 115, 220, 0.15) !important;
-        font-style: italic;
-    }
-    
-    .placeholder-position td {
-        border-left: 5px solid #3273dc !important;
-        padding-left: 12px;
-    }
-    
-    .placeholder-position .remaining-positions-text {
-        font-weight: 700;
-        color: #3273dc;
-        font-size: 1.05em;
-    }
-    
-    .placeholder-position input {
-        background-color: rgba(50, 115, 220, 0.1);
-        font-weight: 600;
-        color: #3273dc;
-        border-color: #3273dc;
-    }
-    
-    /* Disable highlighting for allocation summary table */
-    .no-highlight, .no-highlight td {
-        background-color: transparent !important;
-        border-left: none !important;
-        font-style: normal !important;
-    }
-    
-    /* Portfolio header styling */
-    .compact-box {
-        border-left: 4px solid #209cee;
-        transition: all 0.3s ease;
-    }
-    
-    .compact-box:hover {
-        box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
-    }
-    
-    .columns.is-vcentered.is-mobile .label {
-        color: #363636;
-        font-weight: 600;
-    }
-    
-    /* Enhanced section titles */
-    .section-title {
-        font-size: 2.2rem !important;
-        font-weight: 800 !important;
-        color: #222;
-        margin-bottom: 1.8rem;
-        padding-bottom: 0.6rem;
-        border-bottom: 3px solid #3273dc;
-        position: relative;
-    }
-    
-    .section-title::after {
-        content: "";
-        position: absolute;
-        bottom: -3px;
-        left: 0;
-        width: 80px;
-        height: 3px;
-        background-color: #ff9900;
-    }
-    
-    /* Add more space between sections */
-    .content {
-        margin-bottom: 3rem;
-    }
-    
-    /* Highlight the "remaining positions" row with animation */
-    @keyframes highlight-pulse {
-        0% { background-color: rgba(50, 115, 220, 0.15); }
-        50% { background-color: rgba(50, 115, 220, 0.25); }
-        100% { background-color: rgba(50, 115, 220, 0.15); }
-    }
-    
-    .placeholder-position:not(.no-highlight) {
-        animation: highlight-pulse 3s infinite;
-    }
-</style>
+{% block head_extras %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/build-allocation.css') }}?v={{ range(1000, 9999) | random }}">
 {% endblock %}
 
 {% block content %}
 <div class="container">
     <h1 class="title mb-4">Allocation Builder</h1>
-    <p class="subtitle mb-4">Plan and visualize your investment allocations</p>
 
     <div id="allocation-builder" v-cloak>
         <!-- Budget Management Section -->
-        <h2 class="section-title">Budget Management</h2>
+        <h1 class="section-title title is-3">Budget Management</h1>
         <div class="content">
             <div class="budget-card">
                 <!-- Input Fields Row -->
@@ -172,7 +74,7 @@
         </div>
 
         <!-- Global Allocation Rules -->
-        <h2 class="section-title">Global Allocation Rules</h2>
+        <h2 class="section-title title is-3">Global Allocation Rules</h2>
         <div class="content">
             <div class="columns">
                 <div class="column is-half">
@@ -197,7 +99,7 @@
         </div>
 
         <!-- Portfolio Allocation -->
-        <h2 class="section-title">Portfolio Allocation</h2>
+        <h2 class="section-title title is-3">Portfolio Allocation</h2>
         <div class="content">
             <!-- Allocation Status Indicator -->
             <div class="notification" :class="{
@@ -376,7 +278,7 @@
         </div>
 
         <!-- Allocation Summary -->
-        <h2 class="section-title">Allocation Summary</h2>
+        <h2 class="section-title title is-3">Allocation Summary</h2>
         <div class="content">
             <!-- Summary Table -->
             <div class="table-responsive">
@@ -457,6 +359,15 @@
         </div>
     </div>
 </div>
+
+<!-- Debug output (only visible in development) -->
+{% if config.DEBUG %}
+<div style="background: #f5f5f5; padding: 10px; margin-top: 20px; border: 1px solid #ddd;">
+  <h3>CSS Debug Info:</h3>
+  <p>Build-allocation.css path: {{ url_for('static', filename='css/build-allocation.css') }}</p>
+  <p>Static folder path: {{ url_for('static', filename='') }}</p>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}

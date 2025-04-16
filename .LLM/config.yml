@@ -1,12 +1,6 @@
 # Focus
-#static/css/*
-static/js/allocate.js
-# config.py
-app/routes/portfolio*
-# app/utils/formatting.py
-app/utils/db_utils.py
-app/utils/portfolio_utils.py
-templates/pages/allocate.html
+static/css/*
+static/js/*
 templates/pages/build.html
 #templates/pages/analyze.html
 #templates/components/analyse_components.html
