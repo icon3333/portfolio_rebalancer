@@ -4,7 +4,7 @@ static/js/*
 templates/pages/build.html
 #templates/pages/analyze.html
 #templates/components/analyse_components.html
-#templates/pages/build.html
+templates/pages/allocate.html
 #templates/pages/enrich.html
 #templates/pages/index.html
 #templates/base.html

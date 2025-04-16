@@ -1,505 +1,338 @@
 /**
- * Portfolio Allocation Styles
- * This file contains styles for the portfolio allocation component.
+ * Standardized Minimalist Design for Portfolio Manager Application
+ * Rewritten allocate.css to match the minimalist design system
  */
 
-/* Light Theme Variables */
+/* Base Theme Variables */
 :root {
+    /* Colors */
     --bg: #ffffff;
     --darker-bg: #f5f5f5;
     --card-bg: #ffffff;
-    --border-color: #dee2e6;
-    --text-color: #212529;
-    --text-muted: #6c757d;
-    --primary-color: #0d6efd;
-    --primary-hover: #0b5ed7;
-    --success-color: #198754;
-    --warning-color: #ffc107;
-    --danger-color: #dc3545;
-    --chart-blue: rgba(54, 162, 235, 0.8);
-    --chart-red: rgba(255, 99, 132, 0.8);
-    --input-bg: #ffffff;
-    --table-header-bg: rgba(0, 0, 0, 0.03);
-    --category-row-bg: rgba(0, 0, 0, 0.02);
-    --position-row-bg: rgba(0, 0, 0, 0.01);
-    --missing-positions-bg: rgba(255, 193, 7, 0.1);
-    --hover-bg: rgba(13, 110, 253, 0.08);
-    --active-bg: rgba(13, 110, 253, 0.12);
-}
-
-/* Dark Theme Variables */
-@media (prefers-color-scheme: dark) {
+    --border-color: #e0e0e0;
+    --text-color: #333333;
+    --text-muted: #666666;
+    
+    /* Brand Colors */
+    --primary: #3273dc;
+    --primary-light: rgba(50, 115, 220, 0.1);
+    --primary-hover: #2366d1;
+    --success: #23d160;
+    --warning: #ffdd57;
+    --danger: #ff3860;
+    
+    /* UI Elements */
+    --shadow: 0 2px 3px rgba(10, 10, 10, 0.1);
+    --border-radius: 4px;
+    
+    /* Spacing */
+    --space-xs: 0.25rem;
+    --space-sm: 0.5rem;
+    --space-md: 1rem;
+    --space-lg: 1.5rem;
+    --space-xl: 2rem;
+  }
+  
+  /* Dark Theme Support */
+  @media (prefers-color-scheme: dark) {
     :root {
-        --bg: #1e1e1e;
-        --darker-bg: #121212;
-        --card-bg: #242424;
-        --border-color: #333;
-        --text-color: #e0e0e0;
-        --text-muted: #a0a0a0;
-        --primary-color: #3a8eff;
-        --primary-hover: #1e7eff;
-        --success-color: #28a745;
-        --warning-color: #ffc107;
-        --danger-color: #dc3545;
-        --chart-blue: rgba(54, 162, 235, 0.8);
-        --chart-red: rgba(255, 99, 132, 0.8);
-        --input-bg: #2a2a2a;
-        --table-header-bg: rgba(0, 0, 0, 0.2);
-        --category-row-bg: rgba(0, 0, 0, 0.1);
-        --position-row-bg: rgba(0, 0, 0, 0.05);
-        --missing-positions-bg: rgba(255, 193, 7, 0.1);
-        --hover-bg: rgba(58, 142, 255, 0.2);
-        --active-bg: rgba(58, 142, 255, 0.3);
+      --bg: #1e1e1e;
+      --darker-bg: #121212;
+      --card-bg: #222222;
+      --border-color: #333333;
+      --text-color: #e0e0e0;
+      --text-muted: #999999;
     }
-}
-
-/* Global Styles */
-body {
+  }
+  
+  /* Global Styles */
+  body {
     background-color: var(--bg);
     color: var(--text-color);
-}
-
-/* Container Styling */
-.container {
+  }
+  
+  /* Container Styling */
+  .container {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 2rem;
-}
-
-/* Card Styling */
-.card {
+    padding: var(--space-md);
+  }
+  
+  /* Card Styling */
+  .card {
     background-color: var(--card-bg);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+    margin-bottom: var(--space-lg);
+    padding: var(--space-lg);
     border: 1px solid var(--border-color);
-    border-radius: 0.25rem;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.08);
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-    margin-bottom: 1.5rem;
-}
-
-.card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.12);
-}
-
-.card-body {
-    padding: 1.5rem;
-}
-
-.card-header {
-    background-color: var(--darker-bg);
-    border-bottom: 1px solid var(--border-color);
-    padding: 1.5rem;
-}
-
-.card-title {
-    color: var(--text-color);
-    margin-bottom: 1.25rem;
-    font-weight: 500;
-}
-
-/* Investment Section */
-.investment-section {
-    background-color: var(--card-bg);
-    border: 1px solid var(--border-color);
-    padding: 1.5rem;
-    border-radius: 0.25rem;
-    margin-bottom: 1.5rem;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.investment-section .card-title {
-    color: var(--text-color);
-    font-weight: 500;
-    margin-bottom: 1rem;
-}
-
-/* Header Content Layout */
-.header-content {
+  }
+  
+  /* Header Content Layout */
+  .header-content {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 2rem 0;
-    margin-bottom: 1rem;
-    gap: 2rem;
-}
-
-/* Investment Input Styling */
-.investment-input {
+    padding: var(--space-md) 0;
+    margin-bottom: var(--space-md);
+    gap: var(--space-md);
+  }
+  
+  /* Investment Input Styling */
+  .investment-input {
     display: flex;
     align-items: center;
-    gap: 2rem;
-    padding: 1.5rem;
+    gap: var(--space-md);
+    padding: var(--space-md);
     background: transparent;
-    transition: all 0.3s ease;
     flex: 1;
     min-width: 320px;
-}
-
-.investment-input label {
+  }
+  
+  .investment-input label {
     margin: 0;
     color: var(--text-color);
     font-weight: 500;
-    font-size: 1.1rem;
     white-space: nowrap;
-    opacity: 0.9;
-}
-
-.investment-input .input-group {
-    flex: 1;
-    margin: 0;
+  }
+  
+  .input-group {
     display: flex;
     align-items: center;
     min-width: 0;
-}
-
-.input-group-text {
+    flex: 1;
+  }
+  
+  .input-group-text {
     background: transparent;
     color: var(--text-color);
     border: none;
-    padding: 0.75rem 0.5rem 0.75rem 0;
+    padding: var(--space-xs) var(--space-sm);
     font-weight: 500;
-    font-size: 1.1rem;
-    opacity: 0.9;
-}
-
-.input-group input {
-    border: none;
-    border-bottom: 2px solid var(--border-color);
-    padding: 0.75rem;
-    font-size: 1.1rem;
+  }
+  
+  .input-group input {
+    border: 1px solid var(--border-color);
+    padding: var(--space-sm) var(--space-md);
     font-weight: 500;
-    color: var(--primary-color);
-    background-color: transparent;
-    transition: all 0.2s ease;
-    border-radius: 0;
+    color: var(--primary);
+    background-color: var(--bg);
     width: 100%;
-}
-
-.input-group input:focus {
-    box-shadow: none;
-    border-color: var(--primary-color);
+    border-radius: var(--border-radius);
+  }
+  
+  .input-group input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 1px var(--primary-light);
     outline: none;
-}
-
-.input-group input::placeholder {
-    color: var(--text-muted);
-    font-weight: normal;
-    opacity: 0.7;
-}
-
-/* Tab Navigation */
-.nav-tabs {
-    border-bottom: 2px solid var(--border-color);
+  }
+  
+  /* Tab Navigation */
+  .nav-tabs {
+    border-bottom: 1px solid var(--border-color);
     display: flex;
-    gap: 0;
     background-color: var(--darker-bg);
-    border-radius: 4px 4px 0 0;
+    border-radius: var(--border-radius) var(--border-radius) 0 0;
     overflow: hidden;
-    border: none;
     margin-bottom: 0;
-}
-
-.nav-tabs .nav-item {
+  }
+  
+  .nav-tabs .nav-item {
     flex: 1;
     text-align: center;
-}
-
-.nav-tabs .nav-link {
+  }
+  
+  .nav-tabs .nav-link {
     border: none;
     color: var(--text-muted);
-    padding: 1rem;
-    transition: all 0.3s ease;
+    padding: var(--space-md);
+    transition: all 0.2s ease;
     width: 100%;
     text-align: center;
     background-color: var(--darker-bg);
-    color: #4a4a4a;
-    padding: 0.75rem 1.5rem;
-    margin-right: 0.5rem;
-    border-radius: 4px;
-}
-
-.nav-tabs .nav-link:hover {
+  }
+  
+  .nav-tabs .nav-link:hover {
     color: var(--text-color);
-    background-color: var(--hover-bg);
-}
-
-.nav-tabs .nav-link.active {
-    color: var(--primary-color);
-    border-bottom: 2px solid var(--primary-color);
-    background-color: var(--active-bg);
-}
-
-.tab-content {
-    padding-top: 1rem;
-}
-
-.tab-pane {
+    background-color: var(--primary-light);
+  }
+  
+  .nav-tabs .nav-link.active {
+    color: var(--primary);
+    border-bottom: 2px solid var(--primary);
+    background-color: var(--bg);
+  }
+  
+  .tab-content {
+    padding-top: var(--space-md);
+  }
+  
+  .tab-pane {
     display: none;
-    opacity: 0;
-    transition: opacity 0.3s ease-in-out;
-}
-
-.tab-pane.active {
+  }
+  
+  .tab-pane.active {
     display: block;
-    opacity: 1;
-}
-
-/* Portfolio Table Container */
-.portfolio-table-container {
-    background-color: var(--card-bg);
-    border-radius: 0.25rem;
-    padding: 1.5rem;
-}
-
-/* Rebalancing Actions */
-.rebalancing-actions {
-    background-color: var(--card-bg);
-    border-radius: 0.25rem;
-    padding: 1.5rem;
-}
-
-/* Portfolio Select */
-.portfolio-select {
+  }
+  
+  /* Portfolio Select */
+  .portfolio-select {
     display: flex;
     align-items: center;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-}
-
-.portfolio-select label {
+    gap: var(--space-md);
+    margin-bottom: var(--space-lg);
+  }
+  
+  .portfolio-select label {
     margin: 0;
     color: var(--text-color);
     font-weight: 500;
-    font-size: 1.1rem;
     white-space: nowrap;
-}
-
-.portfolio-select .form-select {
-    background-color: transparent;
-    border: none;
-    border-bottom: 2px solid var(--border-color);
+  }
+  
+  .form-select {
+    background-color: var(--bg);
+    border: 1px solid var(--border-color);
     color: var(--text-color);
-    padding: 0.75rem;
-    font-size: 1.1rem;
-    transition: all 0.2s ease;
-}
-
-.portfolio-select .form-select:focus {
-    box-shadow: none;
-    border-color: var(--primary-color);
+    padding: var(--space-sm) var(--space-md);
+    border-radius: var(--border-radius);
+  }
+  
+  .form-select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 1px var(--primary-light);
     outline: none;
-}
-
-/* Consistent Table Styling for All Overview Sections */
-.table {
+  }
+  
+  /* Table Styling */
+  .table {
     width: 100%;
-    margin-bottom: 1rem;
+    margin-bottom: var(--space-md);
     color: var(--text-color);
     border-collapse: separate;
     border-spacing: 0;
     background-color: var(--card-bg);
-    border-radius: 0.25rem;
+    border-radius: var(--border-radius);
     overflow: hidden;
-}
-
-.table th,
-.table td {
-    padding: 0.75rem 1rem;
-    vertical-align: middle;
-    border: none;
+  }
+  
+  .table th,
+  .table td {
+    padding: 0.65rem 0.75rem;
     border-bottom: 1px solid var(--border-color);
-}
-
-.table thead th {
-    background-color: var(--table-header-bg);
+  }
+  
+  .table thead th {
+    background-color: var(--darker-bg);
     color: var(--text-muted);
     font-weight: 500;
-    text-transform: uppercase;
-    font-size: 0.85rem;
-    letter-spacing: 0.5px;
     border-bottom: 2px solid var(--border-color);
-    position: sticky;
-    top: 0;
-    z-index: 1;
-}
-
-.table tbody tr {
-    transition: background-color 0.2s ease;
-}
-
-.table tbody tr:last-child td {
-    border-bottom: none;
-}
-
-.table-striped tbody tr:nth-of-type(odd) {
-    background-color: var(--category-row-bg);
-}
-
-.table-hover tbody tr:hover {
-    background-color: var(--hover-bg);
-}
-
-/* Category and Position Row Styling */
-.category-row {
-    background-color: var(--category-row-bg) !important;
+  }
+  
+  .table tbody tr:hover {
+    background-color: var(--primary-light);
+  }
+  
+  /* Category and Position Row Styling */
+  .category-row {
+    background-color: var(--darker-bg);
     font-weight: 500;
     cursor: pointer;
-}
-
-.category-row:hover {
-    background-color: var(--hover-bg) !important;
-}
-
-.position-row {
-    background-color: var(--position-row-bg);
-}
-
-.position-row td:first-child,
-.position-name {
-    padding-left: 2rem !important;
-}
-
-/* Value Columns Styling */
-.current-value,
-.target-value,
-.value-after {
+  }
+  
+  .position-row td:first-child {
+    padding-left: var(--space-lg);
+  }
+  
+  /* Value Formatting */
+  .current-value {
+    color: var(--primary);
     font-family: monospace;
-    font-size: 0.95rem;
-    font-weight: 500;
-}
-
-.current-value {
-    color: var(--primary-color);
-}
-
-.target-value {
-    color: var(--chart-red);
-}
-
-.value-after {
-    color: var(--success-color);
-}
-
-.allocation-percentage {
-    font-size: 0.9rem;
-    color: var(--text-muted);
-    font-weight: normal;
-}
-
-/* Total Row Styling */
-.total-row {
-    background-color: var(--table-header-bg) !important;
+  }
+  
+  .target-value {
+    color: var(--text-color);
+    font-family: monospace;
+  }
+  
+  .value-after {
+    color: var(--success);
+    font-family: monospace;
+  }
+  
+  /* Total Row Styling */
+  .total-row {
+    background-color: var(--darker-bg);
     font-weight: 600;
-}
-
-.total-row td {
-    border-top: 2px solid var(--primary-color);
+  }
+  
+  .total-row td {
+    border-top: 2px solid var(--primary);
     border-bottom: none;
-    padding: 0.75rem 1rem !important;
-}
-
-/* Missing Positions Styling */
-.missing-positions-row,
-.missing-position {
-    background-color: var(--missing-positions-bg) !important;
-}
-
-.missing-positions-row td,
-.missing-position td {
-    border-left: 3px solid var(--warning-color);
-}
-
-/* Table Container */
-.table-responsive {
-    border-radius: 0.25rem;
-    overflow: auto;
-    max-height: 600px;
-    margin-bottom: 2rem;
-    background-color: var(--card-bg);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-}
-
-/* Support for Other Table Classes Used in the Application */
-.table.is-fullwidth {
-    width: 100%;
-}
-
-.table.is-hoverable tbody tr:hover {
-    background-color: var(--hover-bg);
-}
-
-.table.mt-4 {
-    margin-top: 1.5rem;
-}
-
-/* Action Colors */
-.actions-positive {
-    color: var(--success-color);
-    font-weight: 500;
-}
-
-.actions-neutral {
-    color: var(--text-muted);
-}
-
-.actions-negative {
-    color: var(--danger-color);
-    font-weight: 500;
-}
-
-/* Loading Spinner */
-.spinner-border {
-    width: 3rem;
-    height: 3rem;
-    margin: 2rem auto;
+  }
+  
+  /* Missing Positions Styling */
+  .missing-positions-row td {
+    border-left: 3px solid var(--warning);
+    background-color: rgba(255, 221, 87, 0.1);
+  }
+  
+  /* Loading Spinner */
+  .spinner-border {
     display: block;
-    color: var(--primary-color);
-}
-
-/* Table Active Row */
-.table-active {
-    background-color: var(--active-bg) !important;
-}
-
-/* Button Styling */
-.btn-primary {
-    background-color: var(--primary-color);
-    border-color: var(--primary-color);
-    color: white;
-    padding: 0.5rem 1.25rem;
+    margin: var(--space-lg) auto;
+  }
+  
+  /* Table Container */
+  .table-responsive {
+    border-radius: var(--border-radius);
+    overflow: auto;
+    margin-bottom: var(--space-lg);
+    background-color: var(--card-bg);
+    box-shadow: var(--shadow);
+  }
+  
+  /* Action Colors */
+  .actions-positive {
+    color: var(--success);
     font-weight: 500;
-    transition: all 0.2s ease;
-}
-
-.btn-primary:hover {
-    background-color: var(--primary-hover);
-    border-color: var(--primary-hover);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-}
-
-/* Animation for expandable rows */
-.category-row i.fas {
-    transition: transform 0.2s ease-in-out;
-}
-
-.category-row:hover i.fas {
-    transform: translateX(2px);
-}
-
-/* Responsive Adjustments */
-@media (max-width: 767.98px) {
+  }
+  
+  .actions-negative {
+    color: var(--danger);
+    font-weight: 500;
+  }
+  
+  .actions-neutral {
+    color: var(--text-muted);
+  }
+  
+  /* Responsive Adjustments */
+  @media (max-width: 768px) {
     .header-content {
-        flex-direction: column;
-        align-items: flex-start;
+      flex-direction: column;
+      align-items: flex-start;
     }
     
     .investment-input {
-        width: 100%;
-        margin-top: 1rem;
+      width: 100%;
+      margin-top: var(--space-md);
+    }
+    
+    .portfolio-select {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    
+    .form-select {
+      width: 100%;
     }
     
     .table-responsive {
-        font-size: 0.875rem;
+      font-size: 0.875rem;
     }
-}
+    
+    .container {
+      padding: var(--space-sm);
+    }
+  }

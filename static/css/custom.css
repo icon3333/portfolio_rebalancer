@@ -1,403 +1,277 @@
-/* Custom CSS for Portfolio Manager - Minimalist Theme */
+/**
+ * Custom CSS for Portfolio Manager - Standardized Minimalist Theme
+ * This file contains shared styles that apply across the entire application
+ */
 
-/* Navbar */
-.navbar {
-    background-color: var(--blue-500) !important;
-}
-
-.navbar-item,
-.navbar-link {
-    color: var(--white) !important;
-}
-
-/* Ensure dropdown items have dark text for visibility */
-.navbar-dropdown .navbar-item {
-    color: var(--dark-grey) !important;
-}
-
-.navbar-item:hover,
-.navbar-link:hover {
-    background-color: var(--blue-700) !important;
-    color: var(--white) !important;
-}
-
-/* Custom hover for dropdown items */
-.navbar-dropdown .navbar-item:hover {
-    background-color: var(--blue-100) !important;
-    color: var(--dark-grey) !important;
-}
-
-.navbar-burger {
-    color: var(--white) !important;
-}
-
-.navbar-menu.is-active {
-    background-color: var(--blue-500) !important;
-}
-
-/* Base theme colors */
+/* Base Theme Variables */
 :root {
-    --white: #ffffff;
-    --light-grey: #f8f9fa;
-    --grey: #e9ecef;
-    --dark-grey: #343a40;
-    --blue-100: #e3f2fd;
-    --blue-200: #90caf9;
-    --blue-500: #2196f3;
-    --blue-700: #1976d2;
-    --green-500: #4caf50;
-    --red-500: #f44336;
-}
-
-/* Global Resets */
-*, .card, .button, .notification, .input, .textarea, .select select, .table {
-    border-radius: 0 !important;
-    box-shadow: none !important;
-}
-
-/* Sidebar */
-.sidebar {
-    min-width: 250px !important;
-    background: var(--white) !important;
-    border-right: 1px solid var(--grey) !important;
-    box-shadow: none !important;
-}
-
-.menu-label {
-    color: var(--dark-grey) !important;
-    font-size: 0.8em !important;
-    font-weight: 500 !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.1em !important;
-}
-
-.menu-list a {
-    color: var(--dark-grey) !important;
-    border-radius: 0 !important;
-}
-
-.menu-list a:hover {
-    background-color: var(--blue-100) !important;
-}
-
-.menu-list a.is-active {
-    background-color: var(--blue-500) !important;
-    color: var(--white) !important;
-}
-
-/* Cards */
-.card {
-    background: var(--white) !important;
-    border: 1px solid var(--grey) !important;
-    margin-bottom: 1rem !important;
-}
-
-.card:hover {
-    border-color: var(--blue-200) !important;
-    transform: none !important;
-}
-
-.card-header {
-    background: var(--white) !important;
-    border-bottom: 1px solid var(--grey) !important;
-    box-shadow: none !important;
-}
-
-.card-header-title {
-    color: var(--dark-grey) !important;
-    font-weight: 500 !important;
-}
-
-/* Tables */
-.table {
-    background: var(--white) !important;
-    border: 1px solid var(--grey) !important;
-}
-
-.table thead th {
-    background: var(--light-grey) !important;
-    border-bottom: 1px solid var(--grey) !important;
-    color: var(--dark-grey) !important;
-    font-weight: 500 !important;
-}
-
-.table.is-hoverable tbody tr:hover {
-    background-color: var(--blue-100) !important;
-}
-
-/* Improved table spacing */
-.table td, .table th {
-    padding: 0.65em 0.75em !important;
-}
-
-.table-container {
+    /* Colors */
+    --bg: #ffffff;
+    --darker-bg: #f5f5f5;
+    --card-bg: #ffffff;
+    --border-color: #e0e0e0;
+    --text-color: #333333;
+    --text-muted: #666666;
+    
+    /* Brand Colors */
+    --primary: #3273dc;
+    --primary-light: rgba(50, 115, 220, 0.1);
+    --primary-hover: #2366d1;
+    --success: #23d160;
+    --warning: #ffdd57;
+    --danger: #ff3860;
+    
+    /* UI Elements */
+    --shadow: 0 2px 3px rgba(10, 10, 10, 0.1);
+    --border-radius: 4px;
+    
+    /* Spacing */
+    --space-xs: 0.25rem;
+    --space-sm: 0.5rem;
+    --space-md: 1rem;
+    --space-lg: 1.5rem;
+    --space-xl: 2rem;
+  }
+  
+  /* Dark Theme Support */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1e1e1e;
+      --darker-bg: #121212;
+      --card-bg: #222222;
+      --border-color: #333333;
+      --text-color: #e0e0e0;
+      --text-muted: #999999;
+    }
+  }
+  
+  /* Global Resets */
+  *, .card, .button, .notification, .input, .textarea, .select select, .table {
+    border-radius: var(--border-radius);
+    box-shadow: none;
+  }
+  
+  /* Navbar */
+  .navbar {
+    background-color: var(--primary);
+  }
+  
+  .navbar-item,
+  .navbar-link {
+    color: #ffffff;
+  }
+  
+  .navbar-dropdown .navbar-item {
+    color: var(--text-color);
+  }
+  
+  .navbar-item:hover,
+  .navbar-link:hover {
+    background-color: var(--primary-hover);
+    color: #ffffff;
+  }
+  
+  .navbar-dropdown .navbar-item:hover {
+    background-color: var(--primary-light);
+    color: var(--text-color);
+  }
+  
+  .navbar-burger {
+    color: #ffffff;
+  }
+  
+  .navbar-menu.is-active {
+    background-color: var(--primary);
+  }
+  
+  /* Sidebar */
+  .sidebar {
+    background: var(--card-bg);
+    border-right: 1px solid var(--border-color);
+    box-shadow: none;
+  }
+  
+  .menu-label {
+    color: var(--text-muted);
+    font-size: 0.8em;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  
+  .menu-list a {
+    color: var(--text-color);
+  }
+  
+  .menu-list a:hover {
+    background-color: var(--primary-light);
+  }
+  
+  .menu-list a.is-active {
+    background-color: var(--primary);
+    color: #ffffff;
+  }
+  
+  /* Cards */
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    margin-bottom: var(--space-md);
+  }
+  
+  .card-header {
+    background: var(--card-bg);
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: none;
+  }
+  
+  .card-header-title {
+    color: var(--text-color);
+    font-weight: 600;
+  }
+  
+  /* Tables */
+  .table {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    width: 100%;
+  }
+  
+  .table thead th {
+    background: var(--darker-bg);
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-color);
+    font-weight: 600;
+  }
+  
+  .table.is-hoverable tbody tr:hover {
+    background-color: var(--primary-light);
+  }
+  
+  .table td, .table th {
+    padding: 0.65em 0.75em;
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  .table-container {
     overflow-x: auto;
     max-width: 100%;
-}
-
-/* Sortable columns */
-.table th.is-sortable {
-    cursor: pointer;
-    user-select: none;
-    position: relative;
-    transition: background-color 0.2s ease;
-}
-
-.table th.is-sortable:hover {
-    background-color: var(--blue-200) !important;
-}
-
-.table th.is-sortable .icon {
-    vertical-align: middle;
-    margin-left: 5px;
-}
-
-/* Forms */
-.input, .textarea, .select select {
-    background-color: var(--white) !important;
-    border: 1px solid var(--grey) !important;
-    color: var(--dark-grey) !important;
-}
-
-.input:focus, .textarea:focus, .select select:focus {
-    border-color: var(--blue-500) !important;
-    box-shadow: none !important;
-}
-
-/* Ensure dropdown options are visible */
-option {
-    color: black !important;
-    background-color: white !important;
-}
-
-/* Buttons */
-.button {
-    background: var(--white) !important;
-    border: 1px solid var(--grey) !important;
-    color: var(--dark-grey) !important;
-}
-
-.button.is-info {
-    background: var(--blue-500) !important;
-    border-color: var(--blue-500) !important;
-    color: var(--white) !important;
-}
-
-.button.is-info:hover {
-    background: var(--blue-700) !important;
-    border-color: var(--blue-700) !important;
-}
-
-.button.is-success {
-    background: var(--green-500) !important;
-    border-color: var(--green-500) !important;
-    color: var(--white) !important;
-}
-
-.button.is-danger {
-    background: var(--red-500) !important;
-    border-color: var(--red-500) !important;
-    color: var(--white) !important;
-}
-
-/* Notifications and Messages */
-.notification {
-    background: var(--light-grey) !important;
-    border: 1px solid var(--grey) !important;
-    padding: 1rem !important;
-}
-
-.notification.is-info {
-    background: var(--blue-100) !important;
-    color: var(--dark-grey) !important;
-    border: 1px solid var(--blue-200) !important;
-}
-
-.notification.is-success {
-    background: var(--green-500) !important;
-    color: var(--white) !important;
-}
-
-.notification.is-danger {
-    background: var(--red-500) !important;
-    color: var(--white) !important;
-}
-
-/* Layout */
-.section {
-    padding: 2rem 2.5rem !important;
-    background: var(--white) !important;
-}
-
-.container {
-    max-width: 95% !important;
-    width: 95% !important;
-}
-
-/* Transitions */
-.message-notification {
-    transition: opacity 0.3s ease-out !important;
-}
-
-.is-fading-out {
-    opacity: 0 !important;
-    box-shadow: 0 0 0 0.125em rgba(50, 115, 220, 0.25);
-}
-
-/* Button adjustments */
-.button {
+  }
+  
+  /* Forms */
+  .input, .textarea, .select select {
+    background-color: var(--bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+  }
+  
+  .input:focus, .textarea:focus, .select select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 1px var(--primary-light);
+  }
+  
+  .label {
+    color: var(--text-color);
     font-weight: 500;
-}
-
-.button.is-primary {
-    background-color: #00d1b2;
-}
-
-.button.is-primary:hover {
-    background-color: #00c4a7;
-}
-
-/* Notification positioning */
-.notification {
-    margin-bottom: 1.5rem;
-}
-
-/* Overlay Notification */
-.notification-overlay {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 1000;
-    max-width: 300px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1) !important;
-    opacity: 0;
-    transform: translateY(-20px);
-    animation: slide-in 0.3s ease forwards;
-}
-
-@keyframes slide-in {
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.notification-overlay.is-fading-out {
-    animation: slide-out 0.5s ease forwards;
-}
-
-@keyframes slide-out {
-    to {
-        opacity: 0;
-        transform: translateY(-20px);
-    }
-}
-
-/* Modal adjustments */
-.modal-card-title {
+  }
+  
+  /* Buttons */
+  .button {
+    background: var(--bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+  }
+  
+  .button.is-primary {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #ffffff;
+  }
+  
+  .button.is-primary:hover {
+    background: var(--primary-hover);
+    border-color: var(--primary-hover);
+  }
+  
+  .button.is-success {
+    background: var(--success);
+    border-color: var(--success);
+    color: #ffffff;
+  }
+  
+  .button.is-danger {
+    background: var(--danger);
+    border-color: var(--danger);
+    color: #ffffff;
+  }
+  
+  /* Notifications */
+  .notification {
+    background: var(--darker-bg);
+    border: 1px solid var(--border-color);
+    padding: var(--space-md);
+  }
+  
+  .notification.is-primary {
+    background: var(--primary-light);
+    color: var(--primary);
+    border: 1px solid var(--primary);
+  }
+  
+  .notification.is-success {
+    background: rgba(35, 209, 96, 0.1);
+    color: var(--success);
+    border: 1px solid rgba(35, 209, 96, 0.2);
+  }
+  
+  .notification.is-warning {
+    background: rgba(255, 221, 87, 0.1);
+    color: #9c8500;
+    border: 1px solid rgba(255, 221, 87, 0.2);
+  }
+  
+  .notification.is-danger {
+    background: rgba(255, 56, 96, 0.1);
+    color: var(--danger);
+    border: 1px solid rgba(255, 56, 96, 0.2);
+  }
+  
+  /* Layout */
+  .section {
+    padding: var(--space-lg);
+    background: var(--bg);
+  }
+  
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: var(--space-md);
+  }
+  
+  /* Section Titles */
+  .section-title {
+    font-size: 1.5rem;
     font-weight: 600;
-}
-
-/* Dashboard styles */
-.dashboard-tile {
-    height: 100%;
-}
-
-.dashboard-tile .title {
-    margin-bottom: 0.5rem;
-}
-
-/* Chart container styles */
-.chart-container {
+    margin-bottom: var(--space-lg);
+    padding-bottom: var(--space-sm);
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-color);
+  }
+  
+  /* Chart container styles */
+  .chart-container {
     height: 400px;
     width: 100%;
-    margin: 1rem 0;
+    margin: var(--space-md) 0;
     position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    visibility: visible !important;
-    opacity: 1 !important;
-    min-height: 350px;
-}
-
-.chart-medium-container {
-    height: 450px;
-    width: 100%;
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    visibility: visible !important;
-    opacity: 1 !important;
-    min-height: 400px;
-}
-
-/* Ensure sunburst charts are always visible */
-[id^="categoryChart"] {
-    width: 100% !important;
-    height: 450px !important;
-    min-height: 400px !important;
-    min-width: 300px !important;
-    position: relative !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    z-index: 1 !important;
-}
-
-/* Data tables */
-.data-table-container {
-    max-height: 500px;
-    overflow-y: auto;
-}
-
-/* Responsive adjustments */
-@media screen and (max-width: 768px) {
-    .sidebar {
-        min-width: auto;
-    }
-    
-    .column.is-3 {
-        width: 50%;
-    }
-}
-
-@media screen and (max-width: 480px) {
-    .column.is-3 {
-        width: 100%;
-    }
-}
-
-/* Vue.js component styles */
-[v-cloak] {
-    display: none;
-}
-
-.vue-loading {
-    text-align: center;
-    padding: 2rem;
-}
-
-/* Animation utilities */
-.fade-enter-active, .fade-leave-active {
-    transition: opacity 0.5s;
-}
-
-.fade-enter, .fade-leave-to {
-    opacity: 0;
-}
-
-/* Positive/negative value colors */
-.is-positive {
-    color: #48c774 !important;
-}
-
-.is-negative {
-    color: #f14668 !important;
-}
-
-/* Loading indicator */
-.loading-overlay {
+    border: 1px solid var(--border-color);
+    background-color: var(--card-bg);
+    border-radius: var(--border-radius);
+    padding: var(--space-md);
+  }
+  
+  /* Loading indicator */
+  .loading-overlay {
     position: fixed;
     top: 0;
     left: 0;
@@ -408,355 +282,123 @@ option {
     justify-content: center;
     align-items: center;
     z-index: 999;
-}
-
-.spinner {
+  }
+  
+  .spinner {
     width: 40px;
     height: 40px;
-    border: 4px solid #dbdbdb;
-    border-top-color: #3273dc;
+    border: 4px solid var(--border-color);
+    border-top-color: var(--primary);
     border-radius: 50%;
     animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
+  }
+  
+  @keyframes spin {
     to {
-        transform: rotate(360deg);
+      transform: rotate(360deg);
     }
-}
-
-/* Portfolio page specific styles */
-.portfolio-header {
-    background-color: #f5f7fa;
-    padding: 1.5rem;
-    border-radius: 4px;
-    margin-bottom: 1.5rem;
-}
-
-.portfolio-metrics {
-    margin-bottom: 2rem;
-}
-
-/* Analysis page */
-.analysis-sidebar {
-    position: sticky;
-    top: 20px;
-}
-
-/* Portfolio Analysis Page Styles */
-/* Refined styling for a lighter, more elegant design */
-.content-panel {
-    background-color: #ffffff;
-    border-radius: 8px;
-    padding: 1.5rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    margin-bottom: 1.5rem;
-}
-
-/* Analysis page table styling - extending existing table styles */
-.portfolio-analysis table th, 
-.portfolio-analysis table td {
-    padding: 0.65em 0.75em;
-    text-align: left;
-    border-bottom: 1px solid #f1f1f1;
-}
-
-.portfolio-analysis table th {
-    background-color: #f8f9fa;
-    font-weight: 500;
-    color: #343a40;
-}
-
-/* Sortable columns for analysis page */
-.portfolio-analysis th.is-sortable {
-    cursor: pointer;
+  }
+  
+  /* Positive/negative value colors */
+  .is-positive {
+    color: var(--success);
+  }
+  
+  .is-negative {
+    color: var(--danger);
+  }
+  
+  /* Tooltip */
+  .has-tooltip-right .tooltip {
     position: relative;
-}
-
-.portfolio-analysis th.is-sortable:hover {
-    background-color: rgba(0, 0, 0, 0.03);
-}
-
-/* Hide sort icons by default */
-.portfolio-analysis .sort-icon {
-    display: none;
-}
-
-/* Improved chart containers for portfolio analysis */
-.chart-large-container {
-    position: relative;
-    width: 100%;
-    height: 500px; /* Increased height for global charts */
-    margin: 0 auto 2rem;
-}
-
-.chart-medium-container {
-    position: relative;
-    width: 100%;
-    height: 100%; /* Fill the parent container */
-    margin: 0 auto;
-}
-
-/* Ensure chart canvases fill their containers */
-.chart-large-container canvas,
-.chart-medium-container canvas,
-.chart-large-container .main-svg,
-.chart-medium-container .main-svg {
-    width: 100% !important;
-    height: 100% !important;
-}
-
-/* Ensure Plotly charts are visible */
-.js-plotly-plot, .plot-container {
-    width: 100% !important;
-    height: 100% !important;
-}
-
-/* Fix for category charts in tabs */
-.tab-pane .chart-medium-container {
-    display: block !important;
-    min-height: 450px;
-}
-
-/* Specific fix for category charts */
-#categories-\* .column,
-[id^="categories-"] .column,
-[id^="categoryChart"] {
-    display: block !important;
-    visibility: visible !important;
-    min-height: 450px;
-    position: relative;
-}
-
-/* Ensure Plotly charts are visible in categories tab */
-[id^="categoryChart"] .js-plotly-plot,
-[id^="categoryChart"] .plot-container,
-[id^="categoryChart"] .main-svg {
-    display: block !important;
-    visibility: visible !important;
-    position: relative !important;
-}
-
-/* Portfolio analysis section styling */
-.portfolio-analysis .portfolio-section {
-    margin-bottom: 2rem;
-    border-radius: 8px;
-    overflow: hidden;
-    background-color: #ffffff;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-}
-
-.portfolio-analysis .portfolio-header {
-    padding: 1rem 1.5rem;
-    background-color: #f8f9fa;
-    border-bottom: 1px solid #f1f1f1;
-    transition: background-color 0.2s ease;
-}
-
-.portfolio-analysis .portfolio-header:hover {
-    background-color: #eaeaea;
-}
-
-.portfolio-analysis .portfolio-header-title {
-    font-size: 1.1rem;
-    font-weight: 500;
-    margin: 0;
-}
-
-.portfolio-analysis .portfolio-content {
-    padding: 1.5rem;
-    transition: all 0.3s ease;
-}
-
-.portfolio-analysis .toggle-portfolio {
-    color: #2196f3;
-    transition: transform 0.3s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-}
-
-.portfolio-analysis .toggle-portfolio .fa-chevron-down {
-    transform: rotate(180deg);
-}
-
-/* Analysis page column widths with more specific selectors */
-.portfolio-analysis table th.company-column,
-.portfolio-analysis table td:nth-child(1) {
-    width: 25%;
-}
-
-.portfolio-analysis table th.category-column,
-.portfolio-analysis table td:nth-child(2) {
-    width: 20%;
-}
-
-/* Updated percentage column styling */
-.portfolio-analysis table th.percentage-column,
-.portfolio-analysis table td:nth-child(3) {
-    width: auto; /* Auto width instead of fixed 8% */
-    min-width: 50px; /* Smaller minimum width */
-    max-width: 70px; /* Maximum width constraint */
-    text-align: right;
-    padding-right: 10px; /* Add some padding on the right */
-    white-space: nowrap; /* Prevent wrapping */
-}
-
-/* Make sure all cells in the percentage column are right-aligned */
-.portfolio-analysis td:nth-child(3) {
-    text-align: right !important;
-}
-
-.portfolio-analysis table th.value-column,
-.portfolio-analysis table td:nth-child(4),
-.portfolio-analysis table td:nth-child(5),
-.portfolio-analysis table td:nth-child(6) {
-    width: 15%;
-    min-width: 120px;
-    text-align: right;
-}
-
-/* Abbreviation adjustment */
-.portfolio-analysis table th.percentage-column {
-    white-space: nowrap;
-}
-
-/* Portfolio filter checkbox styling */
-.portfolio-analysis #portfolioFilters .checkbox {
-    margin-right: 1rem;
-    padding: 0.3rem 0.6rem;
-    border-radius: 4px;
-    background-color: #f8f9fa;
-    font-size: 0.9rem;
-}
-
-.portfolio-analysis #portfolioFilters .checkbox:hover {
-    background-color: #e9ecef;
-}
-
-/* Help icon for tooltips */
-.has-tooltip-right i.fa-question-circle {
-    color: #aaa;
-    font-size: 0.8rem;
-    margin-left: 5px;
-    cursor: help;
-}
-
-.has-tooltip-right i.fa-question-circle:hover {
-    color: var(--blue-500);
-}
-
-/* Portfolio controls and metrics */
-.portfolio-controls-container {
-    background-color: var(--white);
-    border-radius: 4px;
-    position: sticky;
-    top: 0;
-    z-index: 20;
-}
-
-.controls-and-metrics-row {
-    display: flex;
-    align-items: stretch;
-    flex-wrap: nowrap;
-    height: 2.5em;
-}
-
-.controls-group {
-    display: flex;
-    align-items: center;
-    flex-wrap: nowrap;
-    height: 100%;
-}
-
-.controls-group .control {
-    height: 100%;
-    display: flex;
-    align-items: center;
-}
-
-.portfolio-metrics {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    padding: 0 0.75rem;
-    border-radius: 4px;
-    background-color: rgba(0, 0, 0, 0.03);
-    justify-content: space-between;
-    margin-left: 1rem;
-    height: 100%;
-}
-
-.portfolio-metrics.is-success {
-    background-color: rgba(72, 199, 116, 0.1);
-}
-
-.portfolio-metrics.is-warning {
-    background-color: rgba(255, 224, 138, 0.2);
-}
-
-.portfolio-metrics.is-danger {
-    background-color: rgba(241, 70, 104, 0.1);
-}
-
-.metrics-item {
-    display: flex;
-    align-items: center;
-    flex: 1;
-    justify-content: center;
-}
-
-.metric-label {
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--dark-grey);
-    margin-right: 0.3rem;
-}
-
-.metric-value {
-    font-size: 0.85rem;
-    font-weight: 500;
-    white-space: nowrap;
-}
-
-/* Portfolio table specific styles */
-.table-container {
-    max-height: calc(100vh - 250px);
-    overflow-y: auto;
-    position: relative;
-    margin-top: 1rem;
-}
-
-.table-container table {
-    table-layout: auto;
-    width: 100%;
-}
-
-.table-container thead {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-}
-
-.table-container thead th {
-    background-color: var(--light-grey) !important;
-    box-shadow: 0 1px 0 0 var(--grey) !important;
-}
-
-/* Column width adjustments */
-.table-container th:nth-child(1), /* Update column */
-.table-container td:nth-child(1) {
-    width: 80px;
-}
-
-.table-container th:nth-child(2), /* Identifier column */
-.table-container td:nth-child(2) {
+    display: inline-block;
+  }
+  
+  .has-tooltip-right .tooltip .tooltip-text {
+    visibility: hidden;
     width: 120px;
-}
-
-.table-container th:nth-child(3), /* Company column */
-.table-container td:nth-child(3) {
-    min-width: 180px;
-}
+    background-color: var(--darker-bg);
+    color: var(--text-color);
+    text-align: center;
+    border-radius: var(--border-radius);
+    padding: var(--space-xs) var(--space-sm);
+    position: absolute;
+    z-index: 1;
+    top: -5px;
+    left: 105%;
+  }
+  
+  .has-tooltip-right .tooltip:hover .tooltip-text {
+    visibility: visible;
+  }
+  
+  /* Modal styling */
+  .modal-card-title {
+    color: var(--text-color);
+    font-weight: 600;
+  }
+  
+  .modal-background {
+    background-color: rgba(0, 0, 0, 0.5);
+  }
+  
+  .modal-card {
+    background-color: var(--card-bg);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+  }
+  
+  .modal-card-head, .modal-card-foot {
+    background-color: var(--darker-bg);
+    border-color: var(--border-color);
+  }
+  
+  /* Helper Classes */
+  .is-clickable {
+    cursor: pointer;
+  }
+  
+  .has-shadow {
+    box-shadow: var(--shadow);
+  }
+  
+  .no-border {
+    border: none !important;
+  }
+  
+  .border-bottom {
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  /* Responsive adjustments */
+  @media screen and (max-width: 768px) {
+    .container {
+      padding: var(--space-sm);
+    }
+    
+    .section {
+      padding: var(--space-md);
+    }
+    
+    .section-title {
+      font-size: 1.25rem;
+    }
+    
+    .table-container {
+      overflow-x: auto;
+    }
+  }
+  
+  /* Transition utilities */
+  .fade-enter-active, .fade-leave-active {
+    transition: opacity 0.3s;
+  }
+  
+  .fade-enter, .fade-leave-to {
+    opacity: 0;
+  }
+  
+  /* Vue.js component styles */
+  [v-cloak] {
+    display: none;
+  }

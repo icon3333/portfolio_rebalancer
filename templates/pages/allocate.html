@@ -1,83 +1,93 @@
 {% extends "base.html" %}
 
+{% block title %}Portfolio Allocation{% endblock %}
+
+{% block head_extras %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/allocate.css') }}?v={{ range(1000, 9999) | random }}">
+{% endblock %}
+
 {% block content %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/allocate.css') }}">
-
 <div class="container">
-    <h1 class="title mb-4">Portfolio Allocation</h1>
+  <h1 class="title is-3 mb-4">Portfolio Allocation</h1>
 
-    <!-- Combined header with tabs -->
-    <div class="header-content d-flex flex-wrap justify-content-between align-items-center mb-4">
-        <ul class="nav nav-tabs" id="allocationTabs" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="global-tab" type="button" role="tab">
-                    <i class="fas fa-globe me-2"></i>Global Overview
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="detailed-tab" type="button" role="tab">
-                    <i class="fas fa-chart-pie me-2"></i>Detailed Overview
-                </button>
-            </li>
-        </ul>
+  <!-- Tab Navigation -->
+  <div class="header-content">
+    <div class="tabs">
+      <ul class="nav-tabs" id="allocationTabs" role="tablist">
+        <li class="nav-item">
+          <button class="nav-link active" id="global-tab" type="button" role="tab">
+            <i class="fas fa-globe mr-2"></i>Global Overview
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" id="detailed-tab" type="button" role="tab">
+            <i class="fas fa-chart-pie mr-2"></i>Detailed Overview
+          </button>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Tab Content -->
+  <div class="tab-content" id="allocationTabsContent">
+    <!-- Global Overview Tab -->
+    <div class="tab-pane active" id="global" role="tabpanel">
+      <!-- Investment Input in Global Overview -->
+      <div class="card">
+        <div class="investment-input">
+          <label class="label">Investment Amount:</label>
+          <div class="input-group">
+            <span class="input-group-text">€</span>
+            <input type="text" class="input" id="investment-amount" placeholder="Enter amount">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div id="portfolio-table-container">
+          <!-- Table will be rendered here -->
+          <div class="has-text-centered">
+            <div class="spinner-border" role="status">
+              <span class="is-sr-only">Loading...</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- Tab Content -->
-    <div class="tab-content" id="allocationTabsContent">
-        <!-- Global Overview Tab -->
-        <div class="tab-pane active" id="global" role="tabpanel">
-            <!-- Investment Input in Global Overview -->
-            <div class="investment-input mb-4">
-                <label class="form-label">Investment Amount:</label>
-                <div class="input-group">
-                    <span class="input-group-text">€</span>
-                    <input type="text" class="form-control" id="investment-amount" placeholder="Enter amount">
-                </div>
-            </div>
-
-            <div class="portfolio-table-container">
-                <div id="portfolio-table-container">
-                    <!-- Table will be rendered here -->
-                    <div class="d-flex justify-content-center">
-                        <div class="spinner-border text-primary" role="status">
-                            <span class="visually-hidden">Loading...</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    <!-- Detailed Overview Tab -->
+    <div class="tab-pane" id="detailed" role="tabpanel">
+      <!-- Portfolio Selection Dropdown -->
+      <div class="card">
+        <div class="portfolio-select">
+          <label class="label">Select Portfolio:</label>
+          <div class="select is-fullwidth">
+            <select class="form-select" id="portfolio-select">
+              <!-- Options will be populated dynamically -->
+            </select>
+          </div>
         </div>
 
-        <!-- Detailed Overview Tab -->
-        <div class="tab-pane" id="detailed" role="tabpanel">
-            <!-- Portfolio Selection Dropdown -->
-            <div class="portfolio-select mb-4">
-                <label class="form-label">Select Portfolio:</label>
-                <select class="form-select" id="portfolio-select">
-                    <!-- Options will be populated dynamically -->
-                </select>
+        <p class="has-text-grey mb-5">
+          <i class="fas fa-info-circle mr-1"></i> Click on a category to expand/collapse its positions.
+          Missing positions are highlighted.
+        </p>
+        
+        <!-- Single portfolio table will be rendered here -->
+        <div id="detailed-portfolio-container">
+          <div class="has-text-centered">
+            <div class="spinner-border" role="status">
+              <span class="is-sr-only">Loading...</span>
             </div>
-
-            <!-- Rebalancing Actions Section -->
-            <div class="rebalancing-actions">
-                <p class="text-muted mb-3">
-                    <i class="fas fa-info-circle me-1"></i> Click on a category to expand/collapse its positions.
-                    Missing positions are highlighted in yellow.
-                </p>
-                
-                <!-- Single portfolio table will be rendered here -->
-                <div id="detailed-portfolio-container">
-                    <div class="d-flex justify-content-center">
-                        <div class="spinner-border text-primary" role="status">
-                            <span class="visually-hidden">Loading...</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
+          </div>
         </div>
+      </div>
     </div>
+  </div>
 </div>
+{% endblock %}
 
-<!-- Include necessary JavaScript -->
+{% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="{{ url_for('static', filename='js/allocate.js') }}"></script>
+<script src="{{ url_for('static', filename='js/allocate.js') }}?v={{ range(1000, 9999) | random }}"></script>
 {% endblock %}
