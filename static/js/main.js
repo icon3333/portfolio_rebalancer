@@ -1,7 +1,9 @@
 /**
- * Main JavaScript file for Portfolio Manager
+ * Portfolio Manager - Core Utilities
+ * This file provides shared functionality across all pages
  */
 
+// Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize UI components
     initializeModals();
@@ -59,6 +61,13 @@ function initializeModals() {
             closeAllModals();
         }
     });
+
+    // Export modal functions to window object for reuse
+    window.modalFunctions = {
+        openModal,
+        closeModal,
+        closeAllModals
+    };
 }
 
 /**
@@ -119,7 +128,7 @@ function initializeNotifications() {
         
         // Auto-dismiss after 5 seconds
         setTimeout(() => {
-            if (notification) {
+            if (notification && notification.parentNode) {
                 notification.classList.add('is-fading-out');
                 setTimeout(() => {
                     if (notification && notification.parentNode) {
@@ -135,6 +144,7 @@ function initializeNotifications() {
  * Initialize tabs functionality
  */
 function initializeTabs() {
+    // Handle tab groups with class 'tabs'
     const tabGroups = document.querySelectorAll('.tabs');
     
     tabGroups.forEach(tabGroup => {
@@ -169,13 +179,52 @@ function initializeTabs() {
             });
         });
     });
+
+    // Handle tab navigation with class 'nav-tabs' (custom implementation)
+    const navTabs = document.querySelectorAll('.nav-tabs');
+    
+    navTabs.forEach(navTab => {
+        const tabButtons = navTab.querySelectorAll('.nav-link');
+        
+        tabButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                // Get the target tab content element
+                const targetId = this.getAttribute('id').replace('-tab', '');
+                const targetElement = document.getElementById(targetId);
+                
+                // Deactivate all tabs and hide content
+                navTab.querySelectorAll('.nav-link').forEach(tab => {
+                    tab.classList.remove('active');
+                });
+                document.querySelectorAll('.tab-pane').forEach(content => {
+                    content.classList.remove('active');
+                    content.style.display = 'none';
+                });
+                
+                // Activate selected tab and show content
+                this.classList.add('active');
+                if (targetElement) {
+                    targetElement.classList.add('active');
+                    targetElement.style.display = 'block';
+                    
+                    // Apply smooth transition effect
+                    targetElement.style.transition = 'opacity 0.3s ease-in-out';
+                    targetElement.style.opacity = '0';
+                    
+                    setTimeout(() => {
+                        targetElement.style.opacity = '1';
+                    }, 50);
+                }
+            });
+        });
+    });
 }
 
 /**
  * Setup AJAX error handling
  */
 function setupAjaxErrorHandling() {
-    // Add global error handling for Axios
+    // Add global error handling for Axios if available
     if (window.axios) {
         axios.interceptors.response.use(
             response => response,
@@ -225,7 +274,7 @@ function showNotification(message, type = 'is-info', duration = 5000) {
     const messageText = document.createTextNode(message);
     notification.appendChild(messageText);
     
-    // Add notification to container - append to body for overlay positioning
+    // Add notification to body for overlay positioning
     document.body.appendChild(notification);
     
     // Setup delete button
@@ -283,6 +332,29 @@ function formatPercentage(value, decimals = 1, includeSymbol = true) {
 }
 
 /**
+ * Format number with thousand separators
+ * @param {number} value - Number to format
+ * @param {number} decimals - Number of decimal places
+ * @returns {string} Formatted number
+ */
+function formatNumber(value, decimals = 2) {
+    if (value === null || value === undefined) return '0';
+    return parseFloat(value).toLocaleString('en-US', {
+        maximumFractionDigits: decimals, 
+        minimumFractionDigits: decimals
+    });
+}
+
+/**
+ * Parse number from string, removing commas
+ * @param {string} string - String to parse
+ * @returns {number} Parsed number
+ */
+function parseNumber(string) {
+    return parseFloat(string.replace(/,/g, '')) || 0;
+}
+
+/**
  * Create loading overlay
  * @returns {Object} Loading overlay control object
  */
@@ -324,6 +396,24 @@ function debounce(func, wait = 300) {
     };
 }
 
+/**
+ * Format date as time ago
+ * @param {string|Date} date - Date to format
+ * @returns {string} Formatted date
+ */
+function formatDateAgo(date) {
+    if (!date) return 'Never';
+    const d = new Date(date);
+    const now = new Date();
+    const diff = Math.floor((now - d) / 1000); // seconds
+
+    if (diff < 60) return 'Just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    if (diff < 2592000) return `${Math.floor(diff / 86400)}d ago`;
+    return d.toLocaleDateString();
+}
+
 // Cache for portfolio data
 let portfolioDataCache = null;
 let lastCacheTime = 0;
@@ -331,12 +421,22 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 // Portfolio manager utility
 const portfolioManager = {
+    // Formatting functions
     formatCurrency,
     formatPercentage,
+    formatNumber,
+    parseNumber,
+    formatDateAgo,
+    
+    // UI utilities
     showNotification,
     createLoadingOverlay,
     debounce,
 
+    /**
+     * Load portfolio data, using cache when possible
+     * @returns {Object} Portfolio data and cache status
+     */
     async loadData() {
         try {
             // Check cache first
@@ -368,6 +468,10 @@ const portfolioManager = {
         }
     },
 
+    /**
+     * Refresh data in the background without UI blocking
+     * @returns {Object|null} Updated data or null on error
+     */
     async refreshDataInBackground() {
         try {
             const response = await fetch('/portfolio/api/portfolio_data');
@@ -384,31 +488,41 @@ const portfolioManager = {
             console.error('Background refresh failed:', err);
             return null;
         }
-    }
-};
+    },
 
-// Add to portfolioManager object
-portfolioManager.updatePrice = async function(companyId) {
-    try {
-        const response = await fetch(`/portfolio/api/update_price/${companyId}`);
-        const data = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(data.error || 'Failed to update price');
+    /**
+     * Update price for a specific company
+     * @param {string} companyId - ID of the company to update
+     * @returns {Object} Response data
+     */
+    async updatePrice(companyId) {
+        try {
+            const response = await fetch(`/portfolio/api/update_price/${companyId}`);
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to update price');
+            }
+            
+            // Refresh the portfolio data
+            await this.refreshDataInBackground();
+            
+            this.showNotification('Price updated successfully', 'is-success');
+            return data;
+            
+        } catch (error) {
+            console.error('Error updating price:', error);
+            this.showNotification(error.message, 'is-danger');
+            throw error;
         }
-        
-        // Refresh the portfolio data
-        await this.refreshDataInBackground();
-        
-        this.showNotification('Price updated successfully', 'is-success');
-        return data;
-        
-    } catch (error) {
-        console.error('Error updating price:', error);
-        this.showNotification(error.message, 'is-danger');
-        throw error;
     }
 };
 
-// Export global utilities
+// Export to window for global access
 window.portfolioManager = portfolioManager;
+window.showNotification = showNotification;
+window.formatCurrency = formatCurrency;
+window.formatPercentage = formatPercentage;
+window.formatNumber = formatNumber;
+window.parseNumber = parseNumber;
+window.debounce = debounce;

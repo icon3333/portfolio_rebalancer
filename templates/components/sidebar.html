@@ -1,4 +1,4 @@
-<aside class="menu p-4 has-background-light" style="height: 100%; min-height: calc(100vh - 3.25rem);">
+<aside class="menu p-4" style="height: 100%; min-height: calc(100vh - 3.25rem); border-right: 1px solid var(--border-color);">
     {% if session.account_id %}
     <p class="menu-label">
         Portfolios
@@ -52,22 +52,22 @@
         </li>
     </ul>
 
-    <div class="mt-auto pt-6">
+    <div class="mt-6 pt-6">
         {% if session.account_id %}
         <div class="has-text-centered mb-4">
-            <span class="tag is-info is-medium">
+            <span class="tag is-primary is-medium">
                 {{ session.username }}
             </span>
         </div>
         {% endif %}
     </div>
     {% else %}
-    <div class="notification is-warning">
+    <div class="notification is-warning is-light">
         <p class="has-text-centered">Please select an account to access navigation</p>
     </div>
     {% endif %}
     
-    <div class="mt-auto pt-6">
+    <div class="mt-6 pt-6">
         <div class="has-text-centered is-size-7 has-text-grey">
             <p>Portfolio Manager v1.0</p>
             <p>&copy; {{ now.year }} Nico</p>

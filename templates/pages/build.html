@@ -3,10 +3,8 @@
 {% block title %}Allocation Builder{% endblock %}
 
 {% block head_extras %}
-<link rel="stylesheet"
-      href="{{ url_for('static', filename='css/theme.css') }}?v={{ range(1000,9999)|random }}">
-<link rel="stylesheet"
-      href="{{ url_for('static', filename='css/build-allocation.css') }}?v={{ range(1000,9999)|random }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}?v={{ range(1000, 9999) | random }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/build-allocation.css') }}?v={{ range(1000, 9999) | random }}">
 {% endblock %}
 
 {% block content %}
@@ -250,7 +248,7 @@
                   </td>
                   <td class="has-text-centered">
                     <button v-if="!position.isPlaceholder" 
-                            class="button is-danger is-rounded" 
+                            class="button is-danger is-small is-rounded" 
                             style="width: 36px; height: 36px; padding: 0;"
                             @click="removePosition(index, pIndex)"
                             title="Remove position">
@@ -263,7 +261,7 @@
                 </tr>
               </tbody>
               <tfoot v-if="portfolio.positions.length > 0">
-                <tr style="background-color: rgba(255,255,255,0.03);">
+                <tr>
                   <th>Total</th>
                   <th>${ calculateTotalWeight(index).toFixed(0) }%</th>
                   <th>${ formatCurrency(calculateAllocationAmount(portfolio.allocation)) }</th>
@@ -349,7 +347,7 @@
           </tr>
         </tbody>
         <tfoot v-if="portfolios.length > 0">
-          <tr style="background-color: rgba(255,255,255,0.03);">
+          <tr>
             <th>Total</th>
             <th></th>
             <th>${ calculateTotalAllocation().toFixed(1) }%</th>
@@ -364,5 +362,6 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/main.js') }}?v={{ range(1000, 9999) | random }}"></script>
 <script src="{{ url_for('static', filename='js/builder.js') }}?v={{ range(1000, 9999) | random }}"></script>
 {% endblock %}

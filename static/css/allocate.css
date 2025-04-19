@@ -1,48 +1,224 @@
-@charset "UTF-8";
-@import url('theme.css');
+/**
+ * Portfolio Manager - Allocation Page Styles
+ * Extends the core design system with page-specific styles
+ */
 
-/* ===================================================================
-   allocate.css — page‑specific rules for templates/pages/allocate.html
-   =================================================================== */
+/* ===== Allocation Page Extensions ===== */
 
-/* --- tab navigation ------------------------------------------------------ */
-.nav-tabs{display:flex;border-bottom:1px solid var(--border-color);}
-.nav-tabs .nav-item{flex:1;text-align:center;}
-.nav-tabs .nav-link{
-  background:var(--darker-bg);
-  color:var(--text-muted);
-  border:none;
-  padding:var(--space-md);
-  transition:all .2s;
-  width:100%;
-}
-.nav-tabs .nav-link:hover{background:var(--primary-light);color:var(--text-color);}
-.nav-tabs .nav-link.active{
-  background:var(--bg);
-  color:var(--primary);
-  border-bottom:2px solid var(--primary);
+/* Header Content Layout */
+.header-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md) 0;
+  margin-bottom: var(--space-md);
+  gap: var(--space-md);
 }
 
-/* --- investment input field --------------------------------------------- */
-.investment-input{
-  display:flex;align-items:center;gap:var(--space-md);
-  padding:var(--space-md);
-  min-width:320px;
+/* Investment Input Styling */
+.investment-input {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  background: transparent;
+  flex: 1;
+  min-width: 320px;
 }
-.input-group{display:flex;align-items:center;flex:1;min-width:0;}
-.input-group-text{background:transparent;border:none;padding:var(--space-xs) var(--space-sm);color:var(--text-color);}
 
-/* --- tables & rows ------------------------------------------------------- */
-.category-row       {background:var(--darker-bg);font-weight:500;cursor:pointer;}
-.position-row td:first-child{padding-left:var(--space-lg);}
-.missing-positions-row td{
-  border-left:3px solid var(--warning);
-  background:rgba(255,221,87,.1);
+.investment-input label {
+  margin: 0;
+  color: var(--text-color);
+  font-weight: 500;
+  white-space: nowrap;
 }
-.actions-positive{color:var(--success);font-weight:500;}
-.actions-negative{color:var(--danger); font-weight:500;}
-.actions-neutral {color:var(--text-muted);}
-.table-responsive{overflow:auto;border-radius:var(--border-radius);margin-bottom:var(--space-lg);}
 
-/* --- misc ---------------------------------------------------------------- */
-.spinner-border{display:block;margin:var(--space-lg) auto;}
+.input-group {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 1;
+}
+
+.input-group-text {
+  background: transparent;
+  color: var(--text-color);
+  border: none;
+  padding: var(--space-xs) var(--space-sm);
+  font-weight: 500;
+}
+
+/* Portfolio Select */
+.portfolio-select {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.portfolio-select label {
+  margin: 0;
+  color: var(--text-color);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Category and Position Row Styling */
+.category-row {
+  background-color: var(--darker-bg) !important;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.position-row td:first-child {
+  padding-left: var(--space-lg);
+}
+
+/* Total Row Styling */
+.total-row {
+  background-color: var(--darker-bg) !important;
+  font-weight: 600;
+}
+
+.total-row td {
+  border-top: 2px solid var(--primary);
+  border-bottom: none;
+}
+
+/* Missing Positions Styling */
+.missing-positions-row td {
+  border-left: 3px solid var(--warning);
+  background-color: rgba(255, 221, 87, 0.1);
+}
+
+/* Loading Spinner */
+.spinner-border {
+  display: block;
+  margin: var(--space-lg) auto;
+  width: 2rem;
+  height: 2rem;
+  border: 0.25rem solid var(--border-color);
+  border-right-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+
+/* Action Colors */
+.actions-positive {
+  color: var(--success);
+  font-weight: 500;
+}
+
+.actions-negative {
+  color: var(--danger);
+  font-weight: 500;
+}
+
+.actions-neutral {
+  color: var(--text-muted);
+}
+
+/* Tab Navigation Override */
+.nav-tabs {
+  display: flex;
+  background-color: var(--darker-bg);
+  border-radius: var(--border-radius) var(--border-radius) 0 0;
+  overflow: hidden;
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.nav-tabs .nav-item {
+  flex: 1;
+  text-align: center;
+}
+
+.nav-tabs .nav-link {
+  border: none;
+  color: var(--text-muted);
+  padding: var(--space-md);
+  transition: all var(--transition-speed) var(--transition-func);
+  width: 100%;
+  text-align: center;
+  background-color: var(--darker-bg);
+  display: block;
+  cursor: pointer;
+}
+
+.nav-tabs .nav-link:hover {
+  color: var(--text-color);
+  background-color: var(--primary-light);
+}
+
+.nav-tabs .nav-link.active {
+  color: var(--primary);
+  border-bottom: 2px solid var(--primary);
+  background-color: var(--bg);
+}
+
+.tab-content {
+  padding-top: var(--space-md);
+}
+
+.tab-pane {
+  display: none;
+}
+
+.tab-pane.active {
+  display: block;
+}
+
+/* Dark theme adjustments */
+@media (prefers-color-scheme: dark) {
+  .nav-tabs {
+    background-color: var(--section-bg);
+  }
+  
+  .nav-tabs .nav-link {
+    background-color: var(--section-bg);
+  }
+  
+  .nav-tabs .nav-link.active {
+    background-color: var(--bg);
+  }
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  .header-content {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .investment-input {
+    width: 100%;
+    padding: var(--space-sm);
+    margin-top: var(--space-md);
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .input-group {
+    width: 100%;
+    margin-top: var(--space-xs);
+  }
+  
+  .portfolio-select {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .nav-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+  
+  .nav-tabs .nav-item {
+    flex: 0 0 auto;
+  }
+  
+  .nav-tabs .nav-link {
+    white-space: nowrap;
+    padding: var(--space-sm) var(--space-md);
+  }
+}

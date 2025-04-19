@@ -1,7 +1,7 @@
-<nav class="navbar is-primary" role="navigation" aria-label="main navigation">
+<nav class="navbar is-white" role="navigation" aria-label="main navigation" style="border-bottom: 1px solid var(--border-color); box-shadow: var(--shadow);">
     <div class="navbar-brand">
         <a class="navbar-item" href="{{ url_for('main.index') }}">
-            <span class="icon">
+            <span class="icon has-text-primary">
                 <i class="fas fa-chart-line"></i>
             </span>
             <span class="ml-2 has-text-weight-bold">Portfolio Manager</span>
@@ -23,7 +23,7 @@
             <div class="navbar-item">
                 <div class="buttons">
                     {% if not session.account_id %}
-                    <button class="button is-primary is-light js-modal-trigger" data-target="create-account-modal">
+                    <button class="button is-primary js-modal-trigger" data-target="create-account-modal">
                         <span class="icon">
                             <i class="fas fa-plus"></i>
                         </span>
@@ -35,7 +35,7 @@
             {% if session.account_id %}
             <div class="navbar-item has-dropdown is-hoverable">
                 <a class="navbar-link">
-                    <span class="icon">
+                    <span class="icon has-text-primary">
                         <i class="fas fa-user"></i>
                     </span>
                     <span>{{ session.username }}</span>
@@ -85,7 +85,7 @@
                 </div>
             </section>
             <footer class="modal-card-foot">
-                <button type="submit" class="button is-success">Create Account</button>
+                <button type="submit" class="button is-primary">Create Account</button>
                 <button type="button" class="button modal-cancel">Cancel</button>
             </footer>
         </form>

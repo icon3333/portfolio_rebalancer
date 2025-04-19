@@ -32,14 +32,14 @@
     <!-- Navigation -->
     {% include 'components/navbar.html' %}
     
-    <div class="columns is-gapless" style="min-height: calc(100vh - 3.25rem);">
+    <div class="main-wrapper" style="display: flex; min-height: calc(100vh - 3.25rem);">
         <!-- Sidebar -->
-        <div class="column is-narrow sidebar">
+        <div class="sidebar-container" style="width: 240px; flex-shrink: 0;">
             {% include 'components/sidebar.html' %}
         </div>
         
         <!-- Main Content -->
-        <div class="column">
+        <div class="content-container" style="flex-grow: 1; overflow-x: hidden;">
             <main class="section">
                 <div class="container">
                     <!-- Flash Messages -->
