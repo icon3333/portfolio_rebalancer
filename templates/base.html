@@ -51,6 +51,14 @@
             padding-top: 1.5rem;
             padding-bottom: 1.5rem;
         }
+        
+        /* Sidebar scrolling fix */
+        .sidebar-container {
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+        }
     </style>
 </head>
 <body>
@@ -60,7 +68,7 @@
     <div class="main-wrapper">
         <!-- Sidebar - Show by default unless show_sidebar is explicitly set to false by child template -->
         {% if show_sidebar is not defined or show_sidebar %}
-        <div class="sidebar-container" style="width: 240px; flex-shrink: 0; overflow-y: auto;">
+        <div class="sidebar-container" style="width: 240px; flex-shrink: 0;">
             {% include 'components/sidebar.html' %}
         </div>
         {% endif %}
