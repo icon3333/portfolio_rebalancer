@@ -5,6 +5,16 @@
 
 /* ===== Build Allocation Page Extensions ===== */
 
+/* Section Title Styling */
+.section-title {
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin-top: var(--space-xl);
+  margin-bottom: var(--space-md);
+  padding-bottom: var(--space-xs);
+  border-bottom: 2px solid var(--primary-light);
+}
+
 /* Budget Card Styles */
 .budget-card {
   background-color: var(--card-bg);
@@ -38,6 +48,27 @@
   font-size: 0.85rem;
   color: var(--text-muted);
   margin-left: var(--space-sm);
+}
+
+/* Form field spacing and layout */
+.field {
+  margin-bottom: var(--space-md);
+}
+
+.label {
+  font-weight: 500;
+  color: var(--text-color);
+  margin-bottom: var(--space-xs);
+  font-size: 0.95rem;
+}
+
+/* Global Allocation Rules Card */
+.card {
+  background-color: var(--card-bg);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow);
+  margin-bottom: var(--space-xl);
+  padding: var(--space-lg) var(--space-xl);
 }
 
 /* Compact Box for Portfolio Items */
