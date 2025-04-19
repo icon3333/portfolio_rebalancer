@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, redirect, url_for, session, reques
 import logging
 logger = logging.getLogger(__name__)
 from app.database.db_manager import query_db
+from app.utils.portfolio_utils import get_portfolio_data
 
 main_bp = Blueprint('main', __name__)
 
@@ -22,22 +23,42 @@ def index():
         if account:
             logger.info(f"Found account: {account['username']}")
             
-            # Get portfolio summary for the account
+            # Get portfolio summary for the account - only count portfolios with value > 0
             portfolios = query_db('''
-                SELECT p.name, COUNT(c.id) as company_count,
+                SELECT p.id, p.name, 
+                       COUNT(DISTINCT c.id) as company_count,
                        SUM(cs.shares * mp.price_eur) as total_value
                 FROM portfolios p
                 LEFT JOIN companies c ON p.id = c.portfolio_id
                 LEFT JOIN company_shares cs ON c.id = cs.company_id
                 LEFT JOIN market_prices mp ON c.identifier = mp.identifier
                 WHERE p.account_id = ?
-                GROUP BY p.name
+                GROUP BY p.id, p.name
+                HAVING SUM(cs.shares * mp.price_eur) > 0
             ''', [account_id])
             
-            logger.info(f"Found {len(portfolios)} portfolios")
+            # Get portfolio data to calculate total value consistently with enrich page
+            portfolio_data = get_portfolio_data(account_id)
+            
+            # Calculate total value the same way as in enrich page
+            total_value = sum(
+                (item['price_eur'] or 0) * (item['shares'] or 0) 
+                for item in portfolio_data
+            )
+            
+            # Count total assets (positions) with actual shares and prices
+            total_assets = sum(1 for item in portfolio_data if (item['shares'] or 0) > 0 and (item['price_eur'] or 0) > 0)
+            
+            # Get all accounts for account switcher
+            all_accounts = query_db('SELECT * FROM accounts WHERE username != "_global" ORDER BY username')
+            
+            logger.info(f"Found {len(portfolios)} portfolios with value > 0")
             return render_template('pages/index.html',
                                account=account,
-                               portfolios=portfolios)
+                               portfolios=portfolios,
+                               total_value=total_value,
+                               total_assets=total_assets,
+                               all_accounts=all_accounts)
         else:
             logger.warning(f"Account {account_id} not found")
             session.pop('account_id', None)

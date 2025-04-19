@@ -27,19 +27,46 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/bulk-edit.css') }}?v={{ range(1, 10000) | random }}">
     
     {% block head_extras %}{% endblock %}
+    
+    <style>
+        /* Fix for the empty space issue */
+        body {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        
+        .main-wrapper {
+            flex: 1;
+            display: flex;
+        }
+        
+        .content-container {
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+        
+        .footer {
+            margin-top: 0;
+            padding-top: 1.5rem;
+            padding-bottom: 1.5rem;
+        }
+    </style>
 </head>
 <body>
     <!-- Navigation -->
     {% include 'components/navbar.html' %}
     
-    <div class="main-wrapper" style="display: flex; min-height: calc(100vh - 3.25rem);">
-        <!-- Sidebar -->
-        <div class="sidebar-container" style="width: 240px; flex-shrink: 0;">
+    <div class="main-wrapper">
+        <!-- Sidebar - Show by default unless show_sidebar is explicitly set to false by child template -->
+        {% if show_sidebar is not defined or show_sidebar %}
+        <div class="sidebar-container" style="width: 240px; flex-shrink: 0; overflow-y: auto;">
             {% include 'components/sidebar.html' %}
         </div>
+        {% endif %}
         
         <!-- Main Content -->
-        <div class="content-container" style="flex-grow: 1; overflow-x: hidden;">
+        <div class="content-container"{% if show_sidebar is defined and not show_sidebar %} style="width: 100%;"{% endif %}>
             <main class="section">
                 <div class="container">
                     <!-- Flash Messages -->

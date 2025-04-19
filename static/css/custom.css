@@ -1002,7 +1002,6 @@ p {
   background-color: var(--sidebar-bg);
   color: var(--sidebar-text);
   width: 240px;
-  min-height: 100vh;
   position: fixed;
   left: 0;
   top: 0;
@@ -1010,6 +1009,8 @@ p {
   box-shadow: 1px 0 3px rgba(0, 0, 0, 0.1);
   transition: var(--transition);
   z-index: 30;
+  height: 100vh;
+  overflow-y: auto;
 }
 
 .main-content {
@@ -1017,6 +1018,7 @@ p {
   padding: var(--space-lg);
   min-height: calc(100vh - 60px); /* Full height minus header */
   transition: margin-left var(--transition-speed) var(--transition-func);
+  overflow-y: auto;
 }
 
 .sidebar-section {
@@ -1514,4 +1516,61 @@ p {
   .company-item.is-selected {
     background-color: rgba(50, 115, 220, 0.2);
   }
+}
+
+/* ====================== Component Specific Overrides ====================== */
+
+/* Enrich Page - Portfolio Data Header Controls Alignment */
+.card-header .card-header-controls .is-flex {
+  /* Ensure the main flex container aligns items centrally */
+  align-items: center; 
+}
+
+.card-header .card-header-controls .is-flex > * { 
+  /* Ensure direct children are flex items for alignment */
+  display: flex; 
+  align-items: center; /* Vertically center content within each control group */
+}
+
+.card-header .card-header-controls .field.has-addons {
+  margin-bottom: 0; /* Override default field margin */
+}
+
+/* Ensure consistent vertical alignment for icons */
+.card-header .card-header-controls .control .icon,
+.card-header .card-header-controls .button .icon {
+  align-self: center; 
+}
+
+/* Explicitly set font-size for the checkbox label text to match other controls */
+.card-header .card-header-controls .control label.checkbox span {
+  font-size: var(--font-size-sm); /* Match other small controls */
+  /* Removed padding adjustment */
+}
+
+/* Ensure consistent height for buttons, selects, and inputs */
+.card-header .card-header-controls .button,
+.card-header .card-header-controls .select.is-small,
+.card-header .card-header-controls .select.is-small select,
+.card-header .card-header-controls .input.is-small {
+    height: 2.25em; /* Use standard Bulma small height */
+    font-size: var(--font-size-sm); /* Standard small font size */
+    line-height: 1.5; /* Center text vertically */
+}
+
+/* Override Bulma's default button padding if needed for perfect height match */
+.card-header .card-header-controls .button {
+    padding-top: calc(0.375em - 1px);
+    padding-bottom: calc(0.375em - 1px);
+}
+
+/* Adjust icon container height within inputs/selects */
+.card-header .card-header-controls .control.has-icons-left .icon.is-left {
+    height: 2.25em; /* Match control height */
+    font-size: var(--font-size-sm); /* Ensure icon size is consistent */
+}
+
+/* Align the checkbox input itself slightly better */
+.card-header .card-header-controls .control label.checkbox input[type="checkbox"] {
+    vertical-align: middle; /* Improves alignment with text */
 }

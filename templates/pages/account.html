@@ -139,46 +139,6 @@
             </div>
         </div>
     </div>
-
-    <h2 class="section-title">Switch Account</h2>
-    <div class="columns">
-        <div class="column is-12">
-            <div class="card">
-                <div class="card-content">
-                    <div class="content">
-                        {% if all_accounts %}
-                            <div class="columns is-multiline">
-                                {% for acc in all_accounts %}
-                                    <div class="column is-3">
-                                        <div class="card">
-                                            <div class="card-content has-text-centered">
-                                                <p class="title is-5">{{ acc.username }}</p>
-                                                <p class="subtitle is-7">ID: {{ acc.id }}</p>
-                                                {% if acc.id == account.id %}
-                                                    <span class="tag is-success">Current</span>
-                                                {% endif %}
-                                            </div>
-                                            <footer class="card-footer">
-                                                <a href="{{ url_for('main.select_account', account_id=acc.id) }}" class="card-footer-item">
-                                                    {% if acc.id == account.id %}
-                                                    <span>Current Account</span>
-                                                    {% else %}
-                                                    <span>Switch</span>
-                                                    {% endif %}
-                                                </a>
-                                            </footer>
-                                        </div>
-                                    </div>
-                                {% endfor %}
-                            </div>
-                        {% else %}
-                            <p>No other accounts available.</p>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 </div>
 {% endblock %}
 

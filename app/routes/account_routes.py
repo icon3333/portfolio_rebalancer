@@ -76,7 +76,7 @@ def create_account():
     except Exception as e:
         flash(f'Error creating account: {str(e)}', 'error')
     
-    return redirect(url_for('account.index'))
+    return redirect(url_for('main.index'))
 
 @account_bp.route('/update', methods=['POST'])
 def update_account():

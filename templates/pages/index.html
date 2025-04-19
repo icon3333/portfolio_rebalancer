@@ -2,190 +2,152 @@
 
 {% block title %}Portfolio Manager - Welcome{% endblock %}
 
+{% set show_sidebar = session.account_id is defined and session.account_id %}
+
+{% block head_extras %}
+<style>
+    .hover-card {
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    
+    .hover-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    }
+    
+    .feature-list li {
+        margin-bottom: 10px;
+    }
+    
+    .section-title {
+        font-size: 1.5rem;
+        margin-bottom: 1.5rem;
+        position: relative;
+        display: inline-block;
+    }
+    
+    .section-title:after {
+        content: '';
+        position: absolute;
+        width: 100%;
+        height: 3px;
+        background-color: #3298dc;
+        bottom: -10px;
+        left: 0;
+    }
+    
+    .stat-box {
+        padding: 10px;
+        border-radius: 6px;
+        background-color: #f8f9fa;
+    }
+    
+    .stat-box .heading {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #777;
+        text-transform: uppercase;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
     {% if session.account_id %}
-        <!-- Logged in state - Dashboard -->
+        <!-- Logged in state - Dashboard with portfolio info -->
         <div class="container">
-            <h2 class="section-title">What do you want to do?</h2>
-            <div class="columns is-multiline">
-                <div class="column is-3">
-                    <div class="card">
-                        <div class="card-content has-text-centered">
-                            <span class="icon is-large has-text-primary">
-                                <i class="fas fa-gem fa-2x"></i>
-                            </span>
-                            <p class="title is-5 mt-3">Enrich Data</p>
-                            <p class="subtitle is-6">Import and update your portfolio</p>
+            <!-- Account Overview Section -->
+            <div class="box mb-4">
+                <div class="columns is-vcentered">
+                    <div class="column is-8">
+                        <h1 class="title is-4 mb-3">Welcome, {{ account.username }}</h1>
+                        <p class="subtitle is-6 mt-2">Your portfolio at a glance</p>
+                        
+                        <!-- Portfolio Summary Info -->
+                        <div class="columns mt-4">
+                            <div class="column is-3">
+                                <div class="stat-box">
+                                    <p class="heading">Total Value</p>
+                                    <p class="title is-5">
+                                        € {{ '{:,.2f}'.format(total_value|float) }}
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="column is-3">
+                                <div class="stat-box">
+                                    <p class="heading">Portfolios</p>
+                                    <p class="title is-5">{{ portfolios|length }}</p>
+                                </div>
+                            </div>
+                            <div class="column is-3">
+                                <div class="stat-box">
+                                    <p class="heading">Assets</p>
+                                    <p class="title is-5">{{ total_assets }}</p>
+                                </div>
+                            </div>
                         </div>
-                        <footer class="card-footer">
-                            <a href="{{ url_for('portfolio.enrich') }}" class="card-footer-item">Go</a>
-                        </footer>
                     </div>
-                </div>
-                <div class="column is-3">
-                    <div class="card">
-                        <div class="card-content has-text-centered">
-                            <span class="icon is-large has-text-success">
-                                <i class="fas fa-search fa-2x"></i>
-                            </span>
-                            <p class="title is-5 mt-3">Analyse</p>
-                            <p class="subtitle is-6">View portfolio analytics</p>
-                        </div>
-                        <footer class="card-footer">
-                            <a href="{{ url_for('portfolio.analyse') }}" class="card-footer-item">Go</a>
-                        </footer>
-                    </div>
-                </div>
-                <div class="column is-3">
-                    <div class="card">
-                        <div class="card-content has-text-centered">
-                            <span class="icon is-large has-text-warning">
-                                <i class="fas fa-cog fa-2x"></i>
-                            </span>
-                            <p class="title is-5 mt-3">Account Settings</p>
-                            <p class="subtitle is-6">Manage your account</p>
-                        </div>
-                        <footer class="card-footer">
-                            <a href="{{ url_for('account.index') }}" class="card-footer-item">Go</a>
-                        </footer>
-                    </div>
-                </div>
-                <div class="column is-3">
-                    <div class="card">
-                        <div class="card-content has-text-centered">
-                            <span class="icon is-large has-text-info">
-                                <i class="fas fa-cubes fa-2x"></i>
-                            </span>
-                            <p class="title is-5 mt-3">Builder</p>
-                            <p class="subtitle is-6">Plan your investment allocations</p>
-                        </div>
-                        <footer class="card-footer">
-                            <a href="{{ url_for('portfolio.build') }}" class="card-footer-item">Go</a>
-                        </footer>
-                    </div>
-                </div>
-                <div class="column is-3">
-                    <div class="card">
-                        <div class="card-content has-text-centered">
-                            <span class="icon is-large has-text-success">
-                                <i class="fas fa-balance-scale fa-2x"></i>
-                            </span>
-                            <p class="title is-5 mt-3"> Rebalancer</p>
-                            <p class="subtitle is-6">Rebalance your portfolio</p>
-                        </div>
-                        <footer class="card-footer">
-                            <a href="{{ url_for('portfolio.allocate') }}" class="card-footer-item">Go</a>
-                        </footer>
+                    <div class="column is-4 has-text-right">
+                        <!-- Account controls removed -->
                     </div>
                 </div>
             </div>
         </div>
     {% else %}
-        <!-- Not logged in state - Account selection -->
-        <section class="hero is-light is-bold">
-            <div class="hero-body">
-                <div class="container">
-                    <h1 class="title">
-                        Welcome to Portfolio Manager
-                    </h1>
-                    <h2 class="subtitle">
-                        Manage and optimize your investment portfolio
-                    </h2>
-                </div>
-            </div>
-        </section>
-
-        <div class="section">
-            {% if accounts %}
-                <h2 class="section-title">Select an Account</h2>
-                <div class="columns is-multiline">
-                    {% for account in accounts %}
-                        <div class="column is-3">
-                            <div class="card">
-                                <div class="card-content">
-                                    <div class="content has-text-centered">
-                                        <span class="icon is-large">
-                                            <i class="fas fa-user-circle fa-3x"></i>
-                                        </span>
-                                        <p class="title is-4 mt-3">{{ account.username }}</p>
-                                    </div>
-                                </div>
-                                <footer class="card-footer">
-                                    <a href="{{ url_for('main.select_account', account_id=account.id) }}" class="card-footer-item">
-                                        <span class="icon">
-                                            <i class="fas fa-sign-in-alt"></i>
-                                        </span>
-                                        <span>Select</span>
-                                    </a>
-                                </footer>
-                            </div>
-                        </div>
-                    {% endfor %}
+        <!-- Not logged in state - Account selection with minimalist design -->
+        <div class="container">
+            <div class="columns is-centered">
+                <div class="column is-8 has-text-centered">
+                    <h1 class="title is-2">Portfolio Rebalancing Tool</h1>
+                    <h2 class="subtitle is-4 mb-6">Optimize your investments and reach your financial goals</h2>
                     
-                    <!-- Create new account card -->
-                    <div class="column is-3">
-                        <div class="card">
-                            <div class="card-content">
-                                <div class="content has-text-centered">
-                                    <span class="icon is-large has-text-grey-light">
-                                        <i class="fas fa-plus-circle fa-3x"></i>
-                                    </span>
-                                    <p class="title is-4 mt-3">New Account</p>
-                                </div>
+                    {% if accounts %}
+                        <div class="box">
+                            <h2 class="title is-4 mb-4 has-text-left">
+                                <i class="fas fa-users mr-2"></i> Your Accounts
+                            </h2>
+                            
+                            <div class="columns is-multiline">
+                                {% for account in accounts %}
+                                    <div class="column is-4">
+                                        <div class="card has-background-light hover-card">
+                                            <div class="card-content">
+                                                <div class="content has-text-centered">
+                                                    <span class="icon is-large has-text-info">
+                                                        <i class="fas fa-user-circle fa-3x"></i>
+                                                    </span>
+                                                    <p class="title is-4 mt-3">{{ account.username }}</p>
+                                                    <p class="subtitle is-6">
+                                                        Created: {{ account.created_at.split(' ')[0] if account.created_at else 'N/A' }}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <footer class="card-footer">
+                                                <a href="{{ url_for('main.select_account', account_id=account.id) }}" class="card-footer-item button is-info is-light is-fullwidth">
+                                                    <span class="icon">
+                                                        <i class="fas fa-sign-in-alt"></i>
+                                                    </span>
+                                                    <span>Access Portfolio</span>
+                                                </a>
+                                            </footer>
+                                        </div>
+                                    </div>
+                                {% endfor %}
                             </div>
-                            <footer class="card-footer">
-                                <a class="card-footer-item js-modal-trigger" data-target="create-account-modal">
-                                    <span class="icon">
-                                        <i class="fas fa-plus"></i>
-                                    </span>
-                                    <span>Create</span>
-                                </a>
-                            </footer>
                         </div>
-                    </div>
-                </div>
-            {% else %}
-                <div class="notification is-info is-light">
-                    <p>Welcome to Portfolio Manager! To get started, create your first account.</p>
-                    <button class="button is-info mt-3 js-modal-trigger" data-target="create-account-modal">
-                        <span class="icon">
-                            <i class="fas fa-user-plus"></i>
-                        </span>
-                        <span>Create Account</span>
-                    </button>
-                </div>
-            {% endif %}
-        </div>
-
-        <!-- Features section -->
-        <div class="section">
-            <h2 class="section-title">Features</h2>
-            <div class="columns">
-                <div class="column">
-                    <div class="box">
-                        <h4 class="title is-5">
-                            <span class="icon-text">
-                                <span class="icon has-text-primary">
-                                    <i class="fas fa-chart-line"></i>
-                                </span>
-                                <span>Portfolio Tracking</span>
-                            </span>
-                        </h4>
-                        <p>Track your investments across multiple portfolios and categories. Import your data easily from CSV files.</p>
-                    </div>
-                </div>
-                <div class="column">
-                    <div class="box">
-                        <h4 class="title is-5">
-                            <span class="icon-text">
-                                <span class="icon has-text-success">
-                                    <i class="fas fa-chart-pie"></i>
-                                </span>
-                                <span>Portfolio Analytics</span>
-                            </span>
-                        </h4>
-                        <p>Visualize your portfolio with interactive charts and comprehensive analytics to make informed decisions.</p>
-                    </div>
+                    {% else %}
+                        <div class="notification is-info is-light">
+                            <div class="content">
+                                <h3><i class="fas fa-info-circle mr-2"></i> Welcome to Portfolio Manager!</h3>
+                                <p>Create your first account to start tracking and optimizing your investments.</p>
+                                <button class="button is-info mt-3 js-modal-trigger" data-target="create-account-modal">
+                                    <span class="icon">
+                                        <i class="fas fa-user-plus"></i>
+                                    </span>
+                                    <span>Create Your First Account</span>
+                                </button>
+                            </div>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
