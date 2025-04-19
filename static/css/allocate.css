@@ -1,338 +1,48 @@
-/**
- * Standardized Minimalist Design for Portfolio Manager Application
- * Rewritten allocate.css to match the minimalist design system
- */
+@charset "UTF-8";
+@import url('theme.css');
 
-/* Base Theme Variables */
-:root {
-    /* Colors */
-    --bg: #ffffff;
-    --darker-bg: #f5f5f5;
-    --card-bg: #ffffff;
-    --border-color: #e0e0e0;
-    --text-color: #333333;
-    --text-muted: #666666;
-    
-    /* Brand Colors */
-    --primary: #3273dc;
-    --primary-light: rgba(50, 115, 220, 0.1);
-    --primary-hover: #2366d1;
-    --success: #23d160;
-    --warning: #ffdd57;
-    --danger: #ff3860;
-    
-    /* UI Elements */
-    --shadow: 0 2px 3px rgba(10, 10, 10, 0.1);
-    --border-radius: 4px;
-    
-    /* Spacing */
-    --space-xs: 0.25rem;
-    --space-sm: 0.5rem;
-    --space-md: 1rem;
-    --space-lg: 1.5rem;
-    --space-xl: 2rem;
-  }
-  
-  /* Dark Theme Support */
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #1e1e1e;
-      --darker-bg: #121212;
-      --card-bg: #222222;
-      --border-color: #333333;
-      --text-color: #e0e0e0;
-      --text-muted: #999999;
-    }
-  }
-  
-  /* Global Styles */
-  body {
-    background-color: var(--bg);
-    color: var(--text-color);
-  }
-  
-  /* Container Styling */
-  .container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: var(--space-md);
-  }
-  
-  /* Card Styling */
-  .card {
-    background-color: var(--card-bg);
-    border-radius: var(--border-radius);
-    box-shadow: var(--shadow);
-    margin-bottom: var(--space-lg);
-    padding: var(--space-lg);
-    border: 1px solid var(--border-color);
-  }
-  
-  /* Header Content Layout */
-  .header-content {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--space-md) 0;
-    margin-bottom: var(--space-md);
-    gap: var(--space-md);
-  }
-  
-  /* Investment Input Styling */
-  .investment-input {
-    display: flex;
-    align-items: center;
-    gap: var(--space-md);
-    padding: var(--space-md);
-    background: transparent;
-    flex: 1;
-    min-width: 320px;
-  }
-  
-  .investment-input label {
-    margin: 0;
-    color: var(--text-color);
-    font-weight: 500;
-    white-space: nowrap;
-  }
-  
-  .input-group {
-    display: flex;
-    align-items: center;
-    min-width: 0;
-    flex: 1;
-  }
-  
-  .input-group-text {
-    background: transparent;
-    color: var(--text-color);
-    border: none;
-    padding: var(--space-xs) var(--space-sm);
-    font-weight: 500;
-  }
-  
-  .input-group input {
-    border: 1px solid var(--border-color);
-    padding: var(--space-sm) var(--space-md);
-    font-weight: 500;
-    color: var(--primary);
-    background-color: var(--bg);
-    width: 100%;
-    border-radius: var(--border-radius);
-  }
-  
-  .input-group input:focus {
-    border-color: var(--primary);
-    box-shadow: 0 0 0 1px var(--primary-light);
-    outline: none;
-  }
-  
-  /* Tab Navigation */
-  .nav-tabs {
-    border-bottom: 1px solid var(--border-color);
-    display: flex;
-    background-color: var(--darker-bg);
-    border-radius: var(--border-radius) var(--border-radius) 0 0;
-    overflow: hidden;
-    margin-bottom: 0;
-  }
-  
-  .nav-tabs .nav-item {
-    flex: 1;
-    text-align: center;
-  }
-  
-  .nav-tabs .nav-link {
-    border: none;
-    color: var(--text-muted);
-    padding: var(--space-md);
-    transition: all 0.2s ease;
-    width: 100%;
-    text-align: center;
-    background-color: var(--darker-bg);
-  }
-  
-  .nav-tabs .nav-link:hover {
-    color: var(--text-color);
-    background-color: var(--primary-light);
-  }
-  
-  .nav-tabs .nav-link.active {
-    color: var(--primary);
-    border-bottom: 2px solid var(--primary);
-    background-color: var(--bg);
-  }
-  
-  .tab-content {
-    padding-top: var(--space-md);
-  }
-  
-  .tab-pane {
-    display: none;
-  }
-  
-  .tab-pane.active {
-    display: block;
-  }
-  
-  /* Portfolio Select */
-  .portfolio-select {
-    display: flex;
-    align-items: center;
-    gap: var(--space-md);
-    margin-bottom: var(--space-lg);
-  }
-  
-  .portfolio-select label {
-    margin: 0;
-    color: var(--text-color);
-    font-weight: 500;
-    white-space: nowrap;
-  }
-  
-  .form-select {
-    background-color: var(--bg);
-    border: 1px solid var(--border-color);
-    color: var(--text-color);
-    padding: var(--space-sm) var(--space-md);
-    border-radius: var(--border-radius);
-  }
-  
-  .form-select:focus {
-    border-color: var(--primary);
-    box-shadow: 0 0 0 1px var(--primary-light);
-    outline: none;
-  }
-  
-  /* Table Styling */
-  .table {
-    width: 100%;
-    margin-bottom: var(--space-md);
-    color: var(--text-color);
-    border-collapse: separate;
-    border-spacing: 0;
-    background-color: var(--card-bg);
-    border-radius: var(--border-radius);
-    overflow: hidden;
-  }
-  
-  .table th,
-  .table td {
-    padding: 0.65rem 0.75rem;
-    border-bottom: 1px solid var(--border-color);
-  }
-  
-  .table thead th {
-    background-color: var(--darker-bg);
-    color: var(--text-muted);
-    font-weight: 500;
-    border-bottom: 2px solid var(--border-color);
-  }
-  
-  .table tbody tr:hover {
-    background-color: var(--primary-light);
-  }
-  
-  /* Category and Position Row Styling */
-  .category-row {
-    background-color: var(--darker-bg);
-    font-weight: 500;
-    cursor: pointer;
-  }
-  
-  .position-row td:first-child {
-    padding-left: var(--space-lg);
-  }
-  
-  /* Value Formatting */
-  .current-value {
-    color: var(--primary);
-    font-family: monospace;
-  }
-  
-  .target-value {
-    color: var(--text-color);
-    font-family: monospace;
-  }
-  
-  .value-after {
-    color: var(--success);
-    font-family: monospace;
-  }
-  
-  /* Total Row Styling */
-  .total-row {
-    background-color: var(--darker-bg);
-    font-weight: 600;
-  }
-  
-  .total-row td {
-    border-top: 2px solid var(--primary);
-    border-bottom: none;
-  }
-  
-  /* Missing Positions Styling */
-  .missing-positions-row td {
-    border-left: 3px solid var(--warning);
-    background-color: rgba(255, 221, 87, 0.1);
-  }
-  
-  /* Loading Spinner */
-  .spinner-border {
-    display: block;
-    margin: var(--space-lg) auto;
-  }
-  
-  /* Table Container */
-  .table-responsive {
-    border-radius: var(--border-radius);
-    overflow: auto;
-    margin-bottom: var(--space-lg);
-    background-color: var(--card-bg);
-    box-shadow: var(--shadow);
-  }
-  
-  /* Action Colors */
-  .actions-positive {
-    color: var(--success);
-    font-weight: 500;
-  }
-  
-  .actions-negative {
-    color: var(--danger);
-    font-weight: 500;
-  }
-  
-  .actions-neutral {
-    color: var(--text-muted);
-  }
-  
-  /* Responsive Adjustments */
-  @media (max-width: 768px) {
-    .header-content {
-      flex-direction: column;
-      align-items: flex-start;
-    }
-    
-    .investment-input {
-      width: 100%;
-      margin-top: var(--space-md);
-    }
-    
-    .portfolio-select {
-      flex-direction: column;
-      align-items: flex-start;
-    }
-    
-    .form-select {
-      width: 100%;
-    }
-    
-    .table-responsive {
-      font-size: 0.875rem;
-    }
-    
-    .container {
-      padding: var(--space-sm);
-    }
-  }
+/* ===================================================================
+   allocate.css — page‑specific rules for templates/pages/allocate.html
+   =================================================================== */
+
+/* --- tab navigation ------------------------------------------------------ */
+.nav-tabs{display:flex;border-bottom:1px solid var(--border-color);}
+.nav-tabs .nav-item{flex:1;text-align:center;}
+.nav-tabs .nav-link{
+  background:var(--darker-bg);
+  color:var(--text-muted);
+  border:none;
+  padding:var(--space-md);
+  transition:all .2s;
+  width:100%;
+}
+.nav-tabs .nav-link:hover{background:var(--primary-light);color:var(--text-color);}
+.nav-tabs .nav-link.active{
+  background:var(--bg);
+  color:var(--primary);
+  border-bottom:2px solid var(--primary);
+}
+
+/* --- investment input field --------------------------------------------- */
+.investment-input{
+  display:flex;align-items:center;gap:var(--space-md);
+  padding:var(--space-md);
+  min-width:320px;
+}
+.input-group{display:flex;align-items:center;flex:1;min-width:0;}
+.input-group-text{background:transparent;border:none;padding:var(--space-xs) var(--space-sm);color:var(--text-color);}
+
+/* --- tables & rows ------------------------------------------------------- */
+.category-row       {background:var(--darker-bg);font-weight:500;cursor:pointer;}
+.position-row td:first-child{padding-left:var(--space-lg);}
+.missing-positions-row td{
+  border-left:3px solid var(--warning);
+  background:rgba(255,221,87,.1);
+}
+.actions-positive{color:var(--success);font-weight:500;}
+.actions-negative{color:var(--danger); font-weight:500;}
+.actions-neutral {color:var(--text-muted);}
+.table-responsive{overflow:auto;border-radius:var(--border-radius);margin-bottom:var(--space-lg);}
+
+/* --- misc ---------------------------------------------------------------- */
+.spinner-border{display:block;margin:var(--space-lg) auto;}

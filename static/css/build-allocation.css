@@ -1,356 +1,48 @@
-/**
- * Standardized Minimalist Design for Portfolio Manager Application
- * Rewritten build-allocation.css with inspiration from allocate.css
- */
+@charset "UTF-8";
+@import url('theme.css');
 
-/* Base Theme Variables */
-:root {
-  /* Colors */
-  --bg: #ffffff;
-  --darker-bg: #f5f5f5;
-  --card-bg: #ffffff;
-  --section-bg: #1a1a1a; /* Section background for dark theme */
-  --card-bg-dark: #262626; /* Card background for dark theme */
-  --input-bg-dark: #333333; /* Input background for dark theme */
-  --border-color: #e0e0e0;
-  --text-color: #333333;
-  --text-muted: #666666;
-  
-  /* Brand Colors */
-  --primary: #3273dc;
-  --primary-light: rgba(50, 115, 220, 0.1);
-  --primary-hover: #2366d1;
-  --success: #23d160;
-  --warning: #ffdd57;
-  --danger: #ff3860;
-  
-  /* UI Elements */
-  --shadow: 0 2px 3px rgba(10, 10, 10, 0.05);
-  --border-radius: 6px;
-  
-  /* Spacing */
-  --space-xs: 0.25rem;
-  --space-sm: 0.5rem;
-  --space-md: 1rem;
-  --space-lg: 1.5rem;
-  --space-xl: 2rem;
-  --space-xxl: 3rem;
+/* ===================================================================
+   build-allocation.css — page‑specific rules for Allocation Builder
+   =================================================================== */
+
+/* section headings */
+.section-title{
+  font-size:1.5rem;font-weight:600;
+  margin:var(--space-xxl) 0 var(--space-xl);
 }
 
-/* Dark Theme Support */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #1e1e1e;
-    --darker-bg: #121212;
-    --card-bg: var(--card-bg-dark);
-    --border-color: transparent;
-    --text-color: #e0e0e0;
-    --text-muted: #999999;
-  }
-  
-  body {
-    background-color: var(--bg);
-    color: var(--text-color);
-  }
+/* cards & results blocks */
+.budget-card,.compact-box,.budget-results{
+  background:rgba(255,255,255,.03);
+  border:none;
+  border-radius:var(--border-radius);
+  padding:var(--space-xl);
+  margin-bottom:var(--space-xl);
 }
 
-/* Layout & Container */
-.container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: var(--space-md);
+/* portfolio toggle button */
+.portfolio-toggle{
+  cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;
+  width:2.5rem;height:2.5rem;border-radius:50%;
+  background:rgba(255,255,255,.05);
+  transition:background-color .2s ease;
+}
+.portfolio-toggle:hover{background:rgba(255,255,255,.1);}
+.portfolio-toggle i{color:var(--primary);}
+
+/* table hover & placeholder rows */
+.table tr{background:rgba(255,255,255,.02);transition:background-color .15s;}
+.table tr:hover{background:rgba(255,255,255,.04);}
+.placeholder-position{background:rgba(50,115,220,.05);font-style:italic;border-radius:var(--border-radius);}
+.remaining-positions-text{font-weight:500;color:var(--primary);}
+
+/* add‑position block */
+.add-position-section{
+  background:rgba(255,255,255,.03);
+  padding:var(--space-xl);border-radius:var(--border-radius);
+  margin:var(--space-xl) 0;
 }
 
-/* Section Titles */
-.section-title {
-  font-size: 1.5rem;
-  font-weight: 600;
-  margin-bottom: var(--space-xl);
-  padding-bottom: var(--space-md);
-  color: var(--text-color);
-  /* Remove border, use spacing instead */
-  margin-top: var(--space-xxl);
-}
-
-/* Cards */
-.card, .budget-card, .compact-box {
-  background-color: var(--card-bg-dark);
-  border-radius: var(--border-radius);
-  box-shadow: var(--shadow);
-  margin-bottom: var(--space-xl);
-  padding: var(--space-xl);
-  /* Remove border */
-  border: none;
-}
-
-/* Budget Results Section */
-.budget-results {
-  background-color: rgba(255, 255, 255, 0.03);
-  padding: var(--space-lg) var(--space-xl);
-  border-radius: var(--border-radius);
-  margin-top: var(--space-lg);
-  /* Remove border */
-  border: none;
-}
-
-.result-label {
-  display: block;
-  font-size: 0.9rem;
-  color: var(--text-muted);
-  margin-bottom: var(--space-xs);
-}
-
-.result-value {
-  font-size: 1.25rem;
-  font-weight: 500;
-  color: var(--text-color);
-}
-
-.available-percentage {
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  margin-left: var(--space-sm);
-}
-
-/* Form Elements */
-.input, .select select {
-  border: none;
-  border-radius: var(--border-radius);
-  padding: var(--space-md) var(--space-lg);
-  background-color: var(--input-bg-dark);
-  color: var(--text-color);
-  transition: background-color 0.2s ease;
-  height: 3rem;
-}
-
-.input:focus, .select select:focus {
-  background-color: rgba(255, 255, 255, 0.05);
-  outline: none;
-  box-shadow: none;
-}
-
-.label {
-  color: var(--text-muted);
-  font-weight: 500;
-  margin-bottom: var(--space-sm);
-  display: block;
-  font-size: 0.9rem;
-}
-
-/* Buttons */
-.button {
-  border-radius: var(--border-radius);
-  transition: background-color 0.2s ease;
-}
-
-.button.is-primary {
-  background-color: var(--primary);
-}
-
-.button.is-primary:hover {
-  background-color: var(--primary-hover);
-}
-
-/* Portfolio Toggle */
-.portfolio-toggle {
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 50%;
-  background-color: rgba(255, 255, 255, 0.05);
-  transition: background-color 0.2s ease;
-}
-
-.portfolio-toggle:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-.portfolio-toggle i {
-  color: var(--primary);
-}
-
-/* Table Styling */
-.table-responsive {
-  border-radius: var(--border-radius);
-  overflow: hidden;
-  margin-bottom: var(--space-xl);
-  background-color: transparent;
-}
-
-.table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0 0.5rem; /* Create space between rows instead of borders */
-  margin-bottom: 0 !important;
-  background-color: transparent;
-}
-
-.table th, .table td {
-  padding: 1rem 1.25rem;
-  border: none; /* Remove all borders */
-}
-
-.table thead th {
-  font-weight: 500;
-  color: var(--text-muted);
-  background-color: transparent;
-  font-size: 0.9rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  padding-bottom: 1.5rem;
-}
-
-.table-active {
-  background-color: rgba(50, 115, 220, 0.1);
-  border-radius: var(--border-radius);
-}
-
-/* Add Position Section */
-.add-position-section {
-  background-color: rgba(255, 255, 255, 0.03);
-  padding: var(--space-xl);
-  border-radius: var(--border-radius);
-  margin-bottom: var(--space-xl);
-  margin-top: var(--space-lg);
-  border: none;
-}
-
-/* Placeholder Position Styling */
-.placeholder-position {
-  background-color: rgba(50, 115, 220, 0.05);
-  font-style: italic;
-  border-radius: var(--border-radius);
-}
-
-.placeholder-position td:first-child {
-  position: relative;
-  padding-left: 1.5rem;
-}
-
-.placeholder-position td:first-child::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background-color: var(--primary);
-  border-top-left-radius: var(--border-radius);
-  border-bottom-left-radius: var(--border-radius);
-}
-
-.remaining-positions-text {
-  font-weight: 500;
-  color: var(--primary);
-}
-
-/* Notification Styling */
-.notification {
-  padding: var(--space-lg);
-  border-radius: var(--border-radius);
-  margin-bottom: var(--space-xl);
-  border: none;
-}
-
-.notification.is-success {
-  background-color: rgba(35, 209, 96, 0.1);
-  color: var(--success);
-}
-
-.notification.is-warning {
-  background-color: rgba(255, 221, 87, 0.05);
-  color: var(--warning);
-}
-
-.notification.is-danger {
-  background-color: rgba(255, 56, 96, 0.1);
-  color: var(--danger);
-}
-
-/* Extra Styles for Minimalist Layout */
-.result-label {
-  display: block;
-  font-size: 0.9rem;
-  color: var(--text-muted);
-  margin-bottom: var(--space-xs);
-}
-
-.result-value {
-  font-size: 1.75rem;
-  font-weight: 500;
-  color: var(--text-color);
-}
-
-.available-percentage {
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  margin-left: var(--space-sm);
-}
-
-/* Add spacious column layout */
-.columns {
-  margin-left: calc(-1 * var(--space-md));
-  margin-right: calc(-1 * var(--space-md));
-}
-
-.columns .column {
-  padding: var(--space-md);
-}
-
-/* Input fields in columns */
-.columns .field {
-  margin-bottom: var(--space-lg);
-}
-
-/* Remove table outlines */
-.table tr {
-  background-color: rgba(255, 255, 255, 0.02);
-  transition: background-color 0.15s ease;
-}
-
-.table tr:hover {
-  background-color: rgba(255, 255, 255, 0.04);
-}
-
-/* Responsive Adjustments */
-@media (max-width: 768px) {
-  .container {
-    padding: var(--space-sm);
-  }
-  
-  .section-title {
-    font-size: 1.25rem;
-    margin-top: var(--space-xl);
-    margin-bottom: var(--space-lg);
-  }
-  
-  .budget-card .columns {
-    flex-direction: column;
-  }
-  
-  .budget-results {
-    padding: var(--space-md);
-  }
-  
-  .result-item {
-    margin-bottom: var(--space-md);
-  }
-  
-  .card, .budget-card, .compact-box {
-    padding: var(--space-lg);
-    margin-bottom: var(--space-lg);
-  }
-  
-  .input, .select select {
-    padding: var(--space-sm) var(--space-md);
-    height: 2.5rem;
-  }
-}
-
-/* Vue.js integration */
-[v-cloak] {
-  display: none;
-}
+/* small text helper */
+.available-percentage{font-size:.85rem;color:var(--text-muted);margin-left:var(--space-sm);}

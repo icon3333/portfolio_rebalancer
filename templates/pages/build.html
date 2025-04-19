@@ -3,7 +3,10 @@
 {% block title %}Allocation Builder{% endblock %}
 
 {% block head_extras %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/build-allocation.css') }}?v={{ range(1000, 9999) | random }}">
+<link rel="stylesheet"
+      href="{{ url_for('static', filename='css/theme.css') }}?v={{ range(1000,9999)|random }}">
+<link rel="stylesheet"
+      href="{{ url_for('static', filename='css/build-allocation.css') }}?v={{ range(1000,9999)|random }}">
 {% endblock %}
 
 {% block content %}

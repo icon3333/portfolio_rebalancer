@@ -1,5 +1,5 @@
 This file is a merged representation of selected files from the codebase.
-Generated on: 2025-04-16T20:26:11.571652
+Generated on: 2025-04-19T15:10:52.239603
 
 ================================================================
 Purpose:
@@ -25,7 +25,6 @@ Repository Structure
     static/
         css/
             allocate.css
-            allocate.css.bak
             build-allocation.css
             bulk-edit.css
             custom.css
@@ -43,900 +42,703 @@ Repository Structure
 ================================================================
 ###START_FILE_PATH: static/css/build-allocation.css###
 /**
- * Build Portfolio Styles - Allocation Builder
+ * Standardized Minimalist Design for Portfolio Manager Application
+ * Rewritten build-allocation.css with inspiration from allocate.css
  */
 
-/* Theme Variables */
+/* Base Theme Variables */
+:root {
+  /* Colors */
+  --bg: #ffffff;
+  --darker-bg: #f5f5f5;
+  --card-bg: #ffffff;
+  --section-bg: #1a1a1a; /* Section background for dark theme */
+  --card-bg-dark: #262626; /* Card background for dark theme */
+  --input-bg-dark: #333333; /* Input background for dark theme */
+  --border-color: #e0e0e0;
+  --text-color: #333333;
+  --text-muted: #666666;
+  
+  /* Brand Colors */
+  --primary: #3273dc;
+  --primary-light: rgba(50, 115, 220, 0.1);
+  --primary-hover: #2366d1;
+  --success: #23d160;
+  --warning: #ffdd57;
+  --danger: #ff3860;
+  
+  /* UI Elements */
+  --shadow: 0 2px 3px rgba(10, 10, 10, 0.05);
+  --border-radius: 6px;
+  
+  /* Spacing */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --space-xxl: 3rem;
+}
+
+/* Dark Theme Support */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1e1e1e;
+    --darker-bg: #121212;
+    --card-bg: var(--card-bg-dark);
+    --border-color: transparent;
+    --text-color: #e0e0e0;
+    --text-muted: #999999;
+  }
+  
+  body {
+    background-color: var(--bg);
+    color: var(--text-color);
+  }
+}
+
+/* Layout & Container */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--space-md);
+}
+
+/* Section Titles */
+.section-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: var(--space-xl);
+  padding-bottom: var(--space-md);
+  color: var(--text-color);
+  /* Remove border, use spacing instead */
+  margin-top: var(--space-xxl);
+}
+
+/* Cards */
+.card, .budget-card, .compact-box {
+  background-color: var(--card-bg-dark);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow);
+  margin-bottom: var(--space-xl);
+  padding: var(--space-xl);
+  /* Remove border */
+  border: none;
+}
+
+/* Budget Results Section */
+.budget-results {
+  background-color: rgba(255, 255, 255, 0.03);
+  padding: var(--space-lg) var(--space-xl);
+  border-radius: var(--border-radius);
+  margin-top: var(--space-lg);
+  /* Remove border */
+  border: none;
+}
+
+.result-label {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-bottom: var(--space-xs);
+}
+
+.result-value {
+  font-size: 1.25rem;
+  font-weight: 500;
+  color: var(--text-color);
+}
+
+.available-percentage {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-left: var(--space-sm);
+}
+
+/* Form Elements */
+.input, .select select {
+  border: none;
+  border-radius: var(--border-radius);
+  padding: var(--space-md) var(--space-lg);
+  background-color: var(--input-bg-dark);
+  color: var(--text-color);
+  transition: background-color 0.2s ease;
+  height: 3rem;
+}
+
+.input:focus, .select select:focus {
+  background-color: rgba(255, 255, 255, 0.05);
+  outline: none;
+  box-shadow: none;
+}
+
+.label {
+  color: var(--text-muted);
+  font-weight: 500;
+  margin-bottom: var(--space-sm);
+  display: block;
+  font-size: 0.9rem;
+}
+
+/* Buttons */
+.button {
+  border-radius: var(--border-radius);
+  transition: background-color 0.2s ease;
+}
+
+.button.is-primary {
+  background-color: var(--primary);
+}
+
+.button.is-primary:hover {
+  background-color: var(--primary-hover);
+}
+
+/* Portfolio Toggle */
+.portfolio-toggle {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.05);
+  transition: background-color 0.2s ease;
+}
+
+.portfolio-toggle:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.portfolio-toggle i {
+  color: var(--primary);
+}
+
+/* Table Styling */
+.table-responsive {
+  border-radius: var(--border-radius);
+  overflow: hidden;
+  margin-bottom: var(--space-xl);
+  background-color: transparent;
+}
+
+.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 0.5rem; /* Create space between rows instead of borders */
+  margin-bottom: 0 !important;
+  background-color: transparent;
+}
+
+.table th, .table td {
+  padding: 1rem 1.25rem;
+  border: none; /* Remove all borders */
+}
+
+.table thead th {
+  font-weight: 500;
+  color: var(--text-muted);
+  background-color: transparent;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding-bottom: 1.5rem;
+}
+
+.table-active {
+  background-color: rgba(50, 115, 220, 0.1);
+  border-radius: var(--border-radius);
+}
+
+/* Add Position Section */
+.add-position-section {
+  background-color: rgba(255, 255, 255, 0.03);
+  padding: var(--space-xl);
+  border-radius: var(--border-radius);
+  margin-bottom: var(--space-xl);
+  margin-top: var(--space-lg);
+  border: none;
+}
+
+/* Placeholder Position Styling */
+.placeholder-position {
+  background-color: rgba(50, 115, 220, 0.05);
+  font-style: italic;
+  border-radius: var(--border-radius);
+}
+
+.placeholder-position td:first-child {
+  position: relative;
+  padding-left: 1.5rem;
+}
+
+.placeholder-position td:first-child::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background-color: var(--primary);
+  border-top-left-radius: var(--border-radius);
+  border-bottom-left-radius: var(--border-radius);
+}
+
+.remaining-positions-text {
+  font-weight: 500;
+  color: var(--primary);
+}
+
+/* Notification Styling */
+.notification {
+  padding: var(--space-lg);
+  border-radius: var(--border-radius);
+  margin-bottom: var(--space-xl);
+  border: none;
+}
+
+.notification.is-success {
+  background-color: rgba(35, 209, 96, 0.1);
+  color: var(--success);
+}
+
+.notification.is-warning {
+  background-color: rgba(255, 221, 87, 0.05);
+  color: var(--warning);
+}
+
+.notification.is-danger {
+  background-color: rgba(255, 56, 96, 0.1);
+  color: var(--danger);
+}
+
+/* Extra Styles for Minimalist Layout */
+.result-label {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-bottom: var(--space-xs);
+}
+
+.result-value {
+  font-size: 1.75rem;
+  font-weight: 500;
+  color: var(--text-color);
+}
+
+.available-percentage {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-left: var(--space-sm);
+}
+
+/* Add spacious column layout */
+.columns {
+  margin-left: calc(-1 * var(--space-md));
+  margin-right: calc(-1 * var(--space-md));
+}
+
+.columns .column {
+  padding: var(--space-md);
+}
+
+/* Input fields in columns */
+.columns .field {
+  margin-bottom: var(--space-lg);
+}
+
+/* Remove table outlines */
+.table tr {
+  background-color: rgba(255, 255, 255, 0.02);
+  transition: background-color 0.15s ease;
+}
+
+.table tr:hover {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  .container {
+    padding: var(--space-sm);
+  }
+  
+  .section-title {
+    font-size: 1.25rem;
+    margin-top: var(--space-xl);
+    margin-bottom: var(--space-lg);
+  }
+  
+  .budget-card .columns {
+    flex-direction: column;
+  }
+  
+  .budget-results {
+    padding: var(--space-md);
+  }
+  
+  .result-item {
+    margin-bottom: var(--space-md);
+  }
+  
+  .card, .budget-card, .compact-box {
+    padding: var(--space-lg);
+    margin-bottom: var(--space-lg);
+  }
+  
+  .input, .select select {
+    padding: var(--space-sm) var(--space-md);
+    height: 2.5rem;
+  }
+}
+
+/* Vue.js integration */
+[v-cloak] {
+  display: none;
+}
+###END_FILE###
+
+================================================================
+###START_FILE_PATH: static/css/allocate.css###
+/**
+ * Standardized Minimalist Design for Portfolio Manager Application
+ * Rewritten allocate.css to match the minimalist design system
+ */
+
+/* Base Theme Variables */
 :root {
     /* Colors */
     --bg: #ffffff;
     --darker-bg: #f5f5f5;
     --card-bg: #ffffff;
-    --border-color: #dee2e6;
-    --text-color: #212529;
-    --text-muted: #6c757d;
+    --border-color: #e0e0e0;
+    --text-color: #333333;
+    --text-muted: #666666;
     
     /* Brand Colors */
     --primary: #3273dc;
-    --primary-light: rgba(50, 115, 220, 0.15);
-    --primary-medium: rgba(50, 115, 220, 0.25);
-    --accent: #209cee;
-    --accent2: #ff9900;
-    --success: #198754;
-    --warning: #ffc107;
-    --danger: #dc3545;
+    --primary-light: rgba(50, 115, 220, 0.1);
+    --primary-hover: #2366d1;
+    --success: #23d160;
+    --warning: #ffdd57;
+    --danger: #ff3860;
     
     /* UI Elements */
-    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 2px 15px rgba(0, 0, 0, 0.1);
-    --shadow-lg: 0 6px 12px rgba(0, 0, 0, 0.12);
-    --border-radius: 0.5rem;
-    --transition-speed: 0.3s;
+    --shadow: 0 2px 3px rgba(10, 10, 10, 0.1);
+    --border-radius: 4px;
     
     /* Spacing */
+    --space-xs: 0.25rem;
     --space-sm: 0.5rem;
     --space-md: 1rem;
     --space-lg: 1.5rem;
     --space-xl: 2rem;
   }
   
-  /* Dark Theme */
+  /* Dark Theme Support */
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #1e1e1e;
       --darker-bg: #121212;
-      --card-bg: #242424;
-      --border-color: #333;
+      --card-bg: #222222;
+      --border-color: #333333;
       --text-color: #e0e0e0;
-      --text-muted: #a0a0a0;
+      --text-muted: #999999;
     }
   }
   
-  /* Layout & Container */
+  /* Global Styles */
+  body {
+    background-color: var(--bg);
+    color: var(--text-color);
+  }
+  
+  /* Container Styling */
   .container {
     max-width: 1200px;
     margin: 0 auto;
-    padding: var(--space-xl);
+    padding: var(--space-md);
   }
   
-  .content {
-    margin-bottom: 3rem;
-  }
-  
-  /* Page Title */
-  .title.mb-4 {
-    font-size: 2.5rem !important;
-    font-weight: 700 !important;
-    color: white !important;
-    margin-bottom: 2rem !important;
-  }
-  
-  /* Section Titles - Enhanced with decorative lines */
-  .section-title {
-    font-size: 2rem !important; /* 20% smaller than main title (2.5rem * 0.8 = 2rem) */
-    font-weight: 600 !important;
-    color: white !important;
-    margin-bottom: 1.75rem !important;
-    padding-bottom: 1rem !important;
-    border-bottom: 3px solid var(--primary) !important;
-    position: relative;
-    letter-spacing: -0.5px;
-  }
-  
-  /* Special styling for the first section title (Budget Management) */
-  h1.section-title {
-    color: white !important;
-    border-bottom: 4px solid var(--primary) !important;
-  }
-  
-  /* Create decorative accent line */
-  .section-title::after {
-    content: "";
-    position: absolute;
-    bottom: -3px;
-    left: 0;
-    width: 120px; /* Increased width for more visibility */
-    height: 3px;
-    background-color: var(--accent2);
-  }
-  
-  /* Budget Management */
-  .budget-card {
+  /* Card Styling */
+  .card {
     background-color: var(--card-bg);
     border-radius: var(--border-radius);
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow);
+    margin-bottom: var(--space-lg);
     padding: var(--space-lg);
-    margin-bottom: var(--space-xl);
-    transition: box-shadow 0.3s ease;
     border: 1px solid var(--border-color);
   }
   
-  .budget-card:hover {
-    box-shadow: var(--shadow-md);
-  }
-  
-  .budget-results {
-    background-color: var(--darker-bg);
-    padding: var(--space-lg);
-    border-radius: calc(var(--border-radius) - 0.125rem);
-    margin-top: var(--space-lg);
-    border: 1px solid var(--border-color);
-  }
-  
-  .result-label {
-    display: block;
-    font-size: 0.9rem;
-    font-weight: 500;
-    color: var(--text-muted);
-    margin-bottom: 0.25rem;
-  }
-  
-  .result-value {
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--text-color);
-  }
-  
-  .available-percentage {
-    font-size: 0.85rem;
-    color: var(--text-muted);
-    margin-left: 0.5rem;
-  }
-  
-  /* Global Allocation Rules */
-  .content .columns .field {
-    margin-bottom: 1rem;
-  }
-  
-  .content .columns .label {
-    font-weight: 600;
-    color: #333;
-  }
-  
-  .content .columns .input {
-    border: 1px solid var(--border-color);
-    box-shadow: var(--shadow-sm);
-    transition: all 0.3s ease;
-  }
-  
-  .content .columns .input:focus {
-    border-color: var(--primary);
-    box-shadow: 0 0 0 2px var(--primary-light);
-  }
-  
-  /* Portfolio Components */
-  .compact-box {
-    border-left: 4px solid var(--accent);
-    background-color: var(--card-bg);
-    padding: 1.25rem;
-    margin-bottom: 1.5rem;
-    border-radius: var(--border-radius);
-    box-shadow: var(--shadow-sm);
-    transition: all var(--transition-speed) ease;
-  }
-  
-  .compact-box:hover {
-    box-shadow: var(--shadow-md);
-    transform: translateY(-2px);
-  }
-  
-  .portfolio-toggle {
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-    background-color: var(--primary-light);
-    border-radius: 50%;
-    transition: all 0.3s ease;
-  }
-  
-  .portfolio-toggle:hover {
-    background-color: var(--primary-medium);
-  }
-  
-  .portfolio-toggle i {
-    color: var(--primary);
-    font-size: 1.2rem;
-  }
-  
-  /* Table Styling */
-  .table-responsive {
-    border-radius: var(--border-radius);
-    overflow: hidden;
-    box-shadow: var(--shadow-sm);
-    margin-bottom: 2rem;
-  }
-  
-  .table {
-    width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
-    margin-bottom: 0 !important;
-  }
-  
-  .table th, .table td {
-    padding: 0.75rem 1rem;
-  }
-  
-  .table thead th {
-    font-weight: 600;
-    color: #333;
-    background-color: var(--darker-bg);
-    border-bottom: 2px solid var(--border-color);
-  }
-  
-  .table-active {
-    background-color: var(--primary-light) !important;
-  }
-  
-  .table-light {
-    background-color: rgba(0, 0, 0, 0.02);
-  }
-  
-  .no-lines tbody tr td,
-  .no-lines tfoot tr th {
-    border: none;
-  }
-  
-  .no-lines thead tr th {
-    border-bottom: 1px solid var(--border-color);
-  }
-  
-  /* Form elements inside tables */
-  .table td .input {
-    height: 2.25rem;
-    padding: 0.375rem 0.75rem;
-  }
-  
-  /* Placeholder Position Styling */
-  .placeholder-position {
-    background-color: var(--primary-light) !important;
-    font-style: italic;
-  }
-  
-  .placeholder-position td {
-    border-left: 5px solid var(--primary) !important;
-    padding-left: 12px;
-  }
-  
-  .placeholder-position .remaining-positions-text {
-    font-weight: 700;
-    color: var(--primary);
-    font-size: 1.05em;
-  }
-  
-  .placeholder-position input {
-    background-color: var(--primary-light);
-    font-weight: 600;
-    color: var(--primary);
-    border-color: var(--primary);
-  }
-  
-  .no-highlight, 
-  .no-highlight td {
-    background-color: transparent !important;
-    border-left: none !important;
-    font-style: normal !important;
-  }
-  
-  /* Notification Styling */
-  .notification {
-    padding: 1rem 1.25rem;
-    border-radius: var(--border-radius);
-    margin-bottom: 1.5rem;
-  }
-  
-  .notification.is-success {
-    background-color: rgba(25, 135, 84, 0.1);
-    color: var(--success);
-    border: 1px solid rgba(25, 135, 84, 0.3);
-  }
-  
-  .notification.is-warning {
-    background-color: rgba(255, 193, 7, 0.1);
-    color: #664d03;
-    border: 1px solid rgba(255, 193, 7, 0.3);
-  }
-  
-  .notification.is-danger {
-    background-color: rgba(220, 53, 69, 0.1);
-    color: var(--danger);
-    border: 1px solid rgba(220, 53, 69, 0.3);
-  }
-  
-  .notification.is-info {
-    background-color: rgba(13, 202, 240, 0.1);
-    color: #055160;
-    border: 1px solid rgba(13, 202, 240, 0.3);
-  }
-  
-  /* Animation */
-  @keyframes highlight-pulse {
-    0% { background-color: var(--primary-light); }
-    50% { background-color: var(--primary-medium); }
-    100% { background-color: var(--primary-light); }
-  }
-  
-  .placeholder-position:not(.no-highlight) {
-    animation: highlight-pulse 3s infinite;
-  }
-  
-  /* Add Position Section */
-  .add-position-section {
-    background-color: var(--darker-bg);
-    padding: 1rem;
-    border-radius: var(--border-radius);
-    margin-bottom: 1.5rem;
-    border: 1px solid var(--border-color);
-  }
-  
-  .add-position-section .button {
-    background-color: var(--primary);
-    color: white;
-    border-color: var(--primary);
-    transition: all 0.3s ease;
-  }
-  
-  .add-position-section .button:hover {
-    background-color: darken(var(--primary), 10%);
-    transform: translateY(-1px);
-  }
-  
-  /* Summary Table */
-  .table.is-fullwidth.is-hoverable tbody tr:hover {
-    background-color: var(--primary-light);
-  }
-  
-  /* Responsive Adjustments */
-  @media (max-width: 767.98px) {
-    .container {
-      padding: var(--space-md);
-    }
-    
-    .title.mb-4 {
-      font-size: 2rem !important;
-    }
-    
-    .section-title {
-      font-size: 1.6rem !important; /* 20% smaller than responsive main title (2rem * 0.8 = 1.6rem) */
-    }
-    
-    .budget-card .columns {
-      flex-direction: column;
-    }
-    
-    .budget-results {
-      padding: var(--space-md);
-    }
-    
-    .result-item {
-      margin-bottom: var(--space-md);
-    }
-    
-    .result-item:last-child {
-      margin-bottom: 0;
-    }
-    
-    .compact-box {
-      padding: 1rem;
-    }
-  }
-  
-  /* Vue.js integration */
-  [v-cloak] {
-    display: none;
-  }
-###END_FILE###
-
-================================================================
-###START_FILE_PATH: static/css/allocate.css###
-/**
- * Portfolio Allocation Styles
- * This file contains styles for the portfolio allocation component.
- */
-
-/* Light Theme Variables */
-:root {
-    --bg: #ffffff;
-    --darker-bg: #f5f5f5;
-    --card-bg: #ffffff;
-    --border-color: #dee2e6;
-    --text-color: #212529;
-    --text-muted: #6c757d;
-    --primary-color: #0d6efd;
-    --primary-hover: #0b5ed7;
-    --success-color: #198754;
-    --warning-color: #ffc107;
-    --danger-color: #dc3545;
-    --chart-blue: rgba(54, 162, 235, 0.8);
-    --chart-red: rgba(255, 99, 132, 0.8);
-    --input-bg: #ffffff;
-    --table-header-bg: rgba(0, 0, 0, 0.03);
-    --category-row-bg: rgba(0, 0, 0, 0.02);
-    --position-row-bg: rgba(0, 0, 0, 0.01);
-    --missing-positions-bg: rgba(255, 193, 7, 0.1);
-    --hover-bg: rgba(13, 110, 253, 0.08);
-    --active-bg: rgba(13, 110, 253, 0.12);
-}
-
-/* Dark Theme Variables */
-@media (prefers-color-scheme: dark) {
-    :root {
-        --bg: #1e1e1e;
-        --darker-bg: #121212;
-        --card-bg: #242424;
-        --border-color: #333;
-        --text-color: #e0e0e0;
-        --text-muted: #a0a0a0;
-        --primary-color: #3a8eff;
-        --primary-hover: #1e7eff;
-        --success-color: #28a745;
-        --warning-color: #ffc107;
-        --danger-color: #dc3545;
-        --chart-blue: rgba(54, 162, 235, 0.8);
-        --chart-red: rgba(255, 99, 132, 0.8);
-        --input-bg: #2a2a2a;
-        --table-header-bg: rgba(0, 0, 0, 0.2);
-        --category-row-bg: rgba(0, 0, 0, 0.1);
-        --position-row-bg: rgba(0, 0, 0, 0.05);
-        --missing-positions-bg: rgba(255, 193, 7, 0.1);
-        --hover-bg: rgba(58, 142, 255, 0.2);
-        --active-bg: rgba(58, 142, 255, 0.3);
-    }
-}
-
-/* Global Styles */
-body {
-    background-color: var(--bg);
-    color: var(--text-color);
-}
-
-/* Container Styling */
-.container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 2rem;
-}
-
-/* Card Styling */
-.card {
-    background-color: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 0.25rem;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.08);
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-    margin-bottom: 1.5rem;
-}
-
-.card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.12);
-}
-
-.card-body {
-    padding: 1.5rem;
-}
-
-.card-header {
-    background-color: var(--darker-bg);
-    border-bottom: 1px solid var(--border-color);
-    padding: 1.5rem;
-}
-
-.card-title {
-    color: var(--text-color);
-    margin-bottom: 1.25rem;
-    font-weight: 500;
-}
-
-/* Investment Section */
-.investment-section {
-    background-color: var(--card-bg);
-    border: 1px solid var(--border-color);
-    padding: 1.5rem;
-    border-radius: 0.25rem;
-    margin-bottom: 1.5rem;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.investment-section .card-title {
-    color: var(--text-color);
-    font-weight: 500;
-    margin-bottom: 1rem;
-}
-
-/* Header Content Layout */
-.header-content {
+  /* Header Content Layout */
+  .header-content {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 2rem 0;
-    margin-bottom: 1rem;
-    gap: 2rem;
-}
-
-/* Investment Input Styling */
-.investment-input {
+    padding: var(--space-md) 0;
+    margin-bottom: var(--space-md);
+    gap: var(--space-md);
+  }
+  
+  /* Investment Input Styling */
+  .investment-input {
     display: flex;
     align-items: center;
-    gap: 2rem;
-    padding: 1.5rem;
+    gap: var(--space-md);
+    padding: var(--space-md);
     background: transparent;
-    transition: all 0.3s ease;
     flex: 1;
     min-width: 320px;
-}
-
-.investment-input label {
+  }
+  
+  .investment-input label {
     margin: 0;
     color: var(--text-color);
     font-weight: 500;
-    font-size: 1.1rem;
     white-space: nowrap;
-    opacity: 0.9;
-}
-
-.investment-input .input-group {
-    flex: 1;
-    margin: 0;
+  }
+  
+  .input-group {
     display: flex;
     align-items: center;
     min-width: 0;
-}
-
-.input-group-text {
+    flex: 1;
+  }
+  
+  .input-group-text {
     background: transparent;
     color: var(--text-color);
     border: none;
-    padding: 0.75rem 0.5rem 0.75rem 0;
+    padding: var(--space-xs) var(--space-sm);
     font-weight: 500;
-    font-size: 1.1rem;
-    opacity: 0.9;
-}
-
-.input-group input {
-    border: none;
-    border-bottom: 2px solid var(--border-color);
-    padding: 0.75rem;
-    font-size: 1.1rem;
+  }
+  
+  .input-group input {
+    border: 1px solid var(--border-color);
+    padding: var(--space-sm) var(--space-md);
     font-weight: 500;
-    color: var(--primary-color);
-    background-color: transparent;
-    transition: all 0.2s ease;
-    border-radius: 0;
+    color: var(--primary);
+    background-color: var(--bg);
     width: 100%;
-}
-
-.input-group input:focus {
-    box-shadow: none;
-    border-color: var(--primary-color);
+    border-radius: var(--border-radius);
+  }
+  
+  .input-group input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 1px var(--primary-light);
     outline: none;
-}
-
-.input-group input::placeholder {
-    color: var(--text-muted);
-    font-weight: normal;
-    opacity: 0.7;
-}
-
-/* Tab Navigation */
-.nav-tabs {
-    border-bottom: 2px solid var(--border-color);
+  }
+  
+  /* Tab Navigation */
+  .nav-tabs {
+    border-bottom: 1px solid var(--border-color);
     display: flex;
-    gap: 0;
     background-color: var(--darker-bg);
-    border-radius: 4px 4px 0 0;
+    border-radius: var(--border-radius) var(--border-radius) 0 0;
     overflow: hidden;
-    border: none;
     margin-bottom: 0;
-}
-
-.nav-tabs .nav-item {
+  }
+  
+  .nav-tabs .nav-item {
     flex: 1;
     text-align: center;
-}
-
-.nav-tabs .nav-link {
+  }
+  
+  .nav-tabs .nav-link {
     border: none;
     color: var(--text-muted);
-    padding: 1rem;
-    transition: all 0.3s ease;
+    padding: var(--space-md);
+    transition: all 0.2s ease;
     width: 100%;
     text-align: center;
     background-color: var(--darker-bg);
-    color: #4a4a4a;
-    padding: 0.75rem 1.5rem;
-    margin-right: 0.5rem;
-    border-radius: 4px;
-}
-
-.nav-tabs .nav-link:hover {
+  }
+  
+  .nav-tabs .nav-link:hover {
     color: var(--text-color);
-    background-color: var(--hover-bg);
-}
-
-.nav-tabs .nav-link.active {
-    color: var(--primary-color);
-    border-bottom: 2px solid var(--primary-color);
-    background-color: var(--active-bg);
-}
-
-.tab-content {
-    padding-top: 1rem;
-}
-
-.tab-pane {
+    background-color: var(--primary-light);
+  }
+  
+  .nav-tabs .nav-link.active {
+    color: var(--primary);
+    border-bottom: 2px solid var(--primary);
+    background-color: var(--bg);
+  }
+  
+  .tab-content {
+    padding-top: var(--space-md);
+  }
+  
+  .tab-pane {
     display: none;
-    opacity: 0;
-    transition: opacity 0.3s ease-in-out;
-}
-
-.tab-pane.active {
+  }
+  
+  .tab-pane.active {
     display: block;
-    opacity: 1;
-}
-
-/* Portfolio Table Container */
-.portfolio-table-container {
-    background-color: var(--card-bg);
-    border-radius: 0.25rem;
-    padding: 1.5rem;
-}
-
-/* Rebalancing Actions */
-.rebalancing-actions {
-    background-color: var(--card-bg);
-    border-radius: 0.25rem;
-    padding: 1.5rem;
-}
-
-/* Portfolio Select */
-.portfolio-select {
+  }
+  
+  /* Portfolio Select */
+  .portfolio-select {
     display: flex;
     align-items: center;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-}
-
-.portfolio-select label {
+    gap: var(--space-md);
+    margin-bottom: var(--space-lg);
+  }
+  
+  .portfolio-select label {
     margin: 0;
     color: var(--text-color);
     font-weight: 500;
-    font-size: 1.1rem;
     white-space: nowrap;
-}
-
-.portfolio-select .form-select {
-    background-color: transparent;
-    border: none;
-    border-bottom: 2px solid var(--border-color);
+  }
+  
+  .form-select {
+    background-color: var(--bg);
+    border: 1px solid var(--border-color);
     color: var(--text-color);
-    padding: 0.75rem;
-    font-size: 1.1rem;
-    transition: all 0.2s ease;
-}
-
-.portfolio-select .form-select:focus {
-    box-shadow: none;
-    border-color: var(--primary-color);
+    padding: var(--space-sm) var(--space-md);
+    border-radius: var(--border-radius);
+  }
+  
+  .form-select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 1px var(--primary-light);
     outline: none;
-}
-
-/* Consistent Table Styling for All Overview Sections */
-.table {
+  }
+  
+  /* Table Styling */
+  .table {
     width: 100%;
-    margin-bottom: 1rem;
+    margin-bottom: var(--space-md);
     color: var(--text-color);
     border-collapse: separate;
     border-spacing: 0;
     background-color: var(--card-bg);
-    border-radius: 0.25rem;
+    border-radius: var(--border-radius);
     overflow: hidden;
-}
-
-.table th,
-.table td {
-    padding: 0.75rem 1rem;
-    vertical-align: middle;
-    border: none;
+  }
+  
+  .table th,
+  .table td {
+    padding: 0.65rem 0.75rem;
     border-bottom: 1px solid var(--border-color);
-}
-
-.table thead th {
-    background-color: var(--table-header-bg);
+  }
+  
+  .table thead th {
+    background-color: var(--darker-bg);
     color: var(--text-muted);
     font-weight: 500;
-    text-transform: uppercase;
-    font-size: 0.85rem;
-    letter-spacing: 0.5px;
     border-bottom: 2px solid var(--border-color);
-    position: sticky;
-    top: 0;
-    z-index: 1;
-}
-
-.table tbody tr {
-    transition: background-color 0.2s ease;
-}
-
-.table tbody tr:last-child td {
-    border-bottom: none;
-}
-
-.table-striped tbody tr:nth-of-type(odd) {
-    background-color: var(--category-row-bg);
-}
-
-.table-hover tbody tr:hover {
-    background-color: var(--hover-bg);
-}
-
-/* Category and Position Row Styling */
-.category-row {
-    background-color: var(--category-row-bg) !important;
+  }
+  
+  .table tbody tr:hover {
+    background-color: var(--primary-light);
+  }
+  
+  /* Category and Position Row Styling */
+  .category-row {
+    background-color: var(--darker-bg);
     font-weight: 500;
     cursor: pointer;
-}
-
-.category-row:hover {
-    background-color: var(--hover-bg) !important;
-}
-
-.position-row {
-    background-color: var(--position-row-bg);
-}
-
-.position-row td:first-child,
-.position-name {
-    padding-left: 2rem !important;
-}
-
-/* Value Columns Styling */
-.current-value,
-.target-value,
-.value-after {
+  }
+  
+  .position-row td:first-child {
+    padding-left: var(--space-lg);
+  }
+  
+  /* Value Formatting */
+  .current-value {
+    color: var(--primary);
     font-family: monospace;
-    font-size: 0.95rem;
-    font-weight: 500;
-}
-
-.current-value {
-    color: var(--primary-color);
-}
-
-.target-value {
-    color: var(--chart-red);
-}
-
-.value-after {
-    color: var(--success-color);
-}
-
-.allocation-percentage {
-    font-size: 0.9rem;
-    color: var(--text-muted);
-    font-weight: normal;
-}
-
-/* Total Row Styling */
-.total-row {
-    background-color: var(--table-header-bg) !important;
+  }
+  
+  .target-value {
+    color: var(--text-color);
+    font-family: monospace;
+  }
+  
+  .value-after {
+    color: var(--success);
+    font-family: monospace;
+  }
+  
+  /* Total Row Styling */
+  .total-row {
+    background-color: var(--darker-bg);
     font-weight: 600;
-}
-
-.total-row td {
-    border-top: 2px solid var(--primary-color);
+  }
+  
+  .total-row td {
+    border-top: 2px solid var(--primary);
     border-bottom: none;
-    padding: 0.75rem 1rem !important;
-}
-
-/* Missing Positions Styling */
-.missing-positions-row,
-.missing-position {
-    background-color: var(--missing-positions-bg) !important;
-}
-
-.missing-positions-row td,
-.missing-position td {
-    border-left: 3px solid var(--warning-color);
-}
-
-/* Table Container */
-.table-responsive {
-    border-radius: 0.25rem;
-    overflow: auto;
-    max-height: 600px;
-    margin-bottom: 2rem;
-    background-color: var(--card-bg);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-}
-
-/* Support for Other Table Classes Used in the Application */
-.table.is-fullwidth {
-    width: 100%;
-}
-
-.table.is-hoverable tbody tr:hover {
-    background-color: var(--hover-bg);
-}
-
-.table.mt-4 {
-    margin-top: 1.5rem;
-}
-
-/* Action Colors */
-.actions-positive {
-    color: var(--success-color);
-    font-weight: 500;
-}
-
-.actions-neutral {
-    color: var(--text-muted);
-}
-
-.actions-negative {
-    color: var(--danger-color);
-    font-weight: 500;
-}
-
-/* Loading Spinner */
-.spinner-border {
-    width: 3rem;
-    height: 3rem;
-    margin: 2rem auto;
+  }
+  
+  /* Missing Positions Styling */
+  .missing-positions-row td {
+    border-left: 3px solid var(--warning);
+    background-color: rgba(255, 221, 87, 0.1);
+  }
+  
+  /* Loading Spinner */
+  .spinner-border {
     display: block;
-    color: var(--primary-color);
-}
-
-/* Table Active Row */
-.table-active {
-    background-color: var(--active-bg) !important;
-}
-
-/* Button Styling */
-.btn-primary {
-    background-color: var(--primary-color);
-    border-color: var(--primary-color);
-    color: white;
-    padding: 0.5rem 1.25rem;
+    margin: var(--space-lg) auto;
+  }
+  
+  /* Table Container */
+  .table-responsive {
+    border-radius: var(--border-radius);
+    overflow: auto;
+    margin-bottom: var(--space-lg);
+    background-color: var(--card-bg);
+    box-shadow: var(--shadow);
+  }
+  
+  /* Action Colors */
+  .actions-positive {
+    color: var(--success);
     font-weight: 500;
-    transition: all 0.2s ease;
-}
-
-.btn-primary:hover {
-    background-color: var(--primary-hover);
-    border-color: var(--primary-hover);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-}
-
-/* Animation for expandable rows */
-.category-row i.fas {
-    transition: transform 0.2s ease-in-out;
-}
-
-.category-row:hover i.fas {
-    transform: translateX(2px);
-}
-
-/* Responsive Adjustments */
-@media (max-width: 767.98px) {
+  }
+  
+  .actions-negative {
+    color: var(--danger);
+    font-weight: 500;
+  }
+  
+  .actions-neutral {
+    color: var(--text-muted);
+  }
+  
+  /* Responsive Adjustments */
+  @media (max-width: 768px) {
     .header-content {
-        flex-direction: column;
-        align-items: flex-start;
+      flex-direction: column;
+      align-items: flex-start;
     }
     
     .investment-input {
-        width: 100%;
-        margin-top: 1rem;
+      width: 100%;
+      margin-top: var(--space-md);
+    }
+    
+    .portfolio-select {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    
+    .form-select {
+      width: 100%;
     }
     
     .table-responsive {
-        font-size: 0.875rem;
+      font-size: 0.875rem;
     }
-}
+    
+    .container {
+      padding: var(--space-sm);
+    }
+  }
 ###END_FILE###
 
 ================================================================
@@ -1017,406 +819,280 @@ body {
 
 ================================================================
 ###START_FILE_PATH: static/css/custom.css###
-/* Custom CSS for Portfolio Manager - Minimalist Theme */
+/**
+ * Custom CSS for Portfolio Manager - Standardized Minimalist Theme
+ * This file contains shared styles that apply across the entire application
+ */
 
-/* Navbar */
-.navbar {
-    background-color: var(--blue-500) !important;
-}
-
-.navbar-item,
-.navbar-link {
-    color: var(--white) !important;
-}
-
-/* Ensure dropdown items have dark text for visibility */
-.navbar-dropdown .navbar-item {
-    color: var(--dark-grey) !important;
-}
-
-.navbar-item:hover,
-.navbar-link:hover {
-    background-color: var(--blue-700) !important;
-    color: var(--white) !important;
-}
-
-/* Custom hover for dropdown items */
-.navbar-dropdown .navbar-item:hover {
-    background-color: var(--blue-100) !important;
-    color: var(--dark-grey) !important;
-}
-
-.navbar-burger {
-    color: var(--white) !important;
-}
-
-.navbar-menu.is-active {
-    background-color: var(--blue-500) !important;
-}
-
-/* Base theme colors */
+/* Base Theme Variables */
 :root {
-    --white: #ffffff;
-    --light-grey: #f8f9fa;
-    --grey: #e9ecef;
-    --dark-grey: #343a40;
-    --blue-100: #e3f2fd;
-    --blue-200: #90caf9;
-    --blue-500: #2196f3;
-    --blue-700: #1976d2;
-    --green-500: #4caf50;
-    --red-500: #f44336;
-}
-
-/* Global Resets */
-*, .card, .button, .notification, .input, .textarea, .select select, .table {
-    border-radius: 0 !important;
-    box-shadow: none !important;
-}
-
-/* Sidebar */
-.sidebar {
-    min-width: 250px !important;
-    background: var(--white) !important;
-    border-right: 1px solid var(--grey) !important;
-    box-shadow: none !important;
-}
-
-.menu-label {
-    color: var(--dark-grey) !important;
-    font-size: 0.8em !important;
-    font-weight: 500 !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.1em !important;
-}
-
-.menu-list a {
-    color: var(--dark-grey) !important;
-    border-radius: 0 !important;
-}
-
-.menu-list a:hover {
-    background-color: var(--blue-100) !important;
-}
-
-.menu-list a.is-active {
-    background-color: var(--blue-500) !important;
-    color: var(--white) !important;
-}
-
-/* Cards */
-.card {
-    background: var(--white) !important;
-    border: 1px solid var(--grey) !important;
-    margin-bottom: 1rem !important;
-}
-
-.card:hover {
-    border-color: var(--blue-200) !important;
-    transform: none !important;
-}
-
-.card-header {
-    background: var(--white) !important;
-    border-bottom: 1px solid var(--grey) !important;
-    box-shadow: none !important;
-}
-
-.card-header-title {
-    color: var(--dark-grey) !important;
-    font-weight: 500 !important;
-}
-
-/* Tables */
-.table {
-    background: var(--white) !important;
-    border: 1px solid var(--grey) !important;
-}
-
-.table thead th {
-    background: var(--light-grey) !important;
-    border-bottom: 1px solid var(--grey) !important;
-    color: var(--dark-grey) !important;
-    font-weight: 500 !important;
-}
-
-.table.is-hoverable tbody tr:hover {
-    background-color: var(--blue-100) !important;
-}
-
-/* Improved table spacing */
-.table td, .table th {
-    padding: 0.65em 0.75em !important;
-}
-
-.table-container {
+    /* Colors */
+    --bg: #ffffff;
+    --darker-bg: #f5f5f5;
+    --card-bg: #ffffff;
+    --border-color: #e0e0e0;
+    --text-color: #333333;
+    --text-muted: #666666;
+    
+    /* Brand Colors */
+    --primary: #3273dc;
+    --primary-light: rgba(50, 115, 220, 0.1);
+    --primary-hover: #2366d1;
+    --success: #23d160;
+    --warning: #ffdd57;
+    --danger: #ff3860;
+    
+    /* UI Elements */
+    --shadow: 0 2px 3px rgba(10, 10, 10, 0.1);
+    --border-radius: 4px;
+    
+    /* Spacing */
+    --space-xs: 0.25rem;
+    --space-sm: 0.5rem;
+    --space-md: 1rem;
+    --space-lg: 1.5rem;
+    --space-xl: 2rem;
+  }
+  
+  /* Dark Theme Support */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1e1e1e;
+      --darker-bg: #121212;
+      --card-bg: #222222;
+      --border-color: #333333;
+      --text-color: #e0e0e0;
+      --text-muted: #999999;
+    }
+  }
+  
+  /* Global Resets */
+  *, .card, .button, .notification, .input, .textarea, .select select, .table {
+    border-radius: var(--border-radius);
+    box-shadow: none;
+  }
+  
+  /* Navbar */
+  .navbar {
+    background-color: var(--primary);
+  }
+  
+  .navbar-item,
+  .navbar-link {
+    color: #ffffff;
+  }
+  
+  .navbar-dropdown .navbar-item {
+    color: var(--text-color);
+  }
+  
+  .navbar-item:hover,
+  .navbar-link:hover {
+    background-color: var(--primary-hover);
+    color: #ffffff;
+  }
+  
+  .navbar-dropdown .navbar-item:hover {
+    background-color: var(--primary-light);
+    color: var(--text-color);
+  }
+  
+  .navbar-burger {
+    color: #ffffff;
+  }
+  
+  .navbar-menu.is-active {
+    background-color: var(--primary);
+  }
+  
+  /* Sidebar */
+  .sidebar {
+    background: var(--card-bg);
+    border-right: 1px solid var(--border-color);
+    box-shadow: none;
+  }
+  
+  .menu-label {
+    color: var(--text-muted);
+    font-size: 0.8em;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  
+  .menu-list a {
+    color: var(--text-color);
+  }
+  
+  .menu-list a:hover {
+    background-color: var(--primary-light);
+  }
+  
+  .menu-list a.is-active {
+    background-color: var(--primary);
+    color: #ffffff;
+  }
+  
+  /* Cards */
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    margin-bottom: var(--space-md);
+  }
+  
+  .card-header {
+    background: var(--card-bg);
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: none;
+  }
+  
+  .card-header-title {
+    color: var(--text-color);
+    font-weight: 600;
+  }
+  
+  /* Tables */
+  .table {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    width: 100%;
+  }
+  
+  .table thead th {
+    background: var(--darker-bg);
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-color);
+    font-weight: 600;
+  }
+  
+  .table.is-hoverable tbody tr:hover {
+    background-color: var(--primary-light);
+  }
+  
+  .table td, .table th {
+    padding: 0.65em 0.75em;
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  .table-container {
     overflow-x: auto;
     max-width: 100%;
-}
-
-/* Sortable columns */
-.table th.is-sortable {
-    cursor: pointer;
-    user-select: none;
-    position: relative;
-    transition: background-color 0.2s ease;
-}
-
-.table th.is-sortable:hover {
-    background-color: var(--blue-200) !important;
-}
-
-.table th.is-sortable .icon {
-    vertical-align: middle;
-    margin-left: 5px;
-}
-
-/* Forms */
-.input, .textarea, .select select {
-    background-color: var(--white) !important;
-    border: 1px solid var(--grey) !important;
-    color: var(--dark-grey) !important;
-}
-
-.input:focus, .textarea:focus, .select select:focus {
-    border-color: var(--blue-500) !important;
-    box-shadow: none !important;
-}
-
-/* Ensure dropdown options are visible */
-option {
-    color: black !important;
-    background-color: white !important;
-}
-
-/* Buttons */
-.button {
-    background: var(--white) !important;
-    border: 1px solid var(--grey) !important;
-    color: var(--dark-grey) !important;
-}
-
-.button.is-info {
-    background: var(--blue-500) !important;
-    border-color: var(--blue-500) !important;
-    color: var(--white) !important;
-}
-
-.button.is-info:hover {
-    background: var(--blue-700) !important;
-    border-color: var(--blue-700) !important;
-}
-
-.button.is-success {
-    background: var(--green-500) !important;
-    border-color: var(--green-500) !important;
-    color: var(--white) !important;
-}
-
-.button.is-danger {
-    background: var(--red-500) !important;
-    border-color: var(--red-500) !important;
-    color: var(--white) !important;
-}
-
-/* Notifications and Messages */
-.notification {
-    background: var(--light-grey) !important;
-    border: 1px solid var(--grey) !important;
-    padding: 1rem !important;
-}
-
-.notification.is-info {
-    background: var(--blue-100) !important;
-    color: var(--dark-grey) !important;
-    border: 1px solid var(--blue-200) !important;
-}
-
-.notification.is-success {
-    background: var(--green-500) !important;
-    color: var(--white) !important;
-}
-
-.notification.is-danger {
-    background: var(--red-500) !important;
-    color: var(--white) !important;
-}
-
-/* Layout */
-.section {
-    padding: 2rem 2.5rem !important;
-    background: var(--white) !important;
-}
-
-.container {
-    max-width: 95% !important;
-    width: 95% !important;
-}
-
-/* Transitions */
-.message-notification {
-    transition: opacity 0.3s ease-out !important;
-}
-
-.is-fading-out {
-    opacity: 0 !important;
-    box-shadow: 0 0 0 0.125em rgba(50, 115, 220, 0.25);
-}
-
-/* Button adjustments */
-.button {
+  }
+  
+  /* Forms */
+  .input, .textarea, .select select {
+    background-color: var(--bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+  }
+  
+  .input:focus, .textarea:focus, .select select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 1px var(--primary-light);
+  }
+  
+  .label {
+    color: var(--text-color);
     font-weight: 500;
-}
-
-.button.is-primary {
-    background-color: #00d1b2;
-}
-
-.button.is-primary:hover {
-    background-color: #00c4a7;
-}
-
-/* Notification positioning */
-.notification {
-    margin-bottom: 1.5rem;
-}
-
-/* Overlay Notification */
-.notification-overlay {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 1000;
-    max-width: 300px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1) !important;
-    opacity: 0;
-    transform: translateY(-20px);
-    animation: slide-in 0.3s ease forwards;
-}
-
-@keyframes slide-in {
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.notification-overlay.is-fading-out {
-    animation: slide-out 0.5s ease forwards;
-}
-
-@keyframes slide-out {
-    to {
-        opacity: 0;
-        transform: translateY(-20px);
-    }
-}
-
-/* Modal adjustments */
-.modal-card-title {
+  }
+  
+  /* Buttons */
+  .button {
+    background: var(--bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+  }
+  
+  .button.is-primary {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #ffffff;
+  }
+  
+  .button.is-primary:hover {
+    background: var(--primary-hover);
+    border-color: var(--primary-hover);
+  }
+  
+  .button.is-success {
+    background: var(--success);
+    border-color: var(--success);
+    color: #ffffff;
+  }
+  
+  .button.is-danger {
+    background: var(--danger);
+    border-color: var(--danger);
+    color: #ffffff;
+  }
+  
+  /* Notifications */
+  .notification {
+    background: var(--darker-bg);
+    border: 1px solid var(--border-color);
+    padding: var(--space-md);
+  }
+  
+  .notification.is-primary {
+    background: var(--primary-light);
+    color: var(--primary);
+    border: 1px solid var(--primary);
+  }
+  
+  .notification.is-success {
+    background: rgba(35, 209, 96, 0.1);
+    color: var(--success);
+    border: 1px solid rgba(35, 209, 96, 0.2);
+  }
+  
+  .notification.is-warning {
+    background: rgba(255, 221, 87, 0.1);
+    color: #9c8500;
+    border: 1px solid rgba(255, 221, 87, 0.2);
+  }
+  
+  .notification.is-danger {
+    background: rgba(255, 56, 96, 0.1);
+    color: var(--danger);
+    border: 1px solid rgba(255, 56, 96, 0.2);
+  }
+  
+  /* Layout */
+  .section {
+    padding: var(--space-lg);
+    background: var(--bg);
+  }
+  
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: var(--space-md);
+  }
+  
+  /* Section Titles */
+  .section-title {
+    font-size: 1.5rem;
     font-weight: 600;
-}
-
-/* Dashboard styles */
-.dashboard-tile {
-    height: 100%;
-}
-
-.dashboard-tile .title {
-    margin-bottom: 0.5rem;
-}
-
-/* Chart container styles */
-.chart-container {
+    margin-bottom: var(--space-lg);
+    padding-bottom: var(--space-sm);
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-color);
+  }
+  
+  /* Chart container styles */
+  .chart-container {
     height: 400px;
     width: 100%;
-    margin: 1rem 0;
+    margin: var(--space-md) 0;
     position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    visibility: visible !important;
-    opacity: 1 !important;
-    min-height: 350px;
-}
-
-.chart-medium-container {
-    height: 450px;
-    width: 100%;
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    visibility: visible !important;
-    opacity: 1 !important;
-    min-height: 400px;
-}
-
-/* Ensure sunburst charts are always visible */
-[id^="categoryChart"] {
-    width: 100% !important;
-    height: 450px !important;
-    min-height: 400px !important;
-    min-width: 300px !important;
-    position: relative !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    z-index: 1 !important;
-}
-
-/* Data tables */
-.data-table-container {
-    max-height: 500px;
-    overflow-y: auto;
-}
-
-/* Responsive adjustments */
-@media screen and (max-width: 768px) {
-    .sidebar {
-        min-width: auto;
-    }
-    
-    .column.is-3 {
-        width: 50%;
-    }
-}
-
-@media screen and (max-width: 480px) {
-    .column.is-3 {
-        width: 100%;
-    }
-}
-
-/* Vue.js component styles */
-[v-cloak] {
-    display: none;
-}
-
-.vue-loading {
-    text-align: center;
-    padding: 2rem;
-}
-
-/* Animation utilities */
-.fade-enter-active, .fade-leave-active {
-    transition: opacity 0.5s;
-}
-
-.fade-enter, .fade-leave-to {
-    opacity: 0;
-}
-
-/* Positive/negative value colors */
-.is-positive {
-    color: #48c774 !important;
-}
-
-.is-negative {
-    color: #f14668 !important;
-}
-
-/* Loading indicator */
-.loading-overlay {
+    border: 1px solid var(--border-color);
+    background-color: var(--card-bg);
+    border-radius: var(--border-radius);
+    padding: var(--space-md);
+  }
+  
+  /* Loading indicator */
+  .loading-overlay {
     position: fixed;
     top: 0;
     left: 0;
@@ -1427,843 +1103,126 @@ option {
     justify-content: center;
     align-items: center;
     z-index: 999;
-}
-
-.spinner {
+  }
+  
+  .spinner {
     width: 40px;
     height: 40px;
-    border: 4px solid #dbdbdb;
-    border-top-color: #3273dc;
+    border: 4px solid var(--border-color);
+    border-top-color: var(--primary);
     border-radius: 50%;
     animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
+  }
+  
+  @keyframes spin {
     to {
-        transform: rotate(360deg);
+      transform: rotate(360deg);
     }
-}
-
-/* Portfolio page specific styles */
-.portfolio-header {
-    background-color: #f5f7fa;
-    padding: 1.5rem;
-    border-radius: 4px;
-    margin-bottom: 1.5rem;
-}
-
-.portfolio-metrics {
-    margin-bottom: 2rem;
-}
-
-/* Analysis page */
-.analysis-sidebar {
-    position: sticky;
-    top: 20px;
-}
-
-/* Portfolio Analysis Page Styles */
-/* Refined styling for a lighter, more elegant design */
-.content-panel {
-    background-color: #ffffff;
-    border-radius: 8px;
-    padding: 1.5rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    margin-bottom: 1.5rem;
-}
-
-/* Analysis page table styling - extending existing table styles */
-.portfolio-analysis table th, 
-.portfolio-analysis table td {
-    padding: 0.65em 0.75em;
-    text-align: left;
-    border-bottom: 1px solid #f1f1f1;
-}
-
-.portfolio-analysis table th {
-    background-color: #f8f9fa;
-    font-weight: 500;
-    color: #343a40;
-}
-
-/* Sortable columns for analysis page */
-.portfolio-analysis th.is-sortable {
-    cursor: pointer;
+  }
+  
+  /* Positive/negative value colors */
+  .is-positive {
+    color: var(--success);
+  }
+  
+  .is-negative {
+    color: var(--danger);
+  }
+  
+  /* Tooltip */
+  .has-tooltip-right .tooltip {
     position: relative;
-}
-
-.portfolio-analysis th.is-sortable:hover {
-    background-color: rgba(0, 0, 0, 0.03);
-}
-
-/* Hide sort icons by default */
-.portfolio-analysis .sort-icon {
-    display: none;
-}
-
-/* Improved chart containers for portfolio analysis */
-.chart-large-container {
-    position: relative;
-    width: 100%;
-    height: 500px; /* Increased height for global charts */
-    margin: 0 auto 2rem;
-}
-
-.chart-medium-container {
-    position: relative;
-    width: 100%;
-    height: 100%; /* Fill the parent container */
-    margin: 0 auto;
-}
-
-/* Ensure chart canvases fill their containers */
-.chart-large-container canvas,
-.chart-medium-container canvas,
-.chart-large-container .main-svg,
-.chart-medium-container .main-svg {
-    width: 100% !important;
-    height: 100% !important;
-}
-
-/* Ensure Plotly charts are visible */
-.js-plotly-plot, .plot-container {
-    width: 100% !important;
-    height: 100% !important;
-}
-
-/* Fix for category charts in tabs */
-.tab-pane .chart-medium-container {
-    display: block !important;
-    min-height: 450px;
-}
-
-/* Specific fix for category charts */
-#categories-\* .column,
-[id^="categories-"] .column,
-[id^="categoryChart"] {
-    display: block !important;
-    visibility: visible !important;
-    min-height: 450px;
-    position: relative;
-}
-
-/* Ensure Plotly charts are visible in categories tab */
-[id^="categoryChart"] .js-plotly-plot,
-[id^="categoryChart"] .plot-container,
-[id^="categoryChart"] .main-svg {
-    display: block !important;
-    visibility: visible !important;
-    position: relative !important;
-}
-
-/* Portfolio analysis section styling */
-.portfolio-analysis .portfolio-section {
-    margin-bottom: 2rem;
-    border-radius: 8px;
-    overflow: hidden;
-    background-color: #ffffff;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-}
-
-.portfolio-analysis .portfolio-header {
-    padding: 1rem 1.5rem;
-    background-color: #f8f9fa;
-    border-bottom: 1px solid #f1f1f1;
-    transition: background-color 0.2s ease;
-}
-
-.portfolio-analysis .portfolio-header:hover {
-    background-color: #eaeaea;
-}
-
-.portfolio-analysis .portfolio-header-title {
-    font-size: 1.1rem;
-    font-weight: 500;
-    margin: 0;
-}
-
-.portfolio-analysis .portfolio-content {
-    padding: 1.5rem;
-    transition: all 0.3s ease;
-}
-
-.portfolio-analysis .toggle-portfolio {
-    color: #2196f3;
-    transition: transform 0.3s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-}
-
-.portfolio-analysis .toggle-portfolio .fa-chevron-down {
-    transform: rotate(180deg);
-}
-
-/* Analysis page column widths with more specific selectors */
-.portfolio-analysis table th.company-column,
-.portfolio-analysis table td:nth-child(1) {
-    width: 25%;
-}
-
-.portfolio-analysis table th.category-column,
-.portfolio-analysis table td:nth-child(2) {
-    width: 20%;
-}
-
-/* Updated percentage column styling */
-.portfolio-analysis table th.percentage-column,
-.portfolio-analysis table td:nth-child(3) {
-    width: auto; /* Auto width instead of fixed 8% */
-    min-width: 50px; /* Smaller minimum width */
-    max-width: 70px; /* Maximum width constraint */
-    text-align: right;
-    padding-right: 10px; /* Add some padding on the right */
-    white-space: nowrap; /* Prevent wrapping */
-}
-
-/* Make sure all cells in the percentage column are right-aligned */
-.portfolio-analysis td:nth-child(3) {
-    text-align: right !important;
-}
-
-.portfolio-analysis table th.value-column,
-.portfolio-analysis table td:nth-child(4),
-.portfolio-analysis table td:nth-child(5),
-.portfolio-analysis table td:nth-child(6) {
-    width: 15%;
-    min-width: 120px;
-    text-align: right;
-}
-
-/* Abbreviation adjustment */
-.portfolio-analysis table th.percentage-column {
-    white-space: nowrap;
-}
-
-/* Portfolio filter checkbox styling */
-.portfolio-analysis #portfolioFilters .checkbox {
-    margin-right: 1rem;
-    padding: 0.3rem 0.6rem;
-    border-radius: 4px;
-    background-color: #f8f9fa;
-    font-size: 0.9rem;
-}
-
-.portfolio-analysis #portfolioFilters .checkbox:hover {
-    background-color: #e9ecef;
-}
-
-/* Help icon for tooltips */
-.has-tooltip-right i.fa-question-circle {
-    color: #aaa;
-    font-size: 0.8rem;
-    margin-left: 5px;
-    cursor: help;
-}
-
-.has-tooltip-right i.fa-question-circle:hover {
-    color: var(--blue-500);
-}
-
-/* Portfolio controls and metrics */
-.portfolio-controls-container {
-    background-color: var(--white);
-    border-radius: 4px;
-    position: sticky;
-    top: 0;
-    z-index: 20;
-}
-
-.controls-and-metrics-row {
-    display: flex;
-    align-items: stretch;
-    flex-wrap: nowrap;
-    height: 2.5em;
-}
-
-.controls-group {
-    display: flex;
-    align-items: center;
-    flex-wrap: nowrap;
-    height: 100%;
-}
-
-.controls-group .control {
-    height: 100%;
-    display: flex;
-    align-items: center;
-}
-
-.portfolio-metrics {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    padding: 0 0.75rem;
-    border-radius: 4px;
-    background-color: rgba(0, 0, 0, 0.03);
-    justify-content: space-between;
-    margin-left: 1rem;
-    height: 100%;
-}
-
-.portfolio-metrics.is-success {
-    background-color: rgba(72, 199, 116, 0.1);
-}
-
-.portfolio-metrics.is-warning {
-    background-color: rgba(255, 224, 138, 0.2);
-}
-
-.portfolio-metrics.is-danger {
-    background-color: rgba(241, 70, 104, 0.1);
-}
-
-.metrics-item {
-    display: flex;
-    align-items: center;
-    flex: 1;
-    justify-content: center;
-}
-
-.metric-label {
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--dark-grey);
-    margin-right: 0.3rem;
-}
-
-.metric-value {
-    font-size: 0.85rem;
-    font-weight: 500;
-    white-space: nowrap;
-}
-
-/* Portfolio table specific styles */
-.table-container {
-    max-height: calc(100vh - 250px);
-    overflow-y: auto;
-    position: relative;
-    margin-top: 1rem;
-}
-
-.table-container table {
-    table-layout: auto;
-    width: 100%;
-}
-
-.table-container thead {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-}
-
-.table-container thead th {
-    background-color: var(--light-grey) !important;
-    box-shadow: 0 1px 0 0 var(--grey) !important;
-}
-
-/* Column width adjustments */
-.table-container th:nth-child(1), /* Update column */
-.table-container td:nth-child(1) {
-    width: 80px;
-}
-
-.table-container th:nth-child(2), /* Identifier column */
-.table-container td:nth-child(2) {
+    display: inline-block;
+  }
+  
+  .has-tooltip-right .tooltip .tooltip-text {
+    visibility: hidden;
     width: 120px;
-}
-
-.table-container th:nth-child(3), /* Company column */
-.table-container td:nth-child(3) {
-    min-width: 180px;
-}
-###END_FILE###
-
-================================================================
-###START_FILE_PATH: static/css/allocate.css.bak###
-/**
- * Portfolio Allocation Styles
- * This file contains styles for the portfolio allocation component.
- */
-
-/* Light Theme Variables */
-:root {
-    --bg: #ffffff;
-    --darker-bg: #f5f5f5;
-    --card-bg: #ffffff;
-    --border-color: #e0e0e0;
-    --text-color: #333333;
-    --text-muted: #666666;
-    --primary-color: #0d6efd;
-    --primary-hover: #0b5ed7;
-    --success-color: #28a745;
-    --warning-color: #ffc107;
-    --danger-color: #dc3545;
-    --chart-blue: rgba(54, 162, 235, 0.8);
-    --chart-red: rgba(255, 99, 132, 0.8);
-    --input-bg: #ffffff;
-    --table-header-bg: rgba(0, 0, 0, 0.03);
-    --category-row-bg: rgba(0, 0, 0, 0.02);
-    --position-row-bg: rgba(0, 0, 0, 0.01);
-    --missing-positions-bg: rgba(255, 193, 7, 0.1);
-}
-
-/* Dark Theme Variables */
-@media (prefers-color-scheme: dark) {
-    :root {
-        --bg: #1e1e1e;
-        --darker-bg: #121212;
-        --card-bg: #242424;
-        --border-color: #333;
-        --text-color: #e0e0e0;
-        --text-muted: #a0a0a0;
-        --primary-color: #0d6efd;
-        --primary-hover: #0b5ed7;
-        --success-color: #28a745;
-        --warning-color: #ffc107;
-        --danger-color: #dc3545;
-        --chart-blue: rgba(54, 162, 235, 0.8);
-        --chart-red: rgba(255, 99, 132, 0.8);
-        --input-bg: #2a2a2a;
-        --table-header-bg: rgba(0, 0, 0, 0.2);
-        --category-row-bg: rgba(0, 0, 0, 0.1);
-        --position-row-bg: rgba(0, 0, 0, 0.05);
-        --missing-positions-bg: rgba(255, 193, 7, 0.1);
-    }
-}
-
-/* Global Styles */
-body {
-    background-color: var(--bg);
-    color: var(--text-color);
-}
-
-/* Container Styling */
-.container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 2rem;
-}
-
-/* Card Styling */
-.card {
-    background-color: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 0.25rem;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-    margin-bottom: 1.5rem;
-    border: none;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.08);
-}
-
-.card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
-}
-
-.card-body {
-    padding: 1.5rem;
-}
-
-.card-header {
-    background: none;
-    border-bottom: none;
-    padding: 1.5rem;
-    background-color: rgba(0, 0, 0, 0.2);
-    border-bottom: 1px solid var(--border-color);
-}
-
-.card-title {
-    color: var(--text-color);
-    margin-bottom: 1.25rem;
-    font-weight: 500;
-}
-
-/* Investment Section */
-.investment-section {
-    background-color: var(--card-bg);
-    border: 1px solid var(--border-color);
-    padding: 1.5rem;
-    border-radius: 0.25rem;
-    margin-bottom: 1.5rem;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.investment-section .card-title {
-    color: var(--text-color);
-    font-weight: 500;
-    margin-bottom: 1rem;
-}
-
-/* Header Content Layout */
-.header-content {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 2rem 0;
-    margin-bottom: 1rem;
-    gap: 2rem;
-}
-
-/* Investment Input Styling */
-.investment-input {
-    display: flex;
-    align-items: center;
-    gap: 2rem;
-    padding: 1.5rem;
-    background: transparent;
-    transition: all 0.3s ease;
-    flex: 1;
-    min-width: 320px;
-}
-
-.investment-input label {
-    margin: 0;
-    color: var(--text-color);
-    font-weight: 500;
-    font-size: 1.1rem;
-    white-space: nowrap;
-    opacity: 0.9;
-}
-
-.investment-input .input-group {
-    flex: 1;
-    margin: 0;
-    display: flex;
-    align-items: center;
-    min-width: 0;
-}
-
-.input-group-text {
-    background: transparent;
-    color: var(--text-color);
-    border: none;
-    padding: 0.75rem 0.5rem 0.75rem 0;
-    font-weight: 500;
-    font-size: 1.1rem;
-    opacity: 0.9;
-}
-
-.input-group input {
-    border: none;
-    border-bottom: 2px solid var(--border-color);
-    padding: 0.75rem;
-    font-size: 1.1rem;
-    font-weight: 500;
-    color: var(--primary-color);
-    background-color: transparent;
-    transition: all 0.2s ease;
-    border-radius: 0;
-    width: 100%;
-}
-
-.input-group input:focus {
-    box-shadow: none;
-    border-color: var(--primary-color);
-    outline: none;
-}
-
-.input-group input::placeholder {
-    color: var(--text-muted);
-    font-weight: normal;
-    opacity: 0.7;
-}
-
-/* Tab Navigation */
-.nav-tabs {
-    border-bottom: 2px solid var(--border-color);
-    display: flex;
-    gap: 0;
     background-color: var(--darker-bg);
-    border-radius: 4px 4px 0 0;
-    overflow: hidden;
-    border: none;
-    margin-bottom: 0;
-}
-
-.nav-tabs .nav-item {
-    flex: 1;
+    color: var(--text-color);
     text-align: center;
-}
-
-.nav-tabs .nav-link {
-    border: none;
-    color: var(--text-muted);
-    padding: 1rem;
-    transition: all 0.3s ease;
-    width: 100%;
-    text-align: center;
-    background-color: var(--darker-bg);
-    color: #4a4a4a;
-    padding: 0.75rem 1.5rem;
-    margin-right: 0.5rem;
-    border-radius: 4px;
-}
-
-.nav-tabs .nav-link:hover {
-    color: var(--text-color);
-    background-color: rgba(13, 110, 253, 0.1);
-}
-
-.nav-tabs .nav-link.active {
-    color: var(--primary-color);
-    border-bottom: 2px solid var(--primary-color);
-    background-color: var(--card-bg);
-    color: #3273dc;
-    background-color: rgba(50, 115, 220, 0.1);
-}
-
-.tab-content {
-    padding-top: 1rem;
-}
-
-.tab-pane {
-    display: none;
-    opacity: 0;
-    transition: opacity 0.3s ease-in-out;
-}
-
-.tab-pane.active {
-    display: block;
-    opacity: 1;
-}
-
-/* Portfolio Table Container */
-.portfolio-table-container {
-    background-color: var(--card-bg);
-    border-radius: 0.25rem;
-    padding: 1.5rem;
-}
-
-/* Rebalancing Actions */
-.rebalancing-actions {
-    background-color: var(--card-bg);
-    border-radius: 0.25rem;
-    padding: 1.5rem;
-}
-
-/* Portfolio Select */
-.portfolio-select {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-}
-
-.portfolio-select label {
-    margin: 0;
-    color: var(--text-color);
-    font-weight: 500;
-    font-size: 1.1rem;
-    white-space: nowrap;
-}
-
-.portfolio-select .form-select {
-    background-color: transparent;
-    border: none;
-    border-bottom: 2px solid var(--border-color);
-    color: var(--text-color);
-    padding: 0.75rem;
-    font-size: 1.1rem;
-    transition: all 0.2s ease;
-}
-
-.portfolio-select .form-select:focus {
-    box-shadow: none;
-    border-color: var(--primary-color);
-    outline: none;
-}
-
-/* Consistent Table Styling for All Overview Sections */
-.table {
-    width: 100%;
-    margin-bottom: 1rem;
-    color: var(--text-color);
-    border-collapse: separate;
-    border-spacing: 0;
-    background-color: var(--card-bg);
-    border-radius: 0.5rem;
-    overflow: hidden;
-}
-
-.table th,
-.table td {
-    padding: 1rem;
-    vertical-align: middle;
-    border: none;
-    border-bottom: 1px solid var(--border-color);
-}
-
-.table thead th {
-    background-color: var(--table-header-bg);
-    color: var(--text-muted);
-    font-weight: 500;
-    text-transform: uppercase;
-    font-size: 0.8rem;
-    letter-spacing: 0.5px;
-    border-bottom: 2px solid var(--border-color);
-    position: sticky;
-    top: 0;
+    border-radius: var(--border-radius);
+    padding: var(--space-xs) var(--space-sm);
+    position: absolute;
     z-index: 1;
-}
-
-.table tbody tr {
-    transition: background-color 0.2s ease;
-}
-
-.table tbody tr:last-child td {
-    border-bottom: none;
-}
-
-.table-striped tbody tr:nth-of-type(odd) {
-    background-color: var(--category-row-bg);
-}
-
-.table-hover tbody tr:hover {
-    background-color: rgba(13, 110, 253, 0.1);
-}
-
-/* Category and Position Row Styling */
-.category-row {
-    background-color: var(--category-row-bg) !important;
-    font-weight: 500;
-}
-
-.position-row {
-    background-color: var(--position-row-bg);
-}
-
-.position-row td:first-child {
-    padding-left: 2rem;
-}
-
-/* Value Columns Styling */
-.current-value,
-.target-value {
-    font-family: monospace;
-    font-size: 0.95rem;
-}
-
-.current-value {
-    color: var(--primary-color);
-}
-
-.target-value {
-    color: var(--chart-red);
-}
-
-.allocation-percentage {
-    font-size: 0.9rem;
-    color: var(--text-muted);
-    font-weight: normal;
-}
-
-/* Total Row Styling */
-.total-row {
-    background-color: var(--table-header-bg) !important;
+    top: -5px;
+    left: 105%;
+  }
+  
+  .has-tooltip-right .tooltip:hover .tooltip-text {
+    visibility: visible;
+  }
+  
+  /* Modal styling */
+  .modal-card-title {
+    color: var(--text-color);
     font-weight: 600;
-}
-
-.total-row td {
-    border-top: 2px solid var(--primary-color);
-    border-bottom: none;
-}
-
-/* Missing Positions Styling */
-.missing-positions-row,
-.missing-position {
-    background-color: var(--missing-positions-bg) !important;
-}
-
-.missing-positions-row td,
-.missing-position td {
-    border-left: 3px solid var(--warning-color);
-}
-
-/* Table Container */
-.table-responsive {
-    border-radius: 0.5rem;
-    overflow: auto;
-    max-height: 600px;
-    margin-bottom: 2rem;
+  }
+  
+  .modal-background {
+    background-color: rgba(0, 0, 0, 0.5);
+  }
+  
+  .modal-card {
     background-color: var(--card-bg);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-}
-
-/* Action Colors */
-.actions-positive {
-    color: var(--success-color);
-    font-weight: 500;
-}
-
-.actions-neutral {
-    color: var(--text-muted);
-}
-
-.actions-negative {
-    color: var(--danger-color);
-    font-weight: 500;
-}
-
-/* Loading Spinner */
-.spinner-border {
-    width: 3rem;
-    height: 3rem;
-    margin: 2rem auto;
-    display: block;
-    color: var(--primary-color);
-}
-
-/* Table Active Row */
-.table-active {
-    background-color: rgba(13, 110, 253, 0.05) !important;
-}
-
-/* Button Styling */
-.btn-primary {
-    background-color: var(--primary-color);
-    border-color: var(--primary-color);
-    color: white;
-    padding: 0.5rem 1.25rem;
-    font-weight: 500;
-    transition: all 0.2s ease;
-}
-
-.btn-primary:hover {
-    background-color: var(--primary-hover);
-    border-color: var(--primary-hover);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-}
-
-/* Animation for expandable rows */
-.category-row i.fas {
-    transition: transform 0.2s ease-in-out;
-}
-
-.category-row:hover i.fas {
-    transform: translateX(2px);
-}
-
-/* Responsive Adjustments */
-@media (max-width: 767.98px) {
-    .header-content {
-        flex-direction: column;
-        align-items: flex-start;
+    border-radius: var(--border-radius);
+    overflow: hidden;
+  }
+  
+  .modal-card-head, .modal-card-foot {
+    background-color: var(--darker-bg);
+    border-color: var(--border-color);
+  }
+  
+  /* Helper Classes */
+  .is-clickable {
+    cursor: pointer;
+  }
+  
+  .has-shadow {
+    box-shadow: var(--shadow);
+  }
+  
+  .no-border {
+    border: none !important;
+  }
+  
+  .border-bottom {
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  /* Responsive adjustments */
+  @media screen and (max-width: 768px) {
+    .container {
+      padding: var(--space-sm);
     }
     
-    .investment-input {
-        width: 100%;
-        margin-top: 1rem;
+    .section {
+      padding: var(--space-md);
     }
     
-    .table-responsive {
-        font-size: 0.875rem;
+    .section-title {
+      font-size: 1.25rem;
     }
-}
+    
+    .table-container {
+      overflow-x: auto;
+    }
+  }
+  
+  /* Transition utilities */
+  .fade-enter-active, .fade-leave-active {
+    transition: opacity 0.3s;
+  }
+  
+  .fade-enter, .fade-leave-to {
+    opacity: 0;
+  }
+  
+  /* Vue.js component styles */
+  [v-cloak] {
+    display: none;
+  }
 ###END_FILE###
 
 ================================================================
@@ -6846,366 +5805,356 @@ document.addEventListener('DOMContentLoaded', function() {
 
 {% block content %}
 <div class="container">
-    <h1 class="title mb-4">Allocation Builder</h1>
+  <h1 class="title is-3 mb-4">Allocation Builder</h1>
 
-    <div id="allocation-builder" v-cloak>
-        <!-- Budget Management Section -->
-        <h1 class="section-title title is-3">Budget Management</h1>
-        <div class="content">
-            <div class="budget-card">
-                <!-- Input Fields Row -->
-                <div class="columns is-variable is-2">
-                    <div class="column">
-                        <div class="field">
-                            <label class="label">Total Net Worth</label>
-                            <div class="control">
-                                <input class="input" type="text" id="totalNetWorth" 
-                                       placeholder="Enter total net worth" 
-                                       :value="formatNumber(budgetData.totalNetWorth)" 
-                                       @input="budgetData.totalNetWorth = parseFloat($event.target.value.replace(/,/g, '')); updateBudgetData()">
-                            </div>
-                        </div>
-                    </div>
-                    <div class="column">
-                        <div class="field">
-                            <label class="label">Already Invested</label>
-                            <div class="control">
-                                <input class="input" type="text" id="alreadyInvested" 
-                                       placeholder="Enter amount already invested" 
-                                       :value="formatNumber(budgetData.alreadyInvested)" 
-                                       @input="budgetData.alreadyInvested = parseFloat($event.target.value.replace(/,/g, '')); updateBudgetData()">
-                            </div>
-                        </div>
-                    </div>
-                    <div class="column">
-                        <div class="field">
-                            <label class="label">Emergency Fund</label>
-                            <div class="control">
-                                <input class="input" type="text" id="emergencyFund" 
-                                       placeholder="Enter emergency fund amount" 
-                                       :value="formatNumber(budgetData.emergencyFund)" 
-                                       @input="budgetData.emergencyFund = parseFloat($event.target.value.replace(/,/g, '')); updateBudgetData()">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Results Row -->
-                <div class="columns is-variable is-2 budget-results">
-                    <div class="column is-half">
-                        <div class="result-item">
-                            <span class="result-label">Total Investable Capital</span>
-                            <div class="result-value">${ formatCurrency(budgetData.totalInvestableCapital) }</div>
-                        </div>
-                    </div>
-                    <div class="column is-half">
-                        <div class="result-item">
-                            <span class="result-label">Available to Invest</span>
-                            <div class="result-value">
-                                ${ formatCurrency(budgetData.availableToInvest) }
-                                <span class="available-percentage">(${availablePercentage}% of Total)</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+  <div id="allocation-builder" v-cloak>
+    <!-- Budget Management Section -->
+    <h2 class="section-title">Budget Management</h2>
+    <div class="budget-card">
+      <!-- Input Fields Row -->
+      <div class="columns is-variable is-4">
+        <div class="column">
+          <div class="field">
+            <label class="label">Total Net Worth</label>
+            <div class="control">
+              <input class="input" type="text" id="totalNetWorth" 
+                     placeholder="Enter total net worth" 
+                     :value="formatNumber(budgetData.totalNetWorth)" 
+                     @input="budgetData.totalNetWorth = parseFloat($event.target.value.replace(/,/g, '')); updateBudgetData()">
             </div>
+          </div>
         </div>
-
-        <!-- Global Allocation Rules -->
-        <h2 class="section-title title is-3">Global Allocation Rules</h2>
-        <div class="content">
-            <div class="columns">
-                <div class="column is-half">
-                    <div class="field">
-                        <label class="label">Maximum % per Stock</label>
-                        <div class="control">
-                            <input class="input" type="number" min="0" max="100" 
-                                   placeholder="Maximum % per stock" v-model.number="rules.maxPerStock">
-                        </div>
-                    </div>
-                </div>
-                <div class="column is-half">
-                    <div class="field">
-                        <label class="label">Maximum % per Category</label>
-                        <div class="control">
-                            <input class="input" type="number" min="0" max="100" 
-                                   placeholder="Maximum % per category" v-model.number="rules.maxPerCategory">
-                        </div>
-                    </div>
-                </div>
+        <div class="column">
+          <div class="field">
+            <label class="label">Already Invested</label>
+            <div class="control">
+              <input class="input" type="text" id="alreadyInvested" 
+                     placeholder="Enter amount already invested" 
+                     :value="formatNumber(budgetData.alreadyInvested)" 
+                     @input="budgetData.alreadyInvested = parseFloat($event.target.value.replace(/,/g, '')); updateBudgetData()">
             </div>
+          </div>
         </div>
-
-        <!-- Portfolio Allocation -->
-        <h2 class="section-title title is-3">Portfolio Allocation</h2>
-        <div class="content">
-            <!-- Allocation Status Indicator -->
-            <div class="notification" :class="{
-                'is-success': isAllocationValid, 
-                'is-warning': isAllocationUnder, 
-                'is-danger': isAllocationOver
-            }">
-                <p class="has-text-weight-bold">
-                    ${ allocationStatusMessage }
-                </p>
+        <div class="column">
+          <div class="field">
+            <label class="label">Emergency Fund</label>
+            <div class="control">
+              <input class="input" type="text" id="emergencyFund" 
+                     placeholder="Enter emergency fund amount" 
+                     :value="formatNumber(budgetData.emergencyFund)" 
+                     @input="budgetData.emergencyFund = parseFloat($event.target.value.replace(/,/g, '')); updateBudgetData()">
             </div>
-            
-            <!-- Portfolio List -->
-            <div v-if="portfolios.length > 0">
-                <div v-for="(portfolio, index) in portfolios" :key="index" class="compact-box">
-                    <!-- Portfolio Header -->
-                    <div class="columns is-vcentered">
-                        <div class="column is-3">
-                            <label class="label">${ getPortfolioName(portfolio.id) }</label>
-                        </div>
-                        <div class="column is-3">
-                            <div class="field">
-                                <label class="label">Allocation %</label>
-                                <input class="input" type="text" 
-                                       :value="parseFloat(portfolio.allocation).toFixed(0)" 
-                                       @change="$event.target.value && $event.target.value.length > 0 ? portfolio.allocation = parseFloat($event.target.value) : null; updateAllocations()"
-                                       @focus="$event.target.select()">
-                            </div>
-                        </div>
-                        <div class="column is-3">
-                            <div class="field">
-                                <label class="label">Amount</label>
-                                <input class="input" type="text" 
-                                       :value="formatCurrency(calculateAllocationAmount(portfolio.allocation))" 
-                                       readonly>
-                            </div>
-                        </div>
-                        <div class="column is-2">
-                            <div class="field">
-                                <label class="label">Min Positions</label>
-                                <input class="input" type="text" 
-                                       :value="portfolio.minPositions.toFixed(2)" 
-                                       readonly>
-                            </div>
-                        </div>
-                        <div class="column is-1 has-text-centered">
-                            <span class="portfolio-toggle" @click="togglePortfolioExpand(index)">
-                                <i class="fas" :class="isPortfolioExpanded(index) ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
-                            </span>
-                        </div>
-                    </div>
-
-                    <!-- Position Management (collapsible) -->
-                    <div v-if="isPortfolioExpanded(index)" class="mt-3">                      
-                        <div class="columns">
-                            <div class="column is-4">
-                                <div class="field">
-                                    <label class="checkbox">
-                                        <input type="checkbox" v-model="portfolio.evenSplit" 
-                                               @change="updatePositionAllocations(index)">
-                                        Distribute evenly across positions
-                                    </label>
-                                </div>
-                            </div>
-                            <div class="column is-4">
-                                <div class="field">
-                                    <label class="label">Maximum Weight per Position</label>
-                                    <input class="input" type="text" 
-                                           :value="(100 / Math.max(1, Math.ceil(portfolio.minPositions))).toFixed(0) + '%'" 
-                                           readonly>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Add Position Section -->
-                        <div class="add-position-section">
-                            <div class="columns">
-                                <div class="column is-8">
-                                    <div class="field has-addons">
-                                        <div class="control is-expanded">
-                                            <div class="select is-fullwidth">
-                                                <select v-model="portfolio.selectedPosition">
-                                                    <option value="">Select a position to add</option>
-                                                    <option v-for="company in availableCompaniesForPortfolio(portfolio.id)" 
-                                                            :value="company.id"
-                                                            :key="company.id">
-                                                        ${ company.name }
-                                                    </option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                        <div class="control">
-                                            <button class="button is-info" 
-                                                    @click="addSelectedPosition(index)"
-                                                    :disabled="!portfolio.selectedPosition">
-                                                Add Position
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="column is-4">
-                                    <div v-if="getRemainingPositionsCount(index) > 0" 
-                                         class="notification is-warning is-light py-2">
-                                        <span class="has-text-weight-medium">
-                                            ${ getRemainingPositionsCount(index) } positions remaining to meet minimum
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Position List -->
-                        <div class="table-responsive">
-                            <table class="table is-fullwidth is-hoverable">
-                                <thead>
-                                    <tr>
-                                        <th>Company</th>
-                                        <th>Weight %</th>
-                                        <th>Allocation Amount</th>
-                                        <th width="50"></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-for="(position, pIndex) in sortedPositions(portfolio.positions)" :key="pIndex" 
-                                        :class="{'placeholder-position': position.isPlaceholder}">
-                                        <td>
-                                            <div v-if="position.isPlaceholder" class="remaining-positions-text">
-                                                ${ position.companyName }
-                                            </div>
-                                            <div v-else>
-                                                ${ position.companyName || 'Select a company' }
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <input class="input" type="text" 
-                                                   :value="(position.weight || 0).toFixed(0)"
-                                                   @change="updateManualWeight(index, pIndex, $event.target.value)"
-                                                   @focus="$event.target.select()"
-                                                   :disabled="portfolio.evenSplit">
-                                        </td>
-                                        <td>
-                                            <input class="input" type="text" 
-                                                   :value="formatCurrency(calculatePositionAmount(index, pIndex))" 
-                                                   readonly>
-                                        </td>
-                                        <td>
-                                            <button v-if="!position.isPlaceholder" 
-                                                    class="button is-small is-danger" 
-                                                    @click="removePosition(index, pIndex)"
-                                                    title="Remove position">
-                                                <i class="fas fa-times"></i>
-                                            </button>
-                                        </td>
-                                    </tr>
-                                    <tr v-if="portfolio.positions.length === 0">
-                                        <td colspan="4" class="has-text-centered">No positions added yet.</td>
-                                    </tr>
-                                </tbody>
-                                <tfoot v-if="portfolio.positions.length > 0">
-                                    <tr>
-                                        <th>Total</th>
-                                        <th>${ calculateTotalWeight(index).toFixed(0) }%</th>
-                                        <th>${ formatCurrency(calculateAllocationAmount(portfolio.allocation)) }</th>
-                                        <th></th>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div v-else class="notification is-info">
-                No portfolios with positions. Please add positions to your portfolios.
-            </div>
+          </div>
         </div>
-
-        <!-- Allocation Summary -->
-        <h2 class="section-title title is-3">Allocation Summary</h2>
-        <div class="content">
-            <!-- Summary Table -->
-            <div class="table-responsive">
-                <table class="table is-fullwidth is-hoverable">
-                    <thead>
-                        <tr>
-                            <th>Portfolio</th>
-                            <th>Position</th>
-                            <th>Global %</th>
-                            <th>Portfolio %</th>
-                            <th>To Be Invested</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <template v-for="(portfolio, index) in portfolios">
-                            <!-- Portfolio row -->
-                            <tr class="table-active">
-                                <td class="has-text-weight-bold">
-                                    ${ getPortfolioName(portfolio.id) }
-                                </td>
-                                <td></td>
-                                <td class="has-text-weight-bold">
-                                    ${ parseFloat(portfolio.allocation).toFixed(1) }%
-                                </td>
-                                <td class="has-text-weight-bold">100%</td>
-                                <td class="has-text-weight-bold">
-                                    ${ formatCurrency(calculateAllocationAmount(portfolio.allocation)) }
-                                </td>
-                            </tr>
-                            
-                            <!-- Position rows -->
-                            <tr v-for="group in groupPositionsByWeight(portfolio.positions, portfolio)" 
-                                v-if="group.weight > 0"
-                                :class="{'table-light': group.isPlaceholder}">
-                                <td></td>
-                                <td>
-                                    ${ group.companyName }
-                                </td>
-                                <td>
-                                    <span v-if="group.isPlaceholder">
-                                        ${ ((portfolio.allocation * group.weight * group.count) / 100).toFixed(1) }%
-                                    </span>
-                                    <span v-else>
-                                        ${ ((portfolio.allocation * group.weight) / 100).toFixed(1) }%
-                                    </span>
-                                </td>
-                                <td>
-                                    <span v-if="group.isPlaceholder">
-                                        ${ (parseFloat(group.weight) * group.count).toFixed(1) }%
-                                    </span>
-                                    <span v-else>
-                                        ${ parseFloat(group.weight).toFixed(1) }%
-                                    </span>
-                                </td>
-                                <td v-if="group.isPlaceholder">
-                                    ${ formatCurrency(calculateAllocationAmount(portfolio.allocation) * group.weight * group.count / 100) }
-                                </td>
-                                <td v-else>
-                                    ${ formatCurrency(calculateAllocationAmount(portfolio.allocation) * group.weight / 100) }
-                                </td>
-                            </tr>
-                        </template>
-                        <tr v-if="portfolios.length === 0">
-                            <td colspan="5" class="has-text-centered">No portfolios added yet.</td>
-                        </tr>
-                    </tbody>
-                    <tfoot v-if="portfolios.length > 0">
-                        <tr class="table-active">
-                            <th>Total</th>
-                            <th></th>
-                            <th>${ calculateTotalAllocation().toFixed(1) }%</th>
-                            <th>-</th>
-                            <th>${ formatCurrency(calculateTotalAllocatedAmount()) }</th>
-                        </tr>
-                    </tfoot>
-                </table>
+      </div>
+      
+      <!-- Results Row -->
+      <div class="budget-results">
+        <div class="columns is-variable is-4">
+          <div class="column is-half">
+            <div class="result-item">
+              <span class="result-label">Total Investable Capital</span>
+              <div class="result-value">${ formatCurrency(budgetData.totalInvestableCapital) }</div>
             </div>
+          </div>
+          <div class="column is-half">
+            <div class="result-item">
+              <span class="result-label">Available to Invest</span>
+              <div class="result-value">
+                ${ formatCurrency(budgetData.availableToInvest) }
+                <span class="available-percentage">(${availablePercentage}% of Total)</span>
+              </div>
+            </div>
+          </div>
         </div>
+      </div>
     </div>
-</div>
 
-<!-- Debug output (only visible in development) -->
-{% if config.DEBUG %}
-<div style="background: #f5f5f5; padding: 10px; margin-top: 20px; border: 1px solid #ddd;">
-  <h3>CSS Debug Info:</h3>
-  <p>Build-allocation.css path: {{ url_for('static', filename='css/build-allocation.css') }}</p>
-  <p>Static folder path: {{ url_for('static', filename='') }}</p>
+    <!-- Global Allocation Rules -->
+    <h2 class="section-title">Global Allocation Rules</h2>
+    <div class="card">
+      <div class="columns is-variable is-6">
+        <div class="column is-half">
+          <div class="field">
+            <label class="label">Maximum % per Stock</label>
+            <div class="control">
+              <input class="input" type="number" min="0" max="100" 
+                     placeholder="Maximum % per stock" v-model.number="rules.maxPerStock">
+            </div>
+          </div>
+        </div>
+        <div class="column is-half">
+          <div class="field">
+            <label class="label">Maximum % per Category</label>
+            <div class="control">
+              <input class="input" type="number" min="0" max="100" 
+                     placeholder="Maximum % per category" v-model.number="rules.maxPerCategory">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Portfolio Allocation -->
+    <h2 class="section-title">Portfolio Allocation</h2>
+    
+    <!-- Allocation Status Indicator -->
+    <div class="notification" :class="{
+        'is-success': isAllocationValid, 
+        'is-warning': isAllocationUnder, 
+        'is-danger': isAllocationOver
+    }">
+      <p class="has-text-weight-bold">
+        ${ allocationStatusMessage }
+      </p>
+    </div>
+    
+    <!-- Portfolio List -->
+    <div v-if="portfolios.length > 0">
+      <div v-for="(portfolio, index) in portfolios" :key="index" class="compact-box">
+        <!-- Portfolio Header -->
+        <div class="columns is-vcentered is-variable is-4">
+          <div class="column is-3">
+            <label class="label">${ getPortfolioName(portfolio.id) }</label>
+          </div>
+          <div class="column is-3">
+            <div class="field">
+              <label class="label">Allocation %</label>
+              <input class="input" type="text" 
+                     :value="parseFloat(portfolio.allocation).toFixed(0)" 
+                     @change="$event.target.value && $event.target.value.length > 0 ? portfolio.allocation = parseFloat($event.target.value) : null; updateAllocations()"
+                     @focus="$event.target.select()">
+            </div>
+          </div>
+          <div class="column is-3">
+            <div class="field">
+              <label class="label">Amount</label>
+              <input class="input" type="text" 
+                     :value="formatCurrency(calculateAllocationAmount(portfolio.allocation))" 
+                     readonly>
+            </div>
+          </div>
+          <div class="column is-2">
+            <div class="field">
+              <label class="label">Min Positions</label>
+              <input class="input" type="text" 
+                     :value="portfolio.minPositions.toFixed(2)" 
+                     readonly>
+            </div>
+          </div>
+          <div class="column is-1 has-text-centered">
+            <span class="portfolio-toggle" @click="togglePortfolioExpand(index)">
+              <i class="fas" :class="isPortfolioExpanded(index) ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+            </span>
+          </div>
+        </div>
+
+        <!-- Position Management (collapsible) -->
+        <div v-if="isPortfolioExpanded(index)" class="mt-5">                      
+          <div class="columns is-variable is-4">
+            <div class="column is-4">
+              <div class="field">
+                <label class="checkbox">
+                  <input type="checkbox" v-model="portfolio.evenSplit" 
+                         @change="updatePositionAllocations(index)">
+                  <span class="ml-2">Distribute evenly across positions</span>
+                </label>
+              </div>
+            </div>
+            <div class="column is-4">
+              <div class="field">
+                <label class="label">Maximum Weight per Position</label>
+                <input class="input" type="text" 
+                       :value="(100 / Math.max(1, Math.ceil(portfolio.minPositions))).toFixed(0) + '%'" 
+                       readonly>
+              </div>
+            </div>
+          </div>
+
+          <!-- Add Position Section -->
+          <div class="add-position-section">
+            <div class="columns is-variable is-4">
+              <div class="column is-8">
+                <div class="field has-addons">
+                  <div class="control is-expanded">
+                    <div class="select is-fullwidth">
+                      <select v-model="portfolio.selectedPosition">
+                        <option value="">Select a position to add</option>
+                        <option v-for="company in availableCompaniesForPortfolio(portfolio.id)" 
+                                :value="company.id"
+                                :key="company.id">
+                          ${ company.name }
+                        </option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="control">
+                    <button class="button is-primary" 
+                            @click="addSelectedPosition(index)"
+                            :disabled="!portfolio.selectedPosition">
+                      Add Position
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="column is-4">
+                <div v-if="getRemainingPositionsCount(index) > 0" 
+                     class="notification is-warning py-3">
+                  <span class="has-text-weight-medium">
+                    ${ getRemainingPositionsCount(index) } positions remaining to meet minimum
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Position List -->
+          <div class="table-responsive mt-4">
+            <table class="table is-fullwidth">
+              <thead>
+                <tr>
+                  <th>Company</th>
+                  <th>Weight %</th>
+                  <th>Allocation Amount</th>
+                  <th width="70"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(position, pIndex) in sortedPositions(portfolio.positions)" :key="pIndex" 
+                    :class="{'placeholder-position': position.isPlaceholder}">
+                  <td>
+                    <div v-if="position.isPlaceholder" class="remaining-positions-text">
+                      ${ position.companyName }
+                    </div>
+                    <div v-else>
+                      ${ position.companyName || 'Select a company' }
+                    </div>
+                  </td>
+                  <td>
+                    <input class="input" type="text" 
+                           :value="(position.weight || 0).toFixed(0)"
+                           @change="updateManualWeight(index, pIndex, $event.target.value)"
+                           @focus="$event.target.select()"
+                           :disabled="portfolio.evenSplit">
+                  </td>
+                  <td>
+                    <input class="input" type="text" 
+                           :value="formatCurrency(calculatePositionAmount(index, pIndex))" 
+                           readonly>
+                  </td>
+                  <td class="has-text-centered">
+                    <button v-if="!position.isPlaceholder" 
+                            class="button is-danger is-rounded" 
+                            style="width: 36px; height: 36px; padding: 0;"
+                            @click="removePosition(index, pIndex)"
+                            title="Remove position">
+                      <i class="fas fa-times"></i>
+                    </button>
+                  </td>
+                </tr>
+                <tr v-if="portfolio.positions.length === 0">
+                  <td colspan="4" class="has-text-centered py-4">No positions added yet.</td>
+                </tr>
+              </tbody>
+              <tfoot v-if="portfolio.positions.length > 0">
+                <tr style="background-color: rgba(255,255,255,0.03);">
+                  <th>Total</th>
+                  <th>${ calculateTotalWeight(index).toFixed(0) }%</th>
+                  <th>${ formatCurrency(calculateAllocationAmount(portfolio.allocation)) }</th>
+                  <th></th>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-else class="notification is-info">
+      No portfolios with positions. Please add positions to your portfolios.
+    </div>
+
+    <!-- Allocation Summary -->
+    <h2 class="section-title">Allocation Summary</h2>
+    
+    <!-- Summary Table -->
+    <div class="table-responsive">
+      <table class="table is-fullwidth">
+        <thead>
+          <tr>
+            <th>Portfolio</th>
+            <th>Position</th>
+            <th>Global %</th>
+            <th>Portfolio %</th>
+            <th>To Be Invested</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template v-for="(portfolio, index) in portfolios">
+            <!-- Portfolio row -->
+            <tr class="table-active">
+              <td class="has-text-weight-bold">
+                ${ getPortfolioName(portfolio.id) }
+              </td>
+              <td></td>
+              <td class="has-text-weight-bold">
+                ${ parseFloat(portfolio.allocation).toFixed(1) }%
+              </td>
+              <td class="has-text-weight-bold">100%</td>
+              <td class="has-text-weight-bold">
+                ${ formatCurrency(calculateAllocationAmount(portfolio.allocation)) }
+              </td>
+            </tr>
+            
+            <!-- Position rows -->
+            <tr v-for="group in groupPositionsByWeight(portfolio.positions, portfolio)" 
+                v-if="group.weight > 0"
+                :class="{'placeholder-position': group.isPlaceholder}">
+              <td></td>
+              <td>
+                ${ group.companyName }
+              </td>
+              <td>
+                <span v-if="group.isPlaceholder">
+                  ${ ((portfolio.allocation * group.weight * group.count) / 100).toFixed(1) }%
+                </span>
+                <span v-else>
+                  ${ ((portfolio.allocation * group.weight) / 100).toFixed(1) }%
+                </span>
+              </td>
+              <td>
+                <span v-if="group.isPlaceholder">
+                  ${ (parseFloat(group.weight) * group.count).toFixed(1) }%
+                </span>
+                <span v-else>
+                  ${ parseFloat(group.weight).toFixed(1) }%
+                </span>
+              </td>
+              <td v-if="group.isPlaceholder">
+                ${ formatCurrency(calculateAllocationAmount(portfolio.allocation) * group.weight * group.count / 100) }
+              </td>
+              <td v-else>
+                ${ formatCurrency(calculateAllocationAmount(portfolio.allocation) * group.weight / 100) }
+              </td>
+            </tr>
+          </template>
+          <tr v-if="portfolios.length === 0">
+            <td colspan="5" class="has-text-centered py-5">No portfolios added yet.</td>
+          </tr>
+        </tbody>
+        <tfoot v-if="portfolios.length > 0">
+          <tr style="background-color: rgba(255,255,255,0.03);">
+            <th>Total</th>
+            <th></th>
+            <th>${ calculateTotalAllocation().toFixed(1) }%</th>
+            <th>-</th>
+            <th>${ formatCurrency(calculateTotalAllocatedAmount()) }</th>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
 </div>
-{% endif %}
 {% endblock %}
 
 {% block scripts %}
@@ -7217,85 +6166,95 @@ document.addEventListener('DOMContentLoaded', function() {
 ###START_FILE_PATH: templates/pages/allocate.html###
 {% extends "base.html" %}
 
+{% block title %}Portfolio Allocation{% endblock %}
+
+{% block head_extras %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/allocate.css') }}?v={{ range(1000, 9999) | random }}">
+{% endblock %}
+
 {% block content %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/allocate.css') }}">
-
 <div class="container">
-    <h1 class="title mb-4">Portfolio Allocation</h1>
+  <h1 class="title is-3 mb-4">Portfolio Allocation</h1>
 
-    <!-- Combined header with tabs -->
-    <div class="header-content d-flex flex-wrap justify-content-between align-items-center mb-4">
-        <ul class="nav nav-tabs" id="allocationTabs" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="global-tab" type="button" role="tab">
-                    <i class="fas fa-globe me-2"></i>Global Overview
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="detailed-tab" type="button" role="tab">
-                    <i class="fas fa-chart-pie me-2"></i>Detailed Overview
-                </button>
-            </li>
-        </ul>
+  <!-- Tab Navigation -->
+  <div class="header-content">
+    <div class="tabs">
+      <ul class="nav-tabs" id="allocationTabs" role="tablist">
+        <li class="nav-item">
+          <button class="nav-link active" id="global-tab" type="button" role="tab">
+            <i class="fas fa-globe mr-2"></i>Global Overview
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" id="detailed-tab" type="button" role="tab">
+            <i class="fas fa-chart-pie mr-2"></i>Detailed Overview
+          </button>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Tab Content -->
+  <div class="tab-content" id="allocationTabsContent">
+    <!-- Global Overview Tab -->
+    <div class="tab-pane active" id="global" role="tabpanel">
+      <!-- Investment Input in Global Overview -->
+      <div class="card">
+        <div class="investment-input">
+          <label class="label">Investment Amount:</label>
+          <div class="input-group">
+            <span class="input-group-text">€</span>
+            <input type="text" class="input" id="investment-amount" placeholder="Enter amount">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div id="portfolio-table-container">
+          <!-- Table will be rendered here -->
+          <div class="has-text-centered">
+            <div class="spinner-border" role="status">
+              <span class="is-sr-only">Loading...</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- Tab Content -->
-    <div class="tab-content" id="allocationTabsContent">
-        <!-- Global Overview Tab -->
-        <div class="tab-pane active" id="global" role="tabpanel">
-            <!-- Investment Input in Global Overview -->
-            <div class="investment-input mb-4">
-                <label class="form-label">Investment Amount:</label>
-                <div class="input-group">
-                    <span class="input-group-text">€</span>
-                    <input type="text" class="form-control" id="investment-amount" placeholder="Enter amount">
-                </div>
-            </div>
-
-            <div class="portfolio-table-container">
-                <div id="portfolio-table-container">
-                    <!-- Table will be rendered here -->
-                    <div class="d-flex justify-content-center">
-                        <div class="spinner-border text-primary" role="status">
-                            <span class="visually-hidden">Loading...</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    <!-- Detailed Overview Tab -->
+    <div class="tab-pane" id="detailed" role="tabpanel">
+      <!-- Portfolio Selection Dropdown -->
+      <div class="card">
+        <div class="portfolio-select">
+          <label class="label">Select Portfolio:</label>
+          <div class="select is-fullwidth">
+            <select class="form-select" id="portfolio-select">
+              <!-- Options will be populated dynamically -->
+            </select>
+          </div>
         </div>
 
-        <!-- Detailed Overview Tab -->
-        <div class="tab-pane" id="detailed" role="tabpanel">
-            <!-- Portfolio Selection Dropdown -->
-            <div class="portfolio-select mb-4">
-                <label class="form-label">Select Portfolio:</label>
-                <select class="form-select" id="portfolio-select">
-                    <!-- Options will be populated dynamically -->
-                </select>
+        <p class="has-text-grey mb-5">
+          <i class="fas fa-info-circle mr-1"></i> Click on a category to expand/collapse its positions.
+          Missing positions are highlighted.
+        </p>
+        
+        <!-- Single portfolio table will be rendered here -->
+        <div id="detailed-portfolio-container">
+          <div class="has-text-centered">
+            <div class="spinner-border" role="status">
+              <span class="is-sr-only">Loading...</span>
             </div>
-
-            <!-- Rebalancing Actions Section -->
-            <div class="rebalancing-actions">
-                <p class="text-muted mb-3">
-                    <i class="fas fa-info-circle me-1"></i> Click on a category to expand/collapse its positions.
-                    Missing positions are highlighted in yellow.
-                </p>
-                
-                <!-- Single portfolio table will be rendered here -->
-                <div id="detailed-portfolio-container">
-                    <div class="d-flex justify-content-center">
-                        <div class="spinner-border text-primary" role="status">
-                            <span class="visually-hidden">Loading...</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
+          </div>
         </div>
+      </div>
     </div>
+  </div>
 </div>
+{% endblock %}
 
-<!-- Include necessary JavaScript -->
+{% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="{{ url_for('static', filename='js/allocate.js') }}"></script>
+<script src="{{ url_for('static', filename='js/allocate.js') }}?v={{ range(1000, 9999) | random }}"></script>
 {% endblock %}
 ###END_FILE###
