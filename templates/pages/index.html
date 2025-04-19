@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Portfolio Manager - Welcome{% endblock %}
+{% block title %}Portfolio Rebalancer - Welcome{% endblock %}
 
 {% set show_sidebar = session.account_id is defined and session.account_id %}
 
@@ -97,7 +97,7 @@
         <div class="container">
             <div class="columns is-centered">
                 <div class="column is-8 has-text-centered">
-                    <h1 class="title is-2">Portfolio Rebalancing Tool</h1>
+                    <h1 class="title is-2">Portfolio Rebalancer</h1>
                     <h2 class="subtitle is-4 mb-6">Optimize your investments and reach your financial goals</h2>
                     
                     {% if accounts %}
@@ -137,7 +137,7 @@
                     {% else %}
                         <div class="notification is-info is-light">
                             <div class="content">
-                                <h3><i class="fas fa-info-circle mr-2"></i> Welcome to Portfolio Manager!</h3>
+                                <h3><i class="fas fa-info-circle mr-2"></i> Welcome to Portfolio Rebalancer!</h3>
                                 <p>Create your first account to start tracking and optimizing your investments.</p>
                                 <button class="button is-info mt-3 js-modal-trigger" data-target="create-account-modal">
                                     <span class="icon">
