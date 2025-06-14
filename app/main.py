@@ -13,16 +13,10 @@ def create_app(config_name='default'):
     logger.info("Logger initialized at INFO level")
     
     # Configure app
-    secret_key_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'secret_key')
-    if os.path.exists(secret_key_file):
-        with open(secret_key_file, 'rb') as f:
-            secret_key = f.read()
-    else:
-        # Generate a new secret key
+    secret_key = os.environ.get('SECRET_KEY')
+    if not secret_key:
         secret_key = os.urandom(24)
-        with open(secret_key_file, 'wb') as f:
-            f.write(secret_key)
-    
+
     app.config.update(
         SECRET_KEY=secret_key,
         SQLALCHEMY_DATABASE_URI='sqlite:///portfolio.db',

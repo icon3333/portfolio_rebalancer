@@ -3,7 +3,7 @@ from app.database.db_manager import query_db, execute_db, backup_database, get_d
 from app.utils.db_utils import (
     load_portfolio_data, process_portfolio_dataframe, update_price_in_db
 )
-from app.utils.yfinance_utils import get_isin_data
+from app.utils.yfinance_utils import get_isin_data, get_exchange_rate
 from app.utils.data_processing import clear_data_caches
 import pandas as pd
 import logging
@@ -160,8 +160,12 @@ def update_prices(companies, account_id):
                 # Convert to EUR if needed
                 price_eur = price
                 if currency != 'EUR':
-                    # Conversion logic would go here
-                    pass
+                    try:
+                        rate = get_exchange_rate(currency, 'EUR')
+                        price_eur = price * rate
+                    except Exception as exc:
+                        logger.warning(f"Failed to convert {currency} to EUR: {exc}")
+                        price_eur = price
                 
                 results.append({
                     'company_id': company['id'],

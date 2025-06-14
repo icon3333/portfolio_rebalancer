@@ -22,6 +22,59 @@ import io
 # Set up logger
 logger = logging.getLogger(__name__)
 
+
+def _apply_company_update(cursor, company_id, data, account_id):
+    """Internal helper to update company and share data."""
+    portfolio_name = data.get('portfolio')
+    if portfolio_name and portfolio_name != 'None':
+        portfolio = query_db(
+            'SELECT id FROM portfolios WHERE name = ? AND account_id = ?',
+            [portfolio_name, account_id],
+            one=True
+        )
+        if not portfolio:
+            cursor.execute(
+                'INSERT INTO portfolios (name, account_id) VALUES (?, ?)',
+                [portfolio_name, account_id]
+            )
+            portfolio_id = cursor.lastrowid
+        else:
+            portfolio_id = portfolio['id']
+    else:
+        default_portfolio = query_db(
+            'SELECT id FROM portfolios WHERE name = "-" AND account_id = ?',
+            [account_id], one=True)
+        if not default_portfolio:
+            cursor.execute(
+                'INSERT INTO portfolios (name, account_id) VALUES (?, ?)',
+                ['-', account_id]
+            )
+            portfolio_id = cursor.lastrowid
+        else:
+            portfolio_id = default_portfolio['id']
+
+    cursor.execute(
+        'UPDATE companies SET identifier = ?, category = ?, portfolio_id = ? WHERE id = ?',
+        [data.get('identifier', ''), data.get('category', ''), portfolio_id, company_id]
+    )
+
+    if 'shares' in data or 'override_share' in data:
+        shares = data.get('shares')
+        override = data.get('override_share')
+        exists = query_db(
+            'SELECT company_id FROM company_shares WHERE company_id = ?',
+            [company_id], one=True)
+        if exists:
+            cursor.execute(
+                'UPDATE company_shares SET shares = ?, override_share = ? WHERE company_id = ?',
+                [shares, override, company_id]
+            )
+        else:
+            cursor.execute(
+                'INSERT INTO company_shares (company_id, shares, override_share) VALUES (?, ?, ?)',
+                [company_id, shares, override]
+            )
+
 # API endpoint to get and save state data
 def manage_state():
     """Get or save state data"""
@@ -75,50 +128,47 @@ def manage_state():
         try:
             # Create backup before making changes
             backup_database()
-            
-            # Get database connection and cursor
-            db = get_db()
-            cursor = db.cursor()
-            
-            # Start transaction
-            cursor.execute('BEGIN TRANSACTION')
-            
-            # Delete existing state for this page (to avoid orphaned variables)
-            cursor.execute('''
+
+            with get_db() as db:
+                cursor = db.cursor()
+
+                # Start transaction
+                cursor.execute('BEGIN TRANSACTION')
+
+                # Delete existing state for this page (to avoid orphaned variables)
+                cursor.execute('''
                 DELETE FROM expanded_state
                 WHERE account_id = ? AND page_name = ?
             ''', [account_id, page_name])
             
-            # Insert new state variables
-            for key, value in data.items():
-                if key == 'page':
-                    continue  # Skip the page key
-                
-                # Determine variable type
-                if isinstance(value, str):
-                    if value.startswith('{') or value.startswith('['):
-                        var_type = 'object'
+                # Insert new state variables
+                for key, value in data.items():
+                    if key == 'page':
+                        continue  # Skip the page key
+
+                    # Determine variable type
+                    if isinstance(value, str):
+                        if value.startswith('{') or value.startswith('['):
+                            var_type = 'object'
+                        else:
+                            var_type = 'string'
                     else:
                         var_type = 'string'
-                else:
-                    var_type = 'string'
-                
-                # Insert into database
-                cursor.execute('''
-                    INSERT INTO expanded_state
-                    (account_id, page_name, variable_name, variable_type, variable_value)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', [account_id, page_name, key, var_type, value])
-            
-            # Commit transaction
-            db.commit()
-            
+
+                    # Insert into database
+                    cursor.execute('''
+                        INSERT INTO expanded_state
+                        (account_id, page_name, variable_name, variable_type, variable_value)
+                        VALUES (?, ?, ?, ?, ?)
+                    ''', [account_id, page_name, key, var_type, value])
+
+                # Commit transaction
+                db.commit()
+
             logger.info(f"State saved successfully for account {account_id}, page {page_name}")
             return jsonify({'success': True, 'message': 'State saved successfully'})
-            
+
         except Exception as e:
-            if 'db' in locals() and db:
-                db.rollback()
             logger.error(f"Error saving state: {str(e)}")
             return jsonify({'error': str(e)}), 500
 
@@ -865,26 +915,24 @@ def update_single_portfolio_api(company_id):
     
     try:
         account_id = session['account_id']
-        data = request.json
-        
-        # Validate data
-        if not data:
+        data = request.json or {}
+
+        if not isinstance(data, dict):
             return jsonify({'error': 'Invalid data format'}), 400
-            
-        # Verify company belongs to account
+
         company = query_db(
             'SELECT id FROM companies WHERE id = ? AND account_id = ?',
             [company_id, account_id],
             one=True
         )
-        
         if not company:
             return jsonify({'error': 'Company not found or access denied'}), 404
-            
-        # Add processing logic for the update here
-        # (This would include updating the company in the database based on the data received)
-        
-        return jsonify({'success': True, 'message': 'Company updated successfully'}), 200
+
+        with get_db() as db:
+            cursor = db.cursor()
+            _apply_company_update(cursor, company_id, data, account_id)
+
+        return jsonify({'success': True, 'message': 'Company updated successfully'})
         
     except Exception as e:
         logger.error(f"Error updating company {company_id}: {str(e)}")
@@ -898,22 +946,37 @@ def bulk_update():
     try:
         account_id = session['account_id']
         data = request.json
-        
-        # Validate data
-        if not data or not isinstance(data, dict):
+
+        if not data or not isinstance(data, list):
             return jsonify({'error': 'Invalid data format'}), 400
-            
-        # Simple stub implementation that returns success
-        logger.info(f"Bulk update requested for account {account_id}")
-        logger.info(f"Received data: {data}")
-        
-        # Create a proper response
-        return jsonify({
-            'success': True,
-            'message': 'Bulk update processed successfully',
-            'updated': 0,  # No actual updates yet
-            'errors': []
-        })
+
+        updated = 0
+        errors = []
+
+        with get_db() as db:
+            cursor = db.cursor()
+            for item in data:
+                cid = item.get('id')
+                if not cid:
+                    errors.append({'id': None, 'error': 'Missing id'})
+                    continue
+                company = query_db(
+                    'SELECT id FROM companies WHERE id = ? AND account_id = ?',
+                    [cid, account_id], one=True
+                )
+                if not company:
+                    errors.append({'id': cid, 'error': 'Company not found'})
+                    continue
+                try:
+                    _apply_company_update(cursor, cid, item, account_id)
+                    updated += 1
+                except Exception as exc:
+                    errors.append({'id': cid, 'error': str(exc)})
+
+        if errors:
+            return jsonify({'success': False, 'updated': updated, 'errors': errors}), 400
+
+        return jsonify({'success': True, 'updated': updated, 'errors': []})
         
     except Exception as e:
         logger.error(f"Error in bulk update: {str(e)}")
