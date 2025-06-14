@@ -141,45 +141,6 @@ def has_companies_in_default(account_id):
     
     return False
 
-def update_prices(companies, account_id):
-    """Update prices for all companies"""
-    results = []
-    
-    for i, company in enumerate(companies):
-        try:
-            identifier = company['identifier']
-            if not identifier:
-                continue
-                
-            result = get_isin_data(identifier)
-            
-            if result['success'] and result.get('price') is not None:
-                price = result.get('price')
-                currency = result.get('currency', 'USD')
-                
-                # Convert to EUR if needed
-                price_eur = price
-                if currency != 'EUR':
-                    try:
-                        rate = get_exchange_rate(currency, 'EUR')
-                        price_eur = price * rate
-                    except Exception as exc:
-                        logger.warning(f"Failed to convert {currency} to EUR: {exc}")
-                        price_eur = price
-                
-                results.append({
-                    'company_id': company['id'],
-                    'price': price,
-                    'price_eur': price_eur,
-                    'currency': currency,
-                    'identifier': identifier
-                })
-                
-        except Exception as e:
-            logger.error(f"Error updating price for {company['name']}: {str(e)}")
-    
-    return results
-
 def get_stock_info(identifier):
     """Wrapper for get_isin_data to keep consistent interface"""
     try:

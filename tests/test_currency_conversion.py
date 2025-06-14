@@ -7,22 +7,27 @@ if 'flask' not in sys.modules:
     flask_stub.session = {}
     sys.modules['flask'] = flask_stub
 
-from app.utils import portfolio_utils
+from app.utils import db_utils
 
 
 def test_update_prices_conversion(monkeypatch):
-    companies = [{'id': 1, 'name': 'TestCo', 'identifier': 'TEST'}]
+    items = [{'identifier': 'TEST'}]
 
-    def fake_get_isin_data(identifier):
-        return {'success': True, 'price': 10.0, 'currency': 'USD'}
+    def fake_get_price(identifier):
+        return True, {
+            'price': 10.0,
+            'currency': 'USD',
+            'price_eur': 5.0,
+            'country': None,
+            'sector': None,
+            'industry': None,
+        }
 
-    def fake_get_exchange_rate(from_currency, to_currency='EUR'):
-        assert from_currency == 'USD'
-        return 0.5
+    monkeypatch.setattr(db_utils, 'update_price_in_db', lambda *args, **kwargs: True)
 
-    monkeypatch.setattr(portfolio_utils, 'get_isin_data', fake_get_isin_data)
-    monkeypatch.setattr(portfolio_utils, 'get_exchange_rate', fake_get_exchange_rate)
+    updated, success, failure = db_utils.update_prices(items, get_price_function=fake_get_price)
 
-    result = portfolio_utils.update_prices(companies, 1)
-    assert result[0]['price_eur'] == 5.0
-    assert result[0]['currency'] == 'USD'
+    assert updated[0]['price_eur'] == 5.0
+    assert updated[0]['currency'] == 'USD'
+    assert success == 1
+    assert failure == 0
