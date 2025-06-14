@@ -25,7 +25,7 @@ def format_number(
         Formatted string representation of the number
     """
     # Handle None/NaN cases
-    if pd.isna(value) or value is None:
+    if pd.isna(value):
         return 'N/A'
     
     try:
@@ -72,7 +72,7 @@ def format_currency(value: Any, currency: str = "€") -> str:
         Formatted currency string
     """
     try:
-        if pd.isna(value) or value is None:
+        if pd.isna(value):
             return f"{currency}0"
             
         value = float(value)
@@ -95,7 +95,7 @@ def format_percentage(value: Any, decimals: int = 0, include_symbol: bool = True
     Returns:
         Formatted percentage string
     """
-    if pd.isna(value) or value is None:
+    if pd.isna(value):
         return "0%" if include_symbol else "0"
         
     try:
@@ -110,7 +110,7 @@ def format_percentage(value: Any, decimals: int = 0, include_symbol: bool = True
 
 def format_percentage_with_sign(value: Any) -> str:
     """Format a number as a percentage with one decimal place and sign"""
-    if pd.isna(value) or value is None:
+    if pd.isna(value):
         return "+0.0%"
         
     try:
@@ -133,7 +133,7 @@ def parse_number(value: Any) -> Optional[float]:
     Returns:
         Parsed float value or None if parsing fails
     """
-    if pd.isna(value) or value is None:
+    if pd.isna(value):
         return None
         
     if isinstance(value, (int, float)):
@@ -190,7 +190,7 @@ def color_negative_red(value: float) -> str:
     Returns:
         CSS color style string
     """
-    if pd.isna(value) or value is None:
+    if pd.isna(value):
         return ''
     return 'color: red' if value < 0 else 'color: green' if value > 0 else ''
 
