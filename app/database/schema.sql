@@ -74,6 +74,7 @@ CREATE INDEX idx_state_updated ON expanded_state(last_updated);
 CREATE INDEX idx_companies_account_id ON companies(account_id);
 CREATE INDEX idx_company_shares_company_id ON company_shares(company_id);
 CREATE INDEX idx_companies_portfolio_id ON companies(portfolio_id);
+CREATE INDEX idx_companies_identifier ON companies(identifier);
 -- Create trigger for expanded_state
 CREATE TRIGGER update_state_timestamp
 AFTER UPDATE ON expanded_state

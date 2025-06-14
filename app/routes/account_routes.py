@@ -130,121 +130,87 @@ def delete_account():
         flash('Please type DELETE to confirm account deletion', 'error')
         return redirect(url_for('account.index'))
     
-    db = None
     try:
         # Create backup before making changes
         backup_database()
-        
-        # Start a transaction
-        db = get_db()
-        db.execute('BEGIN TRANSACTION')
-        
-        # Delete related data in the correct order to maintain foreign key constraints
-        # 1. Delete from expanded_state
-        db.execute('DELETE FROM expanded_state WHERE account_id = ?', [account_id])
-        
-        # 2. Find all identifiers used by this account that need to be checked for deletion
-        identifiers = query_db('''
-            SELECT DISTINCT identifier 
-            FROM companies 
-            WHERE account_id = ? AND identifier IS NOT NULL AND identifier != ''
-        ''', [account_id])
-        
-        # 3. Delete from company_shares (using subquery to find companies of this account)
-        db.execute('''
-            DELETE FROM company_shares 
-            WHERE company_id IN (
-                SELECT id FROM companies WHERE account_id = ?
-            )
-        ''', [account_id])
-        
-        # 4. Delete from companies
-        db.execute('DELETE FROM companies WHERE account_id = ?', [account_id])
-        
-        # 5. Delete from portfolios
-        db.execute('DELETE FROM portfolios WHERE account_id = ?', [account_id])
-        
-        # 6. Delete market_prices entries that are now orphaned (not used by any other accounts)
-        deleted_count = 0
-        try:
-            # Check if this is the last account being deleted
-            remaining_accounts = query_db('SELECT COUNT(*) as count FROM accounts WHERE id != ?', [account_id])
-            is_last_account = remaining_accounts[0]['count'] == 0
-            
-            if is_last_account:
-                # If this is the last account, we can safely delete all market prices
-                logger.info("This is the last account - deleting all market prices")
-                market_prices_count = query_db('SELECT COUNT(*) as count FROM market_prices')
-                count_to_delete = market_prices_count[0]['count']
-                
-                if count_to_delete > 0:
-                    db.execute('DELETE FROM market_prices')
-                    logger.info(f"Deleted all {count_to_delete} market prices as the last account was deleted")
-                    deleted_count = count_to_delete
-            else:
-                # Normal case: check each identifier
-                logger.info(f"Checking {len(identifiers)} market prices for potential cleanup after account deletion")
-                for item in identifiers:
-                    identifier = item['identifier']
-                    
-                    # Check if this identifier is used by any other companies in other accounts
-                    other_usages = query_db('''
-                        SELECT 1 FROM companies 
-                        WHERE identifier = ? 
-                        LIMIT 1
-                    ''', [identifier])
-                    
-                    # If no other account uses this identifier, delete it from market_prices
-                    if not other_usages:
-                        logger.info(f"Deleting orphaned market price for identifier: {identifier}")
-                        db.execute('DELETE FROM market_prices WHERE identifier = ?', [identifier])
-                        deleted_count += 1
-            
-            if deleted_count > 0:
-                logger.info(f"Deleted {deleted_count} orphaned market prices during account deletion")
-                
-            # Double-check for any orphaned market prices (safety check)
-            # This helps catch any market prices that might have been missed
-            if not is_last_account:  # Skip if we already deleted everything
-                all_company_identifiers = query_db('''
-                    SELECT DISTINCT identifier FROM companies 
-                    WHERE identifier IS NOT NULL AND identifier != ''
-                ''')
-                
-                # Convert to a set for faster lookups
-                used_identifiers = {item['identifier'] for item in all_company_identifiers} if all_company_identifiers else set()
-                
-                # Get all identifiers in market_prices
-                all_price_records = query_db('SELECT identifier FROM market_prices')
-                
-                # Find and delete any orphaned identifiers that were missed
-                for item in all_price_records:
-                    identifier = item['identifier']
-                    if identifier not in used_identifiers:
-                        logger.info(f"Found additional orphaned market price to delete: {identifier}")
-                        db.execute('DELETE FROM market_prices WHERE identifier = ?', [identifier])
-                        deleted_count += 1
-        except Exception as e:
-            # Log but don't abort the account deletion if this fails
-            logger.error(f"Error while cleaning up market prices: {str(e)}")
-            # We don't re-raise the exception as we still want the account deletion to proceed
-        
-        # 7. Finally delete the account
-        db.execute('DELETE FROM accounts WHERE id = ?', [account_id])
-        
-        # Commit the transaction
-        db.commit()
-        
-        # Clear session
+
+        # Use context manager so commit/rollback happen automatically
+        with get_db() as db:
+            # Delete related data in the correct order to maintain foreign key constraints
+            db.execute('DELETE FROM expanded_state WHERE account_id = ?', [account_id])
+
+            # Find identifiers used by this account
+            identifiers = query_db('''
+                SELECT DISTINCT identifier
+                FROM companies
+                WHERE account_id = ? AND identifier IS NOT NULL AND identifier != ''
+            ''', [account_id])
+
+            # Remove related company data
+            db.execute('''
+                DELETE FROM company_shares
+                WHERE company_id IN (
+                    SELECT id FROM companies WHERE account_id = ?
+                )
+            ''', [account_id])
+            db.execute('DELETE FROM companies WHERE account_id = ?', [account_id])
+            db.execute('DELETE FROM portfolios WHERE account_id = ?', [account_id])
+
+            # Delete market prices not used by other accounts
+            deleted_count = 0
+            try:
+                remaining_accounts = query_db('SELECT COUNT(*) as count FROM accounts WHERE id != ?', [account_id])
+                is_last_account = remaining_accounts[0]['count'] == 0
+
+                if is_last_account:
+                    logger.info("This is the last account - deleting all market prices")
+                    market_prices_count = query_db('SELECT COUNT(*) as count FROM market_prices')
+                    count_to_delete = market_prices_count[0]['count']
+                    if count_to_delete > 0:
+                        db.execute('DELETE FROM market_prices')
+                        logger.info(f"Deleted all {count_to_delete} market prices as the last account was deleted")
+                        deleted_count = count_to_delete
+                else:
+                    logger.info(f"Checking {len(identifiers)} market prices for potential cleanup after account deletion")
+                    for item in identifiers:
+                        identifier = item['identifier']
+                        other_usages = query_db('''
+                            SELECT 1 FROM companies
+                            WHERE identifier = ?
+                            LIMIT 1
+                        ''', [identifier])
+                        if not other_usages:
+                            logger.info(f"Deleting orphaned market price for identifier: {identifier}")
+                            db.execute('DELETE FROM market_prices WHERE identifier = ?', [identifier])
+                            deleted_count += 1
+
+                if deleted_count > 0:
+                    logger.info(f"Deleted {deleted_count} orphaned market prices during account deletion")
+
+                if not is_last_account:
+                    all_company_identifiers = query_db('''
+                        SELECT DISTINCT identifier FROM companies
+                        WHERE identifier IS NOT NULL AND identifier != ''
+                    ''')
+                    used_identifiers = {item['identifier'] for item in all_company_identifiers} if all_company_identifiers else set()
+                    all_price_records = query_db('SELECT identifier FROM market_prices')
+                    for item in all_price_records:
+                        identifier = item['identifier']
+                        if identifier not in used_identifiers:
+                            logger.info(f"Found additional orphaned market price to delete: {identifier}")
+                            db.execute('DELETE FROM market_prices WHERE identifier = ?', [identifier])
+                            deleted_count += 1
+            except Exception as e:
+                logger.error(f"Error while cleaning up market prices: {str(e)}")
+
+            db.execute('DELETE FROM accounts WHERE id = ?', [account_id])
+
         session.pop('account_id', None)
         session.pop('username', None)
-        
+
         flash('Account deleted successfully', 'success')
-        
+
     except Exception as e:
-        # Rollback in case of error
-        if db is not None:
-            db.rollback()
         flash(f'Error deleting account: {str(e)}', 'error')
     
     return redirect(url_for('main.index'))
