@@ -18,14 +18,7 @@ from app.routes.portfolio_api import (
 # Set up logger
 logger = logging.getLogger(__name__)
 
-# Global progress tracking variables
-price_fetch_progress = {
-    'current': 0,
-    'total': 0,
-    'start_time': None
-}
-
-portfolio_bp = Blueprint('portfolio', __name__, 
+portfolio_bp = Blueprint('portfolio', __name__,
                        url_prefix='/portfolio',
                        template_folder='../../templates')
 

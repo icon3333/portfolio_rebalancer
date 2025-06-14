@@ -10,7 +10,6 @@ import sqlite3
 from app.utils.yfinance_utils import get_isin_data
 from app.utils.db_utils import update_price_in_db
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # This list is just a reference. Actual ISINs will come from the database or user input

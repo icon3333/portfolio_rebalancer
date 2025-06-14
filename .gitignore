@@ -53,3 +53,5 @@ logs/
 .coverage
 htmlcov/
 .pytest_cache/
+# Secret key
+secret_key

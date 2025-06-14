@@ -3,15 +3,14 @@ import logging
 import os
 from datetime import datetime
 
-# Set up logging
-logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
-logger.info("Logger initialized at DEBUG level")
 
 def create_app(config_name='default'):
-    app = Flask(__name__, 
+    logging.basicConfig(level=logging.INFO)
+    app = Flask(__name__,
                 template_folder='../templates',
                 static_folder='../static')
+    logger.info("Logger initialized at INFO level")
     
     # Configure app
     secret_key_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'secret_key')

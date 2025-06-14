@@ -22,13 +22,6 @@ import io
 # Set up logger
 logger = logging.getLogger(__name__)
 
-# Global progress tracking variables
-price_fetch_progress = {
-    'current': 0,
-    'total': 0,
-    'start_time': None
-}
-
 # API endpoint to get and save state data
 def manage_state():
     """Get or save state data"""
@@ -507,12 +500,6 @@ def upload_csv():
     if file.filename == '':
         flash('No file selected', 'error')
         return redirect(url_for('portfolio.enrich'))
-    
-    # Reset global progress tracking
-    global price_fetch_progress
-    price_fetch_progress['current'] = 0
-    price_fetch_progress['total'] = 0
-    price_fetch_progress['start_time'] = datetime.now().isoformat()
     
     # Process the file
     try:

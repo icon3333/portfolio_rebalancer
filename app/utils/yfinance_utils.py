@@ -7,8 +7,6 @@ import warnings
 
 # Suppress specific yfinance warnings that might clutter the logs
 warnings.filterwarnings("ignore", message="^[Tt]he 'period'")
-
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def find_ticker_for_isin(isin: str) -> str:
