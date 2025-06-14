@@ -8,7 +8,7 @@ from app.utils.db_utils import (
 from app.utils.yfinance_utils import get_isin_data
 from app.utils.batch_processing import start_batch_process, get_job_status
 from app.utils.portfolio_utils import (
-    get_portfolio_data, process_csv_data, has_companies_in_default, get_stock_info, update_prices
+    get_portfolio_data, process_csv_data, has_companies_in_default, get_stock_info
 )
 
 import pandas as pd
