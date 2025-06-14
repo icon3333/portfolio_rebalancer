@@ -3,17 +3,13 @@ from flask import (
     request, flash, session, jsonify, current_app
 )
 import logging
-from datetime import datetime
-import uuid
-
-from app.database.db_manager import query_db
+from app.routes.portfolio_api import (
+    get_portfolios_api, get_portfolio_data_api, manage_state,
+    get_allocate_portfolio_data, update_portfolio_api, upload_csv, manage_portfolios
+)
+from app.routes.portfolio_updates import update_price_api, update_single_portfolio_api, bulk_update, get_portfolio_companies
 from app.utils.data_processing import clear_data_caches
 from app.utils.portfolio_utils import get_portfolio_data, has_companies_in_default
-from app.routes.portfolio_api import (
-    get_portfolios_api, get_portfolio_data_api, manage_state, get_portfolio_companies,
-    get_allocate_portfolio_data, update_portfolio_api, update_price_api,
-    update_single_portfolio_api, upload_csv, manage_portfolios, bulk_update
-)
 
 # Set up logger
 logger = logging.getLogger(__name__)

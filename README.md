@@ -39,3 +39,12 @@ have an existing database, recreate it or add the index manually:
 ```sql
 CREATE INDEX idx_companies_identifier ON companies(identifier);
 ```
+
+## Testing
+
+Install dependencies and run the unit tests with `pytest`:
+
+```bash
+pip install -r requirements.txt
+pytest -q
+```
