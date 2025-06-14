@@ -30,3 +30,12 @@ python run.py --port 5000
 ```
 
 The application will be available at `http://localhost:5000`.
+
+## Database changes
+
+An index has been added on `companies.identifier` to speed up lookups. If you
+have an existing database, recreate it or add the index manually:
+
+```sql
+CREATE INDEX idx_companies_identifier ON companies(identifier);
+```

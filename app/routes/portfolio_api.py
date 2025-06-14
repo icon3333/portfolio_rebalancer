@@ -226,7 +226,8 @@ def get_allocate_portfolio_data():
                     position_key = (portfolio_id, position.get('companyName'))
                     position_target_weights[position_key] = position.get('weight', 0)
         
-        # CRITICAL FIX - STEP 1: Count total positions across all portfolios
+        # Count total positions across all portfolios to determine
+        # the flat weight for each position
         total_positions = 0
         portfolio_positions_count = {}
         portfolio_min_positions = {}  # Store minimum positions needed per portfolio
@@ -254,125 +255,87 @@ def get_allocate_portfolio_data():
             
             total_positions += positions_count
         
-        # CRITICAL FIX - STEP 2: Calculate uniform global weight
+        # Calculate uniform global weight for all positions
         flat_position_weight = 100.0 / total_positions if total_positions > 0 else 0
-        logger.info(f"FLAT DISTRIBUTION: {total_positions} total positions with {flat_position_weight:.2f}% each")
+        logger.info(
+            f"FLAT DISTRIBUTION: {total_positions} total positions with {flat_position_weight:.2f}% each"
+        )
         
         result = {'portfolios': []}
-        
-        # Process each portfolio
-        for portfolio in portfolios_data:
-            portfolio_id = portfolio['id']
-            portfolio_name = portfolio['name']
-            
-            # Get categories for this portfolio
-            categories_data = query_db('''
-                SELECT DISTINCT category 
-                FROM companies
-                WHERE account_id = ? AND portfolio_id = ? AND category IS NOT NULL
-                ORDER BY category
-            ''', [account_id, portfolio_id])
-            
-            # Calculate total portfolio value
-            portfolio_value_result = query_db('''
-                SELECT SUM(mp.price_eur * cs.shares) as total_value
-                FROM companies c
-                JOIN market_prices mp ON c.identifier = mp.identifier
-                JOIN company_shares cs ON c.id = cs.company_id
-                WHERE c.account_id = ? AND c.portfolio_id = ? AND cs.shares > 0
-            ''', [account_id, portfolio_id], one=True)
-            
-            portfolio_value = portfolio_value_result['total_value'] if portfolio_value_result['total_value'] else 0
-            
-            # Find target allocation for this portfolio
+
+        # Fetch all portfolio/company data in one query
+        data = query_db('''
+            SELECT p.id AS portfolio_id, p.name AS portfolio_name,
+                   c.category, c.name AS company_name, c.identifier,
+                   cs.shares, mp.price_eur
+            FROM portfolios p
+            LEFT JOIN companies c ON c.portfolio_id = p.id AND c.account_id = p.account_id
+            LEFT JOIN company_shares cs ON c.id = cs.company_id
+            LEFT JOIN market_prices mp ON c.identifier = mp.identifier
+            WHERE p.account_id = ? AND p.name IS NOT NULL
+            ORDER BY p.name, c.category, c.name
+        ''', [account_id])
+
+        # Group data by portfolio and category
+        portfolio_map = {}
+        for row in data:
+            pid = row['portfolio_id']
+            pname = row['portfolio_name']
+            portfolio = portfolio_map.setdefault(pid, {'name': pname, 'categories': {}, 'currentValue': 0})
+
+            if row['company_name'] and row['category']:
+                cat = portfolio['categories'].setdefault(row['category'], {'positions': [], 'currentValue': 0})
+                pos_value = (row['price_eur'] or 0) * (row['shares'] or 0)
+                portfolio['currentValue'] += pos_value
+                cat['currentValue'] += pos_value
+                target_weight = position_target_weights.get((pid, row['company_name']), 0)
+                cat['positions'].append({
+                    'name': row['company_name'],
+                    'currentValue': pos_value,
+                    'targetAllocation': target_weight,
+                    'identifier': row['identifier']
+                })
+
+        for portfolio_id, pdata in portfolio_map.items():
+            portfolio_name = pdata['name']
+
             portfolio_target_weight = 0
             target_portfolio = next((p for p in target_allocations if p.get('id') == portfolio_id), None)
-            
             if target_portfolio:
                 portfolio_target_weight = target_portfolio.get('allocation', 0)
                 logger.info(f"Found target weight for portfolio {portfolio_name}: {portfolio_target_weight}%")
-            
-            # Get position count for this portfolio from our earlier calculation
-            positions_in_portfolio = portfolio_positions_count.get(portfolio_id, 0)
-            
-            # Create portfolio entry
+
             portfolio_entry = {
                 'name': portfolio_name,
-                'currentValue': portfolio_value,
+                'currentValue': pdata['currentValue'],
                 'targetWeight': portfolio_target_weight,
                 'color': '',
                 'categories': []
             }
-            
-            # Process each category
-            for category_data in categories_data:
-                category_name = category_data['category']
-                
-                # Get companies in this category
-                companies_data = query_db('''
-                    SELECT c.id, c.name, c.identifier, cs.shares, mp.price_eur
-                    FROM companies c
-                    LEFT JOIN market_prices mp ON c.identifier = mp.identifier
-                    LEFT JOIN company_shares cs ON c.id = cs.company_id
-                    WHERE c.account_id = ? AND c.portfolio_id = ? AND c.category = ?
-                    ORDER BY c.name
-                ''', [account_id, portfolio_id, category_name])
-                
-                # Skip empty categories
-                if not companies_data:
-                    continue
-                
-                # Calculate category metrics
-                category_positions = []
-                category_current_value = 0
-                
-                for company in companies_data:
-                    position_value = (company['price_eur'] or 0) * (company['shares'] or 0)
-                    category_current_value += position_value
-                    
-                    # Get target weight for this position
-                    position_key = (portfolio_id, company['name'])
-                    target_weight = position_target_weights.get(position_key, 0)
-                    
-                    position_entry = {
-                        'name': company['name'],
-                        'currentValue': position_value,
-                        'targetAllocation': target_weight,  # Use stored target weight
-                        'identifier': company['identifier']
-                    }
-                    category_positions.append(position_entry)
-                
-                # Add category to portfolio
+
+            for cat_name, cat_data in pdata['categories'].items():
                 category_entry = {
-                    'name': category_name,
-                    'positions': category_positions,
-                    'currentValue': category_current_value,
-                    'positionCount': len(category_positions)
+                    'name': cat_name,
+                    'positions': cat_data['positions'],
+                    'currentValue': cat_data['currentValue'],
+                    'positionCount': len(cat_data['positions'])
                 }
-                
                 portfolio_entry['categories'].append(category_entry)
-            
-            # Calculate total target value for portfolio
-            portfolio_target_value = (portfolio_target_weight / 100) * portfolio_value if portfolio_value > 0 else 0
+
+            portfolio_target_value = (portfolio_target_weight / 100) * pdata['currentValue'] if pdata['currentValue'] > 0 else 0
             portfolio_entry['targetValue'] = portfolio_target_value
-            
-            # For each category in the portfolio
+
             for cat in portfolio_entry['categories']:
-                # Calculate category target value based on sum of position target weights
                 cat_target_value = 0
                 for pos in cat['positions']:
-                    # Calculate position target value based on its target allocation
                     pos_target_value = (pos['targetAllocation'] / 100) * portfolio_target_value
                     pos['targetValue'] = pos_target_value
                     cat_target_value += pos_target_value
-                
+
                 cat['targetValue'] = cat_target_value
                 cat['targetWeight'] = (cat_target_value / portfolio_target_value * 100) if portfolio_target_value > 0 else 0
-            
-            # Keep old properties for backwards compatibility - always set this regardless of categories
+
             portfolio_entry['targetAllocation_portfolio'] = portfolio_target_value
-            
-            # Now add the portfolio entry to the result
             result['portfolios'].append(portfolio_entry)
         
         logger.info(f"Returning {len(result['portfolios'])} portfolios with flat {flat_position_weight:.2f}% weight per position")

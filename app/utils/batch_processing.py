@@ -1,5 +1,6 @@
 import logging
 import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import uuid
 import json
 from datetime import datetime
@@ -55,25 +56,37 @@ def process_isins(app, job_id, isins):
         processed = 0
         success_count = 0
         failure_count = 0
-        
-        for isin in isins:
+
+        def fetch(isin):
             try:
-                logger.info(f"Processing ISIN {isin} ({processed+1}/{total})")
-                result = get_isin_data(isin)
+                logger.info(f"Processing ISIN {isin}")
+                return isin, get_isin_data(isin)
+            except Exception as e:
+                logger.error(f"Error processing {isin}: {str(e)}")
+                return isin, {
+                    'success': False,
+                    'isin': isin,
+                    'error': str(e),
+                    'status': 'error',
+                    'timestamp': datetime.now().isoformat()
+                }
+
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            future_to_isin = {executor.submit(fetch, isin): isin for isin in isins}
+            for future in as_completed(future_to_isin):
+                isin, result = future.result()
                 results[isin] = result
-                
-                # Update price in database if successful
+
                 if result.get('success') and result.get('price') is not None:
                     success = update_price_in_db(
-                        isin, 
-                        result.get('price'), 
+                        isin,
+                        result.get('price'),
                         result.get('currency', 'USD'),
                         result.get('price_eur', result.get('price')),
-                        result.get('country'),  # Add country information
-                        result.get('sector'),   # Add sector information
-                        result.get('industry')  # Add industry information
+                        result.get('country'),
+                        result.get('sector'),
+                        result.get('industry')
                     )
-                    
                     if success:
                         logger.info(f"Successfully updated price for {isin}: {result.get('price')} {result.get('currency', 'USD')}")
                         success_count += 1
@@ -83,26 +96,14 @@ def process_isins(app, job_id, isins):
                 else:
                     logger.warning(f"No valid price data for {isin}: success={result.get('success')}, price={result.get('price')}")
                     failure_count += 1
-                    
-            except Exception as e:
-                logger.error(f"Error processing {isin}: {str(e)}")
-                results[isin] = {
-                    'success': False,
-                    'isin': isin,
-                    'error': str(e),
-                    'status': 'error',
-                    'timestamp': datetime.now().isoformat()
-                }
-                failure_count += 1
-            
-            # Update progress
-            processed += 1
-            c.execute('''
-                UPDATE batch_jobs 
-                SET progress = ?, updated_at = ?
-                WHERE job_id = ?
-            ''', (processed, datetime.now().isoformat(), job_id))
-            conn.commit()
+
+                processed += 1
+                c.execute('''
+                    UPDATE batch_jobs
+                    SET progress = ?, updated_at = ?
+                    WHERE job_id = ?
+                ''', (processed, datetime.now().isoformat(), job_id))
+                conn.commit()
         
         # Add success/failure counts to results
         summary = {
