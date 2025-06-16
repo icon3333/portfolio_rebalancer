@@ -106,43 +106,70 @@
         
         <!-- Risk Breakdown Section -->
         <section class="mb-6">
-            <h2 class="section-title">Heatmap</h2>
+            <h2 class="section-title">Heatmaps</h2>
             
-            <!-- Heatmap Section - Expandable (starts expanded) -->
+            <!-- Category Heatmap Section - Expandable (starts expanded) -->
             <div class="portfolio-section mb-4">
                 <div class="portfolio-header">
                     <div class="is-flex is-justify-content-space-between is-align-items-center">
-                        <h4 class="portfolio-header-title">Heatmap</h4>
+                        <h4 class="portfolio-header-title">Category vs Country Heatmap</h4>
                         <span class="icon toggle-portfolio">
                             <i class="fas fa-chevron-up"></i>
                         </span>
                     </div>
                 </div>
                 <div class="portfolio-content" style="display: block;">
-                    <!-- Moved dimension select inside heatmap container -->
-                    <div class="field mb-3">
-                        <div class="control is-pulled-right">
-                            <div class="select is-small">
-                                <select id="riskDimensionSelect">
-                                    <option value="category">Category</option>
-                                    <option value="sector">Sector</option>
-                                    <option value="industry">Industry</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="is-clearfix"></div>
-            </div>
-            
                     <div class="columns">
                         <div class="column is-full">
                             <div class="chart-large-container">
-                                <div id="riskHeatmap"></div>
-                            </div>
-                        </div>
+                                <div id="categoryHeatmap"></div>
                             </div>
                         </div>
                     </div>
-            
+                </div>
+            </div>
+
+            <!-- Sector Heatmap Section - Expandable (starts expanded) -->
+            <div class="portfolio-section mb-4">
+                <div class="portfolio-header">
+                    <div class="is-flex is-justify-content-space-between is-align-items-center">
+                        <h4 class="portfolio-header-title">Sector vs Country Heatmap</h4>
+                        <span class="icon toggle-portfolio">
+                            <i class="fas fa-chevron-up"></i>
+                        </span>
+                    </div>
+                </div>
+                <div class="portfolio-content" style="display: block;">
+                    <div class="columns">
+                        <div class="column is-full">
+                            <div class="chart-large-container">
+                                <div id="sectorHeatmap"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Industry Heatmap Section - Expandable (starts expanded) -->
+            <div class="portfolio-section mb-4">
+                <div class="portfolio-header">
+                    <div class="is-flex is-justify-content-space-between is-align-items-center">
+                        <h4 class="portfolio-header-title">Industry vs Country Heatmap</h4>
+                        <span class="icon toggle-portfolio">
+                            <i class="fas fa-chevron-up"></i>
+                        </span>
+                    </div>
+                </div>
+                <div class="portfolio-content" style="display: block;">
+                    <div class="columns">
+                        <div class="column is-full">
+                            <div class="chart-large-container">
+                                <div id="industryHeatmap"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
         </section>
 </div>
@@ -1565,18 +1592,25 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // New Risk Breakdown Functions
     function initializeRiskBreakdown() {
-        const dimension = document.getElementById('riskDimensionSelect').value;
-        const heatmapData = calculateExposureData(selectedPortfolioIds, dimension);
+        // Calculate data for all three heatmaps
+        const categoryHeatmapData = calculateExposureData(selectedPortfolioIds, 'category');
+        const sectorHeatmapData = calculateExposureData(selectedPortfolioIds, 'sector');
+        const industryHeatmapData = calculateExposureData(selectedPortfolioIds, 'industry');
         
-        // Ensure the heatmap container is visible before rendering
-        const heatmapContainer = document.querySelector('#riskHeatmap').closest('.portfolio-content');
-        if (heatmapContainer) {
-            heatmapContainer.style.display = 'block';
-        }
+        // Ensure the heatmap containers are visible before rendering
+        const categoryContainer = document.querySelector('#categoryHeatmap').closest('.portfolio-content');
+        const sectorContainer = document.querySelector('#sectorHeatmap').closest('.portfolio-content');
+        const industryContainer = document.querySelector('#industryHeatmap').closest('.portfolio-content');
         
-        // Render the heatmap with a slight delay to ensure container is fully visible
+        if (categoryContainer) categoryContainer.style.display = 'block';
+        if (sectorContainer) sectorContainer.style.display = 'block';
+        if (industryContainer) industryContainer.style.display = 'block';
+        
+        // Render all three heatmaps with a slight delay to ensure containers are fully visible
         setTimeout(() => {
-            renderHeatmap(heatmapData, dimension);
+            renderHeatmap(categoryHeatmapData, 'category', 'categoryHeatmap');
+            renderHeatmap(sectorHeatmapData, 'sector', 'sectorHeatmap');
+            renderHeatmap(industryHeatmapData, 'industry', 'industryHeatmap');
         }, 50);
 
         // Calculate data for distribution charts
@@ -1590,13 +1624,6 @@ document.addEventListener('DOMContentLoaded', function() {
         renderDistributionBarChart('categoryDistributionChart', categoryDistribution, 'Category Distribution');
         renderDistributionBarChart('sectorDistributionChart', sectorDistribution, 'Sector Distribution');
         renderDistributionBarChart('industryDistributionChart', industryDistribution, 'Industry Distribution');
-
-        // Set up dimension select change handler
-        document.getElementById('riskDimensionSelect').addEventListener('change', function() {
-            const newDimension = this.value;
-            const newHeatmapData = calculateExposureData(selectedPortfolioIds, newDimension);
-            renderHeatmap(newHeatmapData, newDimension);
-        });
         
         // Initialize expandable sections with consistent event handling
         initializeExpandableRiskSections();
@@ -1608,16 +1635,17 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function updateRiskBreakdown() {
-        const dimension = document.getElementById('riskDimensionSelect').value;
-        
         // Check if any portfolios are selected
         if (selectedPortfolioIds.length === 0) {
-            // Display a message in the heatmap container when no portfolios are selected
-            document.getElementById('riskHeatmap').innerHTML = 
-                '<div class="has-text-centered p-6">' +
+            // Display a message in all heatmap containers when no portfolios are selected
+            const noDataMessage = '<div class="has-text-centered p-6">' +
                 '<p class="has-text-grey-light"><i class="fas fa-info-circle mr-2"></i>' +
                 'No portfolios selected. Please select at least one portfolio in the Global Overview section.</p>' +
                 '</div>';
+            
+            document.getElementById('categoryHeatmap').innerHTML = noDataMessage;
+            document.getElementById('sectorHeatmap').innerHTML = noDataMessage;
+            document.getElementById('industryHeatmap').innerHTML = noDataMessage;
                 
             // Display empty charts for all distributions
             document.getElementById('countryDistributionChart').innerHTML = 
@@ -1633,63 +1661,89 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         try {
-            // Process data and update charts as normal when portfolios are selected
-        const heatmapData = calculateExposureData(selectedPortfolioIds, dimension);
+            // Calculate data for all three heatmaps
+            const categoryHeatmapData = calculateExposureData(selectedPortfolioIds, 'category');
+            const sectorHeatmapData = calculateExposureData(selectedPortfolioIds, 'sector');
+            const industryHeatmapData = calculateExposureData(selectedPortfolioIds, 'industry');
             
-            // Ensure we have valid data before rendering
-            if (heatmapData && heatmapData.countries && heatmapData.countries.length > 0) {
-        renderHeatmap(heatmapData, dimension);
+            // Render category heatmap
+            if (categoryHeatmapData && categoryHeatmapData.countries && categoryHeatmapData.countries.length > 0) {
+                renderHeatmap(categoryHeatmapData, 'category', 'categoryHeatmap');
             } else {
-                // If no data available for the heatmap, show a message
-                document.getElementById('riskHeatmap').innerHTML = 
+                document.getElementById('categoryHeatmap').innerHTML = 
                     '<div class="has-text-centered p-6">' +
                     '<p class="has-text-grey-light"><i class="fas fa-info-circle mr-2"></i>' +
-                    'No data available for the selected portfolios and dimension.</p>' +
+                    'No category data available for the selected portfolios.</p>' +
+                    '</div>';
+            }
+            
+            // Render sector heatmap
+            if (sectorHeatmapData && sectorHeatmapData.countries && sectorHeatmapData.countries.length > 0) {
+                renderHeatmap(sectorHeatmapData, 'sector', 'sectorHeatmap');
+            } else {
+                document.getElementById('sectorHeatmap').innerHTML = 
+                    '<div class="has-text-centered p-6">' +
+                    '<p class="has-text-grey-light"><i class="fas fa-info-circle mr-2"></i>' +
+                    'No sector data available for the selected portfolios.</p>' +
+                    '</div>';
+            }
+            
+            // Render industry heatmap
+            if (industryHeatmapData && industryHeatmapData.countries && industryHeatmapData.countries.length > 0) {
+                renderHeatmap(industryHeatmapData, 'industry', 'industryHeatmap');
+            } else {
+                document.getElementById('industryHeatmap').innerHTML = 
+                    '<div class="has-text-centered p-6">' +
+                    '<p class="has-text-grey-light"><i class="fas fa-info-circle mr-2"></i>' +
+                    'No industry data available for the selected portfolios.</p>' +
                     '</div>';
             }
 
-        // Update distribution charts
-        const countryDistribution = calculateExposureByDimension(selectedPortfolioIds, 'country');
-        const categoryDistribution = calculateExposureByDimension(selectedPortfolioIds, 'category');
-        const sectorDistribution = calculateExposureByDimension(selectedPortfolioIds, 'sector');
-        const industryDistribution = calculateExposureByDimension(selectedPortfolioIds, 'industry');
-        
+            // Update distribution charts
+            const countryDistribution = calculateExposureByDimension(selectedPortfolioIds, 'country');
+            const categoryDistribution = calculateExposureByDimension(selectedPortfolioIds, 'category');
+            const sectorDistribution = calculateExposureByDimension(selectedPortfolioIds, 'sector');
+            const industryDistribution = calculateExposureByDimension(selectedPortfolioIds, 'industry');
+            
             // Only render charts if we have data
             if (countryDistribution && countryDistribution.labels && countryDistribution.labels.length > 0) {
-        renderDistributionBarChart('countryDistributionChart', countryDistribution, 'Country Distribution');
+                renderDistributionBarChart('countryDistributionChart', countryDistribution, 'Country Distribution');
             } else {
                 document.getElementById('countryDistributionChart').innerHTML = 
                     '<div class="has-text-centered p-6"><p class="has-text-grey-light">No country data available</p></div>';
             }
             
             if (categoryDistribution && categoryDistribution.labels && categoryDistribution.labels.length > 0) {
-        renderDistributionBarChart('categoryDistributionChart', categoryDistribution, 'Category Distribution');
+                renderDistributionBarChart('categoryDistributionChart', categoryDistribution, 'Category Distribution');
             } else {
                 document.getElementById('categoryDistributionChart').innerHTML = 
                     '<div class="has-text-centered p-6"><p class="has-text-grey-light">No category data available</p></div>';
             }
             
             if (sectorDistribution && sectorDistribution.labels && sectorDistribution.labels.length > 0) {
-        renderDistributionBarChart('sectorDistributionChart', sectorDistribution, 'Sector Distribution');
+                renderDistributionBarChart('sectorDistributionChart', sectorDistribution, 'Sector Distribution');
             } else {
                 document.getElementById('sectorDistributionChart').innerHTML = 
                     '<div class="has-text-centered p-6"><p class="has-text-grey-light">No sector data available</p></div>';
             }
             
             if (industryDistribution && industryDistribution.labels && industryDistribution.labels.length > 0) {
-        renderDistributionBarChart('industryDistributionChart', industryDistribution, 'Industry Distribution');
+                renderDistributionBarChart('industryDistributionChart', industryDistribution, 'Industry Distribution');
             } else {
                 document.getElementById('industryDistributionChart').innerHTML = 
                     '<div class="has-text-centered p-6"><p class="has-text-grey-light">No industry data available</p></div>';
             }
         } catch (error) {
             console.error('Error updating risk breakdown:', error);
-            // Show error message in the risk breakdown section
-            document.getElementById('riskHeatmap').innerHTML = 
-                '<div class="has-text-centered p-6">' +
+            // Show error message in all heatmap sections
+            const errorMessage = '<div class="has-text-centered p-6">' +
                 '<p class="has-text-grey-light"><i class="fas fa-exclamation-circle mr-2"></i>' +
                 'An error occurred while updating the risk breakdown. Please try again.</p>' +
                 '</div>';
+            
+            document.getElementById('categoryHeatmap').innerHTML = errorMessage;
+            document.getElementById('sectorHeatmap').innerHTML = errorMessage;
+            document.getElementById('industryHeatmap').innerHTML = errorMessage;
         }
     }
 
@@ -1833,12 +1887,12 @@ document.addEventListener('DOMContentLoaded', function() {
         };
     }
 
-    function renderHeatmap(data, dimensionName) {
+    function renderHeatmap(data, dimensionName, elementId = 'riskHeatmap') {
         // Enhanced error checking
         if (!data || !data.countries || !data.dims || 
             data.countries.length === 0 || data.dims.length === 0) {
-            console.log('No data available for risk heatmap:', data);
-            document.getElementById('riskHeatmap').innerHTML = 
+            console.log(`No data available for ${dimensionName} heatmap:`, data);
+            document.getElementById(elementId).innerHTML = 
                 '<div class="has-text-centered p-4">' +
                 '<p class="has-text-grey"><i class="fas fa-info-circle mr-2"></i>' +
                 'No data available for the selected portfolios and dimension.</p>' +
@@ -1847,7 +1901,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // Use the new ChartConfig to create heatmap
-        ChartConfig.createHeatmap('riskHeatmap', data, {
+        ChartConfig.createHeatmap(elementId, data, {
             title: '',
             height: 400,
             colors: ['#ebedf0', '#c0ddf9', '#73b3f3', '#3886e1', '#17459e']
@@ -2148,11 +2202,16 @@ document.addEventListener('DOMContentLoaded', function() {
                         renderDistributionBarChart('industryDistributionChart', industryDistribution, 'Industry Distribution');
                     }
                     
-                    // If this is the heatmap section, make sure to render/resize the heatmap
-                    if (section.querySelector('#riskHeatmap')) {
-                        const dimension = document.getElementById('riskDimensionSelect').value;
-                        const heatmapData = calculateExposureData(selectedPortfolioIds, dimension);
-                        renderHeatmap(heatmapData, dimension);
+                    // If this is a heatmap section, make sure to render/resize the heatmaps
+                    if (section.querySelector('#categoryHeatmap')) {
+                        const categoryHeatmapData = calculateExposureData(selectedPortfolioIds, 'category');
+                        renderHeatmap(categoryHeatmapData, 'category', 'categoryHeatmap');
+                    } else if (section.querySelector('#sectorHeatmap')) {
+                        const sectorHeatmapData = calculateExposureData(selectedPortfolioIds, 'sector');
+                        renderHeatmap(sectorHeatmapData, 'sector', 'sectorHeatmap');
+                    } else if (section.querySelector('#industryHeatmap')) {
+                        const industryHeatmapData = calculateExposureData(selectedPortfolioIds, 'industry');
+                        renderHeatmap(industryHeatmapData, 'industry', 'industryHeatmap');
                     }
                 } else {
                     content.style.display = 'none';

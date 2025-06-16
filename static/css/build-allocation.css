@@ -71,6 +71,58 @@
   padding: var(--space-lg) var(--space-xl);
 }
 
+/* Allocation Rules List Styles */
+.allocation-rules-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.rule-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md) 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.rule-item:last-child {
+  border-bottom: none;
+}
+
+.rule-description {
+  flex: 1;
+  margin-right: var(--space-lg);
+}
+
+.rule-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-color);
+  margin-bottom: var(--space-xs);
+}
+
+.rule-subtitle {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-bottom: 0;
+  line-height: 1.4;
+}
+
+.rule-input {
+  flex-shrink: 0;
+  width: 140px;
+}
+
+.rule-input .field {
+  margin-bottom: 0;
+}
+
+.rule-input .input {
+  text-align: center;
+  font-weight: 500;
+}
+
 /* Compact Box for Portfolio Items */
 .compact-box {
   background-color: var(--card-bg);
@@ -201,5 +253,21 @@
   
   .add-position-section {
     padding: var(--space-md);
+  }
+  
+  /* Allocation Rules responsive adjustments */
+  .rule-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-md);
+  }
+  
+  .rule-description {
+    margin-right: 0;
+  }
+  
+  .rule-input {
+    width: 100%;
+    max-width: 200px;
   }
 }

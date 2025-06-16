@@ -23,7 +23,9 @@ document.addEventListener('DOMContentLoaded', function() {
       },
       rules: {
         maxPerStock: 5,
-        maxPerCategory: 25
+        maxPerCategory: 25,
+        maxPerCountry: 10,
+        maxPerExchange: 10
       },
       portfolios: [],
       availablePortfolios: [],
@@ -192,6 +194,13 @@ document.addEventListener('DOMContentLoaded', function() {
           
           if (response.data && response.data.rules) {
             this.rules = JSON.parse(response.data.rules);
+            // Ensure all new rule fields have default values for backward compatibility
+            if (!this.rules.hasOwnProperty('maxPerCountry')) {
+              this.rules.maxPerCountry = 10;
+            }
+            if (!this.rules.hasOwnProperty('maxPerExchange')) {
+              this.rules.maxPerExchange = 10;
+            }
           }
           
           // Create a map of available portfolio IDs and names
