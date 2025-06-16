@@ -15,12 +15,22 @@
             </a>
         </li>
         <li>
+            <a href="{{ url_for('portfolio.risk_overview') }}" class="{{ 'is-active' if request.endpoint == 'portfolio.risk_overview' }}">
+                <span class="icon-text">
+                    <span class="icon">
+                        <i class="fas fa-chart-pie"></i>
+                    </span>
+                    <span>Risk Overview</span>
+                </span>
+            </a>
+        </li>
+        <li>
             <a href="{{ url_for('portfolio.analyse') }}" class="{{ 'is-active' if request.endpoint == 'portfolio.analyse' }}">
                 <span class="icon-text">
                     <span class="icon">
                         <i class="fas fa-search"></i>
                     </span>
-                    <span>Analyse</span>
+                    <span>Risk Detail</span>
                 </span>
             </a>
         </li>

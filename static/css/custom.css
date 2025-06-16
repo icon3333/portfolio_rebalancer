@@ -1575,18 +1575,8 @@ p {
     vertical-align: middle; /* Improves alignment with text */
 }
 
-/* Chart styling - Hide legends and ensure charts are visible */
-.frappe-chart .chart-legend,
-.frappe-chart .legend-dataset-text,
-.frappe-chart .legend-dataset-list,
-.frappe-chart .chart-legend-container,
-.chart-legend,
-.legend-dataset,
-.legend {
-    display: none !important;
-}
-
-.frappe-chart {
+/* ApexCharts styling - Ensure charts are visible and responsive */
+.apexcharts-canvas {
     width: 100% !important;
     height: 100% !important;
 }
@@ -1598,13 +1588,24 @@ p {
     position: relative;
 }
 
-/* Ensure chart SVG elements are visible */
-.frappe-chart svg {
+/* ApexCharts responsive container */
+.apexcharts-svg {
     width: 100% !important;
     height: 100% !important;
 }
 
-/* Force hide any legend-related elements */
-.frappe-chart * [class*="legend"] {
-    display: none !important;
+/* Style data labels for better visibility */
+.apexcharts-datalabels text {
+    font-weight: 600 !important;
+}
+
+/* Legend styling */
+.apexcharts-legend {
+    padding: 10px 0 !important;
+}
+
+/* Tooltip styling */
+.apexcharts-tooltip {
+    border-radius: 8px !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
 }

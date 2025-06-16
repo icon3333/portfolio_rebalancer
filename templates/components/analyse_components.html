@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Portfolio Analysis Chart Components</title>
-  <!-- Frappe Charts is included in base.html -->
+  <!-- ApexCharts is included in base.html -->
   <style>
     .sunburst-legend {
       max-height: 150px;
@@ -22,7 +22,7 @@
 /**
  * NOTE:
  * -------
- * This version uses Frappe Charts instead of Plotly.
+ * This version uses ApexCharts for all visualizations.
  * It assumes that the following global variables
  * are set from your main "analyse.html" script:
  *
@@ -37,7 +37,7 @@ window.PortfolioCharts = (function() {
     const chartInstances = {};
 
     /**
-     * Creates a doughnut (pie) chart with a hole in the middle.
+     * Creates a doughnut chart with ApexCharts.
      * @param {string} elementId - ID of the element to render chart in
      * @param {Array<string>} labels - Array of labels
      * @param {Array<number>} values - Array of actual monetary values
@@ -56,7 +56,8 @@ window.PortfolioCharts = (function() {
             percentages: percentages,
             formatCurrency: formatCurrency,
             formatPercentage: window.formatPercentage || (v => v),
-            height: 400
+            height: 400,
+            showTotal: true
         });
     }
 
@@ -128,21 +129,19 @@ window.PortfolioCharts = (function() {
         mainContainer.appendChild(detailsDiv);
         chartContainer.appendChild(mainContainer);
         
-        // Create the donut chart
-        const chart = new frappe.Chart(`#${chartDiv.id}`, {
-            data: {
-                labels: categoryLabels,
-                datasets: [{
-                    values: categoryValues
-                }]
-            },
-            type: 'donut',
-            height: 300,
-            colors: categoryColors,
-            tooltipOptions: {
-                formatTooltipY: (d) => formatCurrency(d)
+        // Create the doughnut chart using ApexCharts
+        const chart = ChartConfig.createDoughnutChart(chartDiv.id, 
+            categories.map(cat => cat.name), 
+            categoryValues, 
+            {
+                colors: categoryColors,
+                percentages: categories.map(cat => cat.percentage),
+                formatCurrency: formatCurrency,
+                formatPercentage: formatPercentage,
+                height: 300,
+                showTotal: true
             }
-        });
+        );
         
         // Add click handler to show category details
         chartDiv.addEventListener('click', function(e) {

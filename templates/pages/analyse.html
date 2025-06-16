@@ -13,76 +13,7 @@
     </div>
     
     <div id="analysisContent" style="display: none;">
-        <!-- Portfolio Filters - Positioned at the top of the page -->
-        <div class="portfolio-filter-container has-text-centered mb-5 p-3">
-            <div id="portfolioFilters" class="is-flex is-flex-wrap-wrap is-justify-content-center">
-                <!-- Portfolio checkboxes will be added here dynamically -->
-            </div>
-        </div>
-        
-        <!-- Global Overview Section -->
-        <section class="mb-6">
-            <div class="is-flex is-justify-content-space-between is-align-items-center mb-4">
-                <h2 class="section-title">Global Overview</h2>
-            </div>
-            
-            <div class="columns">
-                <div class="column is-half">
-                    <h3 class="subtitle is-5 has-text-centered mb-2">Portfolio Allocations</h3>
-                    <div class="chart-large-container">
-                        <div id="portfolioAllocationsChart"></div>
-                    </div>
-                </div>
-                <div class="column is-half">
-                    <h3 class="subtitle is-5 has-text-centered mb-2">Company Allocations (All Portfolios)</h3>
-                    <div class="chart-large-container">
-                        <div id="companyAllocationsChart"></div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Details Section - Expandable -->
-            <div class="portfolio-section mb-4">
-                <div class="portfolio-header">
-                    <div class="is-flex is-justify-content-space-between is-align-items-center">
-                        <h4 class="portfolio-header-title">Details</h4>
-                        <span class="icon toggle-portfolio">
-                            <i class="fas fa-chevron-down"></i>
-                        </span>
-                    </div>
-                </div>
-                <div class="portfolio-content" style="display: none;">
-                    <div class="columns">
-                        <div class="column is-half">
-                            <h3 class="subtitle is-5 has-text-centered mb-2">Country Distribution</h3>
-                            <div class="chart-medium-container">
-                                <div id="countryDistributionChart"></div>
-                            </div>
-                        </div>
-                        <div class="column is-half">
-                            <h3 class="subtitle is-5 has-text-centered mb-2">Category Distribution</h3>
-                            <div class="chart-medium-container">
-                                <div id="categoryDistributionChart"></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="columns mt-4">
-                        <div class="column is-half">
-                            <h3 class="subtitle is-5 has-text-centered mb-2">Sector Distribution</h3>
-                            <div class="chart-medium-container">
-                                <div id="sectorDistributionChart"></div>
-                            </div>
-                        </div>
-                        <div class="column is-half">
-                            <h3 class="subtitle is-5 has-text-centered mb-2">Industry Distribution</h3>
-                            <div class="chart-medium-container">
-                                <div id="industryDistributionChart"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
+
         
         <!-- Portfolio Breakdown Section -->
         <section class="mb-6">
@@ -106,7 +37,7 @@
         
         <!-- Risk Breakdown Section -->
         <section class="mb-6">
-            <h2 class="section-title">Heatmaps</h2>
+            <h2 class="section-title">Concentration</h2>
             
             <!-- Category Heatmap Section - Expandable (starts expanded) -->
             <div class="portfolio-section mb-4">
@@ -200,13 +131,13 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM loaded, initializing Portfolio Analysis...');
     
     // Check if required dependencies are loaded
-    if (typeof frappe === 'undefined') {
-        console.error('Frappe Charts is not loaded');
+    if (typeof ApexCharts === 'undefined') {
+        console.error('ApexCharts is not loaded');
         document.getElementById('loadingIndicator').innerHTML = `
             <div class="has-text-centered">
                 <p class="has-text-danger mb-3">
                     <i class="fas fa-exclamation-triangle mr-2"></i>
-                    Required chart library (Frappe Charts) is not loaded.
+                    Required chart library (ApexCharts) is not loaded.
                 </p>
                 <button class="button is-info" onclick="location.reload()">
                     <i class="fas fa-refresh mr-2"></i>Try Again
@@ -383,7 +314,6 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('Data processed successfully, initializing UI...');
             
             // Initialize the UI
-            initializePortfolioFilters();
             initializeCharts();
             renderPortfolioSections();
             initializeExpandablePortfolios();
@@ -700,68 +630,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return Object.values(categories).sort((a, b) => b.currentValue - a.currentValue);
     }
     
-    // Initialize portfolio filter checkboxes
-    function initializePortfolioFilters() {
-        const filterContainer = document.getElementById('portfolioFilters');
-        
-        // Filter out empty portfolios
-        const nonEmptyPortfolios = portfolios.filter(portfolio => {
-            const portfolioInfo = portfolioData.find(p => p.name === portfolio.name);
-            return portfolioInfo && portfolioInfo.companies && portfolioInfo.companies.length > 0;
-        });
-        
-        nonEmptyPortfolios.forEach(portfolio => {
-            const checkboxDiv = document.createElement('div');
-            checkboxDiv.className = 'control mx-2 my-1';
-            
-            const label = document.createElement('label');
-            label.className = 'portfolio-filter-checkbox checkbox';
-            
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.value = portfolio.id;
-            checkbox.checked = true; // All checked by default
-            checkbox.dataset.portfolioName = portfolio.name;
-            
-            // Add change event listener
-            checkbox.addEventListener('change', handlePortfolioFilterChange);
-            
-            label.appendChild(checkbox);
-            label.appendChild(document.createTextNode(' ' + portfolio.name));
-            
-            checkboxDiv.appendChild(label);
-            filterContainer.appendChild(checkboxDiv);
-        });
-    }
-    
-    // Handle portfolio filter change
-    function handlePortfolioFilterChange(event) {
-        const checkbox = event.target;
-        const portfolioId = parseInt(checkbox.value);
-        
-        if (checkbox.checked) {
-            if (!selectedPortfolioIds.includes(portfolioId)) {
-                selectedPortfolioIds.push(portfolioId);
-            }
-        } else {
-            selectedPortfolioIds = selectedPortfolioIds.filter(id => id !== portfolioId);
-        }
-        
-        // Update everything based on new selection
-        updateCharts();
-        updatePortfolioSectionVisibility();
-        updateRiskBreakdown();
-    }
-    
-    // Update visibility of portfolio sections
-    function updatePortfolioSectionVisibility() {
-        const portfolioSections = document.querySelectorAll('.portfolio-section[data-portfolio-id]');
-        
-        portfolioSections.forEach(section => {
-            const portfolioId = parseInt(section.dataset.portfolioId);
-            section.style.display = selectedPortfolioIds.includes(portfolioId) ? 'block' : 'none';
-        });
-    }
+
     
     // Initialize charts
     function initializeCharts() {
@@ -783,19 +652,22 @@ document.addEventListener('DOMContentLoaded', function() {
         const filteredPortfolios = portfolioData.filter(p => selectedPortfolioIds.includes(p.id));
         const labels = filteredPortfolios.map(p => p.name);
         const values = filteredPortfolios.map(p => p.totalValue);
-        const colors = generateColors(labels.length);
+        const colors = ChartConfig.generateColors(labels.length);
         
         try {
-            if (typeof window.PortfolioCharts !== 'undefined' && window.PortfolioCharts.createDoughnutChart) {
-                window.PortfolioCharts.createDoughnutChart(
+            if (typeof ChartConfig !== 'undefined' && ChartConfig.createDoughnutChart) {
+                ChartConfig.createDoughnutChart(
                     'portfolioAllocationsChart',
                     labels,
                     values,
-                    '',  // Empty title to avoid duplication
-                    colors
+                    {
+                        colors: colors,
+                        height: 400,
+                        showTotal: true
+                    }
                 );
             } else {
-                console.error('PortfolioCharts.createDoughnutChart not available');
+                console.error('ChartConfig.createDoughnutChart not available');
                 document.getElementById('portfolioAllocationsChart').innerHTML = 
                     '<div class="has-text-centered p-4"><p class="has-text-grey-light">Chart library not loaded</p></div>';
             }
@@ -816,18 +688,18 @@ document.addEventListener('DOMContentLoaded', function() {
         const filteredPortfolios = portfolioData.filter(p => selectedPortfolioIds.includes(p.id));
         const labels = filteredPortfolios.map(p => p.name);
         const values = filteredPortfolios.map(p => p.totalValue);
-        const colors = generateColors(labels.length);
+        const colors = ChartConfig.generateColors(labels.length);
         
         try {
-            if (typeof window.PortfolioCharts !== 'undefined' && window.PortfolioCharts.updateDoughnutChart) {
-                window.PortfolioCharts.updateDoughnutChart(
+            if (typeof ChartConfig !== 'undefined' && ChartConfig.updateDoughnutChart) {
+                ChartConfig.updateDoughnutChart(
                     'portfolioAllocationsChart',
                     labels,
                     values,
                     colors
                 );
             } else {
-                console.warn('PortfolioCharts.updateDoughnutChart not available, recreating chart');
+                console.warn('ChartConfig.updateDoughnutChart not available, recreating chart');
                 initializePortfolioAllocationsChart();
             }
         } catch (error) {
@@ -842,19 +714,22 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Sort and prepare chart data
         const { labels, values } = prepareChartData(companyGroups);
-        const colors = generateColors(labels.length);
+        const colors = ChartConfig.generateColors(labels.length);
         
         try {
-            if (typeof window.PortfolioCharts !== 'undefined' && window.PortfolioCharts.createDoughnutChart) {
-                window.PortfolioCharts.createDoughnutChart(
+            if (typeof ChartConfig !== 'undefined' && ChartConfig.createDoughnutChart) {
+                ChartConfig.createDoughnutChart(
                     'companyAllocationsChart',
                     labels,
                     values,
-                    '',  // Empty title to avoid duplication
-                    colors
+                    {
+                        colors: colors,
+                        height: 400,
+                        showTotal: true
+                    }
                 );
             } else {
-                console.error('PortfolioCharts.createDoughnutChart not available');
+                console.error('ChartConfig.createDoughnutChart not available');
                 document.getElementById('companyAllocationsChart').innerHTML = 
                     '<div class="has-text-centered p-4"><p class="has-text-grey-light">Chart library not loaded</p></div>';
             }
@@ -877,18 +752,18 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Sort and prepare chart data
         const { labels, values } = prepareChartData(companyGroups);
-        const colors = generateColors(labels.length);
+        const colors = ChartConfig.generateColors(labels.length);
         
         try {
-            if (typeof window.PortfolioCharts !== 'undefined' && window.PortfolioCharts.updateDoughnutChart) {
-                window.PortfolioCharts.updateDoughnutChart(
+            if (typeof ChartConfig !== 'undefined' && ChartConfig.updateDoughnutChart) {
+                ChartConfig.updateDoughnutChart(
                     'companyAllocationsChart',
                     labels,
                     values,
                     colors
                 );
             } else {
-                console.warn('PortfolioCharts.updateDoughnutChart not available, recreating chart');
+                console.warn('ChartConfig.updateDoughnutChart not available, recreating chart');
                 initializeCompanyAllocationsChart();
             }
         } catch (error) {
@@ -1333,24 +1208,28 @@ document.addEventListener('DOMContentLoaded', function() {
             return null;
         }
         
-        const colors = generateColors(labels.length);
+        const colors = ChartConfig.generateColors(labels.length);
         
         try {
             // Create chart
-            if (typeof window.PortfolioCharts !== 'undefined' && window.PortfolioCharts.createDoughnutChart) {
-                window.PortfolioCharts.createDoughnutChart(
+            if (typeof ChartConfig !== 'undefined' && ChartConfig.createDoughnutChart) {
+                ChartConfig.createDoughnutChart(
                     elementId,
                     labels,
                     values,
-                    'Companies',
-                    colors
+                    {
+                        title: 'Companies',
+                        colors: colors,
+                        height: 400,
+                        showTotal: true
+                    }
                 );
                 
                 // Store reference
                 portfolioCharts[portfolio.id] = chartElement;
                 return chartElement;
             } else {
-                console.error('PortfolioCharts.createDoughnutChart not available');
+                console.error('ChartConfig.createDoughnutChart not available');
                 chartElement.innerHTML = '<div class="has-text-centered p-6 has-text-danger">Chart library not available</div>';
                 return null;
             }
@@ -1438,13 +1317,22 @@ document.addEventListener('DOMContentLoaded', function() {
             // Create the chart with a small delay to ensure the container is ready
             setTimeout(() => {
                 try {
-                    if (typeof window.PortfolioCharts !== 'undefined' && window.PortfolioCharts.createSunburstChart) {
-                        const chart = window.PortfolioCharts.createSunburstChart(
+                    if (typeof ChartConfig !== 'undefined' && ChartConfig.createDoughnutChart) {
+                        // Create a simple doughnut chart showing category breakdown
+                        const categoryLabels = portfolio.categories.map(cat => cat.name);
+                        const categoryValues = portfolio.categories.map(cat => cat.currentValue);
+                        const colors = ChartConfig.generateColors(categoryLabels.length);
+                        
+                        const chart = ChartConfig.createDoughnutChart(
                             elementId,
-                            portfolio,
-                            formatCurrency,
-                            formatPercentage,
-                            generateColors
+                            categoryLabels,
+                            categoryValues,
+                            {
+                                title: 'Categories',
+                                colors: colors,
+                                height: 400,
+                                showTotal: true
+                            }
                         );
 
                         // Store reference to the chart
@@ -1453,7 +1341,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 portfolioCharts.categories = {};
                             }
                             portfolioCharts.categories[portfolio.id] = chart;
-                            console.log(`Successfully created sunburst chart for portfolio ${portfolio.id}`);
+                            console.log(`Successfully created category chart for portfolio ${portfolio.id}`);
                             
                             // Add a delayed check to ensure the chart stays visible
                             setTimeout(() => {
@@ -1463,14 +1351,14 @@ document.addEventListener('DOMContentLoaded', function() {
                                     chartElement.style.setProperty('display', 'block', 'important');
                                     chartElement.style.setProperty('visibility', 'visible', 'important');
                                     chartElement.style.setProperty('opacity', '1', 'important');
-                                    // Frappe Charts handle their own resizing
+                                    // ApexCharts handle their own resizing
                                 }
                             }, 500);
                         } else {
-                            console.warn(`Failed to create sunburst chart for portfolio ${portfolio.id}`);
+                            console.warn(`Failed to create category chart for portfolio ${portfolio.id}`);
                         }
                     } else {
-                        console.error('PortfolioCharts.createSunburstChart not available');
+                        console.error('ChartConfig.createDoughnutChart not available');
                         chartElement.innerHTML = '<div class="has-text-centered p-6 has-text-danger">Chart library not available</div>';
                     }
                 } catch (innerError) {
@@ -2094,16 +1982,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
                 
-                const colors = generateColors(data.labels.length);
+                const colors = ChartConfig.generateColors(data.labels.length);
                 
-                // Create doughnut chart using PortfolioCharts utility
-                PortfolioCharts.createDoughnutChart(
+                // Create doughnut chart using ChartConfig utility
+                ChartConfig.createDoughnutChart(
                     elementId,
                     data.labels,
                     data.values,
-                    '',  // Empty title, since we have a subtitle already
-                    colors,
-                    data.percentages // Pass percentages for display purposes
+                    {
+                        colors: colors,
+                        percentages: data.percentages,
+                        height: 400,
+                        showTotal: true
+                    }
                 );
                 
                 return;
@@ -2145,16 +2036,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 percentages = data.map(d => d.percentage);
         }
         
-        const colors = generateColors(labels.length);
+        const colors = ChartConfig.generateColors(labels.length);
         
-        // Create doughnut chart using PortfolioCharts utility
-        PortfolioCharts.createDoughnutChart(
+        // Create doughnut chart using ChartConfig utility
+        ChartConfig.createDoughnutChart(
             elementId,
             labels,
             values,
-            '',  // Empty title, since we have a subtitle already
-                colors,
-                percentages // Pass percentages for display purposes
+            {
+                colors: colors,
+                percentages: percentages,
+                height: 400,
+                showTotal: true
+            }
         );
         } catch (error) {
             console.error(`Error in renderDoughnutChart for ${elementId}:`, error);
@@ -2289,40 +2183,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 <style>
-    /* Portfolio Filter Styling */
-    .portfolio-filter-container {
-        background-color: #f9f9fa;
-        position: relative;
-        padding-top: 0.5rem;
-    }
 
-    .portfolio-filter-container::before {
-        content: '⚙️ Select Portfolios for Analysis';
-        display: block;
-        font-size: 0.85rem;
-        color: #666;
-        margin-bottom: 0.5rem;
-        letter-spacing: 0.5px;
-    }
-
-    #portfolioFilters .control {
-        margin: 0.4rem 0.5rem;
-    }
-
-    .portfolio-filter-checkbox {
-        display: inline-flex;
-        align-items: center;
-        padding: 0.4rem 0.8rem;
-        transition: all 0.2s;
-    }
-
-    .portfolio-filter-checkbox:hover {
-        color: #3273dc;
-    }
-
-    .portfolio-filter-checkbox input[type='checkbox'] {
-        margin-right: 0.4rem;
-    }
 
     /* Category row styling */
     .category-row {
