@@ -156,6 +156,25 @@
  * - Sunburst visualization for category breakdown
  */
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, initializing Portfolio Analysis...');
+    
+    // Check if required dependencies are loaded
+    if (typeof Plotly === 'undefined') {
+        console.error('Plotly is not loaded');
+        document.getElementById('loadingIndicator').innerHTML = `
+            <div class="has-text-centered">
+                <p class="has-text-danger mb-3">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>
+                    Required chart library (Plotly) is not loaded.
+                </p>
+                <button class="button is-info" onclick="location.reload()">
+                    <i class="fas fa-refresh mr-2"></i>Try Again
+                </button>
+            </div>
+        `;
+        return;
+    }
+    
     // Store data
     let portfolios = [];
     let portfolioData = [];
@@ -283,59 +302,150 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Load data and initialize
+    console.log('Starting data loading process...');
+    
+    // Add timeout to prevent infinite loading
+    const loadingTimeout = setTimeout(() => {
+        console.error('Loading timeout reached');
+        document.getElementById('loadingIndicator').innerHTML = `
+            <div class="has-text-centered">
+                <p class="has-text-danger mb-3">
+                    <i class="fas fa-clock mr-2"></i>
+                    Loading is taking longer than expected.
+                </p>
+                <p class="has-text-grey mb-3">
+                    This might indicate a server issue or authentication problem.
+                </p>
+                <button class="button is-info" onclick="location.reload()">
+                    <i class="fas fa-refresh mr-2"></i>Try Again
+                </button>
+            </div>
+        `;
+    }, 30000); // 30 second timeout
+    
     Promise.all([
         fetchPortfolios(),
         fetchPortfolioData()
     ]).then(([portfoliosList, data]) => {
-        // Process the data
-        processData(portfoliosList, data);
+        clearTimeout(loadingTimeout); // Clear the timeout since we got a response
+        console.log('Data loaded successfully, processing...');
+        console.log('Portfolios list:', portfoliosList);
+        console.log('Portfolio data:', data);
         
-        // Update global portfolioData for components
-        window.portfolioData = portfolioData;
-        
-        // Initialize the UI
-        initializePortfolioFilters();
-        initializeCharts();
-        renderPortfolioSections();
-        initializeExpandablePortfolios();
-        
-        // Hide loading indicator and show content
-        document.getElementById('loadingIndicator').style.display = 'none';
-        document.getElementById('analysisContent').style.display = 'block';
-        
-        // Initialize table sorting
-        initTableSorting();
-        
-        
-        // Setup resize handlers for charts
-        PortfolioCharts.setupResizeHandlers();
-        
-        // Initialize Risk Breakdown
-        initializeRiskBreakdown();
+        try {
+            // Process the data
+            processData(portfoliosList, data);
+            
+            // Update global portfolioData for components
+            window.portfolioData = portfolioData;
+            
+            console.log('Data processed successfully, initializing UI...');
+            
+            // Initialize the UI
+            initializePortfolioFilters();
+            initializeCharts();
+            renderPortfolioSections();
+            initializeExpandablePortfolios();
+            
+            // Hide loading indicator and show content
+            document.getElementById('loadingIndicator').style.display = 'none';
+            document.getElementById('analysisContent').style.display = 'block';
+            
+            // Initialize table sorting
+            initTableSorting();
+            
+            // Setup resize handlers for charts
+            if (typeof window.PortfolioCharts !== 'undefined' && window.PortfolioCharts.setupResizeHandlers) {
+                window.PortfolioCharts.setupResizeHandlers();
+            } else {
+                console.warn('PortfolioCharts.setupResizeHandlers not found - charts may not resize properly');
+            }
+            
+            // Initialize Risk Breakdown
+            initializeRiskBreakdown();
+            
+            console.log('UI initialization completed successfully');
+        } catch (error) {
+            console.error('Error during data processing or UI initialization:', error);
+            document.getElementById('loadingIndicator').innerHTML = `
+                <p class="has-text-danger">Error processing data: ${error.message}</p>
+                <p class="has-text-grey">Check console for more details.</p>
+                <button class="button is-info mt-3" onclick="location.reload()">Try Again</button>
+            `;
+        }
     }).catch(error => {
+        clearTimeout(loadingTimeout); // Clear the timeout since we got a response (even if error)
         console.error('Error loading data:', error);
+        console.error('Error stack:', error.stack);
+        
+        // Provide more detailed error information
+        let errorMessage = error.message;
+        if (error.name === 'TypeError' && errorMessage.includes('fetch')) {
+            errorMessage = 'Unable to connect to the server. Please check your connection and try again.';
+        } else if (error.status === 401) {
+            errorMessage = 'Authentication required. Please log in and try again.';
+        } else if (error.status === 404) {
+            errorMessage = 'API endpoint not found. Please contact support.';
+        }
+        
         document.getElementById('loadingIndicator').innerHTML = `
-            <p class="has-text-danger">Error loading data: ${error.message}</p>
-            <button class="button is-info mt-3" onclick="location.reload()">Try Again</button>
+            <div class="has-text-centered">
+                <p class="has-text-danger mb-3">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>
+                    Error loading data: ${errorMessage}
+                </p>
+                <p class="has-text-grey mb-3">
+                    If this problem persists, please check the browser console for more details.
+                </p>
+                <button class="button is-info" onclick="location.reload()">
+                    <i class="fas fa-refresh mr-2"></i>Try Again
+                </button>
+            </div>
         `;
     });
     
     // Fetch list of portfolios with their IDs
     async function fetchPortfolios() {
-        const response = await fetch('/portfolio/api/portfolios?include_ids=true');
-        if (!response.ok) {
-            throw new Error('Failed to fetch portfolios');
+        console.log('Fetching portfolios...');
+        try {
+            const response = await fetch('/portfolio/api/portfolios?include_ids=true&has_companies=true');
+            console.log('Portfolios API response status:', response.status);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Portfolios API error response:', errorText);
+                throw new Error(`Failed to fetch portfolios (${response.status}): ${errorText}`);
+            }
+            
+            const data = await response.json();
+            console.log('Portfolios data received:', data);
+            return data;
+        } catch (error) {
+            console.error('Error in fetchPortfolios:', error);
+            throw error;
         }
-        return await response.json();
     }
     
     // Fetch portfolio data
     async function fetchPortfolioData() {
-        const response = await fetch('/portfolio/api/portfolio_data');
-        if (!response.ok) {
-            throw new Error('Failed to fetch portfolio data');
+        console.log('Fetching portfolio data...');
+        try {
+            const response = await fetch('/portfolio/api/portfolio_data');
+            console.log('Portfolio data API response status:', response.status);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Portfolio data API error response:', errorText);
+                throw new Error(`Failed to fetch portfolio data (${response.status}): ${errorText}`);
+            }
+            
+            const data = await response.json();
+            console.log('Portfolio data received, length:', Array.isArray(data) ? data.length : 'not an array');
+            return data;
+        } catch (error) {
+            console.error('Error in fetchPortfolioData:', error);
+            throw error;
         }
-        return await response.json();
     }
     
     // Process the data
@@ -634,13 +744,25 @@ document.addEventListener('DOMContentLoaded', function() {
         const values = filteredPortfolios.map(p => p.totalValue);
         const colors = generateColors(labels.length);
         
-        PortfolioCharts.createDoughnutChart(
-            'portfolioAllocationsChart',
-            labels,
-            values,
-            '',  // Empty title to avoid duplication
-            colors
-        );
+        try {
+            if (typeof window.PortfolioCharts !== 'undefined' && window.PortfolioCharts.createDoughnutChart) {
+                window.PortfolioCharts.createDoughnutChart(
+                    'portfolioAllocationsChart',
+                    labels,
+                    values,
+                    '',  // Empty title to avoid duplication
+                    colors
+                );
+            } else {
+                console.error('PortfolioCharts.createDoughnutChart not available');
+                document.getElementById('portfolioAllocationsChart').innerHTML = 
+                    '<div class="has-text-centered p-4"><p class="has-text-grey-light">Chart library not loaded</p></div>';
+            }
+        } catch (error) {
+            console.error('Error creating portfolio allocations chart:', error);
+            document.getElementById('portfolioAllocationsChart').innerHTML = 
+                '<div class="has-text-centered p-4"><p class="has-text-danger">Error creating chart</p></div>';
+        }
         
         // Store reference for later updates
         portfolioAllocationsChart = document.getElementById('portfolioAllocationsChart');
@@ -655,12 +777,21 @@ document.addEventListener('DOMContentLoaded', function() {
         const values = filteredPortfolios.map(p => p.totalValue);
         const colors = generateColors(labels.length);
         
-        PortfolioCharts.updateDoughnutChart(
-            'portfolioAllocationsChart',
-            labels,
-            values,
-            colors
-        );
+        try {
+            if (typeof window.PortfolioCharts !== 'undefined' && window.PortfolioCharts.updateDoughnutChart) {
+                window.PortfolioCharts.updateDoughnutChart(
+                    'portfolioAllocationsChart',
+                    labels,
+                    values,
+                    colors
+                );
+            } else {
+                console.warn('PortfolioCharts.updateDoughnutChart not available, recreating chart');
+                initializePortfolioAllocationsChart();
+            }
+        } catch (error) {
+            console.error('Error updating portfolio allocations chart:', error);
+        }
     }
     
     // Initialize company allocations chart
@@ -672,13 +803,25 @@ document.addEventListener('DOMContentLoaded', function() {
         const { labels, values } = prepareChartData(companyGroups);
         const colors = generateColors(labels.length);
         
-        PortfolioCharts.createDoughnutChart(
-            'companyAllocationsChart',
-            labels,
-            values,
-            '',  // Empty title to avoid duplication
-            colors
-        );
+        try {
+            if (typeof window.PortfolioCharts !== 'undefined' && window.PortfolioCharts.createDoughnutChart) {
+                window.PortfolioCharts.createDoughnutChart(
+                    'companyAllocationsChart',
+                    labels,
+                    values,
+                    '',  // Empty title to avoid duplication
+                    colors
+                );
+            } else {
+                console.error('PortfolioCharts.createDoughnutChart not available');
+                document.getElementById('companyAllocationsChart').innerHTML = 
+                    '<div class="has-text-centered p-4"><p class="has-text-grey-light">Chart library not loaded</p></div>';
+            }
+        } catch (error) {
+            console.error('Error creating company allocations chart:', error);
+            document.getElementById('companyAllocationsChart').innerHTML = 
+                '<div class="has-text-centered p-4"><p class="has-text-danger">Error creating chart</p></div>';
+        }
         
         // Store reference for later updates
         companyAllocationsChart = document.getElementById('companyAllocationsChart');
@@ -695,12 +838,21 @@ document.addEventListener('DOMContentLoaded', function() {
         const { labels, values } = prepareChartData(companyGroups);
         const colors = generateColors(labels.length);
         
-        PortfolioCharts.updateDoughnutChart(
-            'companyAllocationsChart',
-            labels,
-            values,
-            colors
-        );
+        try {
+            if (typeof window.PortfolioCharts !== 'undefined' && window.PortfolioCharts.updateDoughnutChart) {
+                window.PortfolioCharts.updateDoughnutChart(
+                    'companyAllocationsChart',
+                    labels,
+                    values,
+                    colors
+                );
+            } else {
+                console.warn('PortfolioCharts.updateDoughnutChart not available, recreating chart');
+                initializeCompanyAllocationsChart();
+            }
+        } catch (error) {
+            console.error('Error updating company allocations chart:', error);
+        }
     }
     
     // Get all companies from selected portfolios with additional metadata
@@ -1042,8 +1194,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     
-    /**
-
     
     // Render company rows for a portfolio
     function renderCompanyRows(portfolio) {
@@ -1144,17 +1294,23 @@ document.addEventListener('DOMContentLoaded', function() {
         
         try {
             // Create chart
-            PortfolioCharts.createDoughnutChart(
-                elementId,
-                labels,
-                values,
-                'Companies',
-                colors
-            );
-            
-            // Store reference
-            portfolioCharts[portfolio.id] = chartElement;
-            return chartElement;
+            if (typeof window.PortfolioCharts !== 'undefined' && window.PortfolioCharts.createDoughnutChart) {
+                window.PortfolioCharts.createDoughnutChart(
+                    elementId,
+                    labels,
+                    values,
+                    'Companies',
+                    colors
+                );
+                
+                // Store reference
+                portfolioCharts[portfolio.id] = chartElement;
+                return chartElement;
+            } else {
+                console.error('PortfolioCharts.createDoughnutChart not available');
+                chartElement.innerHTML = '<div class="has-text-centered p-6 has-text-danger">Chart library not available</div>';
+                return null;
+            }
         } catch (error) {
             console.error(`Error creating chart for ${elementId}:`, error);
             chartElement.innerHTML = '<div class="has-text-centered p-6 has-text-danger">Error creating chart</div>';
@@ -1239,35 +1395,40 @@ document.addEventListener('DOMContentLoaded', function() {
             // Create the chart with a small delay to ensure the container is ready
             setTimeout(() => {
                 try {
-                    const chart = PortfolioCharts.createSunburstChart(
-                        elementId,
-                        portfolio,
-                        formatCurrency,
-                        formatPercentage,
-                        generateColors
-                    );
+                    if (typeof window.PortfolioCharts !== 'undefined' && window.PortfolioCharts.createSunburstChart) {
+                        const chart = window.PortfolioCharts.createSunburstChart(
+                            elementId,
+                            portfolio,
+                            formatCurrency,
+                            formatPercentage,
+                            generateColors
+                        );
 
-                    // Store reference to the chart
-                    if (chart) {
-                        if (!portfolioCharts.categories) {
-                            portfolioCharts.categories = {};
-                        }
-                        portfolioCharts.categories[portfolio.id] = chart;
-                        console.log(`Successfully created sunburst chart for portfolio ${portfolio.id}`);
-                        
-                        // Add a delayed check to ensure the chart stays visible
-                        setTimeout(() => {
-                            if (chartElement.offsetWidth === 0 || chartElement.offsetHeight === 0 ||
-                                chartElement.style.visibility === 'hidden' || chartElement.style.opacity === '0') {
-                                console.log(`Chart ${elementId} has zero dimensions after creation, fixing...`);
-                                chartElement.style.setProperty('display', 'block', 'important');
-                                chartElement.style.setProperty('visibility', 'visible', 'important');
-                                chartElement.style.setProperty('opacity', '1', 'important');
-                                Plotly.Plots.resize(chartElement);
+                        // Store reference to the chart
+                        if (chart) {
+                            if (!portfolioCharts.categories) {
+                                portfolioCharts.categories = {};
                             }
-                        }, 500);
+                            portfolioCharts.categories[portfolio.id] = chart;
+                            console.log(`Successfully created sunburst chart for portfolio ${portfolio.id}`);
+                            
+                            // Add a delayed check to ensure the chart stays visible
+                            setTimeout(() => {
+                                if (chartElement.offsetWidth === 0 || chartElement.offsetHeight === 0 ||
+                                    chartElement.style.visibility === 'hidden' || chartElement.style.opacity === '0') {
+                                    console.log(`Chart ${elementId} has zero dimensions after creation, fixing...`);
+                                    chartElement.style.setProperty('display', 'block', 'important');
+                                    chartElement.style.setProperty('visibility', 'visible', 'important');
+                                    chartElement.style.setProperty('opacity', '1', 'important');
+                                    Plotly.Plots.resize(chartElement);
+                                }
+                            }, 500);
+                        } else {
+                            console.warn(`Failed to create sunburst chart for portfolio ${portfolio.id}`);
+                        }
                     } else {
-                        console.warn(`Failed to create sunburst chart for portfolio ${portfolio.id}`);
+                        console.error('PortfolioCharts.createSunburstChart not available');
+                        chartElement.innerHTML = '<div class="has-text-centered p-6 has-text-danger">Chart library not available</div>';
                     }
                 } catch (innerError) {
                     console.error(`Error in delayed chart creation for portfolio ${portfolio.id}:`, innerError);

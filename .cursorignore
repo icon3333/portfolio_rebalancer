@@ -27,7 +27,6 @@ instance/
 .webassets-cache
 
 # Database
-*.db
 *.sqlite
 *.sqlite3
 app/database/backups/

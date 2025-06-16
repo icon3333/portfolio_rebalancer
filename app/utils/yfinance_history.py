@@ -16,7 +16,8 @@ def get_enhanced_historical_data(identifiers, years=5):
     start_date = end_date - datetime.timedelta(days=int(365 * years))
 
     try:
-        logger.info(f"Requesting ~{years}y of data from {start_date} to {end_date} for {len(identifiers)} tickers.")
+        logger.info(
+            f"Requesting ~{years}y of data from {start_date} to {end_date} for {len(identifiers)} tickers.")
         session = get_fresh_session()
         try:
             if session is not None:
@@ -92,7 +93,8 @@ def get_historical_prices(identifiers, years=5):
                         actions=False,
                     )
             except Exception as e:
-                logger.warning(f"Download failed for {identifier} with period format: {e}")
+                logger.warning(
+                    f"Download failed for {identifier} with period format: {e}")
                 data = yf.download(
                     identifier,
                     start=start_date,

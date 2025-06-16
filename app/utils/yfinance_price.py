@@ -19,9 +19,11 @@ def get_price_for_ticker(ticker: str) -> Dict[str, Any]:
     session = get_fresh_session()
     try:
         try:
-            ticker_obj = yf.Ticker(ticker, session=session) if session is not None else yf.Ticker(ticker)
+            ticker_obj = yf.Ticker(
+                ticker, session=session) if session is not None else yf.Ticker(ticker)
         except Exception as session_error:
-            logger.warning(f"Error using custom session for {ticker}: {str(session_error)}")
+            logger.warning(
+                f"Error using custom session for {ticker}: {str(session_error)}")
             ticker_obj = yf.Ticker(ticker)
 
         try:
@@ -58,7 +60,8 @@ def get_price_for_ticker(ticker: str) -> Dict[str, Any]:
                 error_messages.append(str(e))
 
         if price is None:
-            logger.warning(f"Could not retrieve price for ticker {ticker}: {'; '.join(error_messages)}")
+            logger.warning(
+                f"Could not retrieve price for ticker {ticker}: {'; '.join(error_messages)}")
             return {"price": None, "currency": None, "error": '; '.join(error_messages), "success": False}
 
         return {"price": price, "currency": currency, "success": True}

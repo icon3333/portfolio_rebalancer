@@ -48,7 +48,8 @@ def process_csv_data(account_id, file_content):
             found = False
             for alt in alternatives:
                 if any(col for col in df.columns if alt in col):
-                    matching_col = next(col for col in df.columns if alt in col)
+                    matching_col = next(
+                        col for col in df.columns if alt in col)
                     column_mapping[required_col] = matching_col
                     found = True
                     break
@@ -76,8 +77,10 @@ def process_csv_data(account_id, file_content):
         if 'date' not in df.columns:
             df['date'] = pd.Timestamp.now()
 
-        df['identifier'] = df['identifier'].apply(lambda x: str(x).strip() if pd.notna(x) else '')
-        df['holdingname'] = df['holdingname'].apply(lambda x: str(x).strip() if pd.notna(x) else '')
+        df['identifier'] = df['identifier'].apply(
+            lambda x: str(x).strip() if pd.notna(x) else '')
+        df['holdingname'] = df['holdingname'].apply(
+            lambda x: str(x).strip() if pd.notna(x) else '')
 
         def normalize_transaction_type(t):
             if pd.isna(t):
@@ -94,7 +97,8 @@ def process_csv_data(account_id, file_content):
             elif t in ['dividend', 'div', 'dividends', 'income', 'interest']:
                 return 'dividend'
             else:
-                logger.warning(f"Unknown transaction type '{t}', defaulting to 'buy'")
+                logger.warning(
+                    f"Unknown transaction type '{t}', defaulting to 'buy'")
                 return 'buy'
 
         df['type'] = df['type'].apply(normalize_transaction_type)
@@ -125,25 +129,33 @@ def process_csv_data(account_id, file_content):
 
         try:
             if 'datetime' in df.columns:
-                df['parsed_date'] = pd.to_datetime(df['datetime'], errors='coerce')
+                df['parsed_date'] = pd.to_datetime(
+                    df['datetime'], errors='coerce')
                 mask = df['parsed_date'].isna()
                 if mask.any():
-                    df.loc[mask, 'parsed_date'] = pd.to_datetime(df.loc[mask, 'date'], format='%d.%m.%Y', errors='coerce')
+                    df.loc[mask, 'parsed_date'] = pd.to_datetime(
+                        df.loc[mask, 'date'], format='%d.%m.%Y', errors='coerce')
                     still_mask = df['parsed_date'].isna()
                     if still_mask.any():
-                        df.loc[still_mask, 'parsed_date'] = pd.to_datetime(df.loc[still_mask, 'date'], dayfirst=True, errors='coerce')
+                        df.loc[still_mask, 'parsed_date'] = pd.to_datetime(
+                            df.loc[still_mask, 'date'], dayfirst=True, errors='coerce')
             else:
-                df['parsed_date'] = pd.to_datetime(df['date'], format='%d.%m.%Y', errors='coerce')
+                df['parsed_date'] = pd.to_datetime(
+                    df['date'], format='%d.%m.%Y', errors='coerce')
                 mask = df['parsed_date'].isna()
                 if mask.any():
-                    df.loc[mask, 'parsed_date'] = pd.to_datetime(df.loc[mask, 'date'], dayfirst=True, errors='coerce')
+                    df.loc[mask, 'parsed_date'] = pd.to_datetime(
+                        df.loc[mask, 'date'], dayfirst=True, errors='coerce')
         except Exception as e:
-            logger.warning(f"Error during date parsing: {str(e)}. Falling back to default parsing.")
-            df['parsed_date'] = pd.to_datetime(df['date'], dayfirst=True, errors='coerce')
+            logger.warning(
+                f"Error during date parsing: {str(e)}. Falling back to default parsing.")
+            df['parsed_date'] = pd.to_datetime(
+                df['date'], dayfirst=True, errors='coerce')
 
         nat_count = df['parsed_date'].isna().sum()
         if nat_count > 0:
-            logger.warning(f"{nat_count} dates could not be parsed and will be set to current time")
+            logger.warning(
+                f"{nat_count} dates could not be parsed and will be set to current time")
         df['parsed_date'] = df['parsed_date'].fillna(pd.Timestamp.now())
 
         df = df.sort_values('parsed_date', ascending=True)
@@ -160,7 +172,8 @@ def process_csv_data(account_id, file_content):
             company_name = row['holdingname']
             transaction_type = row['type']
             if transaction_type == 'dividend':
-                logger.info(f"Skipping dividend transaction for {company_name}")
+                logger.info(
+                    f"Skipping dividend transaction for {company_name}")
                 continue
             if transaction_type not in ['buy', 'transferin']:
                 continue
@@ -170,7 +183,8 @@ def process_csv_data(account_id, file_content):
             fee = float(row['fee']) if 'fee' in row else 0
             tax = float(row['tax']) if 'tax' in row else 0
             if shares <= 0:
-                logger.info(f"Skipping {transaction_type} transaction with zero shares for {company_name}")
+                logger.info(
+                    f"Skipping {transaction_type} transaction with zero shares for {company_name}")
                 continue
             if company_name not in company_positions:
                 company_positions[company_name] = {
@@ -180,8 +194,10 @@ def process_csv_data(account_id, file_content):
                 }
             company = company_positions[company_name]
             transaction_amount = shares * price
-            company['total_shares'] = round(company['total_shares'] + shares, 6)
-            company['total_invested'] = round(company['total_invested'] + transaction_amount, 2)
+            company['total_shares'] = round(
+                company['total_shares'] + shares, 6)
+            company['total_invested'] = round(
+                company['total_invested'] + transaction_amount, 2)
             logger.info(
                 f"Buy/TransferIn: {company_name}, +{shares} @ {price}, total shares: {company['total_shares']}, total invested: {company['total_invested']:.2f}")
 
@@ -190,7 +206,8 @@ def process_csv_data(account_id, file_content):
             company_name = row['holdingname']
             transaction_type = row['type']
             if transaction_type == 'dividend':
-                logger.info(f"Skipping dividend transaction for {company_name}")
+                logger.info(
+                    f"Skipping dividend transaction for {company_name}")
                 continue
             if transaction_type not in ['sell', 'transferout']:
                 continue
@@ -199,10 +216,12 @@ def process_csv_data(account_id, file_content):
             fee = float(row['fee']) if 'fee' in row else 0
             tax = float(row['tax']) if 'tax' in row else 0
             if shares <= 0:
-                logger.info(f"Skipping {transaction_type} transaction with zero shares for {company_name}")
+                logger.info(
+                    f"Skipping {transaction_type} transaction with zero shares for {company_name}")
                 continue
             if company_name not in company_positions:
-                logger.warning(f"Cannot {transaction_type} shares of {company_name} - company not in positions")
+                logger.warning(
+                    f"Cannot {transaction_type} shares of {company_name} - company not in positions")
                 continue
             company = company_positions[company_name]
             logger.info(
@@ -212,12 +231,16 @@ def process_csv_data(account_id, file_content):
                     f"Attempting to {transaction_type} more shares ({shares}) than available ({company['total_shares']}). Limiting to available shares.")
                 shares = company['total_shares']
             if shares <= 0:
-                logger.info(f"Skipping {transaction_type} with zero or negative shares")
+                logger.info(
+                    f"Skipping {transaction_type} with zero or negative shares")
                 continue
-            proportion_sold = shares / company['total_shares'] if company['total_shares'] > 0 else 0
+            proportion_sold = shares / \
+                company['total_shares'] if company['total_shares'] > 0 else 0
             investment_reduction = company['total_invested'] * proportion_sold
-            company['total_shares'] = round(company['total_shares'] - shares, 6)
-            company['total_invested'] = round(company['total_invested'] - investment_reduction, 2)
+            company['total_shares'] = round(
+                company['total_shares'] - shares, 6)
+            company['total_invested'] = round(
+                company['total_invested'] - investment_reduction, 2)
 
         existing_companies = query_db(
             'SELECT id, name, identifier, total_invested FROM companies WHERE account_id = ?',
@@ -253,9 +276,11 @@ def process_csv_data(account_id, file_content):
                 company_id = existing_company_map[company_name]['id']
                 cursor.execute(
                     'UPDATE companies SET identifier = ?, portfolio_id = ?, total_invested = ? WHERE id = ?',
-                    [position['identifier'], default_portfolio_id, total_invested, company_id],
+                    [position['identifier'], default_portfolio_id,
+                        total_invested, company_id],
                 )
-                share_row = query_db('SELECT shares FROM company_shares WHERE company_id = ?', [company_id], one=True)
+                share_row = query_db('SELECT shares FROM company_shares WHERE company_id = ?', [
+                                     company_id], one=True)
                 if share_row:
                     cursor.execute(
                         'UPDATE company_shares SET shares = ? WHERE company_id = ?',
@@ -270,7 +295,8 @@ def process_csv_data(account_id, file_content):
             else:
                 cursor.execute(
                     'INSERT INTO companies (name, identifier, category, portfolio_id, account_id, total_invested) VALUES (?, ?, ?, ?, ?, ?)',
-                    [company_name, position['identifier'], '', default_portfolio_id, account_id, total_invested],
+                    [company_name, position['identifier'], '',
+                        default_portfolio_id, account_id, total_invested],
                 )
                 company_id = cursor.lastrowid
                 cursor.execute(
@@ -284,8 +310,10 @@ def process_csv_data(account_id, file_content):
         for company_name in companies_to_remove:
             company_id = existing_company_map[company_name]['id']
             identifier = existing_company_map[company_name]['identifier']
-            logger.info(f"Removing company {company_name} (not present in CSV)")
-            cursor.execute('DELETE FROM company_shares WHERE company_id = ?', [company_id])
+            logger.info(
+                f"Removing company {company_name} (not present in CSV)")
+            cursor.execute(
+                'DELETE FROM company_shares WHERE company_id = ?', [company_id])
             cursor.execute('DELETE FROM companies WHERE id = ?', [company_id])
             if identifier:
                 other_companies_count = query_db(
@@ -294,8 +322,10 @@ def process_csv_data(account_id, file_content):
                     one=True,
                 )
                 if other_companies_count and other_companies_count['count'] == 0:
-                    logger.info(f"No other accounts use {identifier}, removing from market_prices")
-                    cursor.execute('DELETE FROM market_prices WHERE identifier = ?', [identifier])
+                    logger.info(
+                        f"No other accounts use {identifier}, removing from market_prices")
+                    cursor.execute(
+                        'DELETE FROM market_prices WHERE identifier = ?', [identifier])
             positions_removed.append(company_name)
 
         db.commit()
@@ -312,7 +342,8 @@ def process_csv_data(account_id, file_content):
                 all_identifiers.add(company['identifier'])
 
         if all_identifiers:
-            logger.info(f"Updating prices and metadata for {len(all_identifiers)} companies")
+            logger.info(
+                f"Updating prices and metadata for {len(all_identifiers)} companies")
             for identifier in all_identifiers:
                 try:
                     result = get_isin_data(identifier)
@@ -326,14 +357,18 @@ def process_csv_data(account_id, file_content):
                         logger.info(
                             f"Updating metadata for {identifier}: Country: {country}, Sector: {sector}, Industry: {industry}")
                         if not update_price_in_db(identifier, price, currency, price_eur, country, sector, industry):
-                            logger.warning(f"Failed to update price and metadata in database for {identifier}")
+                            logger.warning(
+                                f"Failed to update price and metadata in database for {identifier}")
                             failed_prices.append(identifier)
                     else:
-                        error_reason = "No price data returned" if result.get('success') else result.get('error', 'Unknown error')
-                        logger.warning(f"Failed to fetch price for {identifier}: {error_reason}")
+                        error_reason = "No price data returned" if result.get(
+                            'success') else result.get('error', 'Unknown error')
+                        logger.warning(
+                            f"Failed to fetch price for {identifier}: {error_reason}")
                         failed_prices.append(identifier)
                 except Exception as e:
-                    logger.error(f"Error updating price for {identifier}: {str(e)}")
+                    logger.error(
+                        f"Error updating price for {identifier}: {str(e)}")
                     failed_prices.append(identifier)
 
         message = "CSV data imported successfully with simple add/subtract calculation"

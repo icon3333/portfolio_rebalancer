@@ -5,11 +5,11 @@ import uuid
 import json
 from datetime import datetime
 from typing import Dict, Any, List
-import sqlite3
+import time
 
-# Import yfinance utility functions
 from app.utils.yfinance_utils import get_isin_data
 from app.utils.db_utils import update_price_in_db
+from app.database.db_manager import get_db
 
 logger = logging.getLogger(__name__)
 
@@ -23,165 +23,204 @@ ISIN_LIST = [
     # (ISIN list shortened for clarity)
 ]
 
-def init_db():
-    """Initialize SQLite database with required table."""
-    conn = sqlite3.connect('batch_jobs.db')
-    c = conn.cursor()
-    
-    # We won't drop the table as in the working code sample
-    # Instead, we'll create it if it doesn't exist
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS batch_jobs (
-            job_id TEXT PRIMARY KEY,
-            status TEXT,
-            progress INTEGER,
-            total INTEGER,
-            results TEXT,
-            created_at TIMESTAMP,
-            updated_at TIMESTAMP
-        )
-    ''')
-    conn.commit()
-    conn.close()
 
-def process_isins(app, job_id, isins):
-    """Process all ISINs in the list and fetch their data."""
-    # We need to use app context for some database operations
+def init_db():
+    """Initialize database with required table - now handled by main database schema."""
+    # This function is no longer needed as background_jobs table 
+    # is now part of the main database schema
+    pass
+
+
+def _process_single_identifier(identifier: str) -> Dict[str, Any]:
+    """
+    Processes a single identifier to fetch its price and metadata.
+    This function is designed to be run in a thread pool.
+    """
+    try:
+        logger.info(f"Processing identifier: {identifier}")
+        result = get_isin_data(identifier)
+
+        if result.get('success'):
+            data = result.get('data', {})
+            price = data.get('currentPrice')
+
+            if price is not None:
+                # Update the price in the main database
+                update_success = update_price_in_db(
+                    identifier,
+                    price,
+                    data.get('currency'),
+                    data.get('priceEUR'),
+                    country=data.get('country'),
+                    sector=data.get('sector'),
+                    industry=data.get('industry'),
+                    modified_identifier=result.get('modified_identifier')
+                )
+                if update_success:
+                    logger.info(f"Successfully updated price for {identifier}")
+                    return {'identifier': identifier, 'status': 'success'}
+                else:
+                    logger.warning(
+                        f"Failed to update price in database for {identifier}")
+                    return {'identifier': identifier, 'status': 'db_error', 'error': 'Failed to write to DB'}
+            else:
+                logger.warning(f"No price data found for {identifier}")
+                return {'identifier': identifier, 'status': 'no_price', 'error': 'No price data available'}
+        else:
+            logger.warning(
+                f"Failed to fetch data for {identifier}: {result.get('error')}")
+            return {'identifier': identifier, 'status': 'fetch_error', 'error': result.get('error')}
+    except Exception as e:
+        logger.error(
+            f"Unhandled error processing {identifier}: {e}", exc_info=True)
+        return {'identifier': identifier, 'status': 'exception', 'error': str(e)}
+
+
+def _run_batch_job(app, job_id: str, identifiers: List[str]):
+    """
+    The main logic for the background batch processing job.
+    Manages a thread pool and reports progress.
+    """
     with app.app_context():
-        conn = sqlite3.connect('batch_jobs.db')
-        c = conn.cursor()
-        
-        results = {}
-        total = len(isins)
-        processed = 0
+        total_items = len(identifiers)
+        processed_count = 0
         success_count = 0
         failure_count = 0
 
-        def fetch(isin):
-            try:
-                logger.info(f"Processing ISIN {isin}")
-                return isin, get_isin_data(isin)
-            except Exception as e:
-                logger.error(f"Error processing {isin}: {str(e)}")
-                return isin, {
-                    'success': False,
-                    'isin': isin,
-                    'error': str(e),
-                    'status': 'error',
-                    'timestamp': datetime.now().isoformat()
-                }
+        last_update_time = time.time()
 
         with ThreadPoolExecutor(max_workers=5) as executor:
-            future_to_isin = {executor.submit(fetch, isin): isin for isin in isins}
-            for future in as_completed(future_to_isin):
-                isin, result = future.result()
-                results[isin] = result
+            future_to_identifier = {executor.submit(
+                _process_single_identifier, i): i for i in identifiers}
 
-                if result.get('success') and result.get('price') is not None:
-                    success = update_price_in_db(
-                        isin,
-                        result.get('price'),
-                        result.get('currency', 'USD'),
-                        result.get('price_eur', result.get('price')),
-                        result.get('country'),
-                        result.get('sector'),
-                        result.get('industry')
-                    )
-                    if success:
-                        logger.info(f"Successfully updated price for {isin}: {result.get('price')} {result.get('currency', 'USD')}")
-                        success_count += 1
-                    else:
-                        logger.warning(f"Failed to update price for {isin} in database")
-                        failure_count += 1
+            for future in as_completed(future_to_identifier):
+                result = future.result()
+
+                if result.get('status') == 'success':
+                    success_count += 1
                 else:
-                    logger.warning(f"No valid price data for {isin}: success={result.get('success')}, price={result.get('price')}")
                     failure_count += 1
 
-                processed += 1
-                c.execute('''
-                    UPDATE batch_jobs
-                    SET progress = ?, updated_at = ?
-                    WHERE job_id = ?
-                ''', (processed, datetime.now().isoformat(), job_id))
-                conn.commit()
-        
-        # Add success/failure counts to results
+                processed_count += 1
+
+                # Batch progress updates to avoid excessive DB writes
+                current_time = time.time()
+                if current_time - last_update_time > 2:  # Update every 2 seconds
+                    _update_job_progress(job_id, processed_count)
+                    last_update_time = current_time
+
+        # Final update with summary
         summary = {
-            'total': total,
+            'total': total_items,
             'success_count': success_count,
             'failure_count': failure_count,
             'completion_time': datetime.now().isoformat()
         }
-        
-        # Update final status and results
-        c.execute('''
-            UPDATE batch_jobs 
-            SET status = ?, results = ?, progress = ?, updated_at = ?
-            WHERE job_id = ?
-        ''', ('completed', json.dumps({'items': results, 'summary': summary}), total, datetime.now().isoformat(), job_id))
-        
-        logger.info(f"Batch processing complete. Total: {total}, Success: {success_count}, Failed: {failure_count}")
-        conn.commit()
-        conn.close()
+        _update_job_final(job_id, total_items, json.dumps(summary))
+        logger.info(
+            f"Batch job {job_id} complete. Success: {success_count}, Failed: {failure_count}")
 
-def start_batch_process(isins):
-    """Start a new batch processing job."""
-    # Ensure database is initialized
-    init_db()
-    
-    job_id = str(uuid.uuid4())
-    conn = sqlite3.connect('batch_jobs.db')
-    c = conn.cursor()
-    
-    # Initialize new job
-    total = len(isins)
-    c.execute('''
-        INSERT INTO batch_jobs (job_id, status, progress, total, created_at, updated_at)
-        VALUES (?, 'processing', 0, ?, ?, ?)
-    ''', (job_id, total, datetime.now().isoformat(), datetime.now().isoformat()))
-    conn.commit()
-    conn.close()
-    
-    # Capture current app before starting thread
+
+def _update_job_progress(job_id: str, progress: int):
+    """Update the progress of a job in the database."""
+    try:
+        db = get_db()
+        db.execute(
+            "UPDATE background_jobs SET progress = ?, updated_at = ? WHERE id = ?",
+            (progress, datetime.now(), job_id)
+        )
+        db.commit()
+    except Exception as e:
+        logger.error(f"Failed to update job progress for {job_id}: {e}")
+
+
+def _update_job_final(job_id: str, total: int, summary: str):
+    """Mark the job as completed in the database."""
+    try:
+        db = get_db()
+        db.execute(
+            "UPDATE background_jobs SET status = 'completed', progress = ?, result = ?, updated_at = ? WHERE id = ?",
+            (total, summary, datetime.now(), job_id)
+        )
+        db.commit()
+    except Exception as e:
+        logger.error(f"Failed to finalize job {job_id}: {e}")
+
+
+def start_batch_process(identifiers: List[str]) -> str:
+    """
+    Starts a new background job to process a list of identifiers.
+    Returns the job ID.
+    """
     from flask import current_app
     app = current_app._get_current_object()
-    
-    # Start processing in background
-    thread = threading.Thread(target=process_isins, args=(app, job_id, isins))
-    thread.daemon = True
-    thread.start()
-    
-    return job_id
+
+    job_id = str(uuid.uuid4())
+    total = len(identifiers)
+
+    try:
+        db = get_db()
+        db.execute(
+            "INSERT INTO background_jobs (id, name, status, progress, total) VALUES (?, ?, ?, ?, ?)",
+            (job_id, 'price_update', 'processing', 0, total)
+        )
+        db.commit()
+
+        thread = threading.Thread(
+            target=_run_batch_job, args=(app, job_id, identifiers))
+        thread.daemon = True
+        thread.start()
+
+        return job_id
+    except Exception as e:
+        logger.error(f"Failed to start batch job: {e}")
+        raise
+
 
 def get_job_status(job_id: str) -> Dict[str, Any]:
     """
-    Get the status and results of a batch processing job.
-    
-    Args:
-        job_id (str): The ID of the job to check
-        
-    Returns:
-        Dict[str, Any]: Job status and results
+    Get the status and results of a batch processing job from the main database.
     """
-    conn = sqlite3.connect('batch_jobs.db')
-    c = conn.cursor()
-    
-    c.execute('SELECT * FROM batch_jobs WHERE job_id = ?', (job_id,))
-    row = c.fetchone()
-    
-    if row is None:
-        return {'status': 'not_found'}
-    
-    # Convert row to dictionary since SQLite Row objects might not be JSON serializable
-    status = {
-        'job_id': row[0],
-        'status': row[1],
-        'progress': row[2],
-        'total': row[3],
-        'results': json.loads(row[4]) if row[4] else None,
-        'created_at': row[5],
-        'updated_at': row[6]
-    }
-    
-    conn.close()
-    return status
+    try:
+        row = get_db().execute("SELECT * FROM background_jobs WHERE id = ?", (job_id,)).fetchone()
+        if row is None:
+            return {'status': 'not_found'}
+
+        return {
+            'job_id': row['id'],
+            'status': row['status'],
+            'progress': row['progress'],
+            'total': row['total'],
+            'results': json.loads(row['result']) if row['result'] else None,
+            'created_at': row['created_at'].isoformat(),
+            'updated_at': row['updated_at'].isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Failed to get job status for {job_id}: {e}")
+        return {'status': 'db_error', 'error': str(e)}
+
+
+def get_latest_job_progress() -> Dict[str, Any]:
+    """
+    Get the progress of the most recent batch processing job.
+    """
+    try:
+        row = get_db().execute(
+            "SELECT * FROM background_jobs ORDER BY created_at DESC LIMIT 1").fetchone()
+        if row is None:
+            return {'current': 0, 'total': 0, 'percentage': 0, 'status': 'idle'}
+
+        progress = row['progress'] or 0
+        total = row['total'] or 1
+        percentage = int((progress / total) * 100) if total > 0 else 0
+
+        return {
+            'current': progress,
+            'total': total,
+            'percentage': percentage,
+            'status': row['status'] or 'idle',
+            'job_id': row['id']
+        }
+    except Exception as e:
+        logger.error(f"Failed to get latest job progress: {e}")
+        return {'current': 0, 'total': 0, 'percentage': 0, 'status': 'db_error'}

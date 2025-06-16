@@ -4,6 +4,7 @@ Utility functions for data processing and cache management.
 from functools import wraps
 from flask import g
 
+
 def clear_data_caches():
     """
     Clear any cached data in the application context.

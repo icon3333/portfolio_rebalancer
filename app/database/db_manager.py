@@ -4,6 +4,8 @@ import shutil
 from datetime import datetime
 import logging
 from flask import g, current_app
+import click
+from flask.cli import with_appcontext
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -44,6 +46,25 @@ def init_db(app):
     """
     with app.app_context():
         db = get_db()
+        # Use safe schema that doesn't drop existing tables
+        with app.open_resource('database/schema_safe.sql', mode='r') as f:
+            db.cursor().executescript(f.read())
+        
+        # Add the background_jobs table if it doesn't exist
+        db.execute('''
+            CREATE TABLE IF NOT EXISTS background_jobs (
+                id TEXT PRIMARY KEY,
+                name TEXT,
+                status TEXT,
+                progress INTEGER,
+                total INTEGER,
+                result TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        db.commit()
+
         try:
             # Create tables if not present
             cursor = db.cursor()
@@ -51,8 +72,8 @@ def init_db(app):
             tables = [row[0] for row in cursor.fetchall()]
 
             if not tables or 'accounts' not in tables:
-                logger.info("Initializing database schema from schema.sql ...")
-                schema_path = os.path.join(os.path.dirname(__file__), 'schema.sql')
+                logger.info("Initializing database schema from schema_safe.sql ...")
+                schema_path = os.path.join(os.path.dirname(__file__), 'schema_safe.sql')
                 with open(schema_path, 'r', encoding='utf-8') as f:
                     db.executescript(f.read())
                 db.commit()
@@ -222,4 +243,11 @@ def execute_db(query, args=()):
         logger.error(f"Statement was: {query}")
         logger.error(f"Args were: {args}")
         raise
+
+@click.command('init-db')
+@with_appcontext
+def init_db_command():
+    """Clear the existing data and create new tables."""
+    init_db(current_app)
+    logger.info('Initialized the database.')
 

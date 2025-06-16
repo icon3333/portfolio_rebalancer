@@ -1,5 +1,5 @@
 from flask import (
-    Blueprint, render_template, redirect, url_for, 
+    Blueprint, render_template, redirect, url_for,
     request, flash, session, jsonify
 )
 from app.database.db_manager import query_db, execute_db, backup_database, get_db
@@ -11,6 +11,7 @@ logger = logging.getLogger('app.routes.account')
 
 account_bp = Blueprint('account', __name__)
 
+
 @account_bp.route('/')
 def index():
     """Account management page"""
@@ -18,65 +19,69 @@ def index():
     if 'account_id' not in session:
         flash('Please select an account first', 'warning')
         return redirect(url_for('main.index'))
-    
+
     account_id = session['account_id']
-    account = query_db('SELECT * FROM accounts WHERE id = ?', [account_id], one=True)
-    
+    account = query_db('SELECT * FROM accounts WHERE id = ?',
+                       [account_id], one=True)
+
     # Get all accounts for the account switcher
-    all_accounts = query_db('SELECT * FROM accounts WHERE username != "_global" ORDER BY username')
-    
-    return render_template('pages/account.html', 
+    all_accounts = query_db(
+        'SELECT * FROM accounts WHERE username != "_global" ORDER BY username')
+
+    return render_template('pages/account.html',
                            account=account,
                            all_accounts=all_accounts)
+
 
 @account_bp.route('/create', methods=['POST'])
 def create_account():
     """Create a new account"""
     username = request.form.get('username', '').strip()
-    
+
     if not username:
         flash('Username cannot be empty', 'error')
         return redirect(url_for('account.index'))
-    
+
     try:
         # Create backup before making changes
         backup_database()
-        
+
         # Insert new account
         created_at = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
         execute_db(
             'INSERT INTO accounts (username, created_at) VALUES (?, ?)',
             [username, created_at]
         )
-        
+
         # Get the new account ID
         new_account = query_db(
             'SELECT id FROM accounts WHERE username = ?',
             [username],
             one=True
         )
-        
+
         if new_account:
             # Create default portfolio for the account
             execute_db(
                 'INSERT INTO portfolios (name, account_id) VALUES (?, ?)',
                 ['-', new_account['id']]
             )
-            
+
             # Update session to use the new account
             session['account_id'] = new_account['id']
             session['username'] = username
-            
+
             flash(f'Account "{username}" created successfully', 'success')
         else:
             flash('Failed to create account', 'error')
-            
+
     except sqlite3.IntegrityError:
         flash(f'Account "{username}" already exists', 'error')
     except Exception as e:
         flash(f'Error creating account: {str(e)}', 'error')
-    
+
     return redirect(url_for('main.index'))
+
 
 @account_bp.route('/update', methods=['POST'])
 def update_account():
@@ -84,37 +89,38 @@ def update_account():
     if 'account_id' not in session:
         flash('Please select an account first', 'warning')
         return redirect(url_for('main.index'))
-    
+
     account_id = session['account_id']
     new_username = request.form.get('new_username', '').strip()
-    
+
     if not new_username:
         flash('Username cannot be empty', 'error')
         return redirect(url_for('account.index'))
-    
+
     try:
         # Create backup before making changes
         backup_database()
-        
+
         # Update username
         rows_affected = execute_db(
             'UPDATE accounts SET username = ? WHERE id = ?',
             [new_username, account_id]
         )
-        
+
         if rows_affected > 0:
             # Update session with new username
             session['username'] = new_username
             flash(f'Username updated to "{new_username}"', 'success')
         else:
             flash('No changes made', 'warning')
-            
+
     except sqlite3.IntegrityError:
         flash(f'Username "{new_username}" already exists', 'error')
     except Exception as e:
         flash(f'Error updating username: {str(e)}', 'error')
-    
+
     return redirect(url_for('account.index'))
+
 
 @account_bp.route('/delete', methods=['POST'])
 def delete_account():
@@ -122,14 +128,14 @@ def delete_account():
     if 'account_id' not in session:
         flash('Please select an account first', 'warning')
         return redirect(url_for('main.index'))
-    
+
     account_id = session['account_id']
     confirmation = request.form.get('confirmation', '')
-    
+
     if confirmation != 'DELETE':
         flash('Please type DELETE to confirm account deletion', 'error')
         return redirect(url_for('account.index'))
-    
+
     try:
         # Create backup before making changes
         backup_database()
@@ -137,7 +143,8 @@ def delete_account():
         # Use context manager so commit/rollback happen automatically
         with get_db() as db:
             # Delete related data in the correct order to maintain foreign key constraints
-            db.execute('DELETE FROM expanded_state WHERE account_id = ?', [account_id])
+            db.execute(
+                'DELETE FROM expanded_state WHERE account_id = ?', [account_id])
 
             # Find identifiers used by this account
             identifiers = query_db('''
@@ -153,25 +160,32 @@ def delete_account():
                     SELECT id FROM companies WHERE account_id = ?
                 )
             ''', [account_id])
-            db.execute('DELETE FROM companies WHERE account_id = ?', [account_id])
-            db.execute('DELETE FROM portfolios WHERE account_id = ?', [account_id])
+            db.execute(
+                'DELETE FROM companies WHERE account_id = ?', [account_id])
+            db.execute(
+                'DELETE FROM portfolios WHERE account_id = ?', [account_id])
 
             # Delete market prices not used by other accounts
             deleted_count = 0
             try:
-                remaining_accounts = query_db('SELECT COUNT(*) as count FROM accounts WHERE id != ?', [account_id])
+                remaining_accounts = query_db(
+                    'SELECT COUNT(*) as count FROM accounts WHERE id != ?', [account_id])
                 is_last_account = remaining_accounts[0]['count'] == 0
 
                 if is_last_account:
-                    logger.info("This is the last account - deleting all market prices")
-                    market_prices_count = query_db('SELECT COUNT(*) as count FROM market_prices')
+                    logger.info(
+                        "This is the last account - deleting all market prices")
+                    market_prices_count = query_db(
+                        'SELECT COUNT(*) as count FROM market_prices')
                     count_to_delete = market_prices_count[0]['count']
                     if count_to_delete > 0:
                         db.execute('DELETE FROM market_prices')
-                        logger.info(f"Deleted all {count_to_delete} market prices as the last account was deleted")
+                        logger.info(
+                            f"Deleted all {count_to_delete} market prices as the last account was deleted")
                         deleted_count = count_to_delete
                 else:
-                    logger.info(f"Checking {len(identifiers)} market prices for potential cleanup after account deletion")
+                    logger.info(
+                        f"Checking {len(identifiers)} market prices for potential cleanup after account deletion")
                     for item in identifiers:
                         identifier = item['identifier']
                         other_usages = query_db('''
@@ -180,28 +194,36 @@ def delete_account():
                             LIMIT 1
                         ''', [identifier])
                         if not other_usages:
-                            logger.info(f"Deleting orphaned market price for identifier: {identifier}")
-                            db.execute('DELETE FROM market_prices WHERE identifier = ?', [identifier])
+                            logger.info(
+                                f"Deleting orphaned market price for identifier: {identifier}")
+                            db.execute(
+                                'DELETE FROM market_prices WHERE identifier = ?', [identifier])
                             deleted_count += 1
 
                 if deleted_count > 0:
-                    logger.info(f"Deleted {deleted_count} orphaned market prices during account deletion")
+                    logger.info(
+                        f"Deleted {deleted_count} orphaned market prices during account deletion")
 
                 if not is_last_account:
                     all_company_identifiers = query_db('''
                         SELECT DISTINCT identifier FROM companies
                         WHERE identifier IS NOT NULL AND identifier != ''
                     ''')
-                    used_identifiers = {item['identifier'] for item in all_company_identifiers} if all_company_identifiers else set()
-                    all_price_records = query_db('SELECT identifier FROM market_prices')
+                    used_identifiers = {
+                        item['identifier'] for item in all_company_identifiers} if all_company_identifiers else set()
+                    all_price_records = query_db(
+                        'SELECT identifier FROM market_prices')
                     for item in all_price_records:
                         identifier = item['identifier']
                         if identifier not in used_identifiers:
-                            logger.info(f"Found additional orphaned market price to delete: {identifier}")
-                            db.execute('DELETE FROM market_prices WHERE identifier = ?', [identifier])
+                            logger.info(
+                                f"Found additional orphaned market price to delete: {identifier}")
+                            db.execute(
+                                'DELETE FROM market_prices WHERE identifier = ?', [identifier])
                             deleted_count += 1
             except Exception as e:
-                logger.error(f"Error while cleaning up market prices: {str(e)}")
+                logger.error(
+                    f"Error while cleaning up market prices: {str(e)}")
 
             db.execute('DELETE FROM accounts WHERE id = ?', [account_id])
 
@@ -212,5 +234,5 @@ def delete_account():
 
     except Exception as e:
         flash(f'Error deleting account: {str(e)}', 'error')
-    
+
     return redirect(url_for('main.index'))

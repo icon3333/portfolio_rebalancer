@@ -19,7 +19,7 @@ def create_app(config_name='default'):
 
     app.config.update(
         SECRET_KEY=secret_key,
-        SQLALCHEMY_DATABASE_URI='sqlite:///portfolio.db',
+        SQLALCHEMY_DATABASE_URI='sqlite:///app/database/portfolio.db',
         TEMPLATES_AUTO_RELOAD=True,
         JSON_SORT_KEYS=False
     )

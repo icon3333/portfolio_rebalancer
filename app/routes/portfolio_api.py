@@ -10,6 +10,8 @@ from app.utils.batch_processing import start_batch_process, get_job_status
 from app.utils.portfolio_utils import (
     get_portfolio_data, process_csv_data, has_companies_in_default, get_stock_info
 )
+from app.utils.yfinance_utils import get_isin_data
+from app.utils.db_utils import update_price_in_db
 
 import pandas as pd
 import logging
@@ -41,21 +43,27 @@ def _apply_company_update(cursor, company_id, data, account_id):
         else:
             portfolio_id = portfolio['id']
     else:
+        # Assign to 'Default' portfolio if no portfolio is specified
         default_portfolio = query_db(
-            'SELECT id FROM portfolios WHERE name = "-" AND account_id = ?',
-            [account_id], one=True)
+            'SELECT id FROM portfolios WHERE name = ? AND account_id = ?',
+            ['Default', account_id], one=True)
+
         if not default_portfolio:
+            # Create 'Default' portfolio if it doesn't exist
             cursor.execute(
                 'INSERT INTO portfolios (name, account_id) VALUES (?, ?)',
-                ['-', account_id]
+                ['Default', account_id]
             )
             portfolio_id = cursor.lastrowid
+            logger.info(
+                f"Created 'Default' portfolio for account_id: {account_id}")
         else:
             portfolio_id = default_portfolio['id']
 
     cursor.execute(
         'UPDATE companies SET identifier = ?, category = ?, portfolio_id = ? WHERE id = ?',
-        [data.get('identifier', ''), data.get('category', ''), portfolio_id, company_id]
+        [data.get('identifier', ''), data.get(
+            'category', ''), portfolio_id, company_id]
     )
 
     if 'shares' in data or 'override_share' in data:
@@ -76,20 +84,22 @@ def _apply_company_update(cursor, company_id, data, account_id):
             )
 
 # API endpoint to get and save state data
+
+
 def manage_state():
     """Get or save state data"""
     if 'account_id' not in session:
         return jsonify({'error': 'Not authenticated'}), 401
-    
+
     account_id = session['account_id']
-    
+
     # GET request to retrieve state
     if request.method == 'GET':
         page_name = request.args.get('page', '')
-        
+
         if not page_name:
             return jsonify({'error': 'Page name is required'}), 400
-        
+
         try:
             # Get all state variables for this account and page
             state_vars = query_db('''
@@ -97,34 +107,34 @@ def manage_state():
                 FROM expanded_state
                 WHERE account_id = ? AND page_name = ?
             ''', [account_id, page_name])
-            
+
             if not state_vars:
                 return jsonify({})
-            
+
             # Convert to proper data structure
             state_data = {}
             for var in state_vars:
                 var_name = var['variable_name']
                 var_value = var['variable_value']
-                
+
                 # Add to state data without conversion (handled by front-end)
                 state_data[var_name] = var_value
-            
+
             return jsonify(state_data)
-            
+
         except Exception as e:
             logger.error(f"Error retrieving state: {str(e)}")
             return jsonify({'error': str(e)}), 500
-    
+
     # POST request to save state
     elif request.method == 'POST':
         data = request.json
-        
+
         if not data or 'page' not in data:
             return jsonify({'error': 'Invalid data format'}), 400
-        
+
         page_name = data['page']
-        
+
         try:
             # Create backup before making changes
             backup_database()
@@ -140,7 +150,7 @@ def manage_state():
                 DELETE FROM expanded_state
                 WHERE account_id = ? AND page_name = ?
             ''', [account_id, page_name])
-            
+
                 # Insert new state variables
                 for key, value in data.items():
                     if key == 'page':
@@ -165,7 +175,8 @@ def manage_state():
                 # Commit transaction
                 db.commit()
 
-            logger.info(f"State saved successfully for account {account_id}, page {page_name}")
+            logger.info(
+                f"State saved successfully for account {account_id}, page {page_name}")
             return jsonify({'success': True, 'message': 'State saved successfully'})
 
         except Exception as e:
@@ -173,17 +184,20 @@ def manage_state():
             return jsonify({'error': str(e)}), 500
 
 # API endpoint to get companies for a specific portfolio
+
+
 def get_allocate_portfolio_data():
     """API endpoint to get structured portfolio data for the rebalancing feature"""
     logger.info("API request for allocate portfolio data")
-    
+
     if 'account_id' not in session:
         logger.warning("No account_id in session")
         return jsonify({'error': 'Not authenticated'}), 401
-    
+
     account_id = session['account_id']
-    logger.info(f"Getting portfolio data for rebalancing, account_id: {account_id}")
-    
+    logger.info(
+        f"Getting portfolio data for rebalancing, account_id: {account_id}")
+
     try:
         # Get all portfolios for this account
         portfolios_data = query_db('''
@@ -192,75 +206,82 @@ def get_allocate_portfolio_data():
             WHERE account_id = ? AND name IS NOT NULL
             ORDER BY name
         ''', [account_id])
-        
+
         if not portfolios_data:
             logger.warning(f"No portfolios found for account {account_id}")
             return jsonify({'portfolios': []})
-        
+
         # Get target allocations from expanded_state
         target_allocation_data = query_db('''
             SELECT variable_value
             FROM expanded_state
             WHERE account_id = ? AND page_name = ? AND variable_name = ?
         ''', [account_id, 'build', 'portfolios'], one=True)
-        
+
         # Parse target allocations if available
         target_allocations = []
         if target_allocation_data and target_allocation_data['variable_value']:
             try:
-                target_allocations = json.loads(target_allocation_data['variable_value'])
-                logger.info(f"Found target allocations in expanded_state: {len(target_allocations)} portfolios")
+                target_allocations = json.loads(
+                    target_allocation_data['variable_value'])
+                logger.info(
+                    f"Found target allocations in expanded_state: {len(target_allocations)} portfolios")
             except json.JSONDecodeError:
                 logger.error("Failed to parse target allocations JSON")
-        
+
         # Create a map of position target weights
         position_target_weights = {}
         for portfolio in target_allocations:
             portfolio_id = portfolio.get('id')
             if not portfolio_id:
                 continue
-                
+
             # Store target weights for real positions
             for position in portfolio.get('positions', []):
                 if not position.get('isPlaceholder'):
                     position_key = (portfolio_id, position.get('companyName'))
-                    position_target_weights[position_key] = position.get('weight', 0)
-        
+                    position_target_weights[position_key] = position.get(
+                        'weight', 0)
+
         # Count total positions across all portfolios to determine
         # the flat weight for each position
         total_positions = 0
         portfolio_positions_count = {}
         portfolio_min_positions = {}  # Store minimum positions needed per portfolio
-        
+
         # First pass: Count all positions (real + placeholder) across ALL portfolios
         for portfolio in target_allocations:
             portfolio_id = portfolio.get('id')
-            real_positions = [p for p in portfolio.get('positions', []) if not p.get('isPlaceholder', False)]
-            placeholder = next((p for p in portfolio.get('positions', []) if p.get('isPlaceholder', False)), None)
-            
+            real_positions = [p for p in portfolio.get(
+                'positions', []) if not p.get('isPlaceholder', False)]
+            placeholder = next((p for p in portfolio.get(
+                'positions', []) if p.get('isPlaceholder', False)), None)
+
             positions_count = len(real_positions)
             if placeholder:
                 positions_count += placeholder.get('positionsRemaining', 0)
-            
+
             portfolio_positions_count[portfolio_id] = positions_count
-            
+
             # Extract minimum positions needed from target allocations
             # For "dividend" portfolio, this should be 20 positions
             min_positions = portfolio.get('minPositions', positions_count)
-            portfolio_min_positions[portfolio_id] = max(min_positions, positions_count)
-            
+            portfolio_min_positions[portfolio_id] = max(
+                min_positions, positions_count)
+
             # Log minimum positions for each portfolio
             portfolio_name = portfolio.get('name', 'Unknown')
-            logger.info(f"Portfolio {portfolio_name} needs minimum {portfolio_min_positions[portfolio_id]} positions")
-            
+            logger.info(
+                f"Portfolio {portfolio_name} needs minimum {portfolio_min_positions[portfolio_id]} positions")
+
             total_positions += positions_count
-        
+
         # Calculate uniform global weight for all positions
         flat_position_weight = 100.0 / total_positions if total_positions > 0 else 0
         logger.info(
             f"FLAT DISTRIBUTION: {total_positions} total positions with {flat_position_weight:.2f}% each"
         )
-        
+
         result = {'portfolios': []}
 
         # Fetch all portfolio/company data in one query
@@ -281,14 +302,17 @@ def get_allocate_portfolio_data():
         for row in data:
             pid = row['portfolio_id']
             pname = row['portfolio_name']
-            portfolio = portfolio_map.setdefault(pid, {'name': pname, 'categories': {}, 'currentValue': 0})
+            portfolio = portfolio_map.setdefault(
+                pid, {'name': pname, 'categories': {}, 'currentValue': 0})
 
             if row['company_name'] and row['category']:
-                cat = portfolio['categories'].setdefault(row['category'], {'positions': [], 'currentValue': 0})
+                cat = portfolio['categories'].setdefault(
+                    row['category'], {'positions': [], 'currentValue': 0})
                 pos_value = (row['price_eur'] or 0) * (row['shares'] or 0)
                 portfolio['currentValue'] += pos_value
                 cat['currentValue'] += pos_value
-                target_weight = position_target_weights.get((pid, row['company_name']), 0)
+                target_weight = position_target_weights.get(
+                    (pid, row['company_name']), 0)
                 cat['positions'].append({
                     'name': row['company_name'],
                     'currentValue': pos_value,
@@ -300,10 +324,12 @@ def get_allocate_portfolio_data():
             portfolio_name = pdata['name']
 
             portfolio_target_weight = 0
-            target_portfolio = next((p for p in target_allocations if p.get('id') == portfolio_id), None)
+            target_portfolio = next(
+                (p for p in target_allocations if p.get('id') == portfolio_id), None)
             if target_portfolio:
                 portfolio_target_weight = target_portfolio.get('allocation', 0)
-                logger.info(f"Found target weight for portfolio {portfolio_name}: {portfolio_target_weight}%")
+                logger.info(
+                    f"Found target weight for portfolio {portfolio_name}: {portfolio_target_weight}%")
 
             portfolio_entry = {
                 'name': portfolio_name,
@@ -322,78 +348,93 @@ def get_allocate_portfolio_data():
                 }
                 portfolio_entry['categories'].append(category_entry)
 
-            portfolio_target_value = (portfolio_target_weight / 100) * pdata['currentValue'] if pdata['currentValue'] > 0 else 0
+            portfolio_target_value = (portfolio_target_weight / 100) * \
+                pdata['currentValue'] if pdata['currentValue'] > 0 else 0
             portfolio_entry['targetValue'] = portfolio_target_value
 
             for cat in portfolio_entry['categories']:
                 cat_target_value = 0
                 for pos in cat['positions']:
-                    pos_target_value = (pos['targetAllocation'] / 100) * portfolio_target_value
+                    pos_target_value = (
+                        pos['targetAllocation'] / 100) * portfolio_target_value
                     pos['targetValue'] = pos_target_value
                     cat_target_value += pos_target_value
 
                 cat['targetValue'] = cat_target_value
-                cat['targetWeight'] = (cat_target_value / portfolio_target_value * 100) if portfolio_target_value > 0 else 0
+                cat['targetWeight'] = (
+                    cat_target_value / portfolio_target_value * 100) if portfolio_target_value > 0 else 0
 
             portfolio_entry['targetAllocation_portfolio'] = portfolio_target_value
             result['portfolios'].append(portfolio_entry)
-        
-        logger.info(f"Returning {len(result['portfolios'])} portfolios with flat {flat_position_weight:.2f}% weight per position")
+
+        logger.info(
+            f"Returning {len(result['portfolios'])} portfolios with flat {flat_position_weight:.2f}% weight per position")
         return jsonify(result)
-    
+
     except Exception as e:
         logger.error(f"Error getting portfolio data for rebalancing: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 # Ensure this function exists to prevent import errors
+
+
 def get_portfolio_data_api():
     """Get portfolio data from the database"""
     try:
         # Check if account_id exists in session
         if 'account_id' not in session:
-            logger.error("No account_id in session when calling portfolio_data API")
+            logger.error(
+                "No account_id in session when calling portfolio_data API")
             return jsonify({'error': 'Not authenticated - account_id missing'}), 401
-            
+
         account_id = session['account_id']
         if not account_id:
-            logger.error("Empty account_id in session when calling portfolio_data API")
+            logger.error(
+                "Empty account_id in session when calling portfolio_data API")
             return jsonify({'error': 'Not authenticated - empty account_id'}), 401
 
         # Log the attempt to fetch data
         logger.info(f"Fetching portfolio data for account_id: {account_id}")
-        
+
         # Get data from database without triggering any yfinance updates
         portfolio_data = get_portfolio_data(account_id)
-        
+
         # Detailed logging of result
         if not portfolio_data:
-            logger.warning(f"No portfolio data found for account_id: {account_id}")
+            logger.warning(
+                f"No portfolio data found for account_id: {account_id}")
             return jsonify({'error': 'Portfolio data could not be loaded. It may have been deleted or is missing from the database.'}), 404
         else:
-            logger.info(f"Successfully retrieved {len(portfolio_data)} portfolio items")
+            logger.info(
+                f"Successfully retrieved {len(portfolio_data)} portfolio items")
 
         return jsonify(portfolio_data)
     except KeyError as ke:
-        logger.error(f"KeyError accessing portfolio data: {str(ke)}", exc_info=True)
+        logger.error(
+            f"KeyError accessing portfolio data: {str(ke)}", exc_info=True)
         return jsonify({'error': f'Session key error: {str(ke)}'}), 401
     except Exception as e:
         logger.error(f"Error getting portfolio data: {str(e)}", exc_info=True)
         return jsonify({'error': f'Portfolio data could not be loaded: {str(e)}'}), 500
 
+
 def get_portfolios_api():
     """API endpoint to get portfolios for an account"""
     logger.info("Accessing portfolios API")
-    
+
     if 'account_id' not in session:
         logger.warning("No account_id in session")
         return jsonify({'error': 'Not authenticated. Please select an account from the home page.'}), 401
-    
+
     try:
         account_id = session['account_id']
-        include_ids = request.args.get('include_ids', 'false').lower() == 'true'
-        has_companies = request.args.get('has_companies', 'false').lower() == 'true'
-        logger.info(f"Getting portfolios for account_id: {account_id}, include_ids: {include_ids}, has_companies: {has_companies}")
-        
+        include_ids = request.args.get(
+            'include_ids', 'false').lower() == 'true'
+        has_companies = request.args.get(
+            'has_companies', 'false').lower() == 'true'
+        logger.info(
+            f"Getting portfolios for account_id: {account_id}, include_ids: {include_ids}, has_companies: {has_companies}")
+
         # Get portfolio data from portfolios table, including all portfolios with non-null names
         if include_ids:
             # Get portfolios from the portfolios table
@@ -406,7 +447,8 @@ def get_portfolios_api():
                     WHERE p.account_id = ? AND p.name IS NOT NULL
                     ORDER BY p.name
                 ''', [account_id])
-                logger.info(f"Filtering for portfolios with associated companies")
+                logger.info(
+                    f"Filtering for portfolios with associated companies")
             else:
                 # Get all portfolios
                 portfolios_from_table = query_db('''
@@ -414,11 +456,13 @@ def get_portfolios_api():
                     WHERE account_id = ? AND name IS NOT NULL
                     ORDER BY name
                 ''', [account_id])
-            
+
             # Convert to list of objects with id and name
-            portfolios = [{'id': p['id'], 'name': p['name']} for p in portfolios_from_table]
-            logger.info(f"Retrieved {len(portfolios)} portfolios with IDs: {portfolios}")
-            
+            portfolios = [{'id': p['id'], 'name': p['name']}
+                          for p in portfolios_from_table]
+            logger.info(
+                f"Retrieved {len(portfolios)} portfolios with IDs: {portfolios}")
+
             # Ensure we're not missing the Default portfolio if it has companies or if we're not filtering
             has_default = any(p['name'] == 'Default' for p in portfolios)
             if not has_default and (not has_companies or has_companies_in_default(account_id)):
@@ -426,9 +470,10 @@ def get_portfolios_api():
                     SELECT id FROM portfolios
                     WHERE account_id = ? AND name = 'Default'
                 ''', [account_id], one=True)
-                
+
                 if default_portfolio:
-                    portfolios.append({'id': default_portfolio['id'], 'name': 'Default'})
+                    portfolios.append(
+                        {'id': default_portfolio['id'], 'name': 'Default'})
                     logger.info("Added Default portfolio to the response")
                 else:
                     # Create Default portfolio if it doesn't exist
@@ -436,10 +481,11 @@ def get_portfolios_api():
                         INSERT INTO portfolios (account_id, name)
                         VALUES (?, 'Default')
                     ''', [account_id])
-                    
+
                     portfolios.append({'id': portfolio_id, 'name': 'Default'})
-                    logger.info("Created and added Default portfolio to the response")
-            
+                    logger.info(
+                        "Created and added Default portfolio to the response")
+
             json_response = jsonify(portfolios)
         else:
             # Get portfolio names only
@@ -452,7 +498,8 @@ def get_portfolios_api():
                     WHERE p.account_id = ? AND p.name IS NOT NULL
                     ORDER BY p.name
                 ''', [account_id])
-                logger.info(f"Filtering for portfolios with associated companies")
+                logger.info(
+                    f"Filtering for portfolios with associated companies")
             else:
                 # Get all portfolios
                 portfolios_from_table = query_db('''
@@ -460,18 +507,19 @@ def get_portfolios_api():
                     WHERE account_id = ? AND name IS NOT NULL
                     ORDER BY name
                 ''', [account_id])
-            
+
             # Extract names from the query results - don't filter out any valid names
             names = [p['name'] for p in portfolios_from_table]
-            logger.info(f"Retrieved {len(names)} portfolio names from portfolios table: {names}")
-            
+            logger.info(
+                f"Retrieved {len(names)} portfolio names from portfolios table: {names}")
+
             # Ensure Default is in the list if it has companies or if we're not filtering
             if 'Default' not in names and (not has_companies or has_companies_in_default(account_id)):
                 default_exists = query_db('''
                     SELECT 1 FROM portfolios
                     WHERE account_id = ? AND name = 'Default'
                 ''', [account_id], one=True)
-                
+
                 if default_exists:
                     names.append('Default')
                     logger.info("Added Default portfolio name to the response")
@@ -481,73 +529,80 @@ def get_portfolios_api():
                         INSERT INTO portfolios (account_id, name)
                         VALUES (?, 'Default')
                     ''', [account_id])
-                    
+
                     names.append('Default')
-                    logger.info("Created and added Default portfolio name to the response")
-            
+                    logger.info(
+                        "Created and added Default portfolio name to the response")
+
             json_response = jsonify(names)
-        
+
         logger.debug(f"JSON response to be sent: {json_response.data}")
         return json_response
-        
+
     except Exception as e:
         logger.error(f"Error getting portfolios: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
+
 
 def upload_csv():
     """Upload and process CSV data"""
     if 'account_id' not in session:
         flash('Please select an account first', 'warning')
         return redirect(url_for('portfolio.enrich'))
-    
+
     account_id = session['account_id']
-    
+
     # Check if file was uploaded
     if 'csv_file' not in request.files:
         flash('No file uploaded', 'error')
         return redirect(url_for('portfolio.enrich'))
-    
+
     file = request.files['csv_file']
-    
+
     # Check if file is empty
     if file.filename == '':
         flash('No file selected', 'error')
         return redirect(url_for('portfolio.enrich'))
-    
+
     # Process the file
     try:
         # Create backup
         backup_database()
-        
+
         # Read file content
         file_content = file.read().decode('utf-8')
-        
+
         # Try to process the data
         success, message, result = process_csv_data(account_id, file_content)
-        
+
         if success:
             # Show detailed success message
             message_parts = []
             if result.get('added'):
-                message_parts.append(f"Added {len(result['added'])} new positions")
+                message_parts.append(
+                    f"Added {len(result['added'])} new positions")
             if result.get('updated'):
-                message_parts.append(f"Updated {len(result['updated'])} existing positions")
+                message_parts.append(
+                    f"Updated {len(result['updated'])} existing positions")
             if result.get('removed'):
-                message_parts.append(f"Removed {len(result['removed'])} positions with zero shares")
-            
-            flash(f"CSV data imported successfully. {' | '.join(message_parts)}", 'success')
-            
+                message_parts.append(
+                    f"Removed {len(result['removed'])} positions with zero shares")
+
+            flash(
+                f"CSV data imported successfully. {' | '.join(message_parts)}", 'success')
+
             # Show warnings if any
             warnings = []
             if result.get('failed'):
-                warnings.append(f"Failed to process {len(result['failed'])} companies")
-                
+                warnings.append(
+                    f"Failed to process {len(result['failed'])} companies")
+
             # If there are failed price fetches, only report the ones from this session
             if result.get('failed_prices') and result.get('added'):
                 # Get only the failed prices from this upload session
                 # by checking if the companies are also in the 'added' list
                 current_failed_prices = []
-                
+
                 # Map company names to their identifiers
                 company_identifiers = {}
                 for company_name in result.get('added', []):
@@ -557,85 +612,93 @@ def upload_csv():
                         one=True
                     )
                     if company and company['identifier']:
-                        company_identifiers[company['identifier']] = company_name
-                
+                        company_identifiers[company['identifier']
+                                            ] = company_name
+
                 # Now filter the failed_prices to only those that match our newly added companies
                 session_failed_prices = []
                 for identifier in result.get('failed_prices', []):
                     if identifier in company_identifiers:
                         session_failed_prices.append(identifier)
-                
+
                 # Only report and log the failures from this session
                 if session_failed_prices:
                     current_failure_count = len(session_failed_prices)
-                    logger.warning(f"Failed to fetch prices for {current_failure_count} identifiers from this upload: {', '.join(session_failed_prices)}")
-                    warnings.append(f"Failed to fetch prices for {current_failure_count} identifiers from this upload. Check logs for details.")
-            
+                    logger.warning(
+                        f"Failed to fetch prices for {current_failure_count} identifiers from this upload: {', '.join(session_failed_prices)}")
+                    warnings.append(
+                        f"Failed to fetch prices for {current_failure_count} identifiers from this upload. Check logs for details.")
+
             # Show price update success message if relevant
             added_count = len(result.get('added', []))
             if added_count > 0:
                 # Calculate the success count - if session_failed_prices exists, use it, otherwise assume all succeeded
-                failure_count = len(session_failed_prices) if 'session_failed_prices' in locals() and session_failed_prices else 0
+                failure_count = len(session_failed_prices) if 'session_failed_prices' in locals(
+                ) and session_failed_prices else 0
                 prices_updated_count = added_count - failure_count
                 if prices_updated_count > 0:
-                    flash(f"Successfully updated prices for {prices_updated_count} out of {added_count} newly added companies", 'success')
-            
+                    flash(
+                        f"Successfully updated prices for {prices_updated_count} out of {added_count} newly added companies", 'success')
+
             if warnings:
                 flash(' | '.join(warnings), 'warning')
-                
+
             # Set session variable to indicate we should use "-" as the default portfolio
             session['use_default_portfolio'] = True
         else:
             flash(message, 'error')
-            
+
     except Exception as e:
         logger.error(f"Error processing CSV: {str(e)}", exc_info=True)
         flash(f'Error processing CSV: {str(e)}', 'error')
-    
+
     return redirect(url_for('portfolio.enrich'))
+
 
 def update_portfolio_api():
     """API endpoint to update portfolio data"""
     if 'account_id' not in session:
         return jsonify({'error': 'Not authenticated. Please select an account from the home page.'}), 401
-    
+
     try:
         account_id = session['account_id']
         data = request.json
-        
+
         # Validate data
         if not data or not isinstance(data, list):
             return jsonify({'error': 'Invalid data format'}), 400
-        
+
         # Create backup
         backup_database()
-        
+
         # Start transaction
         db = get_db()
         cursor = db.cursor()
         cursor.execute('BEGIN TRANSACTION')
-        
+
         updated_count = 0
         failed_items = []
-        
+
         for item in data:
             try:
-                # Get company ID
+                # Get company ID and original identifier
                 company_result = query_db(
-                    'SELECT id FROM companies WHERE name = ? AND account_id = ?',
+                    'SELECT id, identifier FROM companies WHERE name = ? AND account_id = ?',
                     [item['company'], account_id],
                     one=True
                 )
-                
+
                 if not company_result:
                     failed_items.append({
                         'company': item['company'],
                         'error': 'Company not found'
                     })
                     continue
-                    
+
                 company_id = company_result['id']
-                
+                original_identifier = company_result.get('identifier')
+                new_identifier = item.get('identifier', '')
+
                 # Get portfolio ID
                 if item.get('portfolio') and item['portfolio'] != 'None':
                     portfolio_result = query_db(
@@ -643,7 +706,7 @@ def update_portfolio_api():
                         [item['portfolio'], account_id],
                         one=True
                     )
-                    
+
                     if not portfolio_result:
                         # Create portfolio if it doesn't exist
                         cursor.execute(
@@ -660,7 +723,7 @@ def update_portfolio_api():
                         [account_id],
                         one=True
                     )
-                    
+
                     if not portfolio_result:
                         # Create default portfolio if doesn't exist
                         cursor.execute(
@@ -670,31 +733,58 @@ def update_portfolio_api():
                         portfolio_id = cursor.lastrowid
                     else:
                         portfolio_id = portfolio_result['id']
-                
+
                 # Update company
                 cursor.execute('''
                     UPDATE companies 
                     SET identifier = ?, category = ?, portfolio_id = ?
                     WHERE id = ?
                 ''', [
-                    item.get('identifier', ''),
+                    new_identifier,
                     item.get('category', ''),
                     portfolio_id,
                     company_id
                 ])
-                
+
+                # If identifier was added or changed, fetch new price
+                if new_identifier and new_identifier != original_identifier:
+                    logger.info(
+                        f"Identifier for {item['company']} changed to {new_identifier}, fetching price...")
+                    try:
+                        price_data = get_isin_data(new_identifier)
+                        if price_data.get('price_eur') is not None:
+                            update_price_in_db(
+                                identifier=new_identifier,
+                                price=price_data.get('price'),
+                                currency=price_data.get('currency'),
+                                price_eur=price_data.get('price_eur'),
+                                country=price_data.get('country'),
+                                sector=price_data.get('sector'),
+                                industry=price_data.get('industry'),
+                                modified_identifier=price_data.get(
+                                    'modified_identifier')
+                            )
+                            logger.info(
+                                f"Successfully updated price for {new_identifier}")
+                        else:
+                            logger.warning(
+                                f"Failed to fetch price for {new_identifier}: {price_data.get('error')}")
+                    except Exception as e:
+                        logger.error(
+                            f"An error occurred while fetching price for {new_identifier}: {str(e)}")
+
                 # Update shares
                 if 'shares' in item or 'override_share' in item:
                     shares = item.get('shares')
                     override_share = item.get('override_share')
-                    
+
                     # Check if shares record exists
                     share_exists = query_db(
                         'SELECT company_id, shares FROM company_shares WHERE company_id = ?',
                         [company_id],
                         one=True
                     )
-                    
+
                     if share_exists:
                         cursor.execute('''
                             UPDATE company_shares
@@ -706,15 +796,15 @@ def update_portfolio_api():
                             INSERT INTO company_shares (company_id, shares, override_share)
                             VALUES (?, ?, ?)
                         ''', [company_id, shares, override_share])
-                
+
                 updated_count += 1
-                
+
             except Exception as e:
                 failed_items.append({
                     'company': item.get('company', 'Unknown'),
                     'error': str(e)
                 })
-        
+
         if failed_items:
             db.rollback()
             return jsonify({
@@ -728,103 +818,108 @@ def update_portfolio_api():
                 'success': True,
                 'message': f'Successfully updated {updated_count} items'
             })
-            
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
 
 def manage_portfolios():
     """Add, rename, or delete portfolios"""
     if 'account_id' not in session:
         flash('Please select an account first', 'warning')
         return redirect(url_for('portfolio.enrich'))
-    
+
     account_id = session['account_id']
     action = request.form.get('action')
-    
+
     try:
         # Create backup
         backup_database()
-        
+
         if action == 'add':
             portfolio_name = request.form.get('add_portfolio_name', '').strip()
             if not portfolio_name:
                 flash('Portfolio name cannot be empty', 'error')
                 return redirect(url_for('portfolio.enrich'))
-                
+
             # Check if portfolio already exists
             existing = query_db(
                 'SELECT 1 FROM portfolios WHERE name = ? AND account_id = ?',
                 [portfolio_name, account_id],
                 one=True
             )
-            
+
             if existing:
                 flash(f'Portfolio "{portfolio_name}" already exists', 'error')
                 return redirect(url_for('portfolio.enrich'))
-                
+
             # Add new portfolio
             execute_db(
                 'INSERT INTO portfolios (name, account_id) VALUES (?, ?)',
                 [portfolio_name, account_id]
             )
-            
-            flash(f'Portfolio "{portfolio_name}" added successfully', 'success')
-            
+
+            flash(
+                f'Portfolio "{portfolio_name}" added successfully', 'success')
+
         elif action == 'rename':
             old_name = request.form.get('old_name', '').strip()
             new_name = request.form.get('new_name', '').strip()
-            
+
             if not old_name or not new_name:
                 flash('Both old and new portfolio names are required', 'error')
                 return redirect(url_for('portfolio.enrich'))
-                
+
             # Check if new name already exists
             existing = query_db(
                 'SELECT 1 FROM portfolios WHERE name = ? AND account_id = ?',
                 [new_name, account_id],
                 one=True
             )
-            
+
             if existing:
                 flash(f'Portfolio "{new_name}" already exists', 'error')
                 return redirect(url_for('portfolio.enrich'))
-                
+
             # Rename portfolio
             execute_db(
                 'UPDATE portfolios SET name = ? WHERE name = ? AND account_id = ?',
                 [new_name, old_name, account_id]
             )
-            
-            flash(f'Portfolio renamed from "{old_name}" to "{new_name}"', 'success')
-            
+
+            flash(
+                f'Portfolio renamed from "{old_name}" to "{new_name}"', 'success')
+
         elif action == 'delete':
-            portfolio_name = request.form.get('delete_portfolio_name', '').strip()
-            
+            portfolio_name = request.form.get(
+                'delete_portfolio_name', '').strip()
+
             if not portfolio_name:
                 flash('Portfolio name is required', 'error')
                 return redirect(url_for('portfolio.enrich'))
-                
+
             # Check if portfolio is empty
             companies = query_db('''
                 SELECT COUNT(*) as count FROM companies c
                 JOIN portfolios p ON c.portfolio_id = p.id
                 WHERE p.name = ? AND p.account_id = ?
             ''', [portfolio_name, account_id], one=True)
-            
+
             if companies and companies['count'] > 0:
-                flash(f'Cannot delete portfolio "{portfolio_name}" because it contains companies', 'error')
+                flash(
+                    f'Cannot delete portfolio "{portfolio_name}" because it contains companies', 'error')
                 return redirect(url_for('portfolio.enrich'))
-                
+
             # Delete portfolio
             execute_db(
                 'DELETE FROM portfolios WHERE name = ? AND account_id = ?',
                 [portfolio_name, account_id]
             )
-            
-            flash(f'Portfolio "{portfolio_name}" deleted successfully', 'success')
-    
+
+            flash(
+                f'Portfolio "{portfolio_name}" deleted successfully', 'success')
+
     except Exception as e:
         flash(f'Error managing portfolios: {str(e)}', 'error')
-    
-    return redirect(url_for('portfolio.enrich'))
 
+    return redirect(url_for('portfolio.enrich'))
