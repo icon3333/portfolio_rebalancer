@@ -1574,3 +1574,37 @@ p {
 .card-header .card-header-controls .control label.checkbox input[type="checkbox"] {
     vertical-align: middle; /* Improves alignment with text */
 }
+
+/* Chart styling - Hide legends and ensure charts are visible */
+.frappe-chart .chart-legend,
+.frappe-chart .legend-dataset-text,
+.frappe-chart .legend-dataset-list,
+.frappe-chart .chart-legend-container,
+.chart-legend,
+.legend-dataset,
+.legend {
+    display: none !important;
+}
+
+.frappe-chart {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* Ensure chart containers are visible */
+[id*="Chart"], [id*="chart"] {
+    min-height: 300px;
+    width: 100%;
+    position: relative;
+}
+
+/* Ensure chart SVG elements are visible */
+.frappe-chart svg {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* Force hide any legend-related elements */
+.frappe-chart * [class*="legend"] {
+    display: none !important;
+}

@@ -66,6 +66,20 @@
                             </div>
                         </div>
                     </div>
+                    <div class="columns mt-4">
+                        <div class="column is-half">
+                            <h3 class="subtitle is-5 has-text-centered mb-2">Sector Distribution</h3>
+                            <div class="chart-medium-container">
+                                <div id="sectorDistributionChart"></div>
+                            </div>
+                        </div>
+                        <div class="column is-half">
+                            <h3 class="subtitle is-5 has-text-centered mb-2">Industry Distribution</h3>
+                            <div class="chart-medium-container">
+                                <div id="industryDistributionChart"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>
@@ -92,7 +106,7 @@
         
         <!-- Risk Breakdown Section -->
         <section class="mb-6">
-            <h2 class="section-title">Risk Breakdown</h2>
+            <h2 class="section-title">Heatmap</h2>
             
             <!-- Heatmap Section - Expandable (starts expanded) -->
             <div class="portfolio-section mb-4">
@@ -159,13 +173,13 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM loaded, initializing Portfolio Analysis...');
     
     // Check if required dependencies are loaded
-    if (typeof Plotly === 'undefined') {
-        console.error('Plotly is not loaded');
+    if (typeof frappe === 'undefined') {
+        console.error('Frappe Charts is not loaded');
         document.getElementById('loadingIndicator').innerHTML = `
             <div class="has-text-centered">
                 <p class="has-text-danger mb-3">
                     <i class="fas fa-exclamation-triangle mr-2"></i>
-                    Required chart library (Plotly) is not loaded.
+                    Required chart library (Frappe Charts) is not loaded.
                 </p>
                 <button class="button is-info" onclick="location.reload()">
                     <i class="fas fa-refresh mr-2"></i>Try Again
@@ -878,6 +892,7 @@ document.addEventListener('DOMContentLoaded', function() {
             company.country = company.country || 'Unknown';
             company.sector = company.sector || 'Unknown';
             company.industry = company.industry || 'Unknown';
+            company.category = company.category || 'Unknown';
             
             return company;
         });
@@ -896,6 +911,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     shares: 0,
                     totalInvested: 0,
                     // Preserve metadata from the first occurrence
+                    category: company.category || 'Unknown',
                     country: company.country || 'Unknown',
                     sector: company.sector || 'Unknown',
                     industry: company.industry || 'Unknown'
@@ -1420,7 +1436,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     chartElement.style.setProperty('display', 'block', 'important');
                                     chartElement.style.setProperty('visibility', 'visible', 'important');
                                     chartElement.style.setProperty('opacity', '1', 'important');
-                                    Plotly.Plots.resize(chartElement);
+                                    // Frappe Charts handle their own resizing
                                 }
                             }, 500);
                         } else {
@@ -1563,13 +1579,17 @@ document.addEventListener('DOMContentLoaded', function() {
             renderHeatmap(heatmapData, dimension);
         }, 50);
 
-        // Calculate data for doughnut charts
+        // Calculate data for distribution charts
         const countryDistribution = calculateExposureByDimension(selectedPortfolioIds, 'country');
         const categoryDistribution = calculateExposureByDimension(selectedPortfolioIds, 'category');
+        const sectorDistribution = calculateExposureByDimension(selectedPortfolioIds, 'sector');
+        const industryDistribution = calculateExposureByDimension(selectedPortfolioIds, 'industry');
         
-        // Render doughnut charts
-        renderDoughnutChart('countryDistributionChart', countryDistribution, 'Country Distribution');
-        renderDoughnutChart('categoryDistributionChart', categoryDistribution, 'Category Distribution');
+        // Render bar charts instead of doughnut charts
+        renderDistributionBarChart('countryDistributionChart', countryDistribution, 'Country Distribution');
+        renderDistributionBarChart('categoryDistributionChart', categoryDistribution, 'Category Distribution');
+        renderDistributionBarChart('sectorDistributionChart', sectorDistribution, 'Sector Distribution');
+        renderDistributionBarChart('industryDistributionChart', industryDistribution, 'Industry Distribution');
 
         // Set up dimension select change handler
         document.getElementById('riskDimensionSelect').addEventListener('change', function() {
@@ -1599,10 +1619,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 'No portfolios selected. Please select at least one portfolio in the Global Overview section.</p>' +
                 '</div>';
                 
-            // Display empty charts for country and category distributions
+            // Display empty charts for all distributions
             document.getElementById('countryDistributionChart').innerHTML = 
                 '<div class="has-text-centered p-6"><p class="has-text-grey-light">No data available</p></div>';
             document.getElementById('categoryDistributionChart').innerHTML = 
+                '<div class="has-text-centered p-6"><p class="has-text-grey-light">No data available</p></div>';
+            document.getElementById('sectorDistributionChart').innerHTML = 
+                '<div class="has-text-centered p-6"><p class="has-text-grey-light">No data available</p></div>';
+            document.getElementById('industryDistributionChart').innerHTML = 
                 '<div class="has-text-centered p-6"><p class="has-text-grey-light">No data available</p></div>';
                 
             return;
@@ -1624,23 +1648,39 @@ document.addEventListener('DOMContentLoaded', function() {
                     '</div>';
             }
 
-        // Update doughnut charts
+        // Update distribution charts
         const countryDistribution = calculateExposureByDimension(selectedPortfolioIds, 'country');
         const categoryDistribution = calculateExposureByDimension(selectedPortfolioIds, 'category');
+        const sectorDistribution = calculateExposureByDimension(selectedPortfolioIds, 'sector');
+        const industryDistribution = calculateExposureByDimension(selectedPortfolioIds, 'industry');
         
             // Only render charts if we have data
             if (countryDistribution && countryDistribution.labels && countryDistribution.labels.length > 0) {
-        renderDoughnutChart('countryDistributionChart', countryDistribution, 'Country Distribution');
+        renderDistributionBarChart('countryDistributionChart', countryDistribution, 'Country Distribution');
             } else {
                 document.getElementById('countryDistributionChart').innerHTML = 
                     '<div class="has-text-centered p-6"><p class="has-text-grey-light">No country data available</p></div>';
             }
             
             if (categoryDistribution && categoryDistribution.labels && categoryDistribution.labels.length > 0) {
-        renderDoughnutChart('categoryDistributionChart', categoryDistribution, 'Category Distribution');
+        renderDistributionBarChart('categoryDistributionChart', categoryDistribution, 'Category Distribution');
             } else {
                 document.getElementById('categoryDistributionChart').innerHTML = 
                     '<div class="has-text-centered p-6"><p class="has-text-grey-light">No category data available</p></div>';
+            }
+            
+            if (sectorDistribution && sectorDistribution.labels && sectorDistribution.labels.length > 0) {
+        renderDistributionBarChart('sectorDistributionChart', sectorDistribution, 'Sector Distribution');
+            } else {
+                document.getElementById('sectorDistributionChart').innerHTML = 
+                    '<div class="has-text-centered p-6"><p class="has-text-grey-light">No sector data available</p></div>';
+            }
+            
+            if (industryDistribution && industryDistribution.labels && industryDistribution.labels.length > 0) {
+        renderDistributionBarChart('industryDistributionChart', industryDistribution, 'Industry Distribution');
+            } else {
+                document.getElementById('industryDistributionChart').innerHTML = 
+                    '<div class="has-text-centered p-6"><p class="has-text-grey-light">No industry data available</p></div>';
             }
         } catch (error) {
             console.error('Error updating risk breakdown:', error);
@@ -1806,120 +1846,12 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // Clean up any previous plot to avoid errors
-        if (document.getElementById('riskHeatmap')) {
-            Plotly.purge('riskHeatmap');
-        }
-        
-        // Format dimension name for display
-        const formattedDimensionName = dimensionName.charAt(0).toUpperCase() + dimensionName.slice(1);
-        
-        // Truncate long labels for better display
-        const truncateLabel = (label, maxLength = 15) => {
-            if (label.length <= maxLength) return label;
-            return label.substring(0, maxLength) + '...';
-        };
-        
-        // Create shortened labels for display, but keep originals for tooltips
-        const truncatedDims = data.dims.map(d => truncateLabel(d));
-        const truncatedCountries = data.countries.map(c => truncateLabel(c));
-        
-        // Prepare custom data for enhanced tooltips using metadata
-        const metadata = data.metadata || {};
-        const customdata = data.countries.map((country, i) => 
-            data.dims.map((dim, j) => ({
-                country: country,
-                dimension: dim,
-                value: data.z[i][j],
-                // Include overall allocations if available
-                countryAllocation: metadata.countryPercentages?.[country] || 0,
-                dimensionAllocation: metadata.dimensionPercentages?.[dim] || 0
-            }))
-        );
-        
-        // Generate a more visually appealing colorscale
-        const colorscale = [
-            [0, 'rgba(240, 240, 240, 0.6)'],    // Very light gray for 0 values
-            [0.05, 'rgba(220, 238, 242, 0.9)'], // Very light bluish for small values
-            [0.1, 'rgba(166, 216, 225, 1.0)'],  // Light blue
-            [0.25, 'rgba(89, 164, 192, 1.0)'],  // Medium blue
-            [0.5, 'rgba(33, 113, 181, 1.0)'],   // Dark blue
-            [0.75, 'rgba(8, 69, 148, 1.0)'],    // Very dark blue
-            [1.0, 'rgba(8, 48, 107, 1.0)']      // Deepest blue
-        ];
-        
-        const trace = {
-            type: 'heatmap',
-            x: truncatedDims,
-            y: truncatedCountries,
-            z: data.z,
-            colorscale: colorscale,
-            showscale: true,
-            hovertemplate: '<b>%{customdata.country}</b> × <b>%{customdata.dimension}</b><br>' +
-                          'Cell Allocation: <b>%{z:.2f}%</b><br>' +
-                          'Total Country Allocation: %{customdata.countryAllocation:.1f}%<br>' +
-                          'Total ' + formattedDimensionName + ' Allocation: %{customdata.dimensionAllocation:.1f}%' +
-                          '<extra></extra>',
-            customdata: customdata
-        };
-        
-        // Get the container dimensions for responsive sizing
-        const container = document.getElementById('riskHeatmap');
-        const containerWidth = container.offsetWidth;
-        
-        // Calculate a better height based on number of rows
-        // More rows need more height to remain readable
-        const baseHeight = 350;
-        const rowCount = data.countries.length;
-        const colCount = data.dims.length;
-        let responsiveHeight;
-        
-        if (rowCount <= 5) {
-            responsiveHeight = baseHeight;
-        } else {
-            // Add 20px per additional row beyond 5, with a max
-            const additionalRows = Math.min(15, rowCount - 5); // Cap at 15 additional rows
-            responsiveHeight = baseHeight + (additionalRows * 20);
-        }
-        
-        // Calculate margins based on label lengths
-        const longestCountryLabel = Math.max(...data.countries.map(c => c.length));
-        const longestDimLabel = Math.max(...data.dims.map(d => d.length)); 
-        
-        // Adjust margins based on label length
-        const leftMargin = Math.min(150, 60 + (longestCountryLabel * 4)); // 4px per character with a max
-        const bottomMargin = Math.min(150, 50 + (longestDimLabel * 3)); // 3px per character with a max
-        
-        // Layout settings for the heatmap
-        const layout = {
+        // Use the new ChartConfig to create heatmap
+        ChartConfig.createHeatmap('riskHeatmap', data, {
             title: '',
-            showlegend: false,
-            margin: {
-                l: 50,
-                r: 40,
-                b: 50,
-                t: 30,
-                pad: 0
-            },
-            xaxis: {
-                title: 'Volatility',
-                tickfont: { size: 10 }
-            },
-            yaxis: {
-                title: 'Return',
-                tickfont: { size: 10 }
-            }
-        };
-        
-        // Use the centralized chart configuration
-        Plotly.newPlot('riskHeatmap', [trace], layout, ChartConfig.plotlyConfig);
-        
-        // Force a resize after a short delay to ensure proper rendering
-        setTimeout(() => {
-            if (document.getElementById('riskHeatmap')) {
-                Plotly.Plots.resize(document.getElementById('riskHeatmap'));
-            }
-        }, 100);
+            height: 400,
+            colors: ['#ebedf0', '#c0ddf9', '#73b3f3', '#3886e1', '#17459e']
+        });
     }
 
     // Calculate exposure by a single dimension for bar charts
@@ -1933,7 +1865,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 return { labels: [], values: [], percentages: [] };
             }
             
-            const totalValue = allCompanies.reduce((sum, c) => sum + (c.currentValue || 0), 0);
+            // Group companies by name to avoid double counting across portfolios
+            const groupedCompanies = groupCompaniesByName(allCompanies);
+            
+            const totalValue = groupedCompanies.reduce((sum, c) => sum + (c.currentValue || 0), 0);
             
             // If total value is zero, return empty data structure
             if (totalValue <= 0) {
@@ -1943,7 +1878,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const exposure = {};
         
-        allCompanies.forEach(company => {
+        groupedCompanies.forEach(company => {
                 const dimValue = (company[dimension] || '').trim() || 'Unknown';
             if (!exposure[dimValue]) {
                 exposure[dimValue] = 0;
@@ -1981,34 +1916,104 @@ document.addEventListener('DOMContentLoaded', function() {
         const labels = data.map(d => d.name);
         const values = data.map(d => d.percentage);
         
-        const trace = {
-            x: values,
-            y: labels,
-            type: 'bar',
-            orientation: 'h',
-            marker: {
-                color: 'rgb(158,202,225)',
-                opacity: 0.6,
-                line: {
-                    color: 'rgb(8,48,107)',
-                    width: 1.5
-                }
-            }
-        };
-        
-        const layout = {
+        // Use ChartConfig to create bar chart
+        ChartConfig.createBarChart(elementId, labels, values, {
             title: title,
-            xaxis: { title: 'Percentage (%)' },
-            yaxis: { title: '' },
             height: 400,
-            margin: { l: 150, r: 50, t: 50, b: 50 },
-            showlegend: false
-        };
-        
-        Plotly.newPlot(elementId, [trace], layout, ChartConfig.plotlyConfig);
+            color: '#7cd6fd',
+            formatValue: (v) => v.toFixed(1) + '%'
+        });
     }
 
-    // Render doughnut charts
+    // Render distribution bar charts
+    function renderDistributionBarChart(elementId, data, title) {
+        try {
+            // Handle both array format and object format with arrays
+            if (!data) {
+                console.log(`Cannot render bar chart: Data is null or undefined for ${elementId}`);
+                document.getElementById(elementId).innerHTML = 
+                    '<div class="has-text-centered p-4"><p class="has-text-grey-light">No data available</p></div>';
+                return;
+            }
+            
+            // Check if data is in the new format (object with arrays)
+            let labels, values, percentages;
+            if (data.labels && Array.isArray(data.labels)) {
+                // New format - directly use the arrays
+                if (data.labels.length === 0) {
+                    console.log(`Cannot render bar chart: Empty labels array for ${elementId}`);
+                    document.getElementById(elementId).innerHTML = 
+                        '<div class="has-text-centered p-4"><p class="has-text-grey-light">No data available</p></div>';
+                    return;
+                }
+                labels = data.labels;
+                values = data.values;
+                percentages = data.percentages;
+            } else if (Array.isArray(data)) {
+                // Old format (array of objects)
+                if (data.length === 0) {
+                    console.log(`Cannot render bar chart: Empty data array for ${elementId}`);
+                    document.getElementById(elementId).innerHTML = 
+                        '<div class="has-text-centered p-4"><p class="has-text-grey-light">No data available</p></div>';
+                    return;
+                }
+                labels = data.map(d => d.name);
+                values = data.map(d => d.value);
+                percentages = data.map(d => d.percentage);
+            } else {
+                console.log(`Cannot render bar chart: Invalid data format for ${elementId}`);
+                document.getElementById(elementId).innerHTML = 
+                    '<div class="has-text-centered p-4"><p class="has-text-grey-light">No data available</p></div>';
+                return;
+            }
+            
+            // Sort data by value (descending) - create indices array for sorting
+            const indices = Array.from({length: labels.length}, (_, i) => i);
+            indices.sort((a, b) => values[b] - values[a]);
+            
+            // Apply sorting to all arrays
+            const sortedLabels = indices.map(i => labels[i]);
+            const sortedValues = indices.map(i => values[i]);
+            const sortedPercentages = indices.map(i => percentages[i]);
+            
+            // Limit to top 15 items for better visibility
+            const maxItems = 15;
+            let displayLabels = sortedLabels;
+            let displayValues = sortedValues;
+            let displayPercentages = sortedPercentages;
+            
+            if (sortedLabels.length > maxItems) {
+                displayLabels = sortedLabels.slice(0, maxItems);
+                displayValues = sortedValues.slice(0, maxItems);
+                displayPercentages = sortedPercentages.slice(0, maxItems);
+                
+                // Add "Others" category
+                const othersValue = sortedValues.slice(maxItems).reduce((sum, v) => sum + v, 0);
+                const othersPercentage = sortedPercentages.slice(maxItems).reduce((sum, p) => sum + p, 0);
+                
+                if (othersValue > 0) {
+                    displayLabels.push('Others');
+                    displayValues.push(othersValue);
+                    displayPercentages.push(othersPercentage);
+                }
+            }
+            
+            // Use ChartConfig to create bar chart
+            ChartConfig.createBarChart(elementId, displayLabels, displayPercentages, {
+                title: '',
+                height: 400,
+                color: '#3886e1',
+                formatValue: (v) => formatPercentage(v)
+            });
+            
+        } catch (error) {
+            console.error(`Error in renderDistributionBarChart for ${elementId}:`, error);
+            document.getElementById(elementId).innerHTML = 
+                '<div class="has-text-centered p-4"><p class="has-text-grey-light">Error rendering chart</p></div>';
+        }
+    }
+    
+    // Render doughnut charts (keeping for backward compatibility)
     function renderDoughnutChart(elementId, data, title) {
         try {
             // Handle both array format and object format with arrays
@@ -2019,9 +2024,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            // Clear any previous chart to avoid errors
-            if (document.getElementById(elementId)) {
-                Plotly.purge(elementId);
+            // Clear any previous chart
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.innerHTML = '';
             }
             
             // Check if data is in the new format (object with arrays)
@@ -2128,12 +2134,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // If this is the details section, make sure to render the charts
                     if (section.querySelector('#countryDistributionChart') || 
-                        section.querySelector('#categoryDistributionChart')) {
+                        section.querySelector('#categoryDistributionChart') ||
+                        section.querySelector('#sectorDistributionChart') ||
+                        section.querySelector('#industryDistributionChart')) {
                         const countryDistribution = calculateExposureByDimension(selectedPortfolioIds, 'country');
                         const categoryDistribution = calculateExposureByDimension(selectedPortfolioIds, 'category');
+                        const sectorDistribution = calculateExposureByDimension(selectedPortfolioIds, 'sector');
+                        const industryDistribution = calculateExposureByDimension(selectedPortfolioIds, 'industry');
                         
-                        renderDoughnutChart('countryDistributionChart', countryDistribution, 'Country Distribution');
-                        renderDoughnutChart('categoryDistributionChart', categoryDistribution, 'Category Distribution');
+                        renderDistributionBarChart('countryDistributionChart', countryDistribution, 'Country Distribution');
+                        renderDistributionBarChart('categoryDistributionChart', categoryDistribution, 'Category Distribution');
+                        renderDistributionBarChart('sectorDistributionChart', sectorDistribution, 'Sector Distribution');
+                        renderDistributionBarChart('industryDistributionChart', industryDistribution, 'Industry Distribution');
                     }
                     
                     // If this is the heatmap section, make sure to render/resize the heatmap

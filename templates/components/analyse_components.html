@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Portfolio Analysis Chart Components</title>
-  <!-- Plotly.js is already included in base.html -->
+  <!-- Frappe Charts is included in base.html -->
   <style>
     .sunburst-legend {
       max-height: 150px;
@@ -22,27 +22,20 @@
 /**
  * NOTE:
  * -------
- * This version assumes that the following global variables
+ * This version uses Frappe Charts instead of Plotly.
+ * It assumes that the following global variables
  * are set from your main "analyse.html" script:
  *
  *   window.portfolioData
  *   window.formatCurrency
  *   window.formatPercentage
  *   window.generateColors
- *
- * The "Companies" doughnut chart code already lives in "analyse.html"
- * where these variables exist. For the "Categories" sunburst chart
- * to work, the code below references them via window.* (or expects
- * them to be in global scope).
- *
- * The key fix is that the "Categories" tab logic no longer tries
- * to use a local 'portfolioData' that doesn't exist, and instead
- * calls window.portfolioData. Also, we remove repeated references
- * to format functions as parameters, and just read them from
- * window.formatCurrency, etc.
  */
 
 window.PortfolioCharts = (function() {
+    // Store chart instances for updates
+    const chartInstances = {};
+
     /**
      * Creates a doughnut (pie) chart with a hole in the middle.
      * @param {string} elementId - ID of the element to render chart in
@@ -68,313 +61,144 @@ window.PortfolioCharts = (function() {
     }
 
     /**
-     * Creates a sunburst chart for category breakdowns.
+     * Creates a chart for category breakdowns using nested donut charts.
+     * Since Frappe Charts doesn't have sunburst, we'll create a custom visualization
      */
-    function createSunburstChart(elementId, portfolio, formatCurrencyParam, formatPercentageParam, generateColorsParam) {
-        // Use provided parameters or fall back to window globals
-        const formatCurrency    = formatCurrencyParam || window.formatCurrency    || (v => v);
-        const formatPercentage  = formatPercentageParam || window.formatPercentage  || (v => v);
-        const generateColors    = generateColorsParam || window.generateColors    || (count => []);
-
-        const categories = portfolio.categories || [];
-        console.log(`Creating sunburst chart for ${elementId} with ${categories.length} categories`);
+    function createSunburstChart(elementId, portfolio, formatCurrency, formatPercentage, generateColors) {
+        console.log(`Creating category chart for portfolio ${portfolio.id}`);
         
-        // Prepare the chart container
-        const chartContainer = prepareChartContainer(elementId);
+        // Check if we have the necessary functions globally
+        formatCurrency = formatCurrency || window.formatCurrency || (v => v);
+        formatPercentage = formatPercentage || window.formatPercentage || (v => v);
+        generateColors = generateColors || window.generateColors || ((n) => Array(n).fill('#7cd6fd'));
+        
+        const chartContainer = document.getElementById(elementId);
         if (!chartContainer) {
-            console.error(`Chart container element not found: ${elementId}`);
+            console.error(`Element with id ${elementId} not found`);
             return null;
         }
         
+        // Ensure element is visible and has dimensions
+        chartContainer.style.display = 'block';
+        chartContainer.style.height = '450px';
+        chartContainer.style.width = '100%';
+        chartContainer.style.visibility = 'visible';
+        chartContainer.style.opacity = '1';
+        
+        // Clear any existing content
+        chartContainer.innerHTML = '';
+        
+        // Ensure categories exist
+        const categories = portfolio.categories || [];
         if (categories.length === 0) {
+            console.warn(`No categories found for portfolio ${portfolio.id}`);
             chartContainer.innerHTML = '<div class="has-text-centered p-6">No category data available</div>';
             return null;
         }
         
-        // Special handling for single category case (often just "Uncategorized")
-        if (categories.length === 1 && categories[0].name === "Uncategorized") {
-            console.log(`Portfolio ${portfolio.id} has only a single "Uncategorized" category with ${categories[0].companies.length} companies`);
-            
-            // If there are no companies in this category, show a message
-            if (categories[0].companies.length === 0) {
-                chartContainer.innerHTML = '<div class="has-text-centered p-6">No categorized data available</div>';
-                return null;
+        console.log(`Portfolio ${portfolio.id} has ${categories.length} categories`);
+        
+        // For a sunburst-like visualization, we'll create a nested donut chart
+        // First, prepare the data for categories
+        const categoryLabels = categories.map(cat => `${cat.name} (${formatPercentage(cat.percentage)})`);
+        const categoryValues = categories.map(cat => cat.currentValue);
+        const categoryColors = generateColors(categories.length);
+        
+        // Create a container for the main chart and a details section
+        const mainContainer = document.createElement('div');
+        mainContainer.style.height = '100%';
+        mainContainer.style.display = 'flex';
+        mainContainer.style.flexDirection = 'column';
+        
+        // Chart container
+        const chartDiv = document.createElement('div');
+        chartDiv.style.flex = '1';
+        chartDiv.style.minHeight = '300px';
+        chartDiv.id = `${elementId}_chart`;
+        
+        // Details container
+        const detailsDiv = document.createElement('div');
+        detailsDiv.style.height = '150px';
+        detailsDiv.style.overflowY = 'auto';
+        detailsDiv.style.padding = '10px';
+        detailsDiv.style.borderTop = '1px solid #e0e0e0';
+        detailsDiv.innerHTML = '<p class="has-text-centered has-text-grey">Click on a category to see details</p>';
+        
+        mainContainer.appendChild(chartDiv);
+        mainContainer.appendChild(detailsDiv);
+        chartContainer.appendChild(mainContainer);
+        
+        // Create the donut chart
+        const chart = new frappe.Chart(`#${chartDiv.id}`, {
+            data: {
+                labels: categoryLabels,
+                datasets: [{
+                    values: categoryValues
+                }]
+            },
+            type: 'donut',
+            height: 300,
+            colors: categoryColors,
+            tooltipOptions: {
+                formatTooltipY: (d) => formatCurrency(d)
             }
-            
-            // Log the companies for debugging
-            categories[0].companies.forEach(company => {
-                console.log(`  - ${company.name}: ${company.currentValue} (${company.percentage}%)`);
-            });
-        }
-        
-        // Ensure the chart container is fully visible and sized
-        // This is critical for Plotly to render correctly
-        chartContainer.style.display = 'block';
-        chartContainer.style.height = '450px';
-        chartContainer.style.width = '100%';
-        chartContainer.style.position = 'relative';
-        chartContainer.style.visibility = 'visible';
-        chartContainer.style.opacity = '1';
-        chartContainer.style.minHeight = '400px';
-        chartContainer.style.minWidth = '300px';
-        
-        // Force a reflow to ensure dimensions are applied
-        void chartContainer.offsetHeight;
-        
-        // Build arrays with categories as top-level nodes
-        const labels = [];
-        const parents = [];
-        const values = [];
-        const colors = [];
-        const text = [];
-        const ids = [];
-        
-        // Get colors using window.generateColors or fallback to a local implementation
-        let categoryColors;
-        if (typeof window.generateColors === 'function') {
-            categoryColors = window.generateColors(categories.length);
-            console.log('Using global generateColors function');
-        } else {
-            console.warn('Global generateColors function not found, using fallback');
-            // Fallback color generation
-            categoryColors = [];
-            const defaultColors = [
-                '#3366CC', '#DC3912', '#FF9900', '#109618', '#990099', '#3B3EAC',
-                '#0099C6', '#DD4477', '#66AA00', '#B82E2E', '#316395', '#994499'
-            ];
-            
-            for (let i = 0; i < categories.length; i++) {
-                categoryColors.push(defaultColors[i % defaultColors.length]);
-            }
-        }
-        
-        console.log('Generated category colors:', categoryColors);
-        
-        // Top-level category nodes
-        categories.forEach((category, index) => {
-            // Add percentage to the label for top-level categories
-            labels.push(`${category.name} (${formatPercentage(category.percentage)})`);
-            parents.push(""); // top-level has no parent
-            values.push(category.currentValue);
-            ids.push(`category-${category.name}`);
-            text.push(
-                `<b>${formatPercentage(category.percentage)}</b><br>${formatCurrency(category.currentValue)}`
-            );
-            colors.push(categoryColors[index]);
         });
         
-        // Company (child) nodes
-        categories.forEach((category, index) => {
-            const categoryName = category.name;
-            const categoryColor = categoryColors[index];
-            category.companies.forEach(company => {
-                // Add percentage to the company label
-                labels.push(`${company.name} (${formatPercentage(company.percentage)})`);
-                parents.push(`category-${categoryName}`);
-                values.push(company.currentValue);
-                ids.push(`company-${company.name}`);
-                const companyText =
-                    `<b>${formatPercentage(company.percentage)}</b> of portfolio<br>` +
-                    `<b>${formatPercentage(company.categoryPercentage)}</b> of ${categoryName}<br>` +
-                    `${formatCurrency(company.currentValue)}`;
-                text.push(companyText);
-                
-                // Use a lighter color for sub-nodes
-                const lighterColor = adjustColorBrightness(categoryColor, 30);
-                colors.push(lighterColor);
-            });
-        });
-        
-        // Log data for debugging
-        console.log(`Chart data prepared: ${labels.length} labels, ${parents.length} parents, ${values.length} values`);
-        
-        // Special handling for single category with "Uncategorized"
-        // Make sure we have enough data to create a meaningful chart
-        if (labels.length < 3) {
-            console.warn(`Not enough data points for a meaningful sunburst chart (${labels.length})`);
+        // Add click handler to show category details
+        chartDiv.addEventListener('click', function(e) {
+            // Find which segment was clicked (this is a simplified approach)
+            // In practice, you might need to analyze the click coordinates
+            const rect = chartDiv.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
             
-            // If it's just a single "Uncategorized" category, create a simpler pie chart instead
-            if (categories.length === 1 && categories[0].name === "Uncategorized" && categories[0].companies.length > 0) {
-                console.log("Creating pie chart for single Uncategorized category");
+            // For now, we'll show all categories with their companies
+            let detailsHTML = '<div class="category-details">';
+            
+            categories.forEach((category, idx) => {
+                detailsHTML += `
+                    <div class="mb-3">
+                        <h5 class="has-text-weight-bold" style="color: ${categoryColors[idx]}">
+                            ${category.name} - ${formatCurrency(category.currentValue)} (${formatPercentage(category.percentage)})
+                        </h5>
+                        <div class="ml-3">
+                `;
                 
-                // Create a simpler pie chart with just the companies
-                const companyLabels = categories[0].companies.map(c => `${c.name} (${formatPercentage(c.percentage)})`);
-                const companyValues = categories[0].companies.map(c => c.currentValue);
-                const companyColors = generateColors(companyLabels.length);
-                
-                const pieData = [{
-                    type: 'pie',
-                    labels: companyLabels,
-                    values: companyValues,
-                    textinfo: 'label+percent',
-                    hovertemplate: '<b>%{label}</b><br>%{value:,.2f} (%{percent})<extra></extra>',
-                    marker: { colors: companyColors }
-                }];
-                
-                const pieLayout = {
-                    title: 'Companies (Uncategorized)',
-                    height: 450,
-                    margin: { l: 20, r: 20, t: 50, b: 20 },
-                    showlegend: false
-                };
-                
-                // Use the centralized configuration
-                return Plotly.newPlot(elementId, pieData, pieLayout, ChartConfig.plotlyConfig);
-            }
-        }
-        
-        const data = [{
-            type: 'sunburst',
-            labels: labels,
-            parents: parents,
-            values: values,
-            ids: ids,
-            text: text,
-            textinfo: 'label',
-            insidetextorientation: 'radial',
-            hovertemplate: '<b>%{label}</b><br>%{text}<extra></extra>',
-            branchvalues: 'total',
-            marker: { colors: colors, line: { width: 1, color: 'white' } },
-            sort: false
-        }];
-        
-        const layout = {
-            margin: { l: 0, r: 0, t: 0, b: 0 },
-            height: 450,
-            width: chartContainer.offsetWidth || 500,
-            autosize: true
-        };
-        
-        console.log(`Creating sunburst with dimensions: ${layout.width}x${layout.height}`);
-        
-        // Use the centralized configuration
-        const config = ChartConfig.plotlyConfig;
-        
-        try {
-            // Create the plot
-            Plotly.newPlot(elementId, data, layout, config)
-                .then(() => {
-                    console.log(`Sunburst chart ${elementId} created successfully`);
-                    
-                    // Ensure the chart is still visible after a short delay
-                    setTimeout(() => {
-                        const element = document.getElementById(elementId);
-                        if (element) {
-                            element.style.visibility = 'visible';
-                            element.style.opacity = '1';
-                            Plotly.Plots.resize(element);
-                        }
-                    }, 200);
-                })
-                .catch(error => {
-                    console.error(`Error in Plotly.newPlot for ${elementId}:`, error);
+                category.companies.forEach(company => {
+                    detailsHTML += `
+                        <div class="is-size-7">
+                            ${company.name}: ${formatCurrency(company.currentValue)} 
+                            (${formatPercentage(company.categoryPercentage)} of category)
+                        </div>
+                    `;
                 });
-        } catch (plotlyError) {
-            console.error(`Exception in Plotly.newPlot for ${elementId}:`, plotlyError);
-        }
+                
+                detailsHTML += '</div></div>';
+            });
+            
+            detailsHTML += '</div>';
+            detailsDiv.innerHTML = detailsHTML;
+        });
+        
+        // Store the chart instance
+        chartInstances[elementId] = chart;
         
         return chartContainer;
     }
 
     /**
-     * Adds a clickable legend for the sunburst chart.
+     * Helper function to create lighter/darker shades of a color
      */
-    function addSunburstLegend(portfolio, categories, categoryColors, formatPercentage, chartElementId) {
-        const formatPct = window.formatPercentage || (v => v);
-
-        let legendContainer = document.getElementById(`categoryLegend${portfolio.id}`);
-        if (!legendContainer) {
-            const chartContainer = document.getElementById(chartElementId).parentNode;
-            legendContainer = document.createElement('div');
-            legendContainer.id = `categoryLegend${portfolio.id}`;
-            legendContainer.className = 'sunburst-legend mt-3';
-            chartContainer.after(legendContainer);
-        }
-        legendContainer.innerHTML = '';
-        
-        // Legend title removed as requested
-        
-        const legendGrid = document.createElement('div');
-        legendGrid.className = 'legend-grid is-flex is-flex-wrap-wrap is-justify-content-center';
-        
-        categories.forEach((category, index) => {
-            const color = categoryColors[index];
-            const legendItem = document.createElement('div');
-            legendItem.className = 'legend-item is-flex is-align-items-center mr-3 mb-2';
-            legendItem.style.cursor = 'pointer';
-            legendItem.innerHTML = `
-                <span class="color-box mr-1" style="background-color: ${color}; width: 12px; height: 12px; display: inline-block;"></span>
-                <span class="is-size-7">${category.name} (${formatPct(category.percentage)})</span>
-            `;
-            
-            legendItem.addEventListener('click', () => {
-                const chart = document.getElementById(chartElementId);
-                if (legendItem.classList.contains('highlighted')) {
-                    Plotly.restyle(chart, { 'level': [undefined], 'root': [null] });
-                    legendItem.classList.remove('highlighted');
-                } else {
-                    Plotly.restyle(chart, { 'level': [2] });
-                    setTimeout(() => {
-                        Plotly.restyle(chart, { 'root': [`category-${category.name}`] });
-                    }, 10);
-                    document.querySelectorAll(`#categoryLegend${portfolio.id} .legend-item`)
-                            .forEach(item => item.classList.remove('highlighted'));
-                    legendItem.classList.add('highlighted');
-                }
-            });
-            
-            legendGrid.appendChild(legendItem);
-        });
-        
-        legendContainer.appendChild(legendGrid);
-        
-        // Reset button
-        const resetButton = document.createElement('button');
-        resetButton.className = 'button is-small is-light mt-2';
-        resetButton.innerText = 'Reset View';
-        resetButton.addEventListener('click', () => {
-            const chart = document.getElementById(chartElementId);
-            Plotly.restyle(chart, { 'level': [undefined], 'root': [null] });
-            document.querySelectorAll(`#categoryLegend${portfolio.id} .legend-item`)
-                    .forEach(item => item.classList.remove('highlighted'));
-        });
-        
-        const buttonContainer = document.createElement('div');
-        buttonContainer.className = 'has-text-centered';
-        buttonContainer.appendChild(resetButton);
-        legendContainer.appendChild(buttonContainer);
-    }
-
-    /**
-     * Brighten or darken a given hex color by 'percent' (positive or negative).
-     * Includes error handling for undefined or invalid hex values.
-     */
-    function adjustColorBrightness(hex, percent) {
-        // Default color if hex is undefined or invalid
-        if (!hex || typeof hex !== 'string' || !hex.startsWith('#') || hex.length !== 7) {
-            console.warn(`Invalid hex color provided to adjustColorBrightness: ${hex}`);
-            return '#CCCCCC'; // Return a neutral gray as fallback
-        }
-        
-        try {
-            let r = parseInt(hex.substr(1, 2), 16);
-            let g = parseInt(hex.substr(3, 2), 16);
-            let b = parseInt(hex.substr(5, 2), 16);
-            
-            // Check if parsing was successful
-            if (isNaN(r) || isNaN(g) || isNaN(b)) {
-                console.warn(`Failed to parse hex color: ${hex}`);
-                return '#CCCCCC';
-            }
-            
-            r = Math.min(255, Math.max(0, r + percent));
-            g = Math.min(255, Math.max(0, g + percent));
-            b = Math.min(255, Math.max(0, b + percent));
-            return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
-        } catch (error) {
-            console.error(`Error in adjustColorBrightness: ${error.message}`);
-            return '#CCCCCC';
-        }
+    function adjustColorBrightness(color, percent) {
+        // Simple brightness adjustment
+        const num = parseInt(color.replace("#", ""), 16);
+        const amt = Math.round(2.55 * percent);
+        const R = (num >> 16) + amt;
+        const G = (num >> 8 & 0x00FF) + amt;
+        const B = (num & 0x0000FF) + amt;
+        return "#" + (0x1000000 + (R<255?R<1?0:R:255)*0x10000 + 
+                      (G<255?G<1?0:G:255)*0x100 + 
+                      (B<255?B<1?0:B:255)).toString(16).slice(1);
     }
 
     /**
@@ -385,440 +209,39 @@ window.PortfolioCharts = (function() {
     }
 
     /**
-     * Resizes Plotly charts whenever the window is resized,
-     * specifically focusing on the active "Categories" tab charts.
+     * Resizes charts whenever the window is resized
      */
     function setupResizeHandlers() {
         window.addEventListener('resize', () => {
-            // For each active categories tab, relayout
-            document.querySelectorAll('.tab-pane.is-active [id^="categoryChart"]').forEach(element => {
-                Plotly.Plots.resize(element);
+            // Frappe Charts handle resize automatically
+            // Just trigger a re-render for any custom visualizations
+            Object.keys(chartInstances).forEach(id => {
+                const chart = chartInstances[id];
+                if (chart && chart.update) {
+                    chart.update();
+                }
             });
-            // Also resize global charts if present
-            if (document.getElementById('portfolioAllocationsChart')) {
-                Plotly.Plots.resize(document.getElementById('portfolioAllocationsChart'));
-            }
-            if (document.getElementById('companyAllocationsChart')) {
-                Plotly.Plots.resize(document.getElementById('companyAllocationsChart'));
-            }
         });
     }
 
     /**
-     * Enhances the existing tab initialization so that when a "Categories" tab
-     * is clicked, we attempt to create (or recreate) the sunburst chart.
+     * Clean up chart instances
      */
-    function setupTabChangeHandlers(initializePortfolioTabs) {
-        const enhancedInitTabs = function() {
-            // Call the original tab init
-            initializePortfolioTabs();
-
-            // For each tab that references categories
-            document.querySelectorAll('.portfolio-section .tabs li[data-tab*="categories"]').forEach(tab => {
-                const originalHandler = tab.onclick;
-                let pendingTimeout = null;
-
-                // Clear any pending chart creation when the sibling companies
-                // tab is clicked. We only register this once.
-                const portfolioSection = tab.closest('.portfolio-section');
-                const companiesTab = portfolioSection?.querySelector('.tabs li[data-tab*="companies"]');
-                if (companiesTab && !companiesTab.dataset.clearHandlerAdded) {
-                    companiesTab.addEventListener('click', () => {
-                        if (pendingTimeout) {
-                            clearTimeout(pendingTimeout);
-                            pendingTimeout = null;
-                        }
-                    });
-                    companiesTab.dataset.clearHandlerAdded = 'true';
-                }
-
-                tab.onclick = function(e) {
-                    // First run any existing click handler
-                    if (originalHandler) {
-                        originalHandler.call(this, e);
-                    }
-                    const tabId = this.getAttribute('data-tab');
-                    const portfolioId = tabId.split('-')[1];
-                    console.log(`Tab switched to categories for portfolio ${portfolioId}`);
-                    
-                    /**
-                     * Repeated attempts to create the sunburst chart, ensuring
-                     * the container is actually visible with a non-zero size.
-                     */
-                    function createCategoryChart(attempt = 1) {
-                        // If the user switched away from the Categories tab
-                        // while we were waiting, abort to avoid showing the
-                        // categories pane when the Companies tab is active.
-                        if (!tab.classList.contains('is-active')) {
-                            console.log(`Aborting category chart creation for portfolio ${portfolioId} - tab no longer active`);
-                            return;
-                        }
-
-                        console.log(`Chart creation attempt ${attempt} for portfolio ${portfolioId}`);
-                        const elementId = `categoryChart${portfolioId}`;
-                        const chartElement = prepareChartContainer(elementId);
-                        if (!chartElement) {
-                            console.error(`Chart element not found: ${elementId}`);
-                            return;
-                        }
-                        
-                        // If container is not visible, retry up to 5 times
-                        const isVisible = chartElement.offsetParent !== null && chartElement.offsetWidth > 0;
-                        console.log(`Chart container visible: ${isVisible}, width: ${chartElement.offsetWidth}, height: ${chartElement.offsetHeight}`);
-                        
-                        if (!isVisible && attempt < 5) {
-                            const tabPane = chartElement.closest('.tab-pane');
-                            if (tabPane) {
-                                tabPane.style.display = 'block';
-                                tabPane.style.visibility = 'visible';
-                                tabPane.style.opacity = '1';
-                                tabPane.classList.add('is-active');
-                            }
-                            
-                            // Ensure the chart container itself is visible
-                            chartElement.style.display = 'block';
-                            chartElement.style.visibility = 'visible';
-                            chartElement.style.opacity = '1';
-                            chartElement.style.height = '450px';
-                            chartElement.style.width = '100%';
-                            chartElement.style.minHeight = '400px';
-                            chartElement.style.minWidth = '300px';
-                            
-                            // Force a reflow
-                            void chartElement.offsetHeight;
-                            
-                            setTimeout(() => createCategoryChart(attempt + 1), 100 * attempt);
-                            return;
-                        }
-                        
-                        // Now retrieve the correct portfolio from the global data
-                        let portfolio;
-                        let portfolioName = null;
-                        
-                        // Get the portfolio name from the tab text
-                        const tabsContainer = tab.closest('.tabs');
-                        if (tabsContainer) {
-                            const portfolioHeader = tabsContainer.closest('.portfolio-section').querySelector('h2');
-                            if (portfolioHeader) {
-                                portfolioName = portfolioHeader.textContent.trim();
-                                console.log(`Tab for portfolio name: ${portfolioName}`);
-                            }
-                        }
-                        
-                        // First try to find it by ID in window.portfolioData array
-                        if (Array.isArray(window.portfolioData)) {
-                            portfolio = window.portfolioData.find(p => p.id == portfolioId);
-                            
-                            // If not found by ID, try by name as fallback
-                            if (!portfolio && portfolioName) {
-                                portfolio = window.portfolioData.find(p => p.name === portfolioName);
-                                console.log(`Found portfolio by name: ${portfolioName} instead of ID ${portfolioId}`);
-                                
-                                // If still not found, try case-insensitive match
-                                if (!portfolio) {
-                                    const lowerName = portfolioName.toLowerCase();
-                                    portfolio = window.portfolioData.find(p => p.name.toLowerCase() === lowerName);
-                                    if (portfolio) {
-                                        console.log(`Found portfolio by case-insensitive name: ${portfolioName}`);
-                                    }
-                                }
-                            }
-                        }
-                        // Then check if it's in window.portfolioData object by ID
-                        else if (window.portfolioData && window.portfolioData[portfolioId]) {
-                            portfolio = window.portfolioData[portfolioId];
-                        }
-                        // If still not found but we have portfolio data and name, find by name
-                        else if (window.portfolioData && portfolioName) {
-                            // Check all portfolios in the object to find by name
-                            for (const key in window.portfolioData) {
-                                if (window.portfolioData[key].name === portfolioName) {
-                                    portfolio = window.portfolioData[key];
-                                    console.log(`Found portfolio in object by name: ${portfolioName}`);
-                                    break;
-                                }
-                            }
-                        }
-                        
-                        if (!portfolio) {
-                            console.error(`Portfolio data not found for ID ${portfolioId} or name ${portfolioName}`);
-                            console.log('Available portfolios:', window.portfolioData);
-                            
-                            // Add a message in the chart container
-                            const elementId = `categoryChart${portfolioId}`;
-                            const chartElement = document.getElementById(elementId);
-                            if (chartElement) {
-                                chartElement.innerHTML = `
-                                    <div class="has-text-centered p-6">
-                                        <p class="has-text-danger">Portfolio data not found</p>
-                                        <p>Unable to find portfolio with ID: ${portfolioId}</p>
-                                        <p>Please refresh the page or contact support if this issue persists.</p>
-                                    </div>
-                                `;
-                            }
-                            return;
-                        }
-                        
-                        try {
-                            // Create or re-create the sunburst with all parameters
-                            PortfolioCharts.createSunburstChart(
-                                elementId, 
-                                portfolio, 
-                                window.formatCurrency, 
-                                window.formatPercentage, 
-                                window.generateColors
-                            );
-                            
-                            // Check if the chart actually rendered and retry if needed
-                            setTimeout(() => {
-                                if (!chartElement.querySelector('.main-svg') && attempt < 5) {
-                                    console.log('Chart not rendered properly, trying again...');
-                                    createCategoryChart(attempt + 1);
-                                } else {
-                                    // Ensure the chart is properly sized
-                                    Plotly.Plots.resize(chartElement);
-                                    window.dispatchEvent(new Event('resize'));
-                                    
-                                    // Add another check after a delay to ensure it stays visible
-                                    setTimeout(() => {
-                                        if (chartElement.offsetWidth === 0 || chartElement.offsetHeight === 0 ||
-                                            chartElement.style.visibility === 'hidden' || chartElement.style.opacity === '0') {
-                                            console.log('Chart disappeared after rendering, restoring...');
-                                            chartElement.style.display = 'block';
-                                            chartElement.style.visibility = 'visible';
-                                            chartElement.style.opacity = '1';
-                                            Plotly.Plots.resize(chartElement);
-                                        }
-                                    }, 500);
-                                }
-                            }, 100);
-                        } catch (error) {
-                            console.error(`Error creating chart: ${error}`, error.stack);
-                            chartElement.innerHTML = `
-                                <div class="has-text-centered p-6">
-                                    <p class="has-text-danger">Error loading chart</p>
-                                    <button class="button is-small is-info mt-2" onclick="window.createCategoryChart(${portfolioId})">
-                                        Retry
-                                    </button>
-                                </div>
-                            `;
-                            // Expose a retry function on window
-                            window.createCategoryChart = function(id) {
-                                console.log(`Manual retry for chart ${id}`);
-                                const portfolioSection = document.querySelector(`.portfolio-section[data-portfolio-id="${id}"]`);
-                                if (portfolioSection) {
-                                    const categoriesTab = portfolioSection.querySelector('.tabs li[data-tab*="categories"]');
-                                    if (categoriesTab) {
-                                        categoriesTab.click();
-                                    }
-                                }
-                            };
-                        }
-                    }
-                    
-                    // Delay a bit to let the DOM update and keep reference so
-                    // we can cancel it if the user switches tabs quickly
-                    if (pendingTimeout) {
-                        clearTimeout(pendingTimeout);
-                    }
-                    pendingTimeout = setTimeout(createCategoryChart, 300);
-                };
-            });
-        };
-        return enhancedInitTabs;
+    function destroyChart(elementId) {
+        if (chartInstances[elementId]) {
+            delete chartInstances[elementId];
+        }
     }
 
+    // Return the public API
     return {
         createDoughnutChart: createDoughnutChart,
         createSunburstChart: createSunburstChart,
         updateDoughnutChart: updateDoughnutChart,
         setupResizeHandlers: setupResizeHandlers,
-        setupTabChangeHandlers: setupTabChangeHandlers,
-        adjustColorBrightness: adjustColorBrightness
+        destroyChart: destroyChart
     };
 })();
-
-/**
- * Ensures the chart container is fully visible with
- * consistent styling. Returns the container element
- * or null if not found.
- */
-function prepareChartContainer(elementId) {
-    const chartElement = document.getElementById(elementId);
-    if (!chartElement) {
-        console.error(`Chart element not found: ${elementId}`);
-        return null;
-    }
-    
-    // Force the parent column to be visible/flex
-    const chartColumn = chartElement.closest('.column');
-    if (chartColumn) {
-        chartColumn.style.display = 'flex';
-        chartColumn.style.visibility = 'visible';
-        chartColumn.style.opacity = '1';
-        // Ensure the column has minimum dimensions
-        chartColumn.style.minHeight = '450px';
-        chartColumn.style.minWidth = '300px';
-    }
-    
-    // Also ensure any parent containers are visible
-    const chartContainer = chartElement.closest('.chart-medium-container');
-    if (chartContainer) {
-        chartContainer.style.display = 'flex';
-        chartContainer.style.visibility = 'visible';
-        chartContainer.style.opacity = '1';
-        chartContainer.style.height = '100%';
-        chartContainer.style.width = '100%';
-    }
-    
-    // Clear any previous content
-    chartElement.innerHTML = '';
-    chartElement.style.display = 'block';
-    chartElement.style.height = '450px';
-    chartElement.style.width = '100%';
-    chartElement.style.position = 'relative';
-    chartElement.style.visibility = 'visible';
-    chartElement.style.opacity = '1';
-    chartElement.style.zIndex = '1';
-    
-    // Add explicit min dimensions to prevent zero-size issues
-    chartElement.style.minHeight = '400px';
-    chartElement.style.minWidth = '300px';
-    
-    // Force a reflow to ensure styles are applied
-    void chartElement.offsetHeight;
-    
-    // Log the final dimensions
-    console.log(`Chart container ${elementId} dimensions: ${chartElement.offsetWidth}x${chartElement.offsetHeight}`);
-    
-    return chartElement;
-}
-
-/**
- * Enhances the existing sunburst creation so we can
- * handle zero-width containers by forcibly giving them
- * default dimensions before building the chart.
- */
-function enhanceSunburstChart() {
-    const originalCreateSunburst = PortfolioCharts.createSunburstChart;
-    PortfolioCharts.createSunburstChart = function(elementId, portfolio, formatCurrency, formatPercentage, generateColors) {
-        const chartContainer = document.getElementById(elementId);
-        if (!chartContainer) {
-            console.error(`Chart container not found: ${elementId}`);
-            return null;
-        }
-        console.log(`Creating sunburst in container with dimensions: ${chartContainer.offsetWidth}x${chartContainer.offsetHeight}`);
-        if (chartContainer.offsetWidth === 0) {
-            console.warn('Chart container has zero width, setting default width');
-            chartContainer.style.width = '100%';
-            chartContainer.style.minWidth = '400px';
-        }
-        if (chartContainer.offsetHeight === 0) {
-            console.warn('Chart container has zero height, setting default height');
-            chartContainer.style.height = '450px';
-            chartContainer.style.minHeight = '400px';
-        }
-        // Force a reflow to ensure dimensions are applied
-        void chartContainer.offsetHeight;
-        // Pass all parameters to the original function
-        return originalCreateSunburst(elementId, portfolio, formatCurrency, formatPercentage, generateColors);
-    };
-    return PortfolioCharts;
-}
-
-/**
- * Forces a chart redraw when a portfolio is toggled open
- * and the "Categories" tab is already active.
- */
-function enhancePortfolioToggle() {
-    document.querySelectorAll('.portfolio-section .portfolio-header').forEach(header => {
-        const originalHandler = header.onclick;
-        header.onclick = function(e) {
-            if (originalHandler) {
-                originalHandler.call(this, e);
-            }
-            const section = this.closest('.portfolio-section');
-            const content = section.querySelector('.portfolio-content');
-            if (content && content.style.display === 'block') {
-                const activeTab = section.querySelector('.tabs li.is-active');
-                if (activeTab && activeTab.getAttribute('data-tab').includes('categories')) {
-                    console.log('Portfolio expanded with categories tab active - triggering chart redraw');
-                    setTimeout(() => activeTab.click(), 300);
-                }
-            }
-        };
-    });
-}
-
-/**
- * Ensures all sunburst charts remain visible by periodically checking
- * and restoring their visibility if needed.
- */
-function ensureChartsRemainVisible() {
-    // Check all category charts every 500ms
-    setInterval(() => {
-        document.querySelectorAll('[id^="categoryChart"]').forEach(chart => {
-            if (chart.offsetParent !== null) { // Only check visible charts
-                // If the chart is visible but has zero dimensions or is hidden
-                if (chart.offsetWidth === 0 || chart.offsetHeight === 0 || 
-                    chart.style.visibility === 'hidden' || chart.style.opacity === '0') {
-                    
-                    console.log(`Restoring visibility for chart ${chart.id}`);
-                    
-                    // Restore visibility and dimensions
-                    chart.style.display = 'block';
-                    chart.style.visibility = 'visible';
-                    chart.style.opacity = '1';
-                    chart.style.height = '450px';
-                    chart.style.width = '100%';
-                    chart.style.minHeight = '400px';
-                    chart.style.minWidth = '300px';
-                    
-                    // Force a reflow
-                    void chart.offsetHeight;
-                    
-                    // Resize the chart
-                    try {
-                        Plotly.Plots.resize(chart);
-                    } catch (e) {
-                        console.warn(`Error resizing chart ${chart.id}:`, e);
-                    }
-                }
-            }
-        });
-    }, 500);
-}
-
-/**
- * When the DOM is ready, enhance the sunburst creation
- * and set up toggles for portfolio expansions.
- */
-document.addEventListener('DOMContentLoaded', function() {
-    // Patch the sunburst creation to handle zero-size containers
-    PortfolioCharts = enhanceSunburstChart();
-
-    // Re-run the categories chart if a portfolio is toggled open
-    setTimeout(enhancePortfolioToggle, 1000);
-
-    // Also attempt to redraw if the entire window is resized
-    window.addEventListener('resize', function() {
-        document.querySelectorAll('.portfolio-section').forEach(section => {
-            const content = section.querySelector('.portfolio-content');
-            if (content && content.style.display === 'block') {
-                const activeTab = section.querySelector('.tabs li.is-active');
-                if (activeTab && activeTab.getAttribute('data-tab').includes('categories')) {
-                    const portfolioId = section.dataset.portfolioId;
-                    console.log(`Resizing triggered redraw for portfolio ${portfolioId}`);
-                    setTimeout(() => activeTab.click(), 200);
-                }
-            }
-        });
-    });
-    
-    // Start the visibility check
-    ensureChartsRemainVisible();
-});
 </script>
-
 </body>
 </html>
