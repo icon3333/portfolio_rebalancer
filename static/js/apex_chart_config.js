@@ -279,26 +279,106 @@ const ChartConfig = {
             colors = ['#ebedf0', '#c0ddf9', '#73b3f3', '#3886e1', '#17459e']
         } = options;
 
-        // Prepare data for ApexCharts heatmap format
-        const series = data.countries.map((country, countryIndex) => ({
-            name: country,
-            data: data.dims.map((dim, dimIndex) => ({
-                x: dim,
-                y: data.z[countryIndex][dimIndex]
-            }))
-        }));
+        // Validate input data
+        if (!data || !data.countries || !data.dims || !data.z || 
+            data.countries.length === 0 || data.dims.length === 0 || data.z.length === 0) {
+            console.log(`No valid data for heatmap ${elementId}:`, data);
+            element.innerHTML = '<div class="has-text-centered p-4"><p class="has-text-grey">No data available for heatmap</p></div>';
+            return null;
+        }
+
+        console.log(`Creating heatmap for ${elementId} with data:`, {
+            countries: data.countries,
+            dims: data.dims,
+            seriesCount: data.z.length,
+            firstSeriesDataCount: data.z[0]?.length || 0
+        });
+
+        // Ensure element has proper dimensions before creating chart
+        element.style.width = '100%';
+        element.style.height = height + 'px';
+        element.style.minHeight = '300px';
+
+        // Force a reflow to ensure dimensions are applied
+        void element.offsetHeight;
+
+        // Build series data in the exact format ApexCharts expects for heatmaps
+        const series = [];
+        
+        for (let countryIndex = 0; countryIndex < data.countries.length; countryIndex++) {
+            const country = data.countries[countryIndex];
+            const dataPoints = [];
+            
+            for (let dimIndex = 0; dimIndex < data.dims.length; dimIndex++) {
+                const dim = data.dims[dimIndex];
+                const value = data.z[countryIndex] && data.z[countryIndex][dimIndex] !== undefined 
+                    ? data.z[countryIndex][dimIndex] 
+                    : 0;
+                
+                dataPoints.push({
+                    x: dim,
+                    y: Number(value.toFixed(2)) // Ensure it's a clean number
+                });
+            }
+            
+            series.push({
+                name: country,
+                data: dataPoints
+            });
+        }
+
+        console.log(`Built series data for ${elementId}:`, {
+            seriesCount: series.length,
+            firstSeriesName: series[0]?.name,
+            firstSeriesDataLength: series[0]?.data?.length,
+            sampleDataPoint: series[0]?.data?.[0]
+        });
 
         const chartOptions = {
-            ...this.defaultOptions,
             series: series,
             chart: {
-                ...this.defaultOptions.chart,
                 type: 'heatmap',
-                height: height
+                height: height,
+                fontFamily: '"Helvetica Neue", Arial, sans-serif',
+                toolbar: {
+                    show: false
+                },
+                zoom: {
+                    enabled: false
+                },
+                background: '#ffffff'
             },
-            colors: colors,
+            plotOptions: {
+                heatmap: {
+                    shadeIntensity: 0.5,
+                    radius: 0,
+                    useFillColorAsStroke: true,
+                    colorScale: {
+                        ranges: [
+                            { from: 0, to: 0.1, color: colors[0] },
+                            { from: 0.1, to: 1, color: colors[1] },
+                            { from: 1, to: 5, color: colors[2] },
+                            { from: 5, to: 15, color: colors[3] },
+                            { from: 15, to: 100, color: colors[4] }
+                        ]
+                    }
+                }
+            },
+            dataLabels: {
+                enabled: true,
+                style: {
+                    colors: ['#fff'],
+                    fontSize: '9px',
+                    fontWeight: 'normal'
+                },
+                formatter: function(val, opts) {
+                    if (val === null || val === undefined || isNaN(val)) return '';
+                    return val > 0.1 ? val.toFixed(1) + '%' : '';
+                }
+            },
             xaxis: {
-                categories: data.dims,
+                type: 'category',
+                categories: data.dims, // Explicitly set categories
                 labels: {
                     rotate: -45,
                     style: {
@@ -313,47 +393,88 @@ const ChartConfig = {
                     }
                 }
             },
-            plotOptions: {
-                heatmap: {
-                    shadeIntensity: 0.5,
-                    colorScale: {
-                        ranges: [
-                            { from: 0, to: 1, color: colors[0] },
-                            { from: 1, to: 5, color: colors[1] },
-                            { from: 5, to: 15, color: colors[2] },
-                            { from: 15, to: 30, color: colors[3] },
-                            { from: 30, to: 100, color: colors[4] }
-                        ]
-                    }
-                }
-            },
-            dataLabels: {
-                enabled: true,
-                style: {
-                    colors: ['#fff']
-                },
-                formatter: function(val) {
-                    return val > 0 ? val.toFixed(1) + '%' : '';
-                }
-            },
             tooltip: {
-                y: {
-                    formatter: function(val) {
-                        return val.toFixed(1) + '%';
+                enabled: true,
+                custom: function({series, seriesIndex, dataPointIndex, w}) {
+                    try {
+                        const country = data.countries[seriesIndex] || 'Unknown';
+                        const dimension = data.dims[dataPointIndex] || 'Unknown';
+                        const value = series[seriesIndex][dataPointIndex] || 0;
+                        
+                        return `<div style="padding: 8px 12px; background: rgba(0,0,0,0.8); color: white; border-radius: 6px; font-size: 12px;">
+                            <div><strong>${country}</strong> × <strong>${dimension}</strong></div>
+                            <div>Allocation: <strong>${Number(value).toFixed(2)}%</strong></div>
+                        </div>`;
+                    } catch (error) {
+                        console.error('Tooltip error:', error);
+                        return '<div style="padding: 8px;">Data unavailable</div>';
                     }
                 }
             },
-            title: title ? { text: title, align: 'center', style: { fontSize: '18px', fontWeight: 600, color: '#333' } } : undefined
+            legend: {
+                show: false
+            },
+            responsive: [{
+                breakpoint: 768,
+                options: {
+                    chart: {
+                        height: 300
+                    },
+                    xaxis: {
+                        labels: {
+                            rotate: -90
+                        }
+                    }
+                }
+            }]
         };
 
+        if (title) {
+            chartOptions.title = {
+                text: title,
+                align: 'center',
+                style: {
+                    fontSize: '18px',
+                    fontWeight: 600,
+                    color: '#333'
+                }
+            };
+        }
+
         try {
+            console.log(`Rendering heatmap ${elementId} with options:`, {
+                seriesLength: chartOptions.series.length,
+                categoriesLength: chartOptions.xaxis.categories.length,
+                elementDimensions: {
+                    width: element.offsetWidth,
+                    height: element.offsetHeight
+                }
+            });
+            
             const chart = new ApexCharts(element, chartOptions);
-            chart.render();
-            this.chartInstances[elementId] = chart;
+            
+            // Use a promise-based approach for better error handling
+            chart.render().then(() => {
+                console.log(`Successfully rendered heatmap for ${elementId}`);
+                this.chartInstances[elementId] = chart;
+            }).catch((error) => {
+                console.error(`Promise-based error rendering heatmap for ${elementId}:`, error);
+                element.innerHTML = `<div style="text-align: center; padding: 20px;">
+                    <p style="color: #dc3545;">Heatmap Render Error</p>
+                    <p style="font-size: 12px;">${error.message}</p>
+                </div>`;
+            });
+            
             return chart;
         } catch (error) {
             console.error(`Error creating heatmap chart for ${elementId}:`, error);
-            element.innerHTML = `<div style="text-align: center; padding: 20px;"><p style="color: #dc3545;">Heatmap Error</p><p style="font-size: 12px;">${error.message}</p></div>`;
+            console.error('Chart options:', chartOptions);
+            console.error('Input data:', data);
+            element.innerHTML = `<div style="text-align: center; padding: 20px;">
+                <p style="color: #dc3545;">Heatmap Error</p>
+                <p style="font-size: 12px;">${error.message}</p>
+                <p style="font-size: 10px;">Check console for details</p>
+            </div>`;
             return null;
         }
     },
@@ -374,6 +495,19 @@ const ChartConfig = {
         }
         element.innerHTML = ''; // Clear previous content
 
+        // Validate input data
+        if (!labels || !values || labels.length === 0 || values.length === 0) {
+            console.log(`No valid data for bar chart ${elementId}:`, { labels, values });
+            element.innerHTML = '<div class="has-text-centered p-4"><p class="has-text-grey">No data available for chart</p></div>';
+            return null;
+        }
+
+        if (labels.length !== values.length) {
+            console.error(`Mismatched array lengths for bar chart ${elementId}: labels=${labels.length}, values=${values.length}`);
+            element.innerHTML = '<div class="has-text-centered p-4"><p class="has-text-danger">Data validation error</p></div>';
+            return null;
+        }
+
         const {
             title = '',
             height = 400,
@@ -381,15 +515,26 @@ const ChartConfig = {
             formatValue = v => v.toString()
         } = options;
 
+        // Clean the values to ensure they're numbers
+        const cleanedValues = values.map(v => {
+            const num = parseFloat(v);
+            return isNaN(num) ? 0 : num;
+        });
+
         const chartOptions = {
-            ...this.defaultOptions,
             series: [{
-                data: values
+                data: cleanedValues
             }],
             chart: {
-                ...this.defaultOptions.chart,
                 type: 'bar',
-                height: height
+                height: height,
+                fontFamily: '"Helvetica Neue", Arial, sans-serif',
+                toolbar: {
+                    show: false
+                },
+                zoom: {
+                    enabled: false
+                }
             },
             plotOptions: {
                 bar: {
@@ -435,13 +580,19 @@ const ChartConfig = {
         };
 
         try {
+            console.log(`Creating bar chart for ${elementId} with ${labels.length} items`);
             const chart = new ApexCharts(element, chartOptions);
             chart.render();
             this.chartInstances[elementId] = chart;
             return chart;
         } catch (error) {
             console.error(`Error creating bar chart for ${elementId}:`, error);
-            element.innerHTML = `<div style="text-align: center; padding: 20px;"><p style="color: #dc3545;">Bar Chart Error</p><p style="font-size: 12px;">${error.message}</p></div>`;
+            console.error('Chart options:', chartOptions);
+            element.innerHTML = `<div style="text-align: center; padding: 20px;">
+                <p style="color: #dc3545;">Bar Chart Error</p>
+                <p style="font-size: 12px;">${error.message}</p>
+                <p style="font-size: 10px;">Check console for details</p>
+            </div>`;
             return null;
         }
     },

@@ -1582,7 +1582,7 @@ p {
 }
 
 /* Ensure chart containers are visible */
-[id*="Chart"], [id*="chart"] {
+[id*="Chart"], [id*="chart"], [id*="Heatmap"], [id*="heatmap"] {
     min-height: 300px;
     width: 100%;
     position: relative;
@@ -1608,4 +1608,34 @@ p {
 .apexcharts-tooltip {
     border-radius: 8px !important;
     box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+}
+
+/* Custom heatmap tooltip styling */
+.heatmap-tooltip {
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    border-radius: 6px;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.heatmap-tooltip div {
+    margin-bottom: 2px;
+}
+
+.heatmap-tooltip div:last-child {
+    margin-bottom: 0;
+}
+
+/* Heatmap specific styling */
+.chart-large-container {
+    min-height: 400px;
+    width: 100%;
+}
+
+/* Ensure heatmap containers have proper dimensions */
+#categoryHeatmap, #sectorHeatmap, #industryHeatmap {
+    min-height: 400px;
+    width: 100%;
 }
