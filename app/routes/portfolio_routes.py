@@ -3,6 +3,7 @@ from flask import (
     request, flash, session, jsonify, current_app
 )
 import logging
+from app.database.db_manager import query_db
 from app.routes.portfolio_api import (
     get_portfolios_api, get_portfolio_data_api, manage_state,
     get_allocate_portfolio_data, update_portfolio_api, upload_csv, manage_portfolios
