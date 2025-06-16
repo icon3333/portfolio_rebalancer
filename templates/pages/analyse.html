@@ -148,7 +148,6 @@
  * 
  * This script adds company-centric and category-centric views to each portfolio section.
  * Features include:
- * - Toggle between Companies and Categories tabs
  * - Category breakdown with percentages relative to portfolio
  * - Expandable company rows within each category 
  * - Company percentages relative to their category
@@ -165,9 +164,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Make portfolioData available globally for the components
     window.portfolioData = portfolioData;
-    
-    // Enhance the tab initialization with chart handlers
-    initializePortfolioTabs = PortfolioCharts.setupTabChangeHandlers(initializePortfolioTabs);
     
     // Charts
     let portfolioAllocationsChart = null;
@@ -310,9 +306,6 @@ document.addEventListener('DOMContentLoaded', function() {
         // Initialize table sorting
         initTableSorting();
         
-        // Initialize portfolio tabs with enhanced handlers
-        initializePortfolioTabs = PortfolioCharts.setupTabChangeHandlers(initializePortfolioTabs);
-        initializePortfolioTabs();
         
         // Setup resize handlers for charts
         PortfolioCharts.setupResizeHandlers();
@@ -884,46 +877,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const content = document.createElement('div');
             content.className = 'portfolio-content';
             
-            // Add tabs for company vs category view
-            const tabs = document.createElement('div');
-            tabs.className = 'tabs is-boxed mb-0';
-            tabs.innerHTML = `
-                <ul>
-                    <li class="is-active" data-tab="companies-${portfolio.id}">
-                        <a>
-                            <span class="icon is-small"><i class="fas fa-building"></i></span>
-                            <span>Companies</span>
-                        </a>
-                    </li>
-                    <li data-tab="categories-${portfolio.id}">
-                        <a>
-                            <span class="icon is-small"><i class="fas fa-tags"></i></span>
-                            <span>Categories</span>
-                        </a>
-                    </li>
-                </ul>
-            `;
-            
-            // Create tab content container
-            const tabContent = document.createElement('div');
-            tabContent.className = 'tab-content';
-            
-            // Companies tab content
-            const companiesTab = document.createElement('div');
-            companiesTab.id = `companies-${portfolio.id}`;
-            companiesTab.className = 'tab-pane is-active';
-            
-            // Categories tab content
-            const categoriesTab = document.createElement('div');
-            categoriesTab.id = `categories-${portfolio.id}`;
-            categoriesTab.className = 'tab-pane';
-            categoriesTab.style.display = 'none';
-            
-            // Create the columns layout for both tabs
+            // Create the columns layout for company and category sections
             const companiesColumns = document.createElement('div');
             companiesColumns.className = 'columns';
             companiesColumns.style.minHeight = '450px';
-            
+
             const categoriesColumns = document.createElement('div');
             categoriesColumns.className = 'columns';
             categoriesColumns.style.minHeight = '450px';
@@ -1018,24 +976,15 @@ document.addEventListener('DOMContentLoaded', function() {
             categoryChartContainer.appendChild(categoryDiv);
             categoryChartColumn.appendChild(categoryChartContainer);
             
-            // Assemble the columns for both tabs
+            // Assemble the sections
             companiesColumns.appendChild(companyTableColumn);
             companiesColumns.appendChild(companyChartColumn);
-            
+
             categoriesColumns.appendChild(categoryTableColumn);
             categoriesColumns.appendChild(categoryChartColumn);
-            
-            // Add columns to tab content
-            companiesTab.appendChild(companiesColumns);
-            categoriesTab.appendChild(categoriesColumns);
-            
-            // Add tab content to container
-            tabContent.appendChild(companiesTab);
-            tabContent.appendChild(categoriesTab);
-            
-            // Assemble the content
-            content.appendChild(tabs);
-            content.appendChild(tabContent);
+
+            content.appendChild(companiesColumns);
+            content.appendChild(categoriesColumns);
             
             // Set initial state to collapsed
             content.style.display = 'none';
@@ -1062,18 +1011,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Ensure charts render correctly when expanding
                     window.dispatchEvent(new Event('resize'));
-                    
-                    // Find active tab to determine which chart to redraw
-                    const activeTab = section.querySelector('.tabs li.is-active');
-                    if (activeTab) {
-                        const tabId = activeTab.getAttribute('data-tab');
-                        
-                        // If the categories tab is active, force a click to redraw the chart
-                        if (tabId && tabId.includes('categories')) {
-                            // Simulate a click on the categories tab to redraw the chart
-                            setTimeout(() => activeTab.click(), 250);
-                        }
-                    }
                 } else {
                     content.style.display = 'none';
                     icon.classList.remove('fa-chevron-up');
@@ -1091,6 +1028,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 try {
                     console.log(`Initializing portfolio chart for ${portfolio.name} (ID: ${portfolio.id})`);
                     const chartResult = initializePortfolioChart(portfolio);
+                    initializeCategoryChart(portfolio);
                     if (chartResult) {
                         console.log(`Successfully initialized chart for portfolio ${portfolio.id}`);
                     } else {
@@ -1105,118 +1043,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     
     /**
-     * Initialize tab navigation for portfolio sections
-     * Sets up click handlers and ensures charts render correctly when tabs change
-     */
-     function initializePortfolioTabs() {
-        document.querySelectorAll('.portfolio-section .tabs li').forEach(tab => {
-            tab.addEventListener('click', function() {
-                // Get the parent portfolio section
-                const portfolioSection = this.closest('.portfolio-section');
-                
-                // Get the target tab ID
-                const targetId = this.getAttribute('data-tab');
-                
-                // Get the portfolio ID to update the right charts
-                const portfolioId = portfolioSection.dataset.portfolioId;
-                
-                // Update active tab
-                portfolioSection.querySelectorAll('.tabs li').forEach(t => {
-                    t.classList.remove('is-active');
-                });
-                this.classList.add('is-active');
-                
-                // Show the selected tab content with fade effect
-                portfolioSection.querySelectorAll('.tab-pane').forEach(pane => {
-                    if (pane.id === targetId) {
-                        pane.style.opacity = '0';
-                        pane.classList.add('is-active');
-                        pane.style.display = 'block';
-                        void pane.offsetHeight;
-                        pane.style.transition = 'opacity 0.3s ease';
-                        pane.style.opacity = '1';
-                    } else {
-                        pane.classList.remove('is-active');
-                        pane.style.display = 'none';
-                    }
-                });
-                
-                // Save active tab preference
-                try {
-                    localStorage.setItem(`portfolio_tab_${portfolioId}`, targetId);
-                } catch (e) {
-                    console.warn('Could not save tab preference to localStorage', e);
-                }
-                
-                // Handle category chart when switching to categories tab
-                if (targetId.includes('categories')) {
-                    console.log(`Looking for portfolio: ID ${portfolioId}, Name '${tabs[2].textContent.trim()}'`);
-                    
-                    // Get the portfolio object by ID
-                    let portfolioObj = portfolioData.find(p => p.id == portfolioId);
-                    
-                    // If not found by ID, try finding by name (displayed in the tab)
-                    if (!portfolioObj) {
-                        const portfolioName = tabs[2].textContent.trim();
-                        portfolioObj = portfolioData.find(p => p.name === portfolioName);
-                        if (portfolioObj) {
-                            console.log(`Tried to find portfolio by name '${portfolioName}' instead of ID ${portfolioId}: Found ID ${portfolioObj.id}`);
-                        } else {
-                            console.log(`Tried to find portfolio by name '${portfolioName}' instead of ID ${portfolioId}: Not found`);
-                        }
-                    }
-                    
-                    if (!portfolioObj) {
-                        console.error(`Portfolio with ID ${portfolioId} not found - portfolio data may be incomplete`);
-                        return;
-                    }
-                    
-                    console.log(`Tab changed to Categories for portfolio ${portfolioId}`);
-                    
-                    // Check if we already have a chart for this portfolio's categories
-                    const hasCategoryChart = portfolioCharts.categories && portfolioCharts.categories[portfolioId];
-                    
-                    try {
-                        if (!hasCategoryChart) {
-                            console.log(`Initializing category chart for portfolio ${portfolioId}`);
-                            // Initialize the category chart since it doesn't exist yet
-                            initializeCategoryChart(portfolioObj);
-                        } else {
-                            console.log(`Resizing existing category chart for portfolio ${portfolioId}`);
-                            // Resize existing chart
-                            const categoryChart = document.getElementById(`categoryChart${portfolioId}`);
-                            if (categoryChart) {
-                                Plotly.Plots.resize(categoryChart);
-                            }
-                        }
-                    } catch (error) {
-                        console.error(`Error with category chart for portfolio ${portfolioId}:`, error);
-                    }
-                }
-                
-                // Trigger a resize event to fix chart display issues
-                setTimeout(() => {
-                    window.dispatchEvent(new Event('resize'));
-                }, 50);
-            });
-        });
-        
-        // Restore previous tab selections from localStorage if available
-        try {
-            document.querySelectorAll('.portfolio-section').forEach(section => {
-                const portfolioId = section.dataset.portfolioId;
-                const savedTabId = localStorage.getItem(`portfolio_tab_${portfolioId}`);
-                if (savedTabId) {
-                    const tabToActivate = section.querySelector(`[data-tab="${savedTabId}"]`);
-                    if (tabToActivate) {
-                        tabToActivate.click();
-                    }
-                }
-            });
-        } catch (e) {
-            console.warn('Could not restore tab preferences from localStorage', e);
-        }
-    }
 
     
     // Render company rows for a portfolio
@@ -2230,104 +2056,87 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// Add CSS for portfolio tabs and category rows
-document.addEventListener('DOMContentLoaded', function() {
-    // Create style element
-    const style = document.createElement('style');
-    style.innerHTML = `
-        /* Portfolio Filter Styling */
-        .portfolio-filter-container {
-            background-color: #f9f9fa;
-            position: relative;
-            padding-top: 0.5rem;
-        }
-        
-        .portfolio-filter-container::before {
-            content: '⚙️ Select Portfolios for Analysis';
-            display: block;
-            font-size: 0.85rem;
-            color: #666;
-            margin-bottom: 0.5rem;
-            letter-spacing: 0.5px;
-        }
-        
-        #portfolioFilters .control {
-            margin: 0.4rem 0.5rem;
-        }
-        
-        .portfolio-filter-checkbox {
-            display: inline-flex;
-            align-items: center;
-            padding: 0.4rem 0.8rem;
-            transition: all 0.2s;
-        }
-        
-        .portfolio-filter-checkbox:hover {
-            color: #3273dc;
-        }
-        
-        .portfolio-filter-checkbox input[type='checkbox'] {
-            margin-right: 0.4rem;
-        }
-        
-        /* Tab styling */
-        .portfolio-section .tabs {
-            margin-bottom: 0;
-        }
-        
-        .tab-pane {
-            padding-top: 1rem;
-        }
-        
-        /* Category row styling */
-        .category-row {
-            background-color: rgba(0, 0, 0, 0.03);
-            font-weight: 500;
-            transition: background-color 0.2s ease;
-        }
-        
-        .category-row.is-selected {
-            background-color: rgba(50, 115, 220, 0.08);
-        }
-        
-        .toggle-companies {
-            cursor: pointer;
-            color: #3273dc;
-            transition: transform 0.2s ease;
-        }
-        
-        .toggle-companies:hover {
-            transform: scale(1.2);
-        }
-        
-        tr.category-companies {
-            background-color: rgba(0, 0, 0, 0.02);
-            overflow: hidden;
-        }
-        
-        tr.category-companies td {
-            border-top: none;
-            padding-top: 0.4em;
-            padding-bottom: 0.4em;
-        }
-        
-        /* Helper classes for the dual percentage display */
-        .has-text-grey-light {
-            color: #8c9b9d !important;
-            font-size: 0.9em;
-            margin-left: 0.3em;
-        }
-        
-        /* Chart container sizing */
-        .chart-large-container, .chart-medium-container {
-            width: 100%;
-            height: 400px;
-            position: relative;
-        }
-    `;
-    
-    // Add to head
-    document.head.appendChild(style);
-});
 </script>
+<style>
+    /* Portfolio Filter Styling */
+    .portfolio-filter-container {
+        background-color: #f9f9fa;
+        position: relative;
+        padding-top: 0.5rem;
+    }
+
+    .portfolio-filter-container::before {
+        content: '⚙️ Select Portfolios for Analysis';
+        display: block;
+        font-size: 0.85rem;
+        color: #666;
+        margin-bottom: 0.5rem;
+        letter-spacing: 0.5px;
+    }
+
+    #portfolioFilters .control {
+        margin: 0.4rem 0.5rem;
+    }
+
+    .portfolio-filter-checkbox {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.4rem 0.8rem;
+        transition: all 0.2s;
+    }
+
+    .portfolio-filter-checkbox:hover {
+        color: #3273dc;
+    }
+
+    .portfolio-filter-checkbox input[type='checkbox'] {
+        margin-right: 0.4rem;
+    }
+
+    /* Category row styling */
+    .category-row {
+        background-color: rgba(0, 0, 0, 0.03);
+        font-weight: 500;
+        transition: background-color 0.2s ease;
+    }
+
+    .category-row.is-selected {
+        background-color: rgba(50, 115, 220, 0.08);
+    }
+
+    .toggle-companies {
+        cursor: pointer;
+        color: #3273dc;
+        transition: transform 0.2s ease;
+    }
+
+    .toggle-companies:hover {
+        transform: scale(1.2);
+    }
+
+    tr.category-companies {
+        background-color: rgba(0, 0, 0, 0.02);
+        overflow: hidden;
+    }
+
+    tr.category-companies td {
+        border-top: none;
+        padding-top: 0.4em;
+        padding-bottom: 0.4em;
+    }
+
+    /* Helper classes for the dual percentage display */
+    .has-text-grey-light {
+        color: #8c9b9d !important;
+        font-size: 0.9em;
+        margin-left: 0.3em;
+    }
+
+    /* Chart container sizing */
+    .chart-large-container, .chart-medium-container {
+        width: 100%;
+        height: 400px;
+        position: relative;
+    }
+</style>
 {% endblock %}
