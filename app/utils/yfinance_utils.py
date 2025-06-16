@@ -42,6 +42,39 @@ def get_exchange_rate(from_currency: str, to_currency: str = "EUR") -> float:
             f"Error fetching exchange rate for {from_currency}-{to_currency}: {e}")
         return 1.0 * base_rate  # Fallback
 
+# --- Helper Functions for Identifier Detection ---
+
+
+def _is_likely_crypto(identifier: str) -> bool:
+    """
+    Determine if an identifier is likely a cryptocurrency.
+    
+    Since all traditional stocks will be ISINs (12 characters), 
+    any short identifier (≤4 characters) that's alphabetic is likely crypto.
+    This greatly simplifies the detection logic.
+    """
+    if not identifier:
+        return False
+    
+    # Clean identifier
+    clean_id = identifier.upper().strip()
+    
+    # ISINs are 12 characters - exclude them
+    if len(clean_id) == 12 and clean_id[:2].isalpha() and clean_id[2:].isalnum():
+        return False
+    
+    # Skip if it contains exchange suffixes (e.g., ".PA", ".L")
+    if '.' in clean_id:
+        return False
+    
+    # Short identifiers (≤4 chars) that are alphabetic are crypto
+    # since all traditional stocks will be ISINs
+    if len(clean_id) <= 4 and clean_id.isalpha():
+        return True
+    
+    return False
+
+
 # --- Main Data Fetching Function ---
 
 
@@ -49,24 +82,42 @@ def get_isin_data(identifier: str) -> Dict[str, Any]:
     """
     Get stock data for a given ISIN or ticker, with a fallback for crypto.
     Uses the same approach as the working script example.
+    Automatically detects crypto based on identifier characteristics.
     """
     logger.info(f"Processing identifier: {identifier}")
 
-    # Use the exact same pattern as the working script
-    data = _fetch_yfinance_data_robust(identifier)
-
-    # If the initial fetch fails, try a crypto-specific format
-    if not data:
-        logger.warning(
-            f"Standard lookup for '{identifier}' failed, trying crypto format.")
+    # Check if this looks like a crypto identifier first
+    if _is_likely_crypto(identifier):
+        logger.info(f"'{identifier}' appears to be cryptocurrency, trying crypto format first")
         crypto_identifier = f"{identifier}-USD"
         data = _fetch_yfinance_data_robust(crypto_identifier)
         if data:
-            # Mark that we used a fallback
+            # Mark that we used crypto format
             data['modified_identifier'] = crypto_identifier
             data['sector'] = 'Cryptocurrency'
             data['industry'] = 'Digital Currency'
             data['country'] = 'N/A'
+            logger.info(f"Successfully retrieved crypto data for {identifier} as {crypto_identifier}")
+        else:
+            # If crypto format fails, try standard format as fallback
+            logger.warning(f"Crypto format '{crypto_identifier}' failed, trying standard format")
+            data = _fetch_yfinance_data_robust(identifier)
+    else:
+        # Use the exact same pattern as the working script for non-crypto
+        data = _fetch_yfinance_data_robust(identifier)
+
+        # If the initial fetch fails, try a crypto-specific format as fallback
+        if not data:
+            logger.warning(
+                f"Standard lookup for '{identifier}' failed, trying crypto format.")
+            crypto_identifier = f"{identifier}-USD"
+            data = _fetch_yfinance_data_robust(crypto_identifier)
+            if data:
+                # Mark that we used a fallback
+                data['modified_identifier'] = crypto_identifier
+                data['sector'] = 'Cryptocurrency'
+                data['industry'] = 'Digital Currency'
+                data['country'] = 'N/A'
 
     if not data:
         logger.error(

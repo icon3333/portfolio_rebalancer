@@ -10,6 +10,14 @@ from flask.cli import with_appcontext
 # Configure logging
 logger = logging.getLogger(__name__)
 
+# Store the database path when the app initializes
+_db_path = None
+
+def set_db_path(path):
+    """Set the database path for background operations."""
+    global _db_path
+    _db_path = path
+
 def get_db():
     """
     Get a database connection for the current request.
@@ -27,9 +35,18 @@ def get_background_db():
     This should be used instead of get_db() when working in background threads
     where Flask's request context is not available.
     """
-    from flask import current_app
-    db_path = current_app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
-    db = sqlite3.connect(db_path, detect_types=sqlite3.PARSE_DECLTYPES)
+    global _db_path
+    if _db_path is None:
+        # Fallback to try getting from current_app if available
+        try:
+            from flask import current_app
+            _db_path = current_app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
+        except RuntimeError:
+            # If no application context, use the default path
+            _db_path = 'app/database/portfolio.db'
+            logger.warning(f"No application context available, using default database path: {_db_path}")
+    
+    db = sqlite3.connect(_db_path, detect_types=sqlite3.PARSE_DECLTYPES)
     db.row_factory = sqlite3.Row
     return db
 
@@ -45,6 +62,10 @@ def init_db(app):
     Then verify schema, run migrations, and optionally insert sample data if empty.
     """
     with app.app_context():
+        # Store the database path for background operations
+        db_path = app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
+        set_db_path(db_path)
+        
         db = get_db()
         # Use safe schema that doesn't drop existing tables
         with app.open_resource('database/schema_safe.sql', mode='r') as f:

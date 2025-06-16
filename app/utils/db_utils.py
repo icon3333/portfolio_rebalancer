@@ -1,9 +1,153 @@
 # app/utils/db_utils.py
 import logging
 from datetime import datetime
-from app.database.db_manager import query_db, execute_db
+from app.database.db_manager import query_db, execute_db, get_background_db
 
 logger = logging.getLogger(__name__)
+
+
+def query_background_db(query, args=(), one=False):
+    """
+    Query the database from background threads and return results as dictionary objects.
+    This function doesn't require Flask application context.
+    """
+    try:
+        logger.debug(f"Executing background query: {query}")
+        logger.debug(f"Query args: {args}")
+        
+        db = get_background_db()
+        cursor = db.execute(query, args)
+        rv = cursor.fetchall()
+        cursor.close()
+        db.close()
+        
+        # Convert rows to dictionaries
+        result = [dict(row) for row in rv]
+        logger.debug(f"Background query returned {len(result)} rows")
+        
+        return (result[0] if result else None) if one else result
+    except Exception as e:
+        logger.error(f"Background database query failed: {str(e)}")
+        logger.error(f"Query was: {query}")
+        logger.error(f"Args were: {args}")
+        raise
+
+
+def execute_background_db(query, args=()):
+    """
+    Execute a statement from background threads and commit changes, returning the rowcount.
+    This function doesn't require Flask application context.
+    """
+    try:
+        logger.debug(f"Executing background statement: {query}")
+        logger.debug(f"Statement args: {args}")
+        
+        db = get_background_db()
+        cursor = db.execute(query, args)
+        rowcount = cursor.rowcount
+        db.commit()
+        cursor.close()
+        db.close()
+        
+        logger.debug(f"Background statement affected {rowcount} rows")
+        return rowcount
+    except Exception as e:
+        logger.error(f"Background database execute failed: {str(e)}")
+        logger.error(f"Statement was: {query}")
+        logger.error(f"Args were: {args}")
+        raise
+
+
+def update_price_in_db_background(identifier: str, price: float, currency: str, price_eur: float, country: str = None, sector: str = None, industry: str = None, modified_identifier: str = None) -> bool:
+    """
+    Update price in database for a single identifier from background threads.
+    This version uses get_background_db() and doesn't require Flask application context.
+
+    Args:
+        identifier: Stock identifier (ISIN or ticker)
+        price: Price in original currency
+        currency: Currency code
+        price_eur: Price in EUR
+        country: Country of the company
+        sector: Sector of the company
+        industry: Industry of the company
+        modified_identifier: If provided, update the company's identifier to this value
+
+    Returns:
+        Success status
+    """
+    try:
+        if not identifier or price is None:
+            logger.warning(
+                f"Missing identifier or price: {identifier}, {price}")
+            return False
+
+        now = datetime.now().isoformat()
+
+        # If we have a modified identifier, update the company records first
+        if modified_identifier:
+            logger.info(
+                f"⚠️ Updating identifier in database from {identifier} to {modified_identifier}")
+
+            # Update identifier in companies table
+            rows_updated = execute_background_db('''
+                UPDATE companies 
+                SET identifier = ?
+                WHERE identifier = ?
+            ''', [modified_identifier, identifier])
+
+            logger.info(
+                f"Updated {rows_updated} company records with new identifier {modified_identifier}")
+
+            # Use the modified identifier for all subsequent operations
+            identifier = modified_identifier
+
+        # Check if the record exists in market_prices
+        existing = query_background_db(
+            'SELECT 1 FROM market_prices WHERE identifier = ?',
+            [identifier],
+            one=True
+        )
+
+        if existing:
+            # Update existing record
+            execute_background_db('''
+                UPDATE market_prices 
+                SET price = ?, currency = ?, price_eur = ?, last_updated = ?, 
+                    country = ?, sector = ?, industry = ?
+                WHERE identifier = ?
+            ''', [price, currency, price_eur, now, country, sector, industry, identifier])
+            logger.info(
+                f"Updated existing price record for {identifier} with additional data")
+        else:
+            # Insert new record
+            execute_background_db('''
+                INSERT INTO market_prices 
+                (identifier, price, currency, price_eur, last_updated, country, sector, industry)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', [identifier, price, currency, price_eur, now, country, sector, industry])
+            logger.info(
+                f"Created new price record for {identifier} with additional data")
+
+        # Update last_price_update in accounts table for all accounts that have this identifier
+        execute_background_db('''
+            UPDATE accounts 
+            SET last_price_update = ? 
+            WHERE id IN (
+                SELECT DISTINCT account_id 
+                FROM companies 
+                WHERE identifier = ?
+            )
+        ''', [now, identifier])
+
+        logger.info(
+            f"Successfully updated price for {identifier}: {price} {currency} ({price_eur} EUR) with country={country}, sector={sector}, industry={industry}")
+        return True
+
+    except Exception as e:
+        logger.error(
+            f"Failed to update price in database for {identifier}: {str(e)}")
+        return False
 
 
 def update_price_in_db(identifier: str, price: float, currency: str, price_eur: float, country: str = None, sector: str = None, industry: str = None, modified_identifier: str = None) -> bool:

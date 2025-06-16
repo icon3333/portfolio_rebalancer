@@ -60,11 +60,28 @@ def _apply_company_update(cursor, company_id, data, account_id):
         else:
             portfolio_id = default_portfolio['id']
 
-    cursor.execute(
-        'UPDATE companies SET identifier = ?, category = ?, portfolio_id = ? WHERE id = ?',
-        [data.get('identifier', ''), data.get(
-            'category', ''), portfolio_id, company_id]
-    )
+    # Build the SET clause dynamically based on what data is provided
+    set_clause_parts = []
+    params = []
+    
+    if 'identifier' in data:
+        set_clause_parts.append('identifier = ?')
+        params.append(data.get('identifier', ''))
+    
+    if 'category' in data:
+        set_clause_parts.append('category = ?')
+        params.append(data.get('category', ''))
+    
+    # Always update portfolio_id since this is called for portfolio changes
+    set_clause_parts.append('portfolio_id = ?')
+    params.append(portfolio_id)
+    
+    # Add the company_id for the WHERE clause
+    params.append(company_id)
+    
+    if set_clause_parts:
+        set_clause = ', '.join(set_clause_parts)
+        cursor.execute(f'UPDATE companies SET {set_clause} WHERE id = ?', params)
 
     if 'shares' in data or 'override_share' in data:
         shares = data.get('shares')

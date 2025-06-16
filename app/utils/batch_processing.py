@@ -8,7 +8,7 @@ from typing import Dict, Any, List
 import time
 
 from app.utils.yfinance_utils import get_isin_data
-from app.utils.db_utils import update_price_in_db
+from app.utils.db_utils import update_price_in_db_background, query_background_db, execute_background_db
 from app.database.db_manager import get_db
 
 logger = logging.getLogger(__name__)
@@ -45,8 +45,8 @@ def _process_single_identifier(identifier: str) -> Dict[str, Any]:
             price = data.get('currentPrice')
 
             if price is not None:
-                # Update the price in the main database
-                update_success = update_price_in_db(
+                # Update the price in the main database using background-specific function
+                update_success = update_price_in_db_background(
                     identifier,
                     price,
                     data.get('currency'),
@@ -106,7 +106,7 @@ def _run_batch_job(app, job_id: str, identifiers: List[str]):
                 # Batch progress updates to avoid excessive DB writes
                 current_time = time.time()
                 if current_time - last_update_time > 2:  # Update every 2 seconds
-                    _update_job_progress(job_id, processed_count)
+                    _update_job_progress_background(job_id, processed_count)
                     last_update_time = current_time
 
         # Final update with summary
@@ -116,33 +116,29 @@ def _run_batch_job(app, job_id: str, identifiers: List[str]):
             'failure_count': failure_count,
             'completion_time': datetime.now().isoformat()
         }
-        _update_job_final(job_id, total_items, json.dumps(summary))
+        _update_job_final_background(job_id, total_items, json.dumps(summary))
         logger.info(
             f"Batch job {job_id} complete. Success: {success_count}, Failed: {failure_count}")
 
 
-def _update_job_progress(job_id: str, progress: int):
-    """Update the progress of a job in the database."""
+def _update_job_progress_background(job_id: str, progress: int):
+    """Update the progress of a job in the database using background connection."""
     try:
-        db = get_db()
-        db.execute(
+        execute_background_db(
             "UPDATE background_jobs SET progress = ?, updated_at = ? WHERE id = ?",
             (progress, datetime.now(), job_id)
         )
-        db.commit()
     except Exception as e:
         logger.error(f"Failed to update job progress for {job_id}: {e}")
 
 
-def _update_job_final(job_id: str, total: int, summary: str):
-    """Mark the job as completed in the database."""
+def _update_job_final_background(job_id: str, total: int, summary: str):
+    """Mark the job as completed in the database using background connection."""
     try:
-        db = get_db()
-        db.execute(
+        execute_background_db(
             "UPDATE background_jobs SET status = 'completed', progress = ?, result = ?, updated_at = ? WHERE id = ?",
             (total, summary, datetime.now(), job_id)
         )
-        db.commit()
     except Exception as e:
         logger.error(f"Failed to finalize job {job_id}: {e}")
 
