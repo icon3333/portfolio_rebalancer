@@ -122,6 +122,12 @@
         
         .controls-group {
             flex-shrink: 0;
+            margin-right: var(--space-md);
+        }
+        
+        .controls-group .is-flex {
+            flex-wrap: wrap;
+            align-items: center;
         }
         
         .portfolio-metrics {
@@ -268,11 +274,22 @@
                 align-items: flex-start;
             }
             
+            .controls-group {
+                margin-right: 0;
+                margin-bottom: var(--space-md);
+                width: 100%;
+            }
+            
+            .controls-group .is-flex {
+                gap: var(--space-sm) !important;
+                flex-wrap: wrap;
+            }
+            
             .portfolio-metrics {
                 flex-wrap: wrap;
                 padding: 0.4rem 0.8rem;
                 margin-left: 0;
-                margin-top: 0.5rem;
+                margin-top: 0;
                 width: 100%;
             }
             
@@ -465,87 +482,74 @@
 {% endmacro %}
 
 {% macro portfolio_data_section(portfolios) %}
-<div class="card mb-5">
-    <header class="card-header">
-        <p class="card-header-title">
-            <span class="icon-text">
-                <span class="icon">
-                    <i class="fas fa-table"></i>
-                </span>
-                <span>Portfolio Data</span>
-            </span>
-        </p>
-        <div class="card-header-controls is-flex is-align-items-center" style="flex-grow: 1; justify-content: flex-end; padding-right: var(--space-md);">
-            <!-- Control Group with consistent spacing -->
-            <div class="is-flex is-align-items-center" style="gap: var(--space-md);">
-                <!-- Portfolio Filter -->
-                <div class="control has-icons-left">
-                    <div class="select is-small">
-                        <select id="filter-portfolio">
-                            <option value="">All Portfolios</option>
-                            {% for portfolio in portfolios %}
-                                <option value="{{ portfolio }}">{{ portfolio }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <span class="icon is-small is-left">
-                        <i class="fas fa-folder"></i>
-                    </span>
-                </div>
-                
-                <!-- Company Search Filter -->
-                <div class="field has-addons mb-0">
-                    <div class="control has-icons-left">
-                        <input type="text" class="input is-small" id="company-search" placeholder="Search company...">
-                        <span class="icon is-small is-left">
-                            <i class="fas fa-search"></i>
-                        </span>
-                    </div>
-                    <div class="control">
-                        <button class="button is-small" id="clear-company-search">
-                            <span class="icon is-small">
-                                <i class="fas fa-times"></i>
-                            </span>
-                        </button>
-                    </div>
-                </div>
-                
-                <!-- No Price Checkbox -->
-                <div class="control">
-                    <label class="checkbox is-flex is-align-items-center" style="height: 2em;">
-                        <input type="checkbox" id="show-only-missing-prices">
-                        <span class="ml-2">No price</span>
-                    </label>
-                </div>
-                
-                <!-- Action buttons with consistent styling -->
-                <div class="buttons are-small mb-0">
-                    <button class="button" id="open-bulk-edit-btn">
-                        <span class="icon is-small">
-                            <i class="fas fa-edit"></i>
-                        </span>
-                        <span>Bulk Edit</span>
-                    </button>
-                    
-                    <button class="button is-primary" id="update-all-data-btn">
-                        <span class="icon is-small">
-                            <i class="fas fa-sync-alt"></i>
-                        </span>
-                        <span>Update all data</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </header>
-    <div class="card-content">
-        <div class="content">
+<div class="mb-5">
             <div id="portfolio-editor" class="portfolio-editor">
                 <!-- Vue.js component will be mounted here -->
                 <div id="portfolio-table-app" v-cloak>
                     <div class="portfolio-controls-container mb-4">
                         <div class="controls-and-metrics-row">
-                            <!-- Controls -->
+                            <!-- Controls moved to the left -->
                             <div class="controls-group">
+                                <!-- Control Group with consistent spacing -->
+                                <div class="is-flex is-align-items-center" style="gap: var(--space-md);">
+                                    <!-- Portfolio Filter -->
+                                    <div class="control has-icons-left">
+                                        <div class="select is-small">
+                                            <select id="filter-portfolio">
+                                                <option value="">All Portfolios</option>
+                                                {% for portfolio in portfolios %}
+                                                    <option value="{{ portfolio }}">{{ portfolio }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <span class="icon is-small is-left">
+                                            <i class="fas fa-folder"></i>
+                                        </span>
+                                    </div>
+                                    
+                                    <!-- Company Search Filter -->
+                                    <div class="field has-addons mb-0">
+                                        <div class="control has-icons-left">
+                                            <input type="text" class="input is-small" id="company-search" placeholder="Search company...">
+                                            <span class="icon is-small is-left">
+                                                <i class="fas fa-search"></i>
+                                            </span>
+                                        </div>
+                                        <div class="control">
+                                            <button class="button is-small" id="clear-company-search">
+                                                <span class="icon is-small">
+                                                    <i class="fas fa-times"></i>
+                                                </span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- No Price Checkbox -->
+                                    <div class="control">
+                                        <label class="checkbox is-flex is-align-items-center" style="height: 2em;">
+                                            <input type="checkbox" id="show-only-missing-prices">
+                                            <span class="ml-2">No price</span>
+                                        </label>
+                                    </div>
+                                    
+                                    <!-- Action buttons with consistent styling -->
+                                    <div class="buttons are-small mb-0">
+                                        <button class="button" id="open-bulk-edit-btn">
+                                            <span class="icon is-small">
+                                                <i class="fas fa-edit"></i>
+                                            </span>
+                                            <span>Bulk Edit</span>
+                                        </button>
+                                        
+                                        <button class="button is-primary" id="update-all-data-btn">
+                                            <span class="icon is-small">
+                                                <i class="fas fa-sync-alt"></i>
+                                            </span>
+                                            <span>Update all data</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                
                                 <!-- Hidden controls for Vue binding -->
                                 <div class="is-hidden">
                                     <select v-model="selectedPortfolio" id="vue-portfolio-select"></select>
@@ -735,7 +739,6 @@
                 </div>
             </div>
         </div>
-    </div>
 </div>
 {% endmacro %}
 
