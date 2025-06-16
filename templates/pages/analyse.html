@@ -2055,99 +2055,87 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
-
-// Add CSS for portfolio sections
-document.addEventListener('DOMContentLoaded', function() {
-    // Create style element
-    const style = document.createElement('style');
-    style.innerHTML = `
-        /* Portfolio Filter Styling */
-        .portfolio-filter-container {
-            background-color: #f9f9fa;
-            position: relative;
-            padding-top: 0.5rem;
-        }
-        
-        .portfolio-filter-container::before {
-            content: '⚙️ Select Portfolios for Analysis';
-            display: block;
-            font-size: 0.85rem;
-            color: #666;
-            margin-bottom: 0.5rem;
-            letter-spacing: 0.5px;
-        }
-        
-        #portfolioFilters .control {
-            margin: 0.4rem 0.5rem;
-        }
-        
-        .portfolio-filter-checkbox {
-            display: inline-flex;
-            align-items: center;
-            padding: 0.4rem 0.8rem;
-            transition: all 0.2s;
-        }
-        
-        .portfolio-filter-checkbox:hover {
-            color: #3273dc;
-        }
-        
-        .portfolio-filter-checkbox input[type='checkbox'] {
-            margin-right: 0.4rem;
-        }
-        
-        /* Tab styling */
-        
-        
-        /* Category row styling */
-        .category-row {
-            background-color: rgba(0, 0, 0, 0.03);
-            font-weight: 500;
-            transition: background-color 0.2s ease;
-        }
-        
-        .category-row.is-selected {
-            background-color: rgba(50, 115, 220, 0.08);
-        }
-        
-        .toggle-companies {
-            cursor: pointer;
-            color: #3273dc;
-            transition: transform 0.2s ease;
-        }
-        
-        .toggle-companies:hover {
-            transform: scale(1.2);
-        }
-        
-        tr.category-companies {
-            background-color: rgba(0, 0, 0, 0.02);
-            overflow: hidden;
-        }
-        
-        tr.category-companies td {
-            border-top: none;
-            padding-top: 0.4em;
-            padding-bottom: 0.4em;
-        }
-        
-        /* Helper classes for the dual percentage display */
-        .has-text-grey-light {
-            color: #8c9b9d !important;
-            font-size: 0.9em;
-            margin-left: 0.3em;
-        }
-        
-        /* Chart container sizing */
-        .chart-large-container, .chart-medium-container {
-            width: 100%;
-            height: 400px;
-            position: relative;
-        }
-    `;
-    
-    // Add to head
-    document.head.appendChild(style);
-});
 </script>
+<style>
+    /* Portfolio Filter Styling */
+    .portfolio-filter-container {
+        background-color: #f9f9fa;
+        position: relative;
+        padding-top: 0.5rem;
+    }
+
+    .portfolio-filter-container::before {
+        content: '⚙️ Select Portfolios for Analysis';
+        display: block;
+        font-size: 0.85rem;
+        color: #666;
+        margin-bottom: 0.5rem;
+        letter-spacing: 0.5px;
+    }
+
+    #portfolioFilters .control {
+        margin: 0.4rem 0.5rem;
+    }
+
+    .portfolio-filter-checkbox {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.4rem 0.8rem;
+        transition: all 0.2s;
+    }
+
+    .portfolio-filter-checkbox:hover {
+        color: #3273dc;
+    }
+
+    .portfolio-filter-checkbox input[type='checkbox'] {
+        margin-right: 0.4rem;
+    }
+
+    /* Category row styling */
+    .category-row {
+        background-color: rgba(0, 0, 0, 0.03);
+        font-weight: 500;
+        transition: background-color 0.2s ease;
+    }
+
+    .category-row.is-selected {
+        background-color: rgba(50, 115, 220, 0.08);
+    }
+
+    .toggle-companies {
+        cursor: pointer;
+        color: #3273dc;
+        transition: transform 0.2s ease;
+    }
+
+    .toggle-companies:hover {
+        transform: scale(1.2);
+    }
+
+    tr.category-companies {
+        background-color: rgba(0, 0, 0, 0.02);
+        overflow: hidden;
+    }
+
+    tr.category-companies td {
+        border-top: none;
+        padding-top: 0.4em;
+        padding-bottom: 0.4em;
+    }
+
+    /* Helper classes for the dual percentage display */
+    .has-text-grey-light {
+        color: #8c9b9d !important;
+        font-size: 0.9em;
+        margin-left: 0.3em;
+    }
+
+    /* Chart container sizing */
+    .chart-large-container, .chart-medium-container {
+        width: 100%;
+        height: 400px;
+        position: relative;
+    }
+</style>
 {% endblock %}
