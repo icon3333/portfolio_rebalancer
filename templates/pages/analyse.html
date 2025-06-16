@@ -342,6 +342,9 @@ document.addEventListener('DOMContentLoaded', function() {
             // Initialize Risk Breakdown
             initializeRiskBreakdown();
             
+            // Initialize expandable heatmap sections
+            initializeHeatmapSectionToggle();
+            
             console.log('UI initialization completed successfully');
         } catch (error) {
             console.error('Error during data processing or UI initialization:', error);
@@ -1660,23 +1663,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const sectorHeatmapData = calculateExposureData(selectedPortfolioIds, 'sector');
             const industryHeatmapData = calculateExposureData(selectedPortfolioIds, 'industry');
             
-            // Ensure the heatmap containers are visible before rendering
+            // Get heatmap containers (but don't force them to be visible)
             const categoryContainer = document.querySelector('#categoryHeatmap');
             const sectorContainer = document.querySelector('#sectorHeatmap');
             const industryContainer = document.querySelector('#industryHeatmap');
-            
-            if (categoryContainer) {
-                const categoryParent = categoryContainer.closest('.portfolio-content');
-                if (categoryParent) categoryParent.style.display = 'block';
-            }
-            if (sectorContainer) {
-                const sectorParent = sectorContainer.closest('.portfolio-content');
-                if (sectorParent) sectorParent.style.display = 'block';
-            }
-            if (industryContainer) {
-                const industryParent = industryContainer.closest('.portfolio-content');
-                if (industryParent) industryParent.style.display = 'block';
-            }
         
             // Render all three heatmaps with a slight delay to ensure containers are fully visible
             setTimeout(() => {
@@ -1821,6 +1811,39 @@ document.addEventListener('DOMContentLoaded', function() {
         // Implementation of renderDoughnutChart function
     }
     
+    // Initialize click handlers for heatmap section toggles
+    function initializeHeatmapSectionToggle() {
+        // Add click handlers specifically for heatmap section headers (those without data-portfolio-id)
+        const heatmapSectionHeaders = document.querySelectorAll('.portfolio-section .portfolio-header');
+        
+        heatmapSectionHeaders.forEach(header => {
+            // Only handle sections that don't have data-portfolio-id (i.e., heatmap sections)
+            if (!header.closest('[data-portfolio-id]')) {
+                header.style.cursor = 'pointer';
+                header.addEventListener('click', function() {
+                    const section = this.closest('.portfolio-section');
+                    const content = section.querySelector('.portfolio-content');
+                    const icon = section.querySelector('.toggle-portfolio i');
+                    
+                    if (content.style.display === 'none' || content.style.display === '') {
+                        content.style.display = 'block';
+                        icon.classList.remove('fa-chevron-down');
+                        icon.classList.add('fa-chevron-up');
+                        
+                        // Trigger chart rendering when section is expanded
+                        window.dispatchEvent(new Event('resize'));
+                    } else {
+                        content.style.display = 'none';
+                        icon.classList.remove('fa-chevron-up');
+                        icon.classList.add('fa-chevron-down');
+                    }
+                });
+            }
+        });
+        
+        console.log('Heatmap section toggle handlers initialized');
+    }
+
     // FIX: Initialize expandable sections for the Risk Breakdown using consistent event handling
     function initializeExpandableRiskSections() {
         // Implementation of initializeExpandableRiskSections function
