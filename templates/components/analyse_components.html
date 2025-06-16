@@ -416,6 +416,22 @@ window.PortfolioCharts = (function() {
             // For each tab that references categories
             document.querySelectorAll('.portfolio-section .tabs li[data-tab*="categories"]').forEach(tab => {
                 const originalHandler = tab.onclick;
+                let pendingTimeout = null;
+
+                // Clear any pending chart creation when the sibling companies
+                // tab is clicked. We only register this once.
+                const portfolioSection = tab.closest('.portfolio-section');
+                const companiesTab = portfolioSection?.querySelector('.tabs li[data-tab*="companies"]');
+                if (companiesTab && !companiesTab.dataset.clearHandlerAdded) {
+                    companiesTab.addEventListener('click', () => {
+                        if (pendingTimeout) {
+                            clearTimeout(pendingTimeout);
+                            pendingTimeout = null;
+                        }
+                    });
+                    companiesTab.dataset.clearHandlerAdded = 'true';
+                }
+
                 tab.onclick = function(e) {
                     // First run any existing click handler
                     if (originalHandler) {
@@ -430,6 +446,14 @@ window.PortfolioCharts = (function() {
                      * the container is actually visible with a non-zero size.
                      */
                     function createCategoryChart(attempt = 1) {
+                        // If the user switched away from the Categories tab
+                        // while we were waiting, abort to avoid showing the
+                        // categories pane when the Companies tab is active.
+                        if (!tab.classList.contains('is-active')) {
+                            console.log(`Aborting category chart creation for portfolio ${portfolioId} - tab no longer active`);
+                            return;
+                        }
+
                         console.log(`Chart creation attempt ${attempt} for portfolio ${portfolioId}`);
                         const elementId = `categoryChart${portfolioId}`;
                         const chartElement = prepareChartContainer(elementId);
@@ -592,8 +616,12 @@ window.PortfolioCharts = (function() {
                         }
                     }
                     
-                    // Delay a bit to let the DOM update
-                    setTimeout(createCategoryChart, 300);
+                    // Delay a bit to let the DOM update and keep reference so
+                    // we can cancel it if the user switches tabs quickly
+                    if (pendingTimeout) {
+                        clearTimeout(pendingTimeout);
+                    }
+                    pendingTimeout = setTimeout(createCategoryChart, 300);
                 };
             });
         };
