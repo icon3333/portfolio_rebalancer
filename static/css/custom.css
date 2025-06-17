@@ -2050,6 +2050,259 @@ p {
   }
 }
 
+/* ====================== APPLE-INSPIRED PORTFOLIO SELECTION ====================== */
+
+/* Apple-Style Portfolio Selection */
+.portfolio-selection-section {
+  margin-top: var(--space-xxl);
+  margin-bottom: var(--space-xl);
+}
+
+.portfolio-subtitle {
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  color: var(--text-muted);
+  margin: 0 0 var(--space-sm) 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+
+
+.portfolio-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  flex: 1;
+}
+
+.portfolio-pill {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: #F2F2F7;
+  border: 2px solid transparent;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+  color: var(--text-color);
+  min-height: 44px;
+  /* Apple touch target */
+  user-select: none;
+}
+
+.portfolio-pill.selected {
+  background: var(--primary);
+  color: white;
+  transform: scale(1.02);
+}
+
+.portfolio-pill:hover {
+  background: #E5E5EA;
+  transform: translateY(-1px);
+}
+
+.portfolio-pill.selected:hover {
+  background: var(--primary-hover);
+}
+
+.portfolio-pill.all-pill {
+  background: #E5E5EA;
+  border: 2px solid #D1D1D6;
+  font-weight: 600;
+}
+
+.portfolio-pill.all-pill:hover {
+  background: #D1D1D6;
+  border-color: #C7C7CC;
+}
+
+.portfolio-pill-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.portfolio-pill-name {
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+}
+
+.portfolio-pill-value {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+
+
+/* ====================== APPLE-INSPIRED GLOBAL OVERVIEW ====================== */
+
+/* Apple-Style Global Overview */
+.global-overview-section {
+  margin-bottom: var(--space-xl);
+}
+
+.overview-metrics {
+  display: flex;
+  gap: var(--space-md);
+}
+
+.metric-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-md);
+  background: #F2F2F7;
+  border-radius: 12px;
+  min-width: 120px;
+  transition: all 0.2s ease;
+}
+
+.metric-pill:hover {
+  background: #E5E5EA;
+  transform: translateY(-1px);
+}
+
+.metric-pill.success {
+  background: rgba(52, 199, 89, 0.1);
+}
+
+.metric-pill.success .metric-value {
+  color: #34C759;
+}
+
+.metric-value {
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+  margin-bottom: 2px;
+}
+
+.metric-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Empty state styling */
+.empty-state {
+  text-align: center;
+  padding: var(--space-xxl);
+  color: var(--text-muted);
+}
+
+.empty-state-icon {
+  font-size: 3rem;
+  margin-bottom: var(--space-lg);
+  opacity: 0.3;
+}
+
+/* Responsive adjustments for overview charts */
+@media (max-width: 768px) {
+
+  .overview-chart-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-xs);
+  }
+
+  .overview-chart-subtitle {
+    text-align: left;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .portfolio-pill {
+    background: #2C2C2E;
+    color: #FFFFFF;
+  }
+
+  .portfolio-pill:hover {
+    background: #3A3A3C;
+  }
+
+  .portfolio-pill.all-pill {
+    background: #2C2C2E;
+    border-color: #3A3A3C;
+    color: #FFFFFF;
+  }
+
+  .portfolio-pill.all-pill:hover {
+    background: #3A3A3C;
+    border-color: #48484A;
+  }
+
+  .metric-pill {
+    background: #2C2C2E;
+  }
+
+  .metric-pill:hover {
+    background: #3A3A3C;
+  }
+
+  .gauge-violations .company-tag {
+    background: #2C2C2E;
+    color: #FFFFFF;
+  }
+
+  .gauge-violations .company-tag:hover {
+    background: #3A3A3C;
+  }
+}
+
+/* Overview Chart Styling (matching gauge cards) */
+.overview-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-lg);
+  width: 100%;
+}
+
+.overview-chart-title {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--text-color);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+}
+
+.overview-chart-subtitle {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  font-weight: 500;
+  text-align: right;
+}
+
+.overview-chart-container {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Update gauge violations for company list styling */
+.gauge-violations .company-tag {
+  background: #F2F2F7;
+  padding: 4px var(--space-sm);
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-color);
+  transition: all 0.2s ease;
+  margin-right: var(--space-xs);
+  margin-bottom: var(--space-xs);
+}
+
+.gauge-violations .company-tag:hover {
+  background: #E5E5EA;
+  transform: translateY(-1px);
+}
+
 /* ====================== APPLE-INSPIRED RISK DASHBOARD ====================== */
 
 /* Portfolio Health Card */

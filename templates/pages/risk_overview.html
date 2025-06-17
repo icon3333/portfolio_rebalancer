@@ -17,58 +17,105 @@
     </div>
 
     <div id="analysisContent" style="display: none;">
-        <!-- Portfolio Selection -->
-        <h2 class="section-title">Portfolio Selection</h2>
-        <div class="card">
-            <div id="portfolioFilters" class="is-flex is-flex-wrap-wrap">
-                <!-- Portfolio checkboxes will be added here dynamically -->
+        <!-- Apple-Inspired Portfolio Selection -->
+        <div class="portfolio-selection-section">
+            <h3 class="portfolio-subtitle">Portfolio Selection</h3>
+
+            <div class="portfolio-pills" id="portfolioPills">
+                <!-- Dynamic portfolio pills will be added here -->
             </div>
         </div>
 
-        <!-- Global Overview -->
-        <h2 class="section-title">Global Overview</h2>
+        <!-- Apple-Inspired Global Overview -->
+        <div class="global-overview-section">
 
-        <div class="columns">
-            <div class="column is-half">
-                <div class="card">
-                    <h3 class="subtitle is-5 has-text-centered mb-2">Portfolio Allocations</h3>
-                    <div id="portfolioAllocationsChart" style="min-height: 350px;"></div>
+            <!-- Overview Charts Grid (2 per row) -->
+            <div class="columns is-multiline mb-4">
+                <div class="column is-6">
+                    <div class="gauge-card">
+                        <div class="gauge-indicator">
+                            <div class="overview-chart-header">
+                                <div class="overview-chart-title">Portfolio Distribution</div>
+                                <div class="overview-chart-subtitle" id="portfolioCountSubtitle">Loading portfolios...
+                                </div>
+                            </div>
+                            <div class="overview-chart-container">
+                                <div id="portfolioAllocationsChart" style="min-height: 300px;"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div class="column is-half">
-                <div class="card">
-                    <h3 class="subtitle is-5 has-text-centered mb-2">Company Allocations (All Portfolios)</h3>
-                    <div id="companyAllocationsChart" style="min-height: 350px;"></div>
-                </div>
-            </div>
-        </div>
 
-        <div class="columns">
-            <div class="column is-half">
-                <div class="card">
-                    <h3 class="subtitle is-5 has-text-centered mb-2">Country Distribution</h3>
-                    <div id="countryDistributionChart" style="min-height: 300px;"></div>
+                <div class="column is-6">
+                    <div class="gauge-card">
+                        <div class="gauge-indicator">
+                            <div class="overview-chart-header">
+                                <div class="overview-chart-title">All Holdings</div>
+                                <div class="overview-chart-subtitle" id="companyCountSubtitle">Across all portfolios
+                                </div>
+                            </div>
+                            <div class="overview-chart-container">
+                                <div id="companyAllocationsChart" style="min-height: 300px;"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div class="column is-half">
-                <div class="card">
-                    <h3 class="subtitle is-5 has-text-centered mb-2">Category Distribution</h3>
-                    <div id="categoryDistributionChart" style="min-height: 300px;"></div>
-                </div>
-            </div>
-        </div>
 
-        <div class="columns">
-            <div class="column is-half">
-                <div class="card">
-                    <h3 class="subtitle is-5 has-text-centered mb-2">Sector Distribution</h3>
-                    <div id="sectorDistributionChart" style="min-height: 300px;"></div>
+                <div class="column is-6">
+                    <div class="gauge-card">
+                        <div class="gauge-indicator">
+                            <div class="overview-chart-header">
+                                <div class="overview-chart-title">Geographic Spread</div>
+                                <div class="overview-chart-subtitle" id="countryCountSubtitle">Countries represented
+                                </div>
+                            </div>
+                            <div class="overview-chart-container">
+                                <div id="countryDistributionChart" style="min-height: 300px;"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div class="column is-half">
-                <div class="card">
-                    <h3 class="subtitle is-5 has-text-centered mb-2">Industry Distribution</h3>
-                    <div id="industryDistributionChart" style="min-height: 300px;"></div>
+
+                <div class="column is-6">
+                    <div class="gauge-card">
+                        <div class="gauge-indicator">
+                            <div class="overview-chart-header">
+                                <div class="overview-chart-title">Asset Categories</div>
+                                <div class="overview-chart-subtitle" id="categoryCountSubtitle">Category breakdown</div>
+                            </div>
+                            <div class="overview-chart-container">
+                                <div id="categoryDistributionChart" style="min-height: 300px;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="column is-6">
+                    <div class="gauge-card">
+                        <div class="gauge-indicator">
+                            <div class="overview-chart-header">
+                                <div class="overview-chart-title">Sector Analysis</div>
+                                <div class="overview-chart-subtitle" id="sectorCountSubtitle">Sector diversity</div>
+                            </div>
+                            <div class="overview-chart-container">
+                                <div id="sectorDistributionChart" style="min-height: 300px;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="column is-6">
+                    <div class="gauge-card">
+                        <div class="gauge-indicator">
+                            <div class="overview-chart-header">
+                                <div class="overview-chart-title">Industry Focus</div>
+                                <div class="overview-chart-subtitle" id="industryCountSubtitle">Industry breakdown</div>
+                            </div>
+                            <div class="overview-chart-container">
+                                <div id="industryDistributionChart" style="min-height: 300px;"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -621,38 +668,65 @@
         }
 
         function createPortfolioFilters(portfolios) {
-            const filtersContainer = document.getElementById('portfolioFilters');
-            filtersContainer.innerHTML = '';
+            const pillsContainer = document.getElementById('portfolioPills');
 
-            portfolios.forEach(portfolio => {
-                const fieldDiv = document.createElement('div');
-                fieldDiv.className = 'field mr-4 mb-2';
+            pillsContainer.innerHTML = '';
 
-                const controlDiv = document.createElement('div');
-                controlDiv.className = 'control';
-
-                const checkboxLabel = document.createElement('label');
-                checkboxLabel.className = 'checkbox';
-                checkboxLabel.innerHTML = `
-                <input type="checkbox" value="${portfolio}" ${selectedPortfolios.has(portfolio) ? 'checked' : ''}>
-                ${portfolio}
+            // Create "All" button as first pill
+            const allPill = document.createElement('div');
+            allPill.className = 'portfolio-pill all-pill';
+            allPill.innerHTML = `
+                <div class="portfolio-pill-name">All</div>
             `;
 
-                const checkbox = checkboxLabel.querySelector('input');
-                checkbox.addEventListener('change', function () {
-                    if (this.checked) {
-                        selectedPortfolios.add(portfolio);
+            allPill.addEventListener('click', function () {
+                portfolios.forEach(portfolio => {
+                    selectedPortfolios.add(portfolio);
+                });
+                updatePillStates();
+                updateCharts();
+            });
+
+            pillsContainer.appendChild(allPill);
+
+            // Create portfolio pills
+            portfolios.forEach(portfolioName => {
+                const pill = document.createElement('div');
+                pill.className = `portfolio-pill ${selectedPortfolios.has(portfolioName) ? 'selected' : ''}`;
+                pill.dataset.portfolio = portfolioName;
+
+                pill.innerHTML = `
+                    <div class="portfolio-pill-name">${portfolioName}</div>
+                `;
+
+                pill.addEventListener('click', function () {
+                    if (selectedPortfolios.has(portfolioName)) {
+                        selectedPortfolios.delete(portfolioName);
+                        pill.classList.remove('selected');
                     } else {
-                        selectedPortfolios.delete(portfolio);
+                        selectedPortfolios.add(portfolioName);
+                        pill.classList.add('selected');
                     }
                     updateCharts();
                 });
 
-                controlDiv.appendChild(checkboxLabel);
-                fieldDiv.appendChild(controlDiv);
-                filtersContainer.appendChild(fieldDiv);
+                pillsContainer.appendChild(pill);
             });
         }
+
+        function updatePillStates() {
+            const pills = document.querySelectorAll('.portfolio-pill');
+            pills.forEach(pill => {
+                const portfolioName = pill.dataset.portfolio;
+                if (selectedPortfolios.has(portfolioName)) {
+                    pill.classList.add('selected');
+                } else {
+                    pill.classList.remove('selected');
+                }
+            });
+        }
+
+
 
         function updateCharts() {
             console.log('updateCharts called');
@@ -664,11 +738,13 @@
             console.log('filteredPortfolios:', filteredPortfolios);
             console.log('filteredPortfolios length:', filteredPortfolios.length);
 
+            // Update contextual subtitles
+            updateDashboardSubtitles(filteredPortfolios);
+
             if (filteredPortfolios.length === 0) {
                 console.log('No data to display for selected portfolios');
-                // Clear charts if no portfolios are selected
-                document.getElementById('portfolioAllocationsChart').innerHTML = '<div class="has-text-centered p-4"><p class="has-text-grey-light">No portfolio selected</p></div>';
-                document.getElementById('companyAllocationsChart').innerHTML = '<div class="has-text-centered p-4"><p class="has-text-grey-light">No portfolio selected</p></div>';
+                // Show empty states in dashboard cards
+                showEmptyStates();
                 updateDistributionCharts(); // This will show "no data"
                 return;
             }
@@ -678,6 +754,69 @@
             initializeCompanyAllocationsChart();
             updateDistributionCharts();
             updateAllocationWarnings();
+        }
+
+        function updateDashboardSubtitles(filteredPortfolios) {
+            const portfolioCountEl = document.getElementById('portfolioCountSubtitle');
+            const companyCountEl = document.getElementById('companyCountSubtitle');
+            const countryCountEl = document.getElementById('countryCountSubtitle');
+            const categoryCountEl = document.getElementById('categoryCountSubtitle');
+            const sectorCountEl = document.getElementById('sectorCountSubtitle');
+            const industryCountEl = document.getElementById('industryCountSubtitle');
+
+            if (filteredPortfolios.length === 0) {
+                portfolioCountEl.textContent = 'No portfolios selected';
+                companyCountEl.textContent = 'Select portfolios to view';
+                countryCountEl.textContent = '';
+                categoryCountEl.textContent = '';
+                sectorCountEl.textContent = '';
+                industryCountEl.textContent = '';
+                return;
+            }
+
+            // Update portfolio count
+            portfolioCountEl.textContent = `${filteredPortfolios.length} portfolio${filteredPortfolios.length > 1 ? 's' : ''} selected`;
+
+            // Calculate company count across selected portfolios
+            const allCompanies = getAllCompaniesFromSelectedPortfolios();
+            const uniqueCompanies = new Set(allCompanies.map(c => c.name));
+            companyCountEl.textContent = `${uniqueCompanies.size} unique companies`;
+
+            // Calculate distribution counts
+            const countries = new Set(allCompanies.map(c => c.country || 'Unknown'));
+            const categories = new Set(allCompanies.map(c => c.category || 'Unknown'));
+            const sectors = new Set(allCompanies.map(c => c.sector || 'Unknown'));
+            const industries = new Set(allCompanies.map(c => c.industry || 'Unknown'));
+
+            countryCountEl.textContent = `${countries.size} countries`;
+            categoryCountEl.textContent = `${categories.size} categories`;
+            sectorCountEl.textContent = `${sectors.size} sectors`;
+            industryCountEl.textContent = `${industries.size} industries`;
+        }
+
+        function showEmptyStates() {
+            const chartIds = [
+                'portfolioAllocationsChart',
+                'companyAllocationsChart',
+                'countryDistributionChart',
+                'categoryDistributionChart',
+                'sectorDistributionChart',
+                'industryDistributionChart'
+            ];
+
+            chartIds.forEach(chartId => {
+                const element = document.getElementById(chartId);
+                if (element) {
+                    element.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📊</div>
+                            <p>No portfolio selected</p>
+                        </div>
+                    `;
+                }
+            });
+
+
         }
 
         function initializePortfolioAllocationsChart() {
@@ -801,10 +940,12 @@
                         cleanedValues,
                         {
                             colors: colors,
-                            height: 350,
+                            height: 300,
                             showTotal: true
                         }
                     );
+
+
                 } else {
                     console.error('ChartConfig.createDoughnutChart not available');
                     document.getElementById('companyAllocationsChart').innerHTML =
@@ -906,6 +1047,8 @@
 
             return { labels, values };
         }
+
+
 
         // Create bar chart with rotated x-axis labels
         function createBarChart(chartId, labels, values, options = {}) {
