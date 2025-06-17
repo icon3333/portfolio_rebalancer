@@ -74,7 +74,8 @@ const ChartConfig = {
             formatCurrency = v => `€${Math.round(v).toLocaleString()}`,
             formatPercentage = v => `${v.toFixed(1)}%`,
             height = 400,
-            showTotal = true
+            showTotal = true,
+            dataLabelFormatter = null
         } = options;
 
         // Validate and clean the input values
@@ -82,7 +83,7 @@ const ChartConfig = {
             const num = parseFloat(v);
             return isNaN(num) ? 0 : num;
         });
-        
+
         const total = cleanedValues.reduce((a, b) => a + b, 0);
         const calculatedPercentages = cleanedValues.map(v => total > 0 ? (v / total) * 100 : 0);
         const finalPercentages = percentages || calculatedPercentages;
@@ -113,6 +114,9 @@ const ChartConfig = {
                 }
             },
             colors: colors,
+            stroke: {
+                show: false
+            },
             plotOptions: {
                 pie: {
                     donut: {
@@ -147,6 +151,9 @@ const ChartConfig = {
                                     return formatCurrency(total);
                                 }
                             }
+                        },
+                        dataLabels: {
+                            offset: 20
                         }
                     }
                 }
@@ -155,11 +162,15 @@ const ChartConfig = {
                 enabled: true,
                 style: {
                     fontSize: '12px',
-                    fontWeight: 'bold'
+                    fontWeight: 'bold',
+                    colors: ['#333']
                 },
-                formatter: function(val, opts) {
+                formatter: dataLabelFormatter ? dataLabelFormatter : function (val, opts) {
                     const value = cleanedValues[opts.seriesIndex];
                     return formatCurrency(value);
+                },
+                dropShadow: {
+                    enabled: false
                 }
             },
             tooltip: {
@@ -169,11 +180,11 @@ const ChartConfig = {
                     fontSize: '12px'
                 },
                 y: {
-                    formatter: function(value) {
+                    formatter: function (value) {
                         return formatCurrency(value);
                     },
                     title: {
-                        formatter: function(seriesName) {
+                        formatter: function (seriesName) {
                             return seriesName;
                         }
                     }
@@ -191,7 +202,7 @@ const ChartConfig = {
                 }
             }]
         };
-        
+
         if (title) {
             chartOptions.title = {
                 text: title,
@@ -216,7 +227,7 @@ const ChartConfig = {
                     height: element.offsetHeight
                 }
             });
-            
+
             // Ensure element has dimensions
             if (element.offsetWidth === 0 || element.offsetHeight === 0) {
                 console.warn(`Element ${elementId} has no dimensions. Setting default size.`);
@@ -224,7 +235,7 @@ const ChartConfig = {
                 element.style.height = height + 'px';
                 element.style.display = 'block';
             }
-            
+
             const chart = new ApexCharts(element, chartOptions);
             chart.render();
             this.chartInstances[elementId] = chart;
@@ -280,7 +291,7 @@ const ChartConfig = {
         } = options;
 
         // Validate input data
-        if (!data || !data.countries || !data.dims || !data.z || 
+        if (!data || !data.countries || !data.dims || !data.z ||
             data.countries.length === 0 || data.dims.length === 0 || data.z.length === 0) {
             console.log(`No valid data for heatmap ${elementId}:`, data);
             element.innerHTML = '<div class="has-text-centered p-4"><p class="has-text-grey">No data available for heatmap</p></div>';
@@ -304,23 +315,23 @@ const ChartConfig = {
 
         // Build series data in the exact format ApexCharts expects for heatmaps
         const series = [];
-        
+
         for (let countryIndex = 0; countryIndex < data.countries.length; countryIndex++) {
             const country = data.countries[countryIndex];
             const dataPoints = [];
-            
+
             for (let dimIndex = 0; dimIndex < data.dims.length; dimIndex++) {
                 const dim = data.dims[dimIndex];
-                const value = data.z[countryIndex] && data.z[countryIndex][dimIndex] !== undefined 
-                    ? data.z[countryIndex][dimIndex] 
+                const value = data.z[countryIndex] && data.z[countryIndex][dimIndex] !== undefined
+                    ? data.z[countryIndex][dimIndex]
                     : 0;
-                
+
                 dataPoints.push({
                     x: dim,
                     y: Number(value.toFixed(2)) // Ensure it's a clean number
                 });
             }
-            
+
             series.push({
                 name: country,
                 data: dataPoints
@@ -371,7 +382,7 @@ const ChartConfig = {
                     fontSize: '9px',
                     fontWeight: 'normal'
                 },
-                formatter: function(val, opts) {
+                formatter: function (val, opts) {
                     if (val === null || val === undefined || isNaN(val)) return '';
                     return val > 0.1 ? val.toFixed(1) + '%' : '';
                 }
@@ -395,12 +406,12 @@ const ChartConfig = {
             },
             tooltip: {
                 enabled: true,
-                custom: function({series, seriesIndex, dataPointIndex, w}) {
+                custom: function ({ series, seriesIndex, dataPointIndex, w }) {
                     try {
                         const country = data.countries[seriesIndex] || 'Unknown';
                         const dimension = data.dims[dataPointIndex] || 'Unknown';
                         const value = series[seriesIndex][dataPointIndex] || 0;
-                        
+
                         return `<div style="padding: 8px 12px; background: rgba(0,0,0,0.8); color: white; border-radius: 6px; font-size: 12px;">
                             <div><strong>${country}</strong> × <strong>${dimension}</strong></div>
                             <div>Allocation: <strong>${Number(value).toFixed(2)}%</strong></div>
@@ -450,9 +461,9 @@ const ChartConfig = {
                     height: element.offsetHeight
                 }
             });
-            
+
             const chart = new ApexCharts(element, chartOptions);
-            
+
             // Use a promise-based approach for better error handling
             chart.render().then(() => {
                 console.log(`Successfully rendered heatmap for ${elementId}`);
@@ -464,7 +475,7 @@ const ChartConfig = {
                     <p style="font-size: 12px;">${error.message}</p>
                 </div>`;
             });
-            
+
             return chart;
         } catch (error) {
             console.error(`Error creating heatmap chart for ${elementId}:`, error);

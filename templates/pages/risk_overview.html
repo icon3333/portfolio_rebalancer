@@ -80,7 +80,7 @@
                     <div class="gauge-card">
                         <div class="gauge-indicator">
                             <div class="overview-chart-header">
-                                <div class="overview-chart-title">Asset Categories</div>
+                                <div class="overview-chart-title">User Categories</div>
                                 <div class="overview-chart-subtitle" id="categoryCountSubtitle">Category breakdown</div>
                             </div>
                             <div class="overview-chart-container">
@@ -871,7 +871,11 @@
                         {
                             colors: colors,
                             height: 350,
-                            showTotal: true
+                            showTotal: false,
+                            dataLabelFormatter: function (val, opts) {
+                                const label = cleanedLabels[opts.seriesIndex];
+                                return `${label} ${val.toFixed(1)}%`;
+                            }
                         }
                     );
                 } else {
@@ -891,69 +895,34 @@
             const allCompanies = getAllCompaniesFromSelectedPortfolios();
             const companyGroups = groupCompaniesByName(allCompanies);
 
-            // Sort and prepare chart data
+            // Prepare chart data (handles top 10 + "Others")
             const { labels, values } = prepareChartData(companyGroups);
 
-            // Validate and clean data
-            const cleanedData = [];
-            for (let i = 0; i < labels.length; i++) {
-                const value = parseFloat(values[i]) || 0;
-                if (value > 0 && !isNaN(value)) {
-                    cleanedData.push({
-                        label: labels[i],
-                        value: value
-                    });
-                }
-            }
-
-            console.log('Company chart cleaned data:', cleanedData);
-
-            if (cleanedData.length === 0) {
+            if (labels.length === 0) {
                 document.getElementById('companyAllocationsChart').innerHTML =
                     '<div class="has-text-centered p-4"><p class="has-text-grey-light">No data available</p></div>';
                 return;
             }
 
-            const cleanedLabels = cleanedData.map(d => d.label);
-            const cleanedValues = cleanedData.map(d => d.value);
-
-            console.log('Company chart - labels:', cleanedLabels);
-            console.log('Company chart - values:', cleanedValues);
-
-            const colors = ChartConfig.generateColors(cleanedLabels.length);
+            // Calculate total and percentages for the bar chart
+            const totalValue = values.reduce((sum, v) => sum + v, 0);
+            const percentages = values.map(v => totalValue > 0 ? (v / totalValue) * 100 : 0);
 
             try {
-                const chartElement = document.getElementById('companyAllocationsChart');
-                if (!chartElement) {
-                    console.error('Company chart element not found');
-                    return;
+                // Use the existing bar chart function
+                createBarChart('companyAllocationsChart',
+                    labels,
+                    values, {
+                    title: '',
+                    colors: ChartConfig.generateColors(labels.length),
+                    percentages: percentages,
+                    total: totalValue,
+                    formatPercentage: window.formatPercentage || (v => `${v.toFixed(1)}%`),
+                    height: 300
                 }
-
-                // Ensure the element is visible and has dimensions
-                chartElement.style.display = 'block';
-                chartElement.style.minHeight = '350px';
-
-                if (typeof ChartConfig !== 'undefined' && ChartConfig.createDoughnutChart) {
-                    ChartConfig.createDoughnutChart(
-                        'companyAllocationsChart',
-                        cleanedLabels,
-                        cleanedValues,
-                        {
-                            colors: colors,
-                            height: 300,
-                            showTotal: true
-                        }
-                    );
-
-
-                } else {
-                    console.error('ChartConfig.createDoughnutChart not available');
-                    document.getElementById('companyAllocationsChart').innerHTML =
-                        '<div class="has-text-centered p-4"><p class="has-text-grey-light">Chart library not loaded</p></div>';
-                }
+                );
             } catch (error) {
-                console.error('Error creating company allocations chart:', error);
-                console.error('Error stack:', error.stack);
+                console.error('Error creating company allocations bar chart:', error);
                 document.getElementById('companyAllocationsChart').innerHTML =
                     '<div class="has-text-centered p-4"><p class="has-text-danger">Error creating chart: ' + error.message + '</p></div>';
             }
@@ -1061,12 +1030,16 @@
             // Clear existing chart
             element.innerHTML = '';
 
+            // Convert values to percentages
+            const total = options.total || values.reduce((sum, v) => sum + v, 0);
+            const percentageValues = values.map(val => total > 0 ? (val / total * 100) : 0);
+
             const colors = options.colors || ChartConfig.generateColors(labels.length);
 
             const chartOptions = {
                 series: [{
-                    name: 'Value',
-                    data: values
+                    name: 'Percentage',
+                    data: percentageValues
                 }],
                 chart: {
                     type: 'bar',
@@ -1094,7 +1067,7 @@
                 xaxis: {
                     categories: labels,
                     labels: {
-                        rotate: -90,
+                        rotate: -45,
                         rotateAlways: true,
                         style: {
                             fontSize: '12px',
@@ -1104,12 +1077,9 @@
                     }
                 },
                 yaxis: {
-                    title: {
-                        text: 'Value (€)'
-                    },
                     labels: {
                         formatter: function (val) {
-                            return options.formatCurrency ? options.formatCurrency(val) : '€' + val.toLocaleString();
+                            return val.toFixed(1) + '%';
                         }
                     }
                 },
@@ -1118,12 +1088,17 @@
                     colors: colors
                 },
                 tooltip: {
+                    fillSeriesColor: true,
+                    x: {
+                        show: false
+                    },
                     y: {
-                        formatter: function (val, opts) {
-                            const percentage = options.percentages ? options.percentages[opts.dataPointIndex] : 0;
-                            const currency = options.formatCurrency ? options.formatCurrency(val) : '€' + val.toLocaleString();
-                            const percent = options.formatPercentage ? options.formatPercentage(percentage) : percentage.toFixed(1) + '%';
-                            return `${currency} (${percent})`;
+                        formatter: function (val, { dataPointIndex, w }) {
+                            const label = w.globals.labels[dataPointIndex];
+                            return `${label} ${val.toFixed(1)}%`;
+                        },
+                        title: {
+                            formatter: () => ''
                         }
                     }
                 },
@@ -1182,7 +1157,7 @@
                     title: '',
                     colors: ChartConfig.generateColors(distributionData.length),
                     percentages: distributionPercentages,
-                    formatCurrency: window.formatCurrency || (v => `€${v.toLocaleString()}`),
+                    total: distributionTotal,
                     formatPercentage: window.formatPercentage || (v => `${v.toFixed(1)}%`),
                     height: 300
                 });
