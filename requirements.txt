@@ -4,7 +4,6 @@ WTForms==3.2.1
 yfinance==0.2.63
 pandas==2.2.3
 numpy==2.2.3
-plotly==6.0.0
 python-dateutil==2.9.0.post0
 pytz==2025.1
 requests==2.31
@@ -13,4 +12,3 @@ matplotlib==3.10.0
 sqlalchemy==2.0.38
 gunicorn==23.0.0
 python-dotenv==1.0.1
-ratelimit==2.2.1

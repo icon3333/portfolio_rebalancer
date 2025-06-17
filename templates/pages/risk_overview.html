@@ -9,13 +9,13 @@
 {% block content %}
 <div class="container">
     <h1 class="title is-3 mb-4">Risk Overview</h1>
-    
+
     <!-- Loading indicator -->
     <div id="loadingIndicator" class="has-text-centered my-6">
         <p class="mb-3">Loading portfolio data...</p>
         <progress class="progress is-info" max="100"></progress>
     </div>
-    
+
     <div id="analysisContent" style="display: none;">
         <!-- Portfolio Selection -->
         <h2 class="section-title">Portfolio Selection</h2>
@@ -24,10 +24,10 @@
                 <!-- Portfolio checkboxes will be added here dynamically -->
             </div>
         </div>
-        
+
         <!-- Global Overview -->
         <h2 class="section-title">Global Overview</h2>
-        
+
         <div class="columns">
             <div class="column is-half">
                 <div class="card">
@@ -42,41 +42,128 @@
                 </div>
             </div>
         </div>
-        
-        <!-- Distribution Details -->
-        <div class="compact-box">
-            <div class="is-flex is-justify-content-space-between is-align-items-center mb-4" style="cursor: pointer;">
-                <h4 class="has-text-weight-semibold">Distribution Details</h4>
-                <span class="icon toggle-portfolio">
-                    <i class="fas fa-chevron-down"></i>
-                </span>
+
+        <div class="columns">
+            <div class="column is-half">
+                <div class="card">
+                    <h3 class="subtitle is-5 has-text-centered mb-2">Country Distribution</h3>
+                    <div id="countryDistributionChart" style="min-height: 300px;"></div>
+                </div>
             </div>
-            <div class="portfolio-content" style="display: none;">
-                <div class="columns">
-                    <div class="column is-half">
-                        <div class="card">
-                            <h3 class="subtitle is-6 has-text-centered mb-2">Country Distribution</h3>
-                            <div id="countryDistributionChart" style="min-height: 300px;"></div>
-                        </div>
-                    </div>
-                    <div class="column is-half">
-                        <div class="card">
-                            <h3 class="subtitle is-6 has-text-centered mb-2">Category Distribution</h3>
-                            <div id="categoryDistributionChart" style="min-height: 300px;"></div>
+            <div class="column is-half">
+                <div class="card">
+                    <h3 class="subtitle is-5 has-text-centered mb-2">Category Distribution</h3>
+                    <div id="categoryDistributionChart" style="min-height: 300px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="columns">
+            <div class="column is-half">
+                <div class="card">
+                    <h3 class="subtitle is-5 has-text-centered mb-2">Sector Distribution</h3>
+                    <div id="sectorDistributionChart" style="min-height: 300px;"></div>
+                </div>
+            </div>
+            <div class="column is-half">
+                <div class="card">
+                    <h3 class="subtitle is-5 has-text-centered mb-2">Industry Distribution</h3>
+                    <div id="industryDistributionChart" style="min-height: 300px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Risk Indicators -->
+
+        <!-- Portfolio Health Card -->
+        <div class="columns mb-4">
+            <div class="column">
+                <div class="portfolio-health-card" id="portfolioHealthCard">
+                    <div class="health-indicator">
+                        <span class="health-icon" id="healthIcon">⚠️</span>
+                        <div class="health-text">
+                            <div class="health-title" id="healthTitle">Analyzing Risk...</div>
+                            <div class="health-subtitle" id="healthSubtitle">Checking allocation rules</div>
                         </div>
                     </div>
                 </div>
-                <div class="columns mt-3">
-                    <div class="column is-half">
-                        <div class="card">
-                            <h3 class="subtitle is-6 has-text-centered mb-2">Sector Distribution</h3>
-                            <div id="sectorDistributionChart" style="min-height: 300px;"></div>
+            </div>
+        </div>
+
+        <!-- Rule Gauges with Contextual Violations -->
+        <div class="columns is-multiline mb-4">
+            <div class="column is-3">
+                <div class="gauge-card">
+                    <div class="gauge-indicator">
+                        <div class="gauge-container">
+                            <div class="gauge-chart" id="stockGauge"></div>
+                            <div class="gauge-label">
+                                <div class="gauge-title">Stock Violations</div>
+                                <div class="gauge-count" id="stockCount">0</div>
+                                <div class="gauge-subtitle" id="stockSubtitle">stocks over limit</div>
+                            </div>
                         </div>
                     </div>
-                    <div class="column is-half">
-                        <div class="card">
-                            <h3 class="subtitle is-6 has-text-centered mb-2">Industry Distribution</h3>
-                            <div id="industryDistributionChart" style="min-height: 300px;"></div>
+                    <div class="gauge-violations-container">
+                        <div class="gauge-violations" id="stockViolations">
+                            <!-- Stock violations will be populated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="column is-3">
+                <div class="gauge-card">
+                    <div class="gauge-indicator">
+                        <div class="gauge-container">
+                            <div class="gauge-chart" id="categoryGauge"></div>
+                            <div class="gauge-label">
+                                <div class="gauge-title">Category Violations</div>
+                                <div class="gauge-count" id="categoryCount">0</div>
+                                <div class="gauge-subtitle" id="categorySubtitle">categories over limit</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="gauge-violations-container">
+                        <div class="gauge-violations" id="categoryViolations">
+                            <!-- Category violations will be populated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="column is-3">
+                <div class="gauge-card">
+                    <div class="gauge-indicator">
+                        <div class="gauge-container">
+                            <div class="gauge-chart" id="countryGauge"></div>
+                            <div class="gauge-label">
+                                <div class="gauge-title">Country Violations</div>
+                                <div class="gauge-count" id="countryCount">0</div>
+                                <div class="gauge-subtitle" id="countrySubtitle">countries over limit</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="gauge-violations-container">
+                        <div class="gauge-violations" id="countryViolations">
+                            <!-- Country violations will be populated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="column is-3">
+                <div class="gauge-card">
+                    <div class="gauge-indicator">
+                        <div class="gauge-container">
+                            <div class="gauge-chart" id="exchangeGauge"></div>
+                            <div class="gauge-label">
+                                <div class="gauge-title">Exchange Violations</div>
+                                <div class="gauge-count" id="exchangeCount">0</div>
+                                <div class="gauge-subtitle" id="exchangeSubtitle">exchanges over limit</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="gauge-violations-container">
+                        <div class="gauge-violations" id="exchangeViolations">
+                            <!-- Exchange violations will be populated here -->
                         </div>
                     </div>
                 </div>
@@ -92,22 +179,22 @@
 
 <!-- JavaScript for Risk Overview -->
 <script>
-/**
- * Risk Overview - Global Portfolio Analysis
- * 
- * This script provides a high-level overview of portfolio allocations and distributions.
- * Features include:
- * - Portfolio allocation visualization
- * - Company allocation across all portfolios
- * - Distribution breakdowns by country, category, sector, and industry
- */
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM loaded, initializing Risk Overview...');
-    
-    // Check if required dependencies are loaded
-    if (typeof ApexCharts === 'undefined') {
-        console.error('ApexCharts is not loaded');
-        document.getElementById('loadingIndicator').innerHTML = `
+    /**
+     * Risk Overview - Global Portfolio Analysis
+     * 
+     * This script provides a high-level overview of portfolio allocations and distributions.
+     * Features include:
+     * - Portfolio allocation visualization
+     * - Company allocation across all portfolios
+     * - Distribution breakdowns by country, category, sector, and industry
+     */
+    document.addEventListener('DOMContentLoaded', function () {
+        console.log('DOM loaded, initializing Risk Overview...');
+
+        // Check if required dependencies are loaded
+        if (typeof ApexCharts === 'undefined') {
+            console.error('ApexCharts is not loaded');
+            document.getElementById('loadingIndicator').innerHTML = `
             <div class="has-text-centered">
                 <p class="has-text-danger mb-3">
                     <i class="fas fa-exclamation-triangle mr-2"></i>
@@ -118,93 +205,107 @@ document.addEventListener('DOMContentLoaded', function() {
                 </button>
             </div>
         `;
-        return;
-    }
-    
-    // Store data
-    let portfolioData = [];
-    let charts = {};
-    let selectedPortfolios = new Set();
-    let portfolioAllocationsChart = null;
-    let companyAllocationsChart = null;
-    
-    // Utility functions for formatting
-    window.formatCurrency = function(value) {
-        if (typeof value !== 'number' || isNaN(value)) return '€0';
-        return '€' + value.toLocaleString('en-US', {
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0
-        });
-    };
-    
-    window.formatPercentage = function(value) {
-        if (typeof value !== 'number' || isNaN(value)) return '0%';
-        return value.toFixed(1) + '%';
-    };
-    
-    // Toggle functionality for portfolio sections
-    document.addEventListener('click', function(e) {
-        const toggle = e.target.closest('.toggle-portfolio');
-        if (toggle) {
-            const compactBox = toggle.closest('.compact-box');
-            if (compactBox) {
-                const content = compactBox.querySelector('.portfolio-content');
-                const icon = toggle.querySelector('i');
-                
-                if (content.style.display === 'none') {
-                    content.style.display = 'block';
-                    icon.className = 'fas fa-chevron-up';
-                    // Trigger resize to render charts in the now-visible container
-                    window.dispatchEvent(new Event('resize'));
-                } else {
-                    content.style.display = 'none';
-                    icon.className = 'fas fa-chevron-down';
-                }
-            }
+            return;
         }
-    });
-    
-    // Initialize the risk overview
-    initializeRiskOverview();
-    
-    function initializeRiskOverview() {
-        // Data loading is now handled by the Promise.all call below
-    }
-    
-    // Load data and initialize
-    console.log('Starting data loading process...');
-    
-    // Check if we have all required dependencies
-    console.log('Checking dependencies...');
-    console.log('ApexCharts available:', typeof ApexCharts !== 'undefined');
-    console.log('ChartConfig available:', typeof ChartConfig !== 'undefined');
-    
-    if (typeof ApexCharts === 'undefined') {
-        console.error('ApexCharts library not loaded');
-        document.getElementById('loadingIndicator').innerHTML = `
+
+        // Store data
+        let portfolioData = [];
+        let charts = {};
+        let selectedPortfolios = new Set();
+        let portfolioAllocationsChart = null;
+        let companyAllocationsChart = null;
+        let allocationRules = {
+            maxPerStock: null,
+            maxPerCategory: null,
+            maxPerCountry: null,
+            maxPerExchange: null
+        };
+
+        // Utility functions for formatting
+        window.formatCurrency = function (value) {
+            if (typeof value !== 'number' || isNaN(value)) return '€0';
+            return '€' + value.toLocaleString('en-US', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            });
+        };
+
+        window.formatPercentage = function (value) {
+            if (typeof value !== 'number' || isNaN(value)) return '0%';
+            return value.toFixed(1) + '%';
+        };
+
+
+
+        // Initialize the risk overview
+        initializeRiskOverview();
+
+        function initializeRiskOverview() {
+            // Data loading is now handled by the Promise.all call below
+        }
+
+        // Load data and initialize
+        console.log('Starting data loading process...');
+
+        // Check if we have all required dependencies
+        console.log('Checking dependencies...');
+        console.log('ApexCharts available:', typeof ApexCharts !== 'undefined');
+        console.log('ChartConfig available:', typeof ChartConfig !== 'undefined');
+
+        if (typeof ApexCharts === 'undefined') {
+            console.error('ApexCharts library not loaded');
+            document.getElementById('loadingIndicator').innerHTML = `
             <p class="has-text-danger">ApexCharts library not loaded</p>
             <p class="has-text-grey">Please check your internet connection and reload the page.</p>
             <button class="button is-info mt-3" onclick="location.reload()">Try Again</button>
         `;
-        return;
-    }
-    
-    if (typeof ChartConfig === 'undefined') {
-        console.error('ChartConfig module not loaded');
-        document.getElementById('loadingIndicator').innerHTML = `
+            return;
+        }
+
+        if (typeof ChartConfig === 'undefined') {
+            console.error('ChartConfig module not loaded');
+            document.getElementById('loadingIndicator').innerHTML = `
             <p class="has-text-danger">Chart configuration not loaded</p>
             <p class="has-text-grey">Please check your internet connection and reload the page.</p>
             <button class="button is-info mt-3" onclick="location.reload()">Try Again</button>
         `;
-        return;
-    }
-    
-    console.log('All dependencies loaded successfully');
-    
-    // Add timeout to prevent infinite loading
-    const loadingTimeout = setTimeout(() => {
-        console.error('Loading timeout reached');
-        document.getElementById('loadingIndicator').innerHTML = `
+            return;
+        }
+
+        console.log('All dependencies loaded successfully');
+
+        // Fetch allocation rules from the server
+        async function fetchAllocationRules() {
+            console.log('Fetching allocation rules...');
+            try {
+                const response = await fetch('/portfolio/api/state?page=build');
+                console.log('Allocation rules API response status:', response.status);
+
+                if (!response.ok) {
+                    console.log('No allocation rules found (this is normal if none have been set)');
+                    return null;
+                }
+
+                const data = await response.json();
+                console.log('State data received:', data);
+
+                if (data && data.rules) {
+                    const rules = JSON.parse(data.rules);
+                    console.log('Parsed allocation rules:', rules);
+                    return rules;
+                }
+
+                return null;
+            } catch (error) {
+                console.log('Error fetching allocation rules (this is normal if none have been set):', error);
+                return null;
+            }
+        }
+
+        // Add timeout to prevent infinite loading
+        const loadingTimeout = setTimeout(() => {
+            console.error('Loading timeout reached');
+            document.getElementById('loadingIndicator').innerHTML = `
             <div class="has-text-centered">
                 <p class="has-text-danger mb-3">
                     <i class="fas fa-clock mr-2"></i>
@@ -218,90 +319,100 @@ document.addEventListener('DOMContentLoaded', function() {
                 </button>
             </div>
         `;
-    }, 30000); // 30 second timeout
-    
-    Promise.all([
-        fetchPortfolios(),
-        fetchPortfolioData()
-    ]).then(([portfoliosList, data]) => {
-        clearTimeout(loadingTimeout); // Clear the timeout since we got a response
-        console.log('Data loaded successfully, processing...');
-        console.log('Portfolios list:', portfoliosList);
-        console.log('Portfolio data:', data);
-        
-        try {
-            // Process the data
-            processData(portfoliosList, data);
-            
-            console.log('Data processed successfully, initializing UI...');
-            
-            // Initialize with all portfolios selected by default
-            const portfolios = portfolioData.map(p => p.name);
-            selectedPortfolios = new Set(portfolios);
-            
-            console.log('Portfolios found:', portfolios);
-            console.log('selectedPortfolios initialized:', selectedPortfolios);
-            
-            createPortfolioFilters(portfolios);
-            
-            // Hide loading, show content BEFORE creating charts
-            document.getElementById('loadingIndicator').style.display = 'none';
-            document.getElementById('analysisContent').style.display = 'block';
-            
-            // Small delay to ensure DOM is fully rendered before creating charts
-            setTimeout(() => {
-                // Set explicit dimensions on chart containers before creating charts
-                const portfolioChartEl = document.getElementById('portfolioAllocationsChart');
-                const companyChartEl = document.getElementById('companyAllocationsChart');
-                
-                if (portfolioChartEl) {
-                    portfolioChartEl.style.minHeight = '350px';
-                    portfolioChartEl.style.width = '100%';
+        }, 30000); // 30 second timeout
+
+        Promise.all([
+            fetchPortfolios(),
+            fetchPortfolioData(),
+            fetchAllocationRules()
+        ]).then(([portfoliosList, data, rules]) => {
+            clearTimeout(loadingTimeout); // Clear the timeout since we got a response
+            console.log('Data loaded successfully, processing...');
+            console.log('Portfolios list:', portfoliosList);
+            console.log('Portfolio data:', data);
+
+            try {
+                // Process the data
+                processData(portfoliosList, data);
+
+                // Store allocation rules
+                if (rules) {
+                    allocationRules = rules;
+                    console.log('Allocation rules loaded:', allocationRules);
                 }
-                
-                if (companyChartEl) {
-                    companyChartEl.style.minHeight = '350px';
-                    companyChartEl.style.width = '100%';
-                }
-                
-                // Now update charts after containers are properly sized
-                updateCharts();
-                
-                // Force ApexCharts to redraw
-                window.dispatchEvent(new Event('resize'));
-                
-                console.log('UI initialization completed successfully');
-            }, 100);
-        } catch (error) {
-            console.error('Error during data processing or UI initialization:', error);
-            document.getElementById('loadingIndicator').innerHTML = `
+
+                console.log('Data processed successfully, initializing UI...');
+
+                // Initialize with all portfolios selected by default
+                const portfolios = portfolioData.map(p => p.name);
+                selectedPortfolios = new Set(portfolios);
+
+                console.log('Portfolios found:', portfolios);
+                console.log('selectedPortfolios initialized:', selectedPortfolios);
+
+                createPortfolioFilters(portfolios);
+
+                // Hide loading, show content BEFORE creating charts
+                document.getElementById('loadingIndicator').style.display = 'none';
+                document.getElementById('analysisContent').style.display = 'block';
+
+                // Small delay to ensure DOM is fully rendered before creating charts
+                setTimeout(() => {
+                    // Set explicit dimensions on chart containers before creating charts
+                    const portfolioChartEl = document.getElementById('portfolioAllocationsChart');
+                    const companyChartEl = document.getElementById('companyAllocationsChart');
+
+                    if (portfolioChartEl) {
+                        portfolioChartEl.style.minHeight = '350px';
+                        portfolioChartEl.style.width = '100%';
+                    }
+
+                    if (companyChartEl) {
+                        companyChartEl.style.minHeight = '350px';
+                        companyChartEl.style.width = '100%';
+                    }
+
+                    // Now update charts after containers are properly sized
+                    updateCharts();
+
+                    // Update allocation warnings
+                    updateAllocationWarnings();
+
+                    // Force ApexCharts to redraw - all charts are now visible
+                    window.dispatchEvent(new Event('resize'));
+
+                    console.log('UI initialization completed successfully');
+                }, 100);
+            } catch (error) {
+                console.error('Error during data processing or UI initialization:', error);
+                document.getElementById('loadingIndicator').innerHTML = `
                 <p class="has-text-danger">Error processing data: ${error.message}</p>
                 <p class="has-text-grey">Check console for more details.</p>
                 <button class="button is-info mt-3" onclick="location.reload()">Try Again</button>
             `;
-        }
-    }).catch(error => {
-        clearTimeout(loadingTimeout); // Clear the timeout since we got a response (even if error)
-        console.error('Error loading data:', error);
-        console.error('Error stack:', error.stack);
-        
-        // Provide more detailed error information
-        let errorMessage = error.message;
-        let additionalInfo = '';
-        
-        if (error.name === 'TypeError' && errorMessage.includes('fetch')) {
-            errorMessage = 'Unable to connect to the server. Please check your connection and try again.';
-        } else if (error.status === 401) {
-            errorMessage = 'Authentication required. Please select an account from the home page first.';
-            additionalInfo = 'Make sure you have selected an account before accessing this page.';
-        } else if (error.status === 404) {
-            errorMessage = 'API endpoint not found. Please contact support.';
-        } else if (error.message && error.message.includes('Not authenticated')) {
-            errorMessage = 'Authentication required. Please select an account from the home page first.';
-            additionalInfo = 'You need to be logged in with a selected account to view portfolio data.';
-        }
-        
-        document.getElementById('loadingIndicator').innerHTML = `
+            }
+        }).catch(error => {
+            clearTimeout(loadingTimeout); // Clear the timeout since we got a response (even if error)
+            console.error('Error loading data:', error);
+            console.error('Error stack:', error.stack);
+
+            // Provide more detailed error information
+            let errorMessage = error.message;
+            let additionalInfo = '';
+
+            if (error.name === 'TypeError' && errorMessage.includes('fetch')) {
+                errorMessage = 'Unable to connect to the server. Please check your connection and try again.';
+            } else if (error.status === 401) {
+                errorMessage = 'Authentication required. Please select an account from the home page first.';
+                additionalInfo = 'Make sure you have selected an account before accessing this page.';
+            } else if (error.status === 404) {
+                errorMessage = 'API endpoint not found. Please contact support.';
+            } else if (error.message && error.message.includes('Not authenticated')) {
+                errorMessage = 'Authentication required. Please select an account from the home page first.';
+                additionalInfo = 'You need to be logged in with a selected account to view portfolio data.';
+            }
+
+            document.getElementById('loadingIndicator').innerHTML = `
             <div class="has-text-centered">
                 <p class="has-text-danger mb-3">
                     <i class="fas fa-exclamation-triangle mr-2"></i>
@@ -321,534 +432,982 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
             </div>
         `;
-    });
-    
-    // Fetch list of portfolios with their IDs
-    async function fetchPortfolios() {
-        console.log('Fetching portfolios...');
-        try {
-            const response = await fetch('/portfolio/api/portfolios?include_ids=true&has_companies=true');
-            console.log('Portfolios API response status:', response.status);
-            
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('Portfolios API error response:', errorText);
-                
-                // Try to parse as JSON to get structured error
-                try {
-                    const errorData = JSON.parse(errorText);
-                    if (errorData.error && errorData.error.includes('Not authenticated')) {
-                        throw new Error('Not authenticated - please select an account from the home page first');
-                    }
-                } catch (parseError) {
-                    // Ignore parse errors, use original text
-                }
-                
-                throw new Error(`Failed to fetch portfolios (${response.status}): ${errorText}`);
-            }
-            
-            const data = await response.json();
-            console.log('Portfolios data received:', data);
-            
-            // Check if the response contains an error
-            if (data.error) {
-                throw new Error(data.error);
-            }
-            
-            return data;
-        } catch (error) {
-            console.error('Error in fetchPortfolios:', error);
-            throw error;
-        }
-    }
-    
-    // Fetch portfolio data
-    async function fetchPortfolioData() {
-        console.log('Fetching portfolio data...');
-        try {
-            const response = await fetch('/portfolio/api/portfolio_data');
-            console.log('Portfolio data API response status:', response.status);
-            
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('Portfolio data API error response:', errorText);
-                
-                // Try to parse as JSON to get structured error
-                try {
-                    const errorData = JSON.parse(errorText);
-                    if (errorData.error && errorData.error.includes('Not authenticated')) {
-                        throw new Error('Not authenticated - please select an account from the home page first');
-                    }
-                } catch (parseError) {
-                    // Ignore parse errors, use original text
-                }
-                
-                throw new Error(`Failed to fetch portfolio data (${response.status}): ${errorText}`);
-            }
-            
-            const data = await response.json();
-            console.log('Portfolio data received, length:', Array.isArray(data) ? data.length : 'not an array');
-            
-            // Check if the response contains an error
-            if (data.error) {
-                throw new Error(data.error);
-            }
-            
-            return data;
-        } catch (error) {
-            console.error('Error in fetchPortfolioData:', error);
-            throw error;
-        }
-    }
-    
-    // Process the data
-    function processData(portfoliosList, data) {
-        console.log('Processing data:');
-        console.log('Portfolios list:', portfoliosList);
-        console.log('Portfolio data sample:', data.slice(0, 3)); // Log first 3 items for debugging
-        console.log('Portfolio data length:', data.length);
-        
-        // Create portfolio structure
-        let portfolios;
-        if (portfoliosList.length > 0 && typeof portfoliosList[0] === 'object' && portfoliosList[0].id) {
-            // List already contains objects with IDs
-            portfolios = portfoliosList;
-        } else {
-            // List contains only names, create mapping with best-effort IDs
-            portfolios = portfoliosList.map((name, index) => ({
-                id: index + 1,
-                name: name
-            }));
-        }
-        console.log('Mapped portfolios:', portfolios);
-        
-        // Group data by portfolio
-        const portfolioMap = {};
-        
-        data.forEach(item => {
-            // Check for the correct property name for portfolio
-            const portfolioName = item.portfolio || item.portfolio_name;
-            
-            if (!portfolioName) {
-                console.warn('Item has no portfolio name:', item);
-                return; // Skip items without portfolio name
-            }
-            
-            if (!portfolioMap[portfolioName]) {
-                // First try to find portfolio by exact name match
-                let portfolio = portfolios.find(p => p.name === portfolioName);
-                
-                if (!portfolio) {
-                    // If not found by exact match, try case-insensitive match
-                    portfolio = portfolios.find(p => p.name.toLowerCase() === portfolioName.toLowerCase());
-                }
-                
-                if (portfolio) {
-                    portfolioMap[portfolioName] = {
-                        id: portfolio.id,
-                        name: portfolioName,
-                        companies: [],
-                        totalValue: 0,
-                        totalInvested: 0
-                    };
-                } else {
-                    // Create a fallback entry with a generated ID
-                    const fallbackId = 1000 + Object.keys(portfolioMap).length;
-                    portfolioMap[portfolioName] = {
-                        id: fallbackId,
-                        name: portfolioName,
-                        companies: [],
-                        totalValue: 0,
-                        totalInvested: 0
-                    };
-                }
-            }
-            
-            if (portfolioMap[portfolioName]) {
-                // Calculate current value
-                const price = item.price_eur || 0;
-                const shares = item.shares || 0;
-                const currentValue = price * shares;
-                const totalInvested = item.total_invested || 0;
-                
-                // Get company name from the correct property
-                const companyName = item.company || item.name || 'Unknown';
-                
-                // Add company to portfolio with all needed fields
-                portfolioMap[portfolioName].companies.push({
-                    id: item.id,
-                    name: companyName,
-                    category: item.category || 'Uncategorized',
-                    shares: shares,
-                    priceEur: price,
-                    price_eur: price, // Include both naming conventions
-                    currentValue: currentValue, // Explicitly set currentValue
-                    totalInvested: totalInvested,
-                    portfolioId: portfolioMap[portfolioName].id,
-                    portfolioName: portfolioName,
-                    // Include risk analysis fields
-                    country: item.country || 'Unknown',
-                    sector: item.sector || 'Unknown',
-                    industry: item.industry || 'Unknown'
-                });
-                
-                // Update portfolio totals
-                portfolioMap[portfolioName].totalValue += currentValue;
-                portfolioMap[portfolioName].totalInvested += totalInvested;
-            }
         });
-        
-        // Convert map to array
-        portfolioData = Object.values(portfolioMap);
-        
-        console.log(`Created ${portfolioData.length} portfolios from data`);
-        portfolioData.forEach(p => {
-            console.log(`Portfolio ${p.name}: ${p.companies.length} companies, Total Value: ${p.totalValue}`);
-        });
-        
-        console.log('Data processing completed for Risk Overview');
-    }
-    
-    function createPortfolioFilters(portfolios) {
-        const filtersContainer = document.getElementById('portfolioFilters');
-        filtersContainer.innerHTML = '';
-        
-        portfolios.forEach(portfolio => {
-            const fieldDiv = document.createElement('div');
-            fieldDiv.className = 'field mr-4 mb-2';
-            
-            const controlDiv = document.createElement('div');
-            controlDiv.className = 'control';
-            
-            const checkboxLabel = document.createElement('label');
-            checkboxLabel.className = 'checkbox';
-            checkboxLabel.innerHTML = `
+
+        // Fetch list of portfolios with their IDs
+        async function fetchPortfolios() {
+            console.log('Fetching portfolios...');
+            try {
+                const response = await fetch('/portfolio/api/portfolios?include_ids=true&has_companies=true');
+                console.log('Portfolios API response status:', response.status);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Portfolios API error response:', errorText);
+
+                    // Try to parse as JSON to get structured error
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        if (errorData.error && errorData.error.includes('Not authenticated')) {
+                            throw new Error('Not authenticated - please select an account from the home page first');
+                        }
+                    } catch (parseError) {
+                        // Ignore parse errors, use original text
+                    }
+
+                    throw new Error(`Failed to fetch portfolios (${response.status}): ${errorText}`);
+                }
+
+                const data = await response.json();
+                console.log('Portfolios data received:', data);
+
+                // Check if the response contains an error
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                return data;
+            } catch (error) {
+                console.error('Error in fetchPortfolios:', error);
+                throw error;
+            }
+        }
+
+        // Fetch portfolio data
+        async function fetchPortfolioData() {
+            console.log('Fetching portfolio data...');
+            try {
+                const response = await fetch('/portfolio/api/portfolio_data');
+                console.log('Portfolio data API response status:', response.status);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Portfolio data API error response:', errorText);
+
+                    // Try to parse as JSON to get structured error
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        if (errorData.error && errorData.error.includes('Not authenticated')) {
+                            throw new Error('Not authenticated - please select an account from the home page first');
+                        }
+                    } catch (parseError) {
+                        // Ignore parse errors, use original text
+                    }
+
+                    throw new Error(`Failed to fetch portfolio data (${response.status}): ${errorText}`);
+                }
+
+                const data = await response.json();
+                console.log('Portfolio data received, length:', Array.isArray(data) ? data.length : 'not an array');
+
+                // Check if the response contains an error
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                return data;
+            } catch (error) {
+                console.error('Error in fetchPortfolioData:', error);
+                throw error;
+            }
+        }
+
+        // Process the data
+        function processData(portfoliosList, data) {
+            console.log('Processing data:');
+            console.log('Portfolios list:', portfoliosList);
+            console.log('Portfolio data sample:', data.slice(0, 3)); // Log first 3 items for debugging
+            console.log('Portfolio data length:', data.length);
+
+            // Create portfolio structure
+            let portfolios;
+            if (portfoliosList.length > 0 && typeof portfoliosList[0] === 'object' && portfoliosList[0].id) {
+                // List already contains objects with IDs
+                portfolios = portfoliosList;
+            } else {
+                // List contains only names, create mapping with best-effort IDs
+                portfolios = portfoliosList.map((name, index) => ({
+                    id: index + 1,
+                    name: name
+                }));
+            }
+            console.log('Mapped portfolios:', portfolios);
+
+            // Group data by portfolio
+            const portfolioMap = {};
+
+            data.forEach(item => {
+                // Check for the correct property name for portfolio
+                const portfolioName = item.portfolio || item.portfolio_name;
+
+                if (!portfolioName) {
+                    console.warn('Item has no portfolio name:', item);
+                    return; // Skip items without portfolio name
+                }
+
+                if (!portfolioMap[portfolioName]) {
+                    // First try to find portfolio by exact name match
+                    let portfolio = portfolios.find(p => p.name === portfolioName);
+
+                    if (!portfolio) {
+                        // If not found by exact match, try case-insensitive match
+                        portfolio = portfolios.find(p => p.name.toLowerCase() === portfolioName.toLowerCase());
+                    }
+
+                    if (portfolio) {
+                        portfolioMap[portfolioName] = {
+                            id: portfolio.id,
+                            name: portfolioName,
+                            companies: [],
+                            totalValue: 0,
+                            totalInvested: 0
+                        };
+                    } else {
+                        // Create a fallback entry with a generated ID
+                        const fallbackId = 1000 + Object.keys(portfolioMap).length;
+                        portfolioMap[portfolioName] = {
+                            id: fallbackId,
+                            name: portfolioName,
+                            companies: [],
+                            totalValue: 0,
+                            totalInvested: 0
+                        };
+                    }
+                }
+
+                if (portfolioMap[portfolioName]) {
+                    // Calculate current value
+                    const price = item.price_eur || 0;
+                    const shares = item.shares || 0;
+                    const currentValue = price * shares;
+                    const totalInvested = item.total_invested || 0;
+
+                    // Get company name from the correct property
+                    const companyName = item.company || item.name || 'Unknown';
+
+                    // Add company to portfolio with all needed fields
+                    portfolioMap[portfolioName].companies.push({
+                        id: item.id,
+                        name: companyName,
+                        category: item.category || 'Uncategorized',
+                        shares: shares,
+                        priceEur: price,
+                        price_eur: price, // Include both naming conventions
+                        currentValue: currentValue, // Explicitly set currentValue
+                        totalInvested: totalInvested,
+                        portfolioId: portfolioMap[portfolioName].id,
+                        portfolioName: portfolioName,
+                        // Include risk analysis fields
+                        country: item.country || 'Unknown',
+                        sector: item.sector || 'Unknown',
+                        industry: item.industry || 'Unknown'
+                    });
+
+                    // Update portfolio totals
+                    portfolioMap[portfolioName].totalValue += currentValue;
+                    portfolioMap[portfolioName].totalInvested += totalInvested;
+                }
+            });
+
+            // Convert map to array
+            portfolioData = Object.values(portfolioMap);
+
+            console.log(`Created ${portfolioData.length} portfolios from data`);
+            portfolioData.forEach(p => {
+                console.log(`Portfolio ${p.name}: ${p.companies.length} companies, Total Value: ${p.totalValue}`);
+            });
+
+            console.log('Data processing completed for Risk Overview');
+        }
+
+        function createPortfolioFilters(portfolios) {
+            const filtersContainer = document.getElementById('portfolioFilters');
+            filtersContainer.innerHTML = '';
+
+            portfolios.forEach(portfolio => {
+                const fieldDiv = document.createElement('div');
+                fieldDiv.className = 'field mr-4 mb-2';
+
+                const controlDiv = document.createElement('div');
+                controlDiv.className = 'control';
+
+                const checkboxLabel = document.createElement('label');
+                checkboxLabel.className = 'checkbox';
+                checkboxLabel.innerHTML = `
                 <input type="checkbox" value="${portfolio}" ${selectedPortfolios.has(portfolio) ? 'checked' : ''}>
                 ${portfolio}
             `;
-            
-            const checkbox = checkboxLabel.querySelector('input');
-            checkbox.addEventListener('change', function() {
-                if (this.checked) {
-                    selectedPortfolios.add(portfolio);
-                } else {
-                    selectedPortfolios.delete(portfolio);
-                }
-                updateCharts();
+
+                const checkbox = checkboxLabel.querySelector('input');
+                checkbox.addEventListener('change', function () {
+                    if (this.checked) {
+                        selectedPortfolios.add(portfolio);
+                    } else {
+                        selectedPortfolios.delete(portfolio);
+                    }
+                    updateCharts();
+                });
+
+                controlDiv.appendChild(checkboxLabel);
+                fieldDiv.appendChild(controlDiv);
+                filtersContainer.appendChild(fieldDiv);
             });
-            
-            controlDiv.appendChild(checkboxLabel);
-            fieldDiv.appendChild(controlDiv);
-            filtersContainer.appendChild(fieldDiv);
-        });
-    }
-    
-    function updateCharts() {
-        console.log('updateCharts called');
-        console.log('portfolioData:', portfolioData);
-        console.log('selectedPortfolios:', selectedPortfolios);
-        
-        const filteredPortfolios = portfolioData.filter(p => selectedPortfolios.has(p.name));
-        
-        console.log('filteredPortfolios:', filteredPortfolios);
-        console.log('filteredPortfolios length:', filteredPortfolios.length);
-        
-        if (filteredPortfolios.length === 0) {
-            console.log('No data to display for selected portfolios');
-            // Clear charts if no portfolios are selected
-            document.getElementById('portfolioAllocationsChart').innerHTML = '<div class="has-text-centered p-4"><p class="has-text-grey-light">No portfolio selected</p></div>';
-            document.getElementById('companyAllocationsChart').innerHTML = '<div class="has-text-centered p-4"><p class="has-text-grey-light">No portfolio selected</p></div>';
-            updateDistributionCharts(); // This will show "no data"
-            return;
         }
-        
-        console.log('Calling chart update functions...');
-        initializePortfolioAllocationsChart();
-        initializeCompanyAllocationsChart();
-        updateDistributionCharts();
-    }
-    
-    function initializePortfolioAllocationsChart() {
-        const filteredPortfolios = portfolioData.filter(p => selectedPortfolios.has(p.name));
-        const labels = filteredPortfolios.map(p => p.name);
-        const values = filteredPortfolios.map(p => p.totalValue);
-        
-        // Validate and clean data
-        const cleanedData = [];
-        for (let i = 0; i < labels.length; i++) {
-            const value = parseFloat(values[i]) || 0;
-            if (value > 0 && !isNaN(value)) {
-                cleanedData.push({
-                    label: labels[i],
-                    value: value
-                });
-            }
-        }
-        
-        console.log('Portfolio chart cleaned data:', cleanedData);
-        
-        if (cleanedData.length === 0) {
-            document.getElementById('portfolioAllocationsChart').innerHTML = 
-                '<div class="has-text-centered p-4"><p class="has-text-grey-light">No data available</p></div>';
-            return;
-        }
-        
-        const cleanedLabels = cleanedData.map(d => d.label);
-        const cleanedValues = cleanedData.map(d => d.value);
-        
-        console.log('Portfolio chart - labels:', cleanedLabels);
-        console.log('Portfolio chart - values:', cleanedValues);
-        
-        const colors = ChartConfig.generateColors(cleanedLabels.length);
-        
-        try {
-            const chartElement = document.getElementById('portfolioAllocationsChart');
-            if (!chartElement) {
-                console.error('Portfolio chart element not found');
+
+        function updateCharts() {
+            console.log('updateCharts called');
+            console.log('portfolioData:', portfolioData);
+            console.log('selectedPortfolios:', selectedPortfolios);
+
+            const filteredPortfolios = portfolioData.filter(p => selectedPortfolios.has(p.name));
+
+            console.log('filteredPortfolios:', filteredPortfolios);
+            console.log('filteredPortfolios length:', filteredPortfolios.length);
+
+            if (filteredPortfolios.length === 0) {
+                console.log('No data to display for selected portfolios');
+                // Clear charts if no portfolios are selected
+                document.getElementById('portfolioAllocationsChart').innerHTML = '<div class="has-text-centered p-4"><p class="has-text-grey-light">No portfolio selected</p></div>';
+                document.getElementById('companyAllocationsChart').innerHTML = '<div class="has-text-centered p-4"><p class="has-text-grey-light">No portfolio selected</p></div>';
+                updateDistributionCharts(); // This will show "no data"
                 return;
             }
-            
-            // Ensure the element is visible and has dimensions
-            chartElement.style.display = 'block';
-            chartElement.style.minHeight = '350px';
-            
-            if (typeof ChartConfig !== 'undefined' && ChartConfig.createDoughnutChart) {
-                ChartConfig.createDoughnutChart(
-                    'portfolioAllocationsChart',
-                    cleanedLabels,
-                    cleanedValues,
-                    {
-                        colors: colors,
-                        height: 350,
-                        showTotal: true
-                    }
-                );
-            } else {
-                console.error('ChartConfig.createDoughnutChart not available');
-                document.getElementById('portfolioAllocationsChart').innerHTML = 
-                    '<div class="has-text-centered p-4"><p class="has-text-grey-light">Chart library not loaded</p></div>';
+
+            console.log('Calling chart update functions...');
+            initializePortfolioAllocationsChart();
+            initializeCompanyAllocationsChart();
+            updateDistributionCharts();
+            updateAllocationWarnings();
+        }
+
+        function initializePortfolioAllocationsChart() {
+            const filteredPortfolios = portfolioData.filter(p => selectedPortfolios.has(p.name));
+            const labels = filteredPortfolios.map(p => p.name);
+            const values = filteredPortfolios.map(p => p.totalValue);
+
+            // Validate and clean data
+            const cleanedData = [];
+            for (let i = 0; i < labels.length; i++) {
+                const value = parseFloat(values[i]) || 0;
+                if (value > 0 && !isNaN(value)) {
+                    cleanedData.push({
+                        label: labels[i],
+                        value: value
+                    });
+                }
             }
-        } catch (error) {
-            console.error('Error creating portfolio allocations chart:', error);
-            console.error('Error stack:', error.stack);
-            document.getElementById('portfolioAllocationsChart').innerHTML = 
-                '<div class="has-text-centered p-4"><p class="has-text-danger">Error creating chart: ' + error.message + '</p></div>';
-        }
-    }
-    
-    function initializeCompanyAllocationsChart() {
-        const allCompanies = getAllCompaniesFromSelectedPortfolios();
-        const companyGroups = groupCompaniesByName(allCompanies);
-        
-        // Sort and prepare chart data
-        const { labels, values } = prepareChartData(companyGroups);
-        
-        // Validate and clean data
-        const cleanedData = [];
-        for (let i = 0; i < labels.length; i++) {
-            const value = parseFloat(values[i]) || 0;
-            if (value > 0 && !isNaN(value)) {
-                cleanedData.push({
-                    label: labels[i],
-                    value: value
-                });
-            }
-        }
-        
-        console.log('Company chart cleaned data:', cleanedData);
-        
-        if (cleanedData.length === 0) {
-            document.getElementById('companyAllocationsChart').innerHTML = 
-                '<div class="has-text-centered p-4"><p class="has-text-grey-light">No data available</p></div>';
-            return;
-        }
-        
-        const cleanedLabels = cleanedData.map(d => d.label);
-        const cleanedValues = cleanedData.map(d => d.value);
-        
-        console.log('Company chart - labels:', cleanedLabels);
-        console.log('Company chart - values:', cleanedValues);
-        
-        const colors = ChartConfig.generateColors(cleanedLabels.length);
-        
-        try {
-            const chartElement = document.getElementById('companyAllocationsChart');
-            if (!chartElement) {
-                console.error('Company chart element not found');
+
+            console.log('Portfolio chart cleaned data:', cleanedData);
+
+            if (cleanedData.length === 0) {
+                document.getElementById('portfolioAllocationsChart').innerHTML =
+                    '<div class="has-text-centered p-4"><p class="has-text-grey-light">No data available</p></div>';
                 return;
             }
-            
-            // Ensure the element is visible and has dimensions
-            chartElement.style.display = 'block';
-            chartElement.style.minHeight = '350px';
-            
-            if (typeof ChartConfig !== 'undefined' && ChartConfig.createDoughnutChart) {
-                ChartConfig.createDoughnutChart(
-                    'companyAllocationsChart',
-                    cleanedLabels,
-                    cleanedValues,
-                    {
-                        colors: colors,
-                        height: 350,
-                        showTotal: true
-                    }
-                );
+
+            const cleanedLabels = cleanedData.map(d => d.label);
+            const cleanedValues = cleanedData.map(d => d.value);
+
+            console.log('Portfolio chart - labels:', cleanedLabels);
+            console.log('Portfolio chart - values:', cleanedValues);
+
+            const colors = ChartConfig.generateColors(cleanedLabels.length);
+
+            try {
+                const chartElement = document.getElementById('portfolioAllocationsChart');
+                if (!chartElement) {
+                    console.error('Portfolio chart element not found');
+                    return;
+                }
+
+                // Ensure the element is visible and has dimensions
+                chartElement.style.display = 'block';
+                chartElement.style.minHeight = '350px';
+
+                if (typeof ChartConfig !== 'undefined' && ChartConfig.createDoughnutChart) {
+                    ChartConfig.createDoughnutChart(
+                        'portfolioAllocationsChart',
+                        cleanedLabels,
+                        cleanedValues,
+                        {
+                            colors: colors,
+                            height: 350,
+                            showTotal: true
+                        }
+                    );
+                } else {
+                    console.error('ChartConfig.createDoughnutChart not available');
+                    document.getElementById('portfolioAllocationsChart').innerHTML =
+                        '<div class="has-text-centered p-4"><p class="has-text-grey-light">Chart library not loaded</p></div>';
+                }
+            } catch (error) {
+                console.error('Error creating portfolio allocations chart:', error);
+                console.error('Error stack:', error.stack);
+                document.getElementById('portfolioAllocationsChart').innerHTML =
+                    '<div class="has-text-centered p-4"><p class="has-text-danger">Error creating chart: ' + error.message + '</p></div>';
+            }
+        }
+
+        function initializeCompanyAllocationsChart() {
+            const allCompanies = getAllCompaniesFromSelectedPortfolios();
+            const companyGroups = groupCompaniesByName(allCompanies);
+
+            // Sort and prepare chart data
+            const { labels, values } = prepareChartData(companyGroups);
+
+            // Validate and clean data
+            const cleanedData = [];
+            for (let i = 0; i < labels.length; i++) {
+                const value = parseFloat(values[i]) || 0;
+                if (value > 0 && !isNaN(value)) {
+                    cleanedData.push({
+                        label: labels[i],
+                        value: value
+                    });
+                }
+            }
+
+            console.log('Company chart cleaned data:', cleanedData);
+
+            if (cleanedData.length === 0) {
+                document.getElementById('companyAllocationsChart').innerHTML =
+                    '<div class="has-text-centered p-4"><p class="has-text-grey-light">No data available</p></div>';
+                return;
+            }
+
+            const cleanedLabels = cleanedData.map(d => d.label);
+            const cleanedValues = cleanedData.map(d => d.value);
+
+            console.log('Company chart - labels:', cleanedLabels);
+            console.log('Company chart - values:', cleanedValues);
+
+            const colors = ChartConfig.generateColors(cleanedLabels.length);
+
+            try {
+                const chartElement = document.getElementById('companyAllocationsChart');
+                if (!chartElement) {
+                    console.error('Company chart element not found');
+                    return;
+                }
+
+                // Ensure the element is visible and has dimensions
+                chartElement.style.display = 'block';
+                chartElement.style.minHeight = '350px';
+
+                if (typeof ChartConfig !== 'undefined' && ChartConfig.createDoughnutChart) {
+                    ChartConfig.createDoughnutChart(
+                        'companyAllocationsChart',
+                        cleanedLabels,
+                        cleanedValues,
+                        {
+                            colors: colors,
+                            height: 350,
+                            showTotal: true
+                        }
+                    );
+                } else {
+                    console.error('ChartConfig.createDoughnutChart not available');
+                    document.getElementById('companyAllocationsChart').innerHTML =
+                        '<div class="has-text-centered p-4"><p class="has-text-grey-light">Chart library not loaded</p></div>';
+                }
+            } catch (error) {
+                console.error('Error creating company allocations chart:', error);
+                console.error('Error stack:', error.stack);
+                document.getElementById('companyAllocationsChart').innerHTML =
+                    '<div class="has-text-centered p-4"><p class="has-text-danger">Error creating chart: ' + error.message + '</p></div>';
+            }
+        }
+
+        // Get all companies from selected portfolios with additional metadata
+        function getAllCompaniesFromSelectedPortfolios() {
+            // Check if there are any selected portfolios
+            if (selectedPortfolios.size === 0) {
+                console.log('No portfolios selected, returning empty array');
+                return [];
+            }
+
+            const companies = portfolioData
+                .filter(p => selectedPortfolios.has(p.name))
+                .flatMap(p => p.companies);
+
+            // Ensure companies have calculated currentValue and metadata fields
+            return companies.map(company => {
+                // Calculate currentValue if not already present
+                if (typeof company.currentValue === 'undefined') {
+                    company.currentValue = (company.price_eur || 0) * (company.shares || 0);
+                }
+
+                // Ensure metadata fields exist
+                company.country = company.country || 'Unknown';
+                company.sector = company.sector || 'Unknown';
+                company.industry = company.industry || 'Unknown';
+                company.category = company.category || 'Unknown';
+
+                return company;
+            });
+        }
+
+        // Group companies by name and sum values
+        function groupCompaniesByName(companies) {
+            const companyMap = {};
+
+            companies.forEach(company => {
+                const name = company.name;
+                if (!companyMap[name]) {
+                    companyMap[name] = {
+                        name: name,
+                        currentValue: 0,
+                        shares: 0,
+                        totalInvested: 0,
+                        // Preserve metadata from the first occurrence
+                        category: company.category || 'Unknown',
+                        country: company.country || 'Unknown',
+                        sector: company.sector || 'Unknown',
+                        industry: company.industry || 'Unknown'
+                    };
+                }
+
+                // Sum up values
+                companyMap[name].currentValue += company.currentValue || 0;
+                companyMap[name].shares += company.shares || 0;
+                companyMap[name].totalInvested += company.totalInvested || 0;
+            });
+
+            // Convert to array and sort by value
+            return Object.values(companyMap).sort((a, b) => b.currentValue - a.currentValue);
+        }
+
+        // Prepare chart data (labels and values)
+        function prepareChartData(companies) {
+            // Sort by value
+            const sortedCompanies = [...companies].sort((a, b) => b.currentValue - a.currentValue);
+
+            let labels = [];
+            let values = [];
+
+            if (sortedCompanies.length > 10) {
+                // Take top 10 companies
+                const top10 = sortedCompanies.slice(0, 10);
+                const others = sortedCompanies.slice(10);
+
+                labels = top10.map(c => c.name);
+                values = top10.map(c => c.currentValue);
+
+                // Add "Others" category
+                const othersTotal = others.reduce((sum, c) => sum + c.currentValue, 0);
+                if (othersTotal > 0) {
+                    labels.push('Others');
+                    values.push(othersTotal);
+                }
             } else {
-                console.error('ChartConfig.createDoughnutChart not available');
-                document.getElementById('companyAllocationsChart').innerHTML = 
-                    '<div class="has-text-centered p-4"><p class="has-text-grey-light">Chart library not loaded</p></div>';
+                labels = sortedCompanies.map(c => c.name);
+                values = sortedCompanies.map(c => c.currentValue);
             }
-        } catch (error) {
-            console.error('Error creating company allocations chart:', error);
-            console.error('Error stack:', error.stack);
-            document.getElementById('companyAllocationsChart').innerHTML = 
-                '<div class="has-text-centered p-4"><p class="has-text-danger">Error creating chart: ' + error.message + '</p></div>';
+
+            return { labels, values };
         }
-    }
-    
-    // Get all companies from selected portfolios with additional metadata
-    function getAllCompaniesFromSelectedPortfolios() {
-        // Check if there are any selected portfolios
-        if (selectedPortfolios.size === 0) {
-            console.log('No portfolios selected, returning empty array');
-            return [];
-        }
-        
-        const companies = portfolioData
-            .filter(p => selectedPortfolios.has(p.name))
-            .flatMap(p => p.companies);
-        
-        // Ensure companies have calculated currentValue and metadata fields
-        return companies.map(company => {
-            // Calculate currentValue if not already present
-            if (typeof company.currentValue === 'undefined') {
-                company.currentValue = (company.price_eur || 0) * (company.shares || 0);
+
+        // Create bar chart with rotated x-axis labels
+        function createBarChart(chartId, labels, values, options = {}) {
+            const element = document.getElementById(chartId);
+            if (!element) {
+                console.error(`Chart element ${chartId} not found`);
+                return;
             }
-            
-            // Ensure metadata fields exist
-            company.country = company.country || 'Unknown';
-            company.sector = company.sector || 'Unknown';
-            company.industry = company.industry || 'Unknown';
-            company.category = company.category || 'Unknown';
-            
-            return company;
-        });
-    }
-    
-    // Group companies by name and sum values
-    function groupCompaniesByName(companies) {
-        const companyMap = {};
-        
-        companies.forEach(company => {
-            const name = company.name;
-            if (!companyMap[name]) {
-                companyMap[name] = {
-                    name: name,
-                    currentValue: 0,
-                    shares: 0,
-                    totalInvested: 0,
-                    // Preserve metadata from the first occurrence
-                    category: company.category || 'Unknown',
-                    country: company.country || 'Unknown',
-                    sector: company.sector || 'Unknown',
-                    industry: company.industry || 'Unknown'
-                };
-            }
-            
-            // Sum up values
-            companyMap[name].currentValue += company.currentValue || 0;
-            companyMap[name].shares += company.shares || 0;
-            companyMap[name].totalInvested += company.totalInvested || 0;
-        });
-        
-        // Convert to array and sort by value
-        return Object.values(companyMap).sort((a, b) => b.currentValue - a.currentValue);
-    }
-    
-    // Prepare chart data (labels and values)
-    function prepareChartData(companies) {
-        // Sort by value
-        const sortedCompanies = [...companies].sort((a, b) => b.currentValue - a.currentValue);
-        
-        let labels = [];
-        let values = [];
-        
-        if (sortedCompanies.length > 10) {
-            // Take top 10 companies
-            const top10 = sortedCompanies.slice(0, 10);
-            const others = sortedCompanies.slice(10);
-            
-            labels = top10.map(c => c.name);
-            values = top10.map(c => c.currentValue);
-            
-            // Add "Others" category
-            const othersTotal = others.reduce((sum, c) => sum + c.currentValue, 0);
-            if (othersTotal > 0) {
-                labels.push('Others');
-                values.push(othersTotal);
-            }
-        } else {
-            labels = sortedCompanies.map(c => c.name);
-            values = sortedCompanies.map(c => c.currentValue);
+
+            // Clear existing chart
+            element.innerHTML = '';
+
+            const colors = options.colors || ChartConfig.generateColors(labels.length);
+
+            const chartOptions = {
+                series: [{
+                    name: 'Value',
+                    data: values
+                }],
+                chart: {
+                    type: 'bar',
+                    height: options.height || 300,
+                    toolbar: {
+                        show: false
+                    }
+                },
+                plotOptions: {
+                    bar: {
+                        horizontal: false,
+                        columnWidth: '55%',
+                        endingShape: 'rounded',
+                        distributed: true
+                    },
+                },
+                dataLabels: {
+                    enabled: false
+                },
+                stroke: {
+                    show: true,
+                    width: 2,
+                    colors: ['transparent']
+                },
+                xaxis: {
+                    categories: labels,
+                    labels: {
+                        rotate: -90,
+                        rotateAlways: true,
+                        style: {
+                            fontSize: '12px',
+                            fontWeight: 400
+                        },
+                        maxHeight: 120
+                    }
+                },
+                yaxis: {
+                    title: {
+                        text: 'Value (€)'
+                    },
+                    labels: {
+                        formatter: function (val) {
+                            return options.formatCurrency ? options.formatCurrency(val) : '€' + val.toLocaleString();
+                        }
+                    }
+                },
+                fill: {
+                    opacity: 1,
+                    colors: colors
+                },
+                tooltip: {
+                    y: {
+                        formatter: function (val, opts) {
+                            const percentage = options.percentages ? options.percentages[opts.dataPointIndex] : 0;
+                            const currency = options.formatCurrency ? options.formatCurrency(val) : '€' + val.toLocaleString();
+                            const percent = options.formatPercentage ? options.formatPercentage(percentage) : percentage.toFixed(1) + '%';
+                            return `${currency} (${percent})`;
+                        }
+                    }
+                },
+                legend: {
+                    show: false
+                },
+                colors: colors
+            };
+
+            const chart = new ApexCharts(element, chartOptions);
+            chart.render();
+
+            return chart;
         }
-        
-        return { labels, values };
-    }
-    
-    function updateDistributionCharts() {
-        updateDistributionChart('country', 'countryDistributionChart');
-        updateDistributionChart('category', 'categoryDistributionChart');
-        updateDistributionChart('sector', 'sectorDistributionChart');
-        updateDistributionChart('industry', 'industryDistributionChart');
-    }
-    
-    function updateDistributionChart(field, chartId) {
-        const distributions = {};
-        
-        // Get all companies from selected portfolios
-        const allCompanies = getAllCompaniesFromSelectedPortfolios();
-        
-        allCompanies.forEach(company => {
-            const value = company.currentValue || 0;
-            const key = company[field] || 'Unknown';
-            distributions[key] = (distributions[key] || 0) + value;
-        });
-        
-        const distributionData = Object.entries(distributions)
-            .map(([name, value]) => ({ name, value }))
-            .sort((a, b) => b.value - a.value);
-        
-        // Clear existing chart
-        document.getElementById(chartId).innerHTML = '';
-        
-        if (distributionData.length === 0) {
-            document.getElementById(chartId).innerHTML = '<p class="has-text-grey has-text-centered p-4">No data available</p>';
-            return;
+
+        function updateDistributionCharts() {
+            updateDistributionChart('country', 'countryDistributionChart');
+            updateDistributionChart('category', 'categoryDistributionChart');
+            updateDistributionChart('sector', 'sectorDistributionChart');
+            updateDistributionChart('industry', 'industryDistributionChart');
         }
-        
-        // Calculate percentages for better display
-        const distributionTotal = distributionData.reduce((sum, item) => sum + item.value, 0);
-        const distributionPercentages = distributionData.map(item => distributionTotal > 0 ? (item.value / distributionTotal) * 100 : 0);
-        
-        try {
-            // Create donut chart using ChartConfig for consistent styling
-            ChartConfig.createDoughnutChart(chartId, 
-                distributionData.map(item => item.name), 
-                distributionData.map(item => item.value), {
+
+        function updateDistributionChart(field, chartId) {
+            const distributions = {};
+
+            // Get all companies from selected portfolios
+            const allCompanies = getAllCompaniesFromSelectedPortfolios();
+
+            allCompanies.forEach(company => {
+                const value = company.currentValue || 0;
+                const key = company[field] || 'Unknown';
+                distributions[key] = (distributions[key] || 0) + value;
+            });
+
+            const distributionData = Object.entries(distributions)
+                .map(([name, value]) => ({ name, value }))
+                .sort((a, b) => b.value - a.value);
+
+            // Clear existing chart
+            document.getElementById(chartId).innerHTML = '';
+
+            if (distributionData.length === 0) {
+                document.getElementById(chartId).innerHTML = '<p class="has-text-grey has-text-centered p-4">No data available</p>';
+                return;
+            }
+
+            // Calculate percentages for better display
+            const distributionTotal = distributionData.reduce((sum, item) => sum + item.value, 0);
+            const distributionPercentages = distributionData.map(item => distributionTotal > 0 ? (item.value / distributionTotal) * 100 : 0);
+
+            try {
+                // Create bar chart with rotated labels for better visibility
+                createBarChart(chartId,
+                    distributionData.map(item => item.name),
+                    distributionData.map(item => item.value), {
                     title: '',
                     colors: ChartConfig.generateColors(distributionData.length),
                     percentages: distributionPercentages,
                     formatCurrency: window.formatCurrency || (v => `€${v.toLocaleString()}`),
                     formatPercentage: window.formatPercentage || (v => `${v.toFixed(1)}%`),
-                    height: 250,
-                    showTotal: true
+                    height: 300
                 });
-        } catch (error) {
-            console.error(`Error creating ${field} distribution chart:`, error);
-            document.getElementById(chartId).innerHTML = '<p class="has-text-danger">Error creating chart</p>';
+            } catch (error) {
+                console.error(`Error creating ${field} distribution chart:`, error);
+                document.getElementById(chartId).innerHTML = '<p class="has-text-danger">Error creating chart</p>';
+            }
         }
-    }
-});
+
+        // Update allocation warnings based on current portfolio selection and rules
+        function updateAllocationWarnings() {
+            updatePortfolioHealthCard();
+            updateRuleGauges();
+            updateContextualViolations();
+        }
+
+        // Update the main portfolio health card
+        function updatePortfolioHealthCard() {
+            const healthIcon = document.getElementById('healthIcon');
+            const healthTitle = document.getElementById('healthTitle');
+            const healthSubtitle = document.getElementById('healthSubtitle');
+
+            if (!allocationRules || (!allocationRules.maxPerStock && !allocationRules.maxPerCategory && !allocationRules.maxPerCountry)) {
+                healthIcon.textContent = '🔧';
+                healthTitle.textContent = 'No Rules Configured';
+                healthSubtitle.textContent = 'Set allocation rules to monitor portfolio risk';
+                return;
+            }
+
+            let violations = [];
+            try {
+                violations = calculateAllocationViolations();
+            } catch (error) {
+                console.error('Error calculating allocation violations:', error);
+                healthIcon.textContent = '⚠️';
+                healthTitle.textContent = 'Analysis Error';
+                healthSubtitle.textContent = 'Unable to calculate risk metrics';
+                return;
+            }
+
+            if (violations.length === 0) {
+                healthIcon.textContent = '✅';
+                healthTitle.textContent = 'Low Risk';
+                healthSubtitle.textContent = 'All allocation rules are being followed';
+            } else if (violations.length <= 2) {
+                healthIcon.textContent = '⚠️';
+                healthTitle.textContent = 'Medium Risk';
+                healthSubtitle.textContent = `${violations.length} rule${violations.length > 1 ? 's' : ''} violated`;
+            } else {
+                healthIcon.textContent = '🚨';
+                healthTitle.textContent = 'High Risk';
+                healthSubtitle.textContent = `${violations.length} rules violated`;
+            }
+        }
+
+        // Update the rule gauges
+        function updateRuleGauges() {
+            updateGauge('stock', 'stockGauge', 'stockCount', 'stockSubtitle', allocationRules.maxPerStock);
+            updateGauge('category', 'categoryGauge', 'categoryCount', 'categorySubtitle', allocationRules.maxPerCategory);
+            updateGauge('country', 'countryGauge', 'countryCount', 'countrySubtitle', allocationRules.maxPerCountry);
+            updateGauge('exchange', 'exchangeGauge', 'exchangeCount', 'exchangeSubtitle', allocationRules.maxPerExchange);
+        }
+
+        // Update individual gauge
+        function updateGauge(type, chartId, countId, subtitleId, maxPercentage) {
+            const countElement = document.getElementById(countId);
+            const subtitleElement = document.getElementById(subtitleId);
+            const chartElement = document.getElementById(chartId);
+
+            if (!maxPercentage || maxPercentage <= 0) {
+                countElement.textContent = '—';
+                subtitleElement.textContent = '';
+                chartElement.innerHTML = '<div style="width: 120px; height: 120px; display: flex; align-items: center; justify-content: center; color: #ccc; font-size: 12px;">No Limit</div>';
+                return;
+            }
+
+            // Get violations for this type
+            const violations = getViolationsForType(type, maxPercentage);
+            const violationCount = violations.length;
+
+            // Update count and clear subtitle
+            countElement.textContent = violationCount;
+            subtitleElement.textContent = '';
+
+            // Calculate percentage for gauge (0-100 scale)
+            const totalItems = getTotalItemsForType(type);
+            const percentage = totalItems > 0 ? (violationCount / totalItems) * 100 : 0;
+
+            // Create gauge chart
+            createViolationGaugeChart(chartId, violationCount, percentage);
+        }
+
+        // Get violations for a specific type
+        function getViolationsForType(type, maxPercentage) {
+            const allCompanies = getAllCompaniesFromSelectedPortfolios();
+            if (allCompanies.length === 0) return [];
+
+            const totalValue = allCompanies.reduce((sum, company) => sum + (company.currentValue || 0), 0);
+            if (totalValue === 0) return [];
+
+            const violations = [];
+
+            if (type === 'stock') {
+                const stockAllocations = groupCompaniesByName(allCompanies);
+                stockAllocations.forEach(stock => {
+                    const percentage = (stock.currentValue / totalValue) * 100;
+                    if (percentage > maxPercentage) {
+                        violations.push({
+                            name: stock.name,
+                            currentPercentage: percentage,
+                            maxPercentage: maxPercentage
+                        });
+                    }
+                });
+            } else if (type === 'category') {
+                const categoryAllocations = {};
+                allCompanies.forEach(company => {
+                    const category = company.category || 'Unknown';
+                    categoryAllocations[category] = (categoryAllocations[category] || 0) + (company.currentValue || 0);
+                });
+                Object.entries(categoryAllocations).forEach(([category, value]) => {
+                    const percentage = (value / totalValue) * 100;
+                    if (percentage > maxPercentage) {
+                        violations.push({
+                            name: category,
+                            currentPercentage: percentage,
+                            maxPercentage: maxPercentage
+                        });
+                    }
+                });
+            } else if (type === 'country') {
+                const countryAllocations = {};
+                allCompanies.forEach(company => {
+                    const country = company.country || 'Unknown';
+                    countryAllocations[country] = (countryAllocations[country] || 0) + (company.currentValue || 0);
+                });
+                Object.entries(countryAllocations).forEach(([country, value]) => {
+                    const percentage = (value / totalValue) * 100;
+                    if (percentage > maxPercentage) {
+                        violations.push({
+                            name: country,
+                            currentPercentage: percentage,
+                            maxPercentage: maxPercentage
+                        });
+                    }
+                });
+            }
+
+            return violations;
+        }
+
+        // Get total number of items for a type (for percentage calculation)
+        function getTotalItemsForType(type) {
+            const allCompanies = getAllCompaniesFromSelectedPortfolios();
+            if (allCompanies.length === 0) return 0;
+
+            if (type === 'stock') {
+                const stockAllocations = groupCompaniesByName(allCompanies);
+                return stockAllocations.length;
+            } else if (type === 'category') {
+                const categories = new Set(allCompanies.map(company => company.category || 'Unknown'));
+                return categories.size;
+            } else if (type === 'country') {
+                const countries = new Set(allCompanies.map(company => company.country || 'Unknown'));
+                return countries.size;
+            }
+
+            return 0;
+        }
+
+        // Create violation gauge chart using ApexCharts
+        function createViolationGaugeChart(elementId, violationCount, percentage) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = '';
+
+            // Apple-inspired color logic
+            let color = '#34C759'; // Apple Green
+            if (violationCount > 0) {
+                if (violationCount >= 3) {
+                    color = '#FF3B30'; // Apple Red
+                } else {
+                    color = '#FF9500'; // Apple Orange
+                }
+            }
+
+            // Use violation count percentage, but cap at 100
+            const chartPercentage = Math.min(percentage, 100);
+
+            const options = {
+                series: [chartPercentage],
+                chart: {
+                    height: 120,
+                    type: 'radialBar',
+                },
+                plotOptions: {
+                    radialBar: {
+                        hollow: {
+                            size: '65%',
+                        },
+                        dataLabels: {
+                            show: false
+                        },
+                        track: {
+                            background: '#F2F2F7',
+                            strokeWidth: '100%',
+                        }
+                    },
+                },
+                colors: [color],
+                stroke: {
+                    lineCap: 'round'
+                }
+            };
+
+            try {
+                const chart = new ApexCharts(element, options);
+                chart.render();
+            } catch (error) {
+                console.error('Error creating violation gauge chart:', error);
+                // Fallback to simple circle
+                element.innerHTML = `
+                    <div style="width: 120px; height: 120px; display: flex; align-items: center; justify-content: center; border: 3px solid ${color}; border-radius: 50%; background: ${violationCount === 0 ? '#F2F2F7' : 'rgba(255, 59, 48, 0.1)'};">
+                        <span style="font-size: 1.5rem; font-weight: bold; color: ${color};">${violationCount}</span>
+                    </div>
+                `;
+            }
+        }
+
+        // Update contextual violations under each gauge
+        function updateContextualViolations() {
+            if (!allocationRules || (!allocationRules.maxPerStock && !allocationRules.maxPerCategory && !allocationRules.maxPerCountry && !allocationRules.maxPerExchange)) {
+                // Clear all violation containers
+                document.getElementById('stockViolations').innerHTML = '';
+                document.getElementById('categoryViolations').innerHTML = '';
+                document.getElementById('countryViolations').innerHTML = '';
+                document.getElementById('exchangeViolations').innerHTML = '';
+                return;
+            }
+
+            let violations = [];
+            try {
+                violations = calculateAllocationViolations();
+            } catch (error) {
+                console.error('Error calculating allocation violations:', error);
+                return;
+            }
+
+            // Group violations by type
+            const violationsByType = {
+                'Stock': violations.filter(v => v.type === 'Stock'),
+                'Category': violations.filter(v => v.type === 'Category'),
+                'Country': violations.filter(v => v.type === 'Country'),
+                'Exchange': violations.filter(v => v.type === 'Exchange')
+            };
+
+            // Update each gauge's violations
+            updateGaugeViolations('stockViolations', violationsByType['Stock']);
+            updateGaugeViolations('categoryViolations', violationsByType['Category']);
+            updateGaugeViolations('countryViolations', violationsByType['Country']);
+            updateGaugeViolations('exchangeViolations', violationsByType['Exchange']);
+        }
+
+        // Update individual gauge violations
+        function updateGaugeViolations(containerId, violations) {
+            const container = document.getElementById(containerId);
+
+            if (!violations || violations.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+
+            // Sort by severity (highest excess first)
+            violations.sort((a, b) => (b.currentPercentage - b.maxPercentage) - (a.currentPercentage - a.maxPercentage));
+
+            let violationsHtml = '';
+            violations.forEach(violation => {
+                const excessPercentage = violation.currentPercentage - violation.maxPercentage;
+                violationsHtml += `
+                    <div class="gauge-violation-item">
+                        <div class="gauge-violation-name" title="${violation.name}">${violation.name}</div>
+                        <div class="gauge-violation-excess">+${excessPercentage.toFixed(1)}%</div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = violationsHtml;
+        }
+
+        // Calculate allocation rule violations for selected portfolios
+        function calculateAllocationViolations() {
+            const violations = [];
+            const allCompanies = getAllCompaniesFromSelectedPortfolios();
+
+            if (allCompanies.length === 0) {
+                return violations;
+            }
+
+            // Calculate total value for percentage calculations
+            const totalValue = allCompanies.reduce((sum, company) => sum + (company.currentValue || 0), 0);
+
+            if (totalValue === 0) {
+                return violations;
+            }
+
+            // Check per stock violations
+            if (allocationRules.maxPerStock && allocationRules.maxPerStock > 0) {
+                const stockAllocations = groupCompaniesByName(allCompanies);
+                stockAllocations.forEach(stock => {
+                    const percentage = (stock.currentValue / totalValue) * 100;
+                    if (percentage > allocationRules.maxPerStock) {
+                        violations.push({
+                            type: 'Stock',
+                            name: stock.name,
+                            currentPercentage: percentage,
+                            maxPercentage: allocationRules.maxPerStock
+                        });
+                    }
+                });
+            }
+
+            // Check per category violations
+            if (allocationRules.maxPerCategory && allocationRules.maxPerCategory > 0) {
+                const categoryAllocations = {};
+                allCompanies.forEach(company => {
+                    const category = company.category || 'Unknown';
+                    categoryAllocations[category] = (categoryAllocations[category] || 0) + (company.currentValue || 0);
+                });
+
+                Object.entries(categoryAllocations).forEach(([category, value]) => {
+                    const percentage = (value / totalValue) * 100;
+                    if (percentage > allocationRules.maxPerCategory) {
+                        violations.push({
+                            type: 'Category',
+                            name: category,
+                            currentPercentage: percentage,
+                            maxPercentage: allocationRules.maxPerCategory
+                        });
+                    }
+                });
+            }
+
+            // Check per country violations
+            if (allocationRules.maxPerCountry && allocationRules.maxPerCountry > 0) {
+                const countryAllocations = {};
+                allCompanies.forEach(company => {
+                    const country = company.country || 'Unknown';
+                    countryAllocations[country] = (countryAllocations[country] || 0) + (company.currentValue || 0);
+                });
+
+                Object.entries(countryAllocations).forEach(([country, value]) => {
+                    const percentage = (value / totalValue) * 100;
+                    if (percentage > allocationRules.maxPerCountry) {
+                        violations.push({
+                            type: 'Country',
+                            name: country,
+                            currentPercentage: percentage,
+                            maxPercentage: allocationRules.maxPerCountry
+                        });
+                    }
+                });
+            }
+
+            // Sort violations by severity (highest over-allocation first)
+            violations.sort((a, b) => (b.currentPercentage - b.maxPercentage) - (a.currentPercentage - a.maxPercentage));
+
+            return violations;
+        }
+    });
 </script>
 
-{% endblock %} 
+{% endblock %}
