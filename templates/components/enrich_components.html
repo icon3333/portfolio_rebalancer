@@ -286,6 +286,27 @@
         flex-grow: 1;
     }
 
+    /* Column health indicators */
+    .column-health {
+        display: block;
+        font-size: 0.7rem;
+        font-weight: var(--font-weight-medium);
+        margin-top: 2px;
+        line-height: 1;
+    }
+
+    .column-health.health-red {
+        color: #e53e3e;
+    }
+
+    .column-health.health-orange {
+        color: #dd6b20;
+    }
+
+    .column-health.health-green {
+        color: #38a169;
+    }
+
     /* Responsive adjustments */
     @media screen and (max-width: 768px) {
         .columns .column .card {
@@ -580,19 +601,10 @@
                     </div>
 
                     <!-- Metrics with consistent styling -->
-                    <div v-if="!loading && filteredPortfolioItems.length > 0" class="portfolio-metrics"
-                        :class="healthColorClass">
+                    <div v-if="!loading && filteredPortfolioItems.length > 0" class="portfolio-metrics">
                         <div class="metrics-item">
                             <span class="metric-label">Total:</span>
                             <span class="metric-value" v-text="metrics.total"></span>
-                        </div>
-                        <div class="metrics-item">
-                            <span class="metric-label">Health:</span>
-                            <span class="metric-value"><span v-text="metrics.health"></span>%</span>
-                        </div>
-                        <div class="metrics-item">
-                            <span class="metric-label">Missing:</span>
-                            <span class="metric-value" v-text="metrics.missing"></span>
                         </div>
                         <div class="metrics-item">
                             <span class="metric-label">Value:</span>
@@ -696,12 +708,16 @@
                                 </th>
                                 <th @click="sortBy('portfolio')" class="is-sortable">
                                     Portfolio
+                                    <span class="column-health" :class="getHealthColorClass(portfolioHealthPercentage)"
+                                        v-text="portfolioHealthPercentage + '%'"></span>
                                     <span class="icon is-small ml-1" v-if="sortColumn === 'portfolio'">
                                         <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
                                     </span>
                                 </th>
                                 <th @click="sortBy('category')" class="is-sortable">
                                     Category
+                                    <span class="column-health" :class="getHealthColorClass(categoryHealthPercentage)"
+                                        v-text="categoryHealthPercentage + '%'"></span>
                                     <span class="icon is-small ml-1" v-if="sortColumn === 'category'">
                                         <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
                                     </span>
@@ -714,6 +730,8 @@
                                 </th>
                                 <th @click="sortBy('price_eur')" class="is-sortable">
                                     Price (EUR)
+                                    <span class="column-health" :class="getHealthColorClass(priceHealthPercentage)"
+                                        v-text="priceHealthPercentage + '%'"></span>
                                     <span class="icon is-small ml-1" v-if="sortColumn === 'price_eur'">
                                         <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
                                     </span>

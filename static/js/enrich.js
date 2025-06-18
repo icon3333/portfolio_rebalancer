@@ -506,7 +506,6 @@ class PortfolioTableApp {
                     metrics: {
                         total: 0,
                         health: 0,
-                        missing: 0,
                         totalValue: 0,
                         lastUpdate: null
                     },
@@ -608,6 +607,28 @@ class PortfolioTableApp {
                 someFilteredSelected() {
                     return this.selectedItemIds.length > 0 &&
                         this.filteredPortfolioItems.some(item => this.selectedItemIds.includes(item.id));
+                },
+                // Column health percentages
+                portfolioHealthPercentage() {
+                    if (this.filteredPortfolioItems.length === 0) return 0;
+                    const filledCount = this.filteredPortfolioItems.filter(item =>
+                        item.portfolio && item.portfolio.trim() !== '' && item.portfolio !== '-'
+                    ).length;
+                    return Math.round((filledCount / this.filteredPortfolioItems.length) * 100);
+                },
+                categoryHealthPercentage() {
+                    if (this.filteredPortfolioItems.length === 0) return 0;
+                    const filledCount = this.filteredPortfolioItems.filter(item =>
+                        item.category && item.category.trim() !== ''
+                    ).length;
+                    return Math.round((filledCount / this.filteredPortfolioItems.length) * 100);
+                },
+                priceHealthPercentage() {
+                    if (this.filteredPortfolioItems.length === 0) return 0;
+                    const filledCount = this.filteredPortfolioItems.filter(item =>
+                        item.price_eur && item.price_eur > 0
+                    ).length;
+                    return Math.round((filledCount / this.filteredPortfolioItems.length) * 100);
                 }
             },
             watch: {
@@ -797,7 +818,6 @@ class PortfolioTableApp {
                     this.metrics = {
                         total: items.length,
                         health: items.length ? Math.round(((items.length - missingPriceItems.length) / items.length) * 100) : 100,
-                        missing: missingPriceItems.length,
                         totalValue: items.reduce((sum, item) => sum + ((item.price_eur || 0) * (item.shares || 0)), 0),
                         lastUpdate: items.reduce((latest, item) => !latest || (item.last_updated && item.last_updated > latest) ? item.last_updated : latest, null)
                     };
@@ -812,14 +832,13 @@ class PortfolioTableApp {
                     this.metrics = {
                         total: filteredItems.length,
                         health: filteredItems.length ? Math.round(((filteredItems.length - missingPriceItems.length) / filteredItems.length) * 100) : 100,
-                        missing: missingPriceItems.length,
                         totalValue: filteredItems.reduce((sum, item) => sum + ((item.price_eur || 0) * (item.shares || 0)), 0),
                         lastUpdate: filteredItems.reduce((latest, item) => !latest || (item.last_updated && item.last_updated > latest) ? item.last_updated : latest, null)
                     };
 
                     // Force Vue to re-render the filtered list
                     this.$forceUpdate();
-                    console.log(`Updated metrics: ${this.metrics.total} items, ${this.metrics.missing} missing prices`);
+                    console.log(`Updated metrics: ${this.metrics.total} items`);
                     console.log(`Filtering conditions: portfolio=${this.selectedPortfolio}, show missing only=${this.showOnlyMissingPrices}`);
                 },
 
@@ -1203,6 +1222,13 @@ class PortfolioTableApp {
                     if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
                     if (diff < 2592000) return `${Math.floor(diff / 86400)}d ago`;
                     return d.toLocaleDateString();
+                },
+
+                // Get health color class based on percentage
+                getHealthColorClass(percentage) {
+                    if (percentage >= 100) return 'health-green';
+                    if (percentage >= 70) return 'health-orange';
+                    return 'health-red';
                 },
 
                 // Sort table by column
