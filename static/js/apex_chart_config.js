@@ -48,8 +48,153 @@ const ChartConfig = {
         }]
     },
 
+    // Standardized donut chart configuration
+    standardDonutConfig: {
+        height: 350,
+        showTotal: false,
+        dataLabelFormatter: function (val, opts) {
+            const element = document.getElementById(opts.w.config.chart.id || 'chart');
+            const labels = opts.w.config.labels || [];
+            const label = labels[opts.seriesIndex] || '';
+            return `${label} ${val.toFixed(1)}%`;
+        },
+        formatCurrency: v => `€${Math.round(v).toLocaleString()}`,
+        formatPercentage: v => `${v.toFixed(1)}%`
+    },
+
+    // Centralized color mapping for consistent colors across all donut charts
+    colorMapping: {
+        // Companies - Crypto
+        'Bitcoin': '#FF6B6B',
+        'Ethereum': '#4ECDC4',
+        'Solana': '#45B7D1',
+        'Chainlink': '#96CEB4',
+        'Loopring': '#FFEAA7',
+        'Dogecoin': '#DDA0DD',
+        'Pepe': '#98D8C8',
+        'IOTA': '#F7DC6F',
+        'TRON': '#BB8FCE',
+        'Convex Finance': '#85C1E9',
+        'Apu Apustaja': '#F8C471',
+
+        // Companies - Others
+        'Gamestop \'A\'': '#E74C3C',
+        'Xetra-Gold ETC': '#FFD700',
+        'Cosmos': '#9B59B6',
+        'Téléperformance': '#3498DB',
+        'VanEck Vectors Gold Miners UCITS ETF': '#F39C12',
+        'British American Tobacco (ADR)': '#8B4513',
+        'Volkswagen': '#34495E',
+        'Stellantis N.V.': '#2C3E50',
+        'BOSS ENERGY LTD.': '#16A085',
+        'Paladin Energy': '#27AE60',
+
+        // Categories
+        'Blue Chip': '#4B7BEC',
+        'L1': '#45B7D1',
+        'Infra': '#A55EEA',
+        'DeFi': '#FD9644',
+        'Meme': '#F6B93B',
+        'Uncategorized': '#778CA3',
+        'Gold': '#FFD700',
+        'Oil': '#2F3542',
+        'Shipping': '#3867D6',
+        'Tobacco': '#8B4513',
+        'Automotive': '#34495E',
+        'Service Industry': '#E74C3C',
+
+        // Countries
+        'USA': '#3498DB',
+        'Europe': '#2ECC71',
+        'China': '#E74C3C',
+        'Japan': '#F39C12',
+        'Unknown': '#95A5A6',
+
+        // Portfolios
+        'crypto': '#9B59B6',
+        'dividend': '#1ABC9C',
+        'GME': '#E74C3C',
+        'value': '#3498DB',
+
+        // Fallback colors for items not in the mapping
+        fallback: [
+            '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+            '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9',
+            '#F8C471', '#82E0AA', '#F1948A', '#AED6F1', '#F4D03F',
+            '#D2B4DE', '#A3E4D7', '#FAD7A0', '#D5A6BD', '#AED6F1'
+        ]
+    },
+
     // Chart instances cache
     chartInstances: {},
+
+    /**
+     * Converts HSL color values to hex
+     * @param {number} h - Hue (0-360)
+     * @param {number} s - Saturation (0-100)
+     * @param {number} l - Lightness (0-100)
+     * @returns {string} Hex color string
+     */
+    hslToHex(h, s, l) {
+        s /= 100;
+        l /= 100;
+        const c = (1 - Math.abs(2 * l - 1)) * s;
+        const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+        const m = l - c / 2;
+        let r, g, b;
+
+        if (h < 60) { r = c; g = x; b = 0; }
+        else if (h < 120) { r = x; g = c; b = 0; }
+        else if (h < 180) { r = 0; g = c; b = x; }
+        else if (h < 240) { r = 0; g = x; b = c; }
+        else if (h < 300) { r = x; g = 0; b = c; }
+        else { r = c; g = 0; b = x; }
+
+        r = Math.round((r + m) * 255);
+        g = Math.round((g + m) * 255);
+        b = Math.round((b + m) * 255);
+
+        return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+    },
+
+    /**
+     * Generates an array of consistent, well-distributed colors.
+     * This is the centralized color palette for all charts in the application.
+     * @param {number} count - The number of colors to generate.
+     * @returns {Array<string>}
+     */
+    generateColors(count) {
+        // Primary color palette for consistent theming
+        const basePalette = [
+            '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+            '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9',
+            '#F8C471', '#82E0AA', '#F1948A', '#AED6F1', '#F4D03F',
+            '#D2B4DE', '#A3E4D7', '#FAD7A0', '#D5A6BD', '#AED6F1'
+        ];
+
+        const result = [];
+
+        if (count <= basePalette.length) {
+            // If we need fewer colors than the base palette, return subset
+            for (let i = 0; i < count; i++) {
+                result.push(basePalette[i]);
+            }
+        } else {
+            // If we need more colors, use base palette + generated HSL colors
+            result.push(...basePalette);
+
+            // Generate additional colors using HSL for consistency
+            const additionalCount = count - basePalette.length;
+            for (let i = 0; i < additionalCount; i++) {
+                const hue = (i * 137.508) % 360; // Golden angle distribution
+                const saturation = 65 + (i % 3) * 10; // Vary saturation slightly
+                const lightness = 60 + (i % 2) * 10; // Vary lightness slightly
+                result.push(this.hslToHex(hue, saturation, lightness));
+            }
+        }
+
+        return result;
+    },
 
     /**
      * Creates a doughnut chart
@@ -69,7 +214,7 @@ const ChartConfig = {
 
         const {
             title = '',
-            colors = this.generateColors(labels.length),
+            colors = this.getConsistentColors(labels),
             percentages,
             formatCurrency = v => `€${Math.round(v).toLocaleString()}`,
             formatPercentage = v => `${v.toFixed(1)}%`,
@@ -261,11 +406,11 @@ const ChartConfig = {
 
             chart.updateOptions({
                 labels: enhancedLabels,
-                colors: colors || this.generateColors(labels.length)
+                colors: colors || this.getConsistentColors(labels)
             });
             chart.updateSeries(values);
         } else {
-            this.createDoughnutChart(elementId, labels, values, { colors });
+            this.createDoughnutChart(elementId, labels, values, { colors: colors || this.getConsistentColors(labels) });
         }
     },
 
@@ -609,28 +754,93 @@ const ChartConfig = {
     },
 
     /**
-     * Generates an array of default colors.
-     * @param {number} count - The number of colors to generate.
-     * @returns {Array<string>}
-     */
-    generateColors(count) {
-        const colors = [
-            '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
-            '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9',
-            '#F8C471', '#82E0AA', '#F1948A', '#85C1E9', '#F4D03F'
-        ];
-        const result = [];
-        for (let i = 0; i < count; i++) {
-            result.push(colors[i % colors.length]);
-        }
-        return result;
-    },
-
-    /**
      * Retrieves the default color palette.
      * @param {number} [count] - The number of colors to return.
      */
     getColorPalette(count) {
         // Implementation of getColorPalette method
+    },
+
+    /**
+     * Creates a standardized doughnut chart with consistent formatting
+     *
+     * @param {string} elementId - ID of the element to render chart in
+     * @param {Array<string>} labels - Array of labels
+     * @param {Array<number>} values - Array of values
+     * @param {Object} overrides - Optional overrides for standard config
+     */
+    createStandardDoughnutChart(elementId, labels, values, overrides = {}) {
+        // Merge standard config with any overrides
+        const config = { ...this.standardDonutConfig, ...overrides };
+
+        // Use consistent colors based on labels if not provided
+        if (!config.colors) {
+            config.colors = this.getConsistentColors(labels);
+        }
+
+        return this.createDoughnutChart(elementId, labels, values, config);
+    },
+
+    /**
+     * Gets consistent colors for donut charts based on labels
+     * @param {Array<string>} labels - Array of labels
+     * @returns {Array<string>} Array of colors
+     */
+    getConsistentColors(labels) {
+        console.log('getConsistentColors called with labels:', labels);
+
+        const colors = [];
+        const usedFallbackIndices = new Set();
+
+        labels.forEach((label) => {
+            let colorFound = false;
+
+            // First, check for exact match
+            if (this.colorMapping[label]) {
+                colors.push(this.colorMapping[label]);
+                colorFound = true;
+                console.log(`Exact match found for "${label}": ${this.colorMapping[label]}`);
+            } else {
+                // Try to find a match in the color mapping keys
+                // This handles cases where the label might have extra info like percentages
+                for (const [key, color] of Object.entries(this.colorMapping)) {
+                    // Skip the fallback array
+                    if (key === 'fallback') continue;
+
+                    if (typeof key === 'string' && typeof label === 'string' && typeof color === 'string') {
+                        // Check if the label contains the key or vice versa
+                        if (label.includes(key) || key.includes(label)) {
+                            colors.push(color);
+                            colorFound = true;
+                            console.log(`Partial match found for "${label}" with key "${key}": ${color}`);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (!colorFound) {
+                // Use a fallback color that hasn't been used yet
+                let fallbackIndex = 0;
+                while (usedFallbackIndices.has(fallbackIndex) && fallbackIndex < this.colorMapping.fallback.length) {
+                    fallbackIndex++;
+                }
+
+                if (fallbackIndex < this.colorMapping.fallback.length) {
+                    colors.push(this.colorMapping.fallback[fallbackIndex]);
+                    usedFallbackIndices.add(fallbackIndex);
+                    console.log(`Using fallback color for "${label}": ${this.colorMapping.fallback[fallbackIndex]}`);
+                } else {
+                    // If we've used all fallback colors, generate a new one
+                    const hue = (fallbackIndex * 137.508) % 360;
+                    const generatedColor = this.hslToHex(hue, 65, 60);
+                    colors.push(generatedColor);
+                    console.log(`Generated new color for "${label}": ${generatedColor}`);
+                }
+            }
+        });
+
+        console.log('Final colors array:', colors);
+        return colors;
     }
 }; 

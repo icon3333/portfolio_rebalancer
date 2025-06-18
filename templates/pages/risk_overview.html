@@ -850,8 +850,6 @@
             console.log('Portfolio chart - labels:', cleanedLabels);
             console.log('Portfolio chart - values:', cleanedValues);
 
-            const colors = ChartConfig.generateColors(cleanedLabels.length);
-
             try {
                 const chartElement = document.getElementById('portfolioAllocationsChart');
                 if (!chartElement) {
@@ -863,23 +861,17 @@
                 chartElement.style.display = 'block';
                 chartElement.style.minHeight = '350px';
 
-                if (typeof ChartConfig !== 'undefined' && ChartConfig.createDoughnutChart) {
-                    ChartConfig.createDoughnutChart(
+                if (typeof ChartConfig !== 'undefined' && ChartConfig.createStandardDoughnutChart) {
+                    ChartConfig.createStandardDoughnutChart(
                         'portfolioAllocationsChart',
                         cleanedLabels,
                         cleanedValues,
                         {
-                            colors: colors,
-                            height: 350,
-                            showTotal: false,
-                            dataLabelFormatter: function (val, opts) {
-                                const label = cleanedLabels[opts.seriesIndex];
-                                return `${label} ${val.toFixed(1)}%`;
-                            }
+                            // colors will be automatically assigned based on labels
                         }
                     );
                 } else {
-                    console.error('ChartConfig.createDoughnutChart not available');
+                    console.error('ChartConfig.createStandardDoughnutChart not available');
                     document.getElementById('portfolioAllocationsChart').innerHTML =
                         '<div class="has-text-centered p-4"><p class="has-text-grey-light">Chart library not loaded</p></div>';
                 }
