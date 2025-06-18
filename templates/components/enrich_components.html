@@ -70,7 +70,28 @@
     /* Portfolio table styling */
     .portfolio-editor {
         height: 600px;
+        display: flex;
+        flex-direction: column;
+        padding: 0;
+    }
+
+    .portfolio-controls-container {
+        flex-shrink: 0;
+        /* Prevent controls from shrinking */
+        background-color: var(--bg);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        border-bottom: 1px solid var(--border-color);
+        padding: var(--space-md);
+        margin-bottom: 0;
+        /* Remove any default margin */
+    }
+
+    .portfolio-table-container {
+        flex: 1;
         overflow: auto;
+        /* Only the table area scrolls */
         padding: 0;
     }
 
@@ -120,7 +141,8 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: var(--space-md);
+        margin-bottom: 0;
+        /* Remove margin since it's in the fixed container */
     }
 
     .controls-group {
@@ -541,13 +563,6 @@
 
                             <!-- Action buttons with consistent styling -->
                             <div class="buttons are-small mb-0">
-                                <button class="button" id="open-bulk-edit-btn">
-                                    <span class="icon is-small">
-                                        <i class="fas fa-edit"></i>
-                                    </span>
-                                    <span>Bulk Edit</span>
-                                </button>
-
                                 <button class="button is-primary" id="update-all-data-btn">
                                     <span class="icon is-small">
                                         <i class="fas fa-sync-alt"></i>
@@ -604,439 +619,199 @@
             </div>
 
             <!-- Bulk Edit Controls -->
-            <div v-if="!loading && filteredPortfolioItems.length > 0 && selectedItemIds.length > 0"
-                class="box mb-4 p-4">
-                <div class="level">
-                    <div class="level-left">
-                        <div class="level-item">
-                            <span class="has-text-weight-semibold">
-                                {% raw %}{{ selectedItemIds.length }} item{{ selectedItemIds.length === 1 ? '' : 's' }}
-                                selected{% endraw %}
-                            </span>
+            <div class="portfolio-table-container">
+                <div v-if="!loading && filteredPortfolioItems.length > 0 && selectedItemIds.length > 0"
+                    class="box mb-4 p-4">
+                    <div class="level">
+                        <div class="level-left">
+                            <div class="level-item">
+                                <span class="has-text-weight-semibold">
+                                    {% raw %}{{ selectedItemIds.length }} item{{ selectedItemIds.length === 1 ? '' : 's'
+                                    }} selected{% endraw %}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="level-right">
+                            <div class="level-item">
+                                <div class="field has-addons">
+                                    <div class="control">
+                                        <div class="select is-small">
+                                            <select v-model="bulkPortfolio">
+                                                <option value="">Select Portfolio</option>
+                                                {% for portfolio in portfolios %}
+                                                <option value="{{ portfolio }}">{{ portfolio }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="control">
+                                        <input class="input is-small" type="text" v-model="bulkCategory"
+                                            placeholder="Category">
+                                    </div>
+                                    <div class="control">
+                                        <button class="button is-small is-primary" @click="applyBulkChanges"
+                                            :disabled="(!bulkPortfolio && !bulkCategory) || isBulkProcessing"
+                                            :class="{'is-loading': isBulkProcessing}">
+                                            Apply Changes
+                                        </button>
+                                    </div>
+                                    <div class="control">
+                                        <button class="button is-small" @click="clearSelection">
+                                            Clear Selection
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div class="level-right">
-                        <div class="level-item">
-                            <div class="field has-addons">
-                                <div class="control">
+                </div>
+
+                <!-- Portfolio table with better structure -->
+                <div v-if="!loading && filteredPortfolioItems.length > 0" class="table-container">
+                    <table class="table is-striped is-hoverable is-fullwidth portfolio-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px;">
+                                    <label class="checkbox">
+                                        <input type="checkbox" :checked="allFilteredSelected" @change="toggleSelectAll"
+                                            :indeterminate.prop="someFilteredSelected && !allFilteredSelected">
+                                    </label>
+                                </th>
+                                <th>Update</th>
+                                <th @click="sortBy('identifier')" class="is-sortable">
+                                    Identifier
+                                    <span class="icon is-small has-tooltip-right"
+                                        data-tooltip="Supported formats: Stock tickers (AAPL), Crypto (BTC-USD), or ISINs (US0378331005)">
+                                        <i class="fas fa-question-circle"></i>
+                                    </span>
+                                    <span class="icon is-small ml-1" v-if="sortColumn === 'identifier'">
+                                        <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
+                                    </span>
+                                </th>
+                                <th @click="sortBy('company')" class="is-sortable">
+                                    Company
+                                    <span class="icon is-small ml-1" v-if="sortColumn === 'company'">
+                                        <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
+                                    </span>
+                                </th>
+                                <th @click="sortBy('portfolio')" class="is-sortable">
+                                    Portfolio
+                                    <span class="icon is-small ml-1" v-if="sortColumn === 'portfolio'">
+                                        <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
+                                    </span>
+                                </th>
+                                <th @click="sortBy('category')" class="is-sortable">
+                                    Category
+                                    <span class="icon is-small ml-1" v-if="sortColumn === 'category'">
+                                        <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
+                                    </span>
+                                </th>
+                                <th @click="sortBy('shares')" class="is-sortable">
+                                    Shares
+                                    <span class="icon is-small ml-1" v-if="sortColumn === 'shares'">
+                                        <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
+                                    </span>
+                                </th>
+                                <th @click="sortBy('price_eur')" class="is-sortable">
+                                    Price (EUR)
+                                    <span class="icon is-small ml-1" v-if="sortColumn === 'price_eur'">
+                                        <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
+                                    </span>
+                                </th>
+                                <th @click="sortBy('total_value')" class="is-sortable">
+                                    Total Value
+                                    <span class="icon is-small ml-1" v-if="sortColumn === 'total_value'">
+                                        <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
+                                    </span>
+                                </th>
+                                <th @click="sortBy('total_invested')" class="is-sortable">
+                                    Total Invested
+                                    <span class="icon is-small ml-1" v-if="sortColumn === 'total_invested'">
+                                        <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
+                                    </span>
+                                </th>
+                                <th @click="sortBy('last_updated')" class="is-sortable">
+                                    Last Update
+                                    <span class="icon is-small ml-1" v-if="sortColumn === 'last_updated'">
+                                        <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
+                                    </span>
+                                </th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="item in filteredPortfolioItems" :key="item.id">
+                                <td>
+                                    <label class="checkbox">
+                                        <input type="checkbox" :value="item.id" v-model="selectedItemIds">
+                                    </label>
+                                </td>
+                                <td>
+                                    <button class="button is-small is-info" @click="confirmPriceUpdate(item)"
+                                        :class="{'is-loading': isUpdating && selectedItem.id === item.id}"
+                                        :disabled="isUpdating" title="Update price immediately">
+                                        <span class="icon is-small">
+                                            <i class="fas fa-sync"></i>
+                                        </span>
+                                    </button>
+                                </td>
+                                <td>
+                                    <input class="input is-small" type="text" v-model="item.identifier"
+                                        @input="debouncedSaveIdentifierChange(item)"
+                                        @change="saveIdentifierChange(item)">
+                                </td>
+                                <td>
+                                    <span v-text="item.company"></span>
+                                </td>
+                                <td class="input-column">
                                     <div class="select is-small">
-                                        <select v-model="bulkPortfolio">
-                                            <option value="">Select Portfolio</option>
+                                        <select v-model="item.portfolio" @change="debouncedSavePortfolioChange(item)">
+                                            <!-- Special handling for the default portfolio value '-' -->
                                             {% for portfolio in portfolios %}
                                             <option value="{{ portfolio }}">{{ portfolio }}</option>
                                             {% endfor %}
                                         </select>
                                     </div>
-                                </div>
-                                <div class="control">
-                                    <input class="input is-small" type="text" v-model="bulkCategory"
-                                        placeholder="Category">
-                                </div>
-                                <div class="control">
-                                    <button class="button is-small is-primary" @click="applyBulkChanges"
-                                        :disabled="(!bulkPortfolio && !bulkCategory) || isBulkProcessing"
-                                        :class="{'is-loading': isBulkProcessing}">
-                                        Apply Changes
-                                    </button>
-                                </div>
-                                <div class="control">
-                                    <button class="button is-small" @click="clearSelection">
-                                        Clear Selection
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                                </td>
+                                <td class="input-column">
+                                    <input class="input is-small" type="text" v-model="item.category"
+                                        @input="debouncedSaveCategoryChange(item)" @change="saveCategoryChange(item)">
+                                </td>
+                                <td class="input-column">
+                                    <input class="input is-small" type="text" :value="formatNumber(item.shares)"
+                                        @input="(e) => { item.shares = parseFloat(e.target.value); debouncedSaveSharesChange(item); }"
+                                        @change="saveSharesChange(item)">
+                                </td>
+                                <td :class="{'has-text-danger': !item.price_eur}">
+                                    <span v-text="item.price_eur ? formatCurrency(item.price_eur) : 'No price'"></span>
+                                </td>
+                                <td>
+                                    <span v-text="formatCurrency(item.price_eur * item.shares)"></span>
+                                </td>
+                                <td>
+                                    <span v-text="formatCurrency(item.total_invested)"></span>
+                                </td>
+                                <td>
+                                    <span v-text="formatDateAgo(item.last_updated)"></span>
+                                </td>
+                                <td>
+                                    <div class="buttons is-right">
+                                        <button class="button is-small is-danger" @click="confirmDelete(item)"
+                                            :class="{'is-loading': isDeleting && selectedItem.id === item.id}"
+                                            :disabled="isDeleting">
+                                            <span class="icon is-small">
+                                                <i class="fas fa-trash"></i>
+                                            </span>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
-            </div>
-
-            <!-- Portfolio table with better structure -->
-            <div v-if="!loading && filteredPortfolioItems.length > 0" class="table-container">
-                <table class="table is-striped is-hoverable is-fullwidth portfolio-table">
-                    <thead>
-                        <tr>
-                            <th style="width: 40px;">
-                                <label class="checkbox">
-                                    <input type="checkbox" :checked="allFilteredSelected" @change="toggleSelectAll"
-                                        :indeterminate.prop="someFilteredSelected && !allFilteredSelected">
-                                </label>
-                            </th>
-                            <th>Update</th>
-                            <th @click="sortBy('identifier')" class="is-sortable">
-                                Identifier
-                                <span class="icon is-small has-tooltip-right"
-                                    data-tooltip="Supported formats: Stock tickers (AAPL), Crypto (BTC-USD), or ISINs (US0378331005)">
-                                    <i class="fas fa-question-circle"></i>
-                                </span>
-                                <span class="icon is-small ml-1" v-if="sortColumn === 'identifier'">
-                                    <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
-                                </span>
-                            </th>
-                            <th @click="sortBy('company')" class="is-sortable">
-                                Company
-                                <span class="icon is-small ml-1" v-if="sortColumn === 'company'">
-                                    <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
-                                </span>
-                            </th>
-                            <th @click="sortBy('portfolio')" class="is-sortable">
-                                Portfolio
-                                <span class="icon is-small ml-1" v-if="sortColumn === 'portfolio'">
-                                    <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
-                                </span>
-                            </th>
-                            <th @click="sortBy('category')" class="is-sortable">
-                                Category
-                                <span class="icon is-small ml-1" v-if="sortColumn === 'category'">
-                                    <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
-                                </span>
-                            </th>
-                            <th @click="sortBy('shares')" class="is-sortable">
-                                Shares
-                                <span class="icon is-small ml-1" v-if="sortColumn === 'shares'">
-                                    <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
-                                </span>
-                            </th>
-                            <th @click="sortBy('price_eur')" class="is-sortable">
-                                Price (EUR)
-                                <span class="icon is-small ml-1" v-if="sortColumn === 'price_eur'">
-                                    <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
-                                </span>
-                            </th>
-                            <th @click="sortBy('total_value')" class="is-sortable">
-                                Total Value
-                                <span class="icon is-small ml-1" v-if="sortColumn === 'total_value'">
-                                    <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
-                                </span>
-                            </th>
-                            <th @click="sortBy('total_invested')" class="is-sortable">
-                                Total Invested
-                                <span class="icon is-small ml-1" v-if="sortColumn === 'total_invested'">
-                                    <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
-                                </span>
-                            </th>
-                            <th @click="sortBy('last_updated')" class="is-sortable">
-                                Last Update
-                                <span class="icon is-small ml-1" v-if="sortColumn === 'last_updated'">
-                                    <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
-                                </span>
-                            </th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="item in filteredPortfolioItems" :key="item.id">
-                            <td>
-                                <label class="checkbox">
-                                    <input type="checkbox" :value="item.id" v-model="selectedItemIds">
-                                </label>
-                            </td>
-                            <td>
-                                <button class="button is-small is-info" @click="confirmPriceUpdate(item)"
-                                    :class="{'is-loading': isUpdating && selectedItem.id === item.id}"
-                                    :disabled="isUpdating" title="Update price immediately">
-                                    <span class="icon is-small">
-                                        <i class="fas fa-sync"></i>
-                                    </span>
-                                </button>
-                            </td>
-                            <td>
-                                <input class="input is-small" type="text" v-model="item.identifier"
-                                    @input="debouncedSaveIdentifierChange(item)" @change="saveIdentifierChange(item)">
-                            </td>
-                            <td>
-                                <span v-text="item.company"></span>
-                            </td>
-                            <td class="input-column">
-                                <div class="select is-small">
-                                    <select v-model="item.portfolio" @change="debouncedSavePortfolioChange(item)">
-                                        <!-- Special handling for the default portfolio value '-' -->
-                                        {% for portfolio in portfolios %}
-                                        <option value="{{ portfolio }}">{{ portfolio }}</option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
-                            </td>
-                            <td class="input-column">
-                                <input class="input is-small" type="text" v-model="item.category"
-                                    @input="debouncedSaveCategoryChange(item)" @change="saveCategoryChange(item)">
-                            </td>
-                            <td class="input-column">
-                                <input class="input is-small" type="text" :value="formatNumber(item.shares)"
-                                    @input="(e) => { item.shares = parseFloat(e.target.value); debouncedSaveSharesChange(item); }"
-                                    @change="saveSharesChange(item)">
-                            </td>
-                            <td :class="{'has-text-danger': !item.price_eur}">
-                                <span v-text="item.price_eur ? formatCurrency(item.price_eur) : 'No price'"></span>
-                            </td>
-                            <td>
-                                <span v-text="formatCurrency(item.price_eur * item.shares)"></span>
-                            </td>
-                            <td>
-                                <span v-text="formatCurrency(item.total_invested)"></span>
-                            </td>
-                            <td>
-                                <span v-text="formatDateAgo(item.last_updated)"></span>
-                            </td>
-                            <td>
-                                <div class="buttons is-right">
-                                    <button class="button is-small is-danger" @click="confirmDelete(item)"
-                                        :class="{'is-loading': isDeleting && selectedItem.id === item.id}"
-                                        :disabled="isDeleting">
-                                        <span class="icon is-small">
-                                            <i class="fas fa-trash"></i>
-                                        </span>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
             </div>
         </div>
     </div>
 </div>
-</div>
-{% endmacro %}
-
-{% macro bulk_edit_modal(portfolios) %}
-<div class="modal" id="bulk-edit-modal">
-    <div class="modal-background"></div>
-    <div class="modal-card">
-        <header class="modal-card-head">
-            <p class="modal-card-title">Bulk Edit</p>
-            <button class="delete" aria-label="close"></button>
-        </header>
-        <section class="modal-card-body">
-            <!-- Bulk Edit App Container -->
-            <div id="bulk-edit-app" v-cloak>
-                <div v-if="loading" class="has-text-centered my-4">
-                    <span class="icon is-large">
-                        <i class="fas fa-spinner fa-pulse fa-2x"></i>
-                    </span>
-                    <p>Loading data...</p>
-                </div>
-
-                <div v-else>
-                    <!-- Tab Navigation -->
-                    <div class="tabs">
-                        <ul>
-                            <li :class="{'is-active': activeTab === 'portfolio'}">
-                                <a @click="activeTab = 'portfolio'">Portfolio Assignment</a>
-                            </li>
-                            <li :class="{'is-active': activeTab === 'category'}">
-                                <a @click="activeTab = 'category'">Category Assignment</a>
-                            </li>
-                            <li :class="{'is-active': activeTab === 'management'}">
-                                <a @click="activeTab = 'management'">Portfolio Management</a>
-                            </li>
-                        </ul>
-                    </div>
-
-                    <!-- Tab Content -->
-                    <div class="tab-content">
-                        <!-- Portfolio Assignment Tab -->
-                        <div v-show="activeTab === 'portfolio'" class="tab-pane">
-                            <div class="field mb-4">
-                                <label class="label">Assign selected companies to portfolio:</label>
-                                <div class="field has-addons">
-                                    <div class="control is-expanded">
-                                        <div class="select is-fullwidth">
-                                            <select v-model="selectedPortfolio">
-                                                <option value="">Select a portfolio</option>
-                                                <option v-for="portfolio in portfolios" :value="portfolio">
-                                                    {% raw %}{{ portfolio }}{% endraw %}
-                                                </option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="control">
-                                        <button class="button is-primary" @click="applyPortfolioChanges"
-                                            :disabled="!selectedPortfolio || selectedCompaniesCount === 0 || isProcessing"
-                                            :class="{'is-loading': isProcessing}">
-                                            Apply
-                                        </button>
-                                    </div>
-                                </div>
-                                <p class="help mt-2">
-                                    <span v-if="selectedCompaniesCount > 0">
-                                        {% raw %}{{ selectedCompaniesCount }}{% endraw %} companies selected
-                                    </span>
-                                    <span v-else class="has-text-danger">
-                                        Please select at least one company
-                                    </span>
-                                </p>
-                            </div>
-
-                            <!-- Companies List -->
-                            <div class="company-list-container mt-4">
-                                <div v-for="(companies, portfolio) in computedGroupedCompanies" :key="portfolio"
-                                    class="mb-4">
-                                    <!-- Portfolio Header with Select All -->
-                                    <div class="portfolio-header">
-                                        <h4 class="portfolio-title">{% raw %}{{ portfolio }}{% endraw %}</h4>
-                                        <label class="checkbox select-all">
-                                            <input type="checkbox" :checked="isPortfolioSelected(portfolio)"
-                                                @change="togglePortfolio(portfolio)">
-                                            <span>Select All</span>
-                                        </label>
-                                    </div>
-
-                                    <!-- Companies in Portfolio -->
-                                    <div class="company-list pl-3">
-                                        <label v-for="company in companies" :key="company.id"
-                                            class="checkbox block py-1 px-2">
-                                            <input type="checkbox" v-model="selectedCompanies" :value="company.id">
-                                            <span class="company-name ml-2">{% raw %}{{ company.company }}{% endraw
-                                                %}</span>
-                                            <span v-if="company.identifier" class="has-text-grey ml-2">({% raw %}{{
-                                                company.identifier }}{% endraw %})</span>
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Category Assignment Tab -->
-                        <div v-show="activeTab === 'category'" class="tab-pane">
-                            <div class="field mb-4">
-                                <label class="label">Assign selected companies to category:</label>
-                                <div class="field has-addons">
-                                    <div class="control is-expanded">
-                                        <input class="input" type="text" v-model="selectedCategory"
-                                            placeholder="Enter category name">
-                                    </div>
-                                    <div class="control">
-                                        <button class="button is-primary" @click="applyCategoryChanges"
-                                            :disabled="!selectedCategory || selectedCompaniesCount === 0 || isProcessing"
-                                            :class="{'is-loading': isProcessing}">
-                                            Apply
-                                        </button>
-                                    </div>
-                                </div>
-                                <p class="help mt-2">
-                                    <span v-if="selectedCompaniesCount > 0">
-                                        {% raw %}{{ selectedCompaniesCount }}{% endraw %} companies selected
-                                    </span>
-                                    <span v-else class="has-text-danger">
-                                        Please select at least one company
-                                    </span>
-                                </p>
-                            </div>
-
-                            <!-- Companies List (same as in Portfolio tab) -->
-                            <div class="company-list-container mt-4">
-                                <div v-for="(companies, portfolio) in computedGroupedCompanies" :key="portfolio"
-                                    class="mb-4">
-                                    <div class="portfolio-header">
-                                        <h4 class="portfolio-title">{% raw %}{{ portfolio }}{% endraw %}</h4>
-                                        <label class="checkbox select-all">
-                                            <input type="checkbox" :checked="isPortfolioSelected(portfolio)"
-                                                @change="togglePortfolio(portfolio)">
-                                            <span>Select All</span>
-                                        </label>
-                                    </div>
-
-                                    <div class="company-list pl-3">
-                                        <label v-for="company in companies" :key="company.id"
-                                            class="checkbox block py-1 px-2">
-                                            <input type="checkbox" v-model="selectedCompanies" :value="company.id">
-                                            <span class="company-name ml-2">{% raw %}{{ company.company }}{% endraw
-                                                %}</span>
-                                            <span v-if="company.category" class="has-text-grey ml-2">({% raw %}{{
-                                                company.category }}{% endraw %})</span>
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Portfolio Management Tab -->
-                        <div v-show="activeTab === 'management'" class="tab-pane">
-                            <h4 class="subtitle is-5 mb-4">Portfolio Management</h4>
-
-                            <!-- Add New Portfolio -->
-                            <div class="box mb-4 p-4">
-                                <h5 class="subtitle is-6 mb-3">Add New Portfolio</h5>
-                                <div class="field">
-                                    <div class="field has-addons">
-                                        <div class="control is-expanded">
-                                            <input class="input" type="text" v-model="newPortfolioName"
-                                                placeholder="Enter portfolio name">
-                                        </div>
-                                        <div class="control">
-                                            <button class="button is-success" @click="addPortfolio"
-                                                :disabled="!newPortfolioName || isProcessing"
-                                                :class="{'is-loading': isProcessing && currentAction === 'add'}">
-                                                Add
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Rename Portfolio -->
-                            <div class="box mb-4 p-4">
-                                <h5 class="subtitle is-6 mb-3">Rename Portfolio</h5>
-                                <div class="field">
-                                    <div class="control is-expanded mb-2">
-                                        <div class="select is-fullwidth">
-                                            <select v-model="renamePortfolioSource">
-                                                <option value="">Select portfolio to rename</option>
-                                                <option v-for="portfolio in portfolios" :value="portfolio">
-                                                    {% raw %}{{ portfolio }}{% endraw %}
-                                                </option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="field has-addons">
-                                    <div class="control is-expanded">
-                                        <input class="input" type="text" v-model="renamePortfolioTarget"
-                                            placeholder="New portfolio name">
-                                    </div>
-                                    <div class="control">
-                                        <button class="button is-info" @click="renamePortfolio"
-                                            :disabled="!renamePortfolioSource || !renamePortfolioTarget || isProcessing"
-                                            :class="{'is-loading': isProcessing && currentAction === 'rename'}">
-                                            Rename
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Delete Portfolio -->
-                            <div class="box p-4">
-                                <h5 class="subtitle is-6 mb-3">Delete Portfolio</h5>
-                                <div class="field has-addons">
-                                    <div class="control is-expanded">
-                                        <div class="select is-fullwidth">
-                                            <select v-model="deletePortfolioName">
-                                                <option value="">Select portfolio to delete</option>
-                                                <option v-for="portfolio in portfolios" :value="portfolio">
-                                                    {% raw %}{{ portfolio }}{% endraw %}
-                                                </option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="control">
-                                        <button class="button is-danger" @click="deletePortfolio"
-                                            :disabled="!deletePortfolioName || isProcessing"
-                                            :class="{'is-loading': isProcessing && currentAction === 'delete'}">
-                                            Delete
-                                        </button>
-                                    </div>
-                                </div>
-                                <p class="help has-text-danger mt-2">Warning: This will remove the portfolio assignment
-                                    from all items (but won't delete the items themselves).</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-        <footer class="modal-card-foot">
-            <button class="button is-text" id="bulk-edit-close-btn">Close</button>
-        </footer>
-    </div>
 </div>
 {% endmacro %}
