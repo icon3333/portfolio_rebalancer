@@ -50,7 +50,8 @@ def enrich():
         flash('Account not found', 'error')
         return redirect(url_for('main.index'))
 
-    logger.info(f"Account found: {account['username']}")
+    if isinstance(account, dict):
+        logger.info(f"Account found: {account.get('username', '')}")
 
     # Get portfolio data
     portfolio_data = get_portfolio_data(account_id)
@@ -64,7 +65,7 @@ def enrich():
     ''', [account_id])
 
     # Extract portfolio names without filtering out any valid names
-    portfolios = [{'name': p['name']} for p in portfolios_from_table]
+    portfolios = [{'name': p['name']} for p in portfolios_from_table] if portfolios_from_table else []
 
     # Ensure Default is in the list
     has_default = any(p['name'] == 'Default' for p in portfolios)
@@ -136,7 +137,8 @@ def risk_overview():
         flash('Account not found', 'error')
         return redirect(url_for('main.index'))
 
-    logger.info(f"Account found: {account['username']}")
+    if isinstance(account, dict):
+        logger.info(f"Account found: {account.get('username', '')}")
 
     return render_template('pages/risk_overview.html')
 
@@ -163,7 +165,8 @@ def analyse():
         flash('Account not found', 'error')
         return redirect(url_for('main.index'))
 
-    logger.info(f"Account found: {account['username']}")
+    if isinstance(account, dict):
+        logger.info(f"Account found: {account.get('username', '')}")
 
     return render_template('pages/analyse.html')
 
@@ -193,7 +196,8 @@ def build():
         flash('Account not found', 'error')
         return redirect(url_for('main.index'))
 
-    logger.info(f"Account found: {account['username']}")
+    if isinstance(account, dict):
+        logger.info(f"Account found: {account.get('username', '')}")
 
     # Pass empty data that Vue.js will replace
     position = {'companyName': ''}  # Placeholder to avoid Jinja2 errors
@@ -226,7 +230,8 @@ def allocate():
         flash('Account not found', 'error')
         return redirect(url_for('main.index'))
 
-    logger.info(f"Account found: {account['username']}")
+    if isinstance(account, dict):
+        logger.info(f"Account found: {account.get('username', '')}")
 
     return render_template('pages/allocate.html')
 

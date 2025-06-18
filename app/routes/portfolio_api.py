@@ -200,6 +200,8 @@ def manage_state():
             logger.error(f"Error saving state: {str(e)}")
             return jsonify({'error': str(e)}), 500
 
+    return jsonify({'error': 'Method not allowed'}), 405
+
 # API endpoint to get companies for a specific portfolio
 
 
