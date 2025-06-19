@@ -7,6 +7,8 @@ from datetime import datetime
 from typing import Dict, Any, List
 import time
 
+from flask import current_app
+
 from app.utils.yfinance_utils import get_isin_data
 from app.utils.db_utils import update_price_in_db_background, query_background_db, execute_background_db
 from app.database.db_manager import get_db
@@ -148,8 +150,7 @@ def start_batch_process(identifiers: List[str]) -> str:
     Starts a new background job to process a list of identifiers.
     Returns the job ID.
     """
-    from flask import current_app
-    app = current_app._get_current_object()
+    app = current_app._get_current_object()  # type: ignore
 
     job_id = str(uuid.uuid4())
     total = len(identifiers)
