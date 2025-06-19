@@ -1,6 +1,7 @@
 # app/utils/db_utils.py
 import logging
 from datetime import datetime
+from typing import Optional, List, Dict, Any, Union
 from app.database.db_manager import query_db, execute_db, get_background_db
 
 logger = logging.getLogger(__name__)
@@ -58,7 +59,7 @@ def execute_background_db(query, args=()):
         raise
 
 
-def update_price_in_db_background(identifier: str, price: float, currency: str, price_eur: float, country: str = None, sector: str = None, industry: str = None, modified_identifier: str = None) -> bool:
+def update_price_in_db_background(identifier: str, price: float, currency: str, price_eur: float, country: Optional[str] = None, sector: Optional[str] = None, industry: Optional[str] = None, modified_identifier: Optional[str] = None) -> bool:
     """
     Update price in database for a single identifier from background threads.
     This version uses get_background_db() and doesn't require Flask application context.
@@ -150,7 +151,7 @@ def update_price_in_db_background(identifier: str, price: float, currency: str, 
         return False
 
 
-def update_price_in_db(identifier: str, price: float, currency: str, price_eur: float, country: str = None, sector: str = None, industry: str = None, modified_identifier: str = None) -> bool:
+def update_price_in_db(identifier: str, price: float, currency: str, price_eur: float, country: Optional[str] = None, sector: Optional[str] = None, industry: Optional[str] = None, modified_identifier: Optional[str] = None) -> bool:
     """
     Update price in database for a single identifier.
 
@@ -251,6 +252,9 @@ def get_portfolios(account_id):
             ORDER BY name
         ''', [account_id])
 
+        if portfolios is None:
+            return []
+        
         return [{'id': p['id'], 'name': p['name']} for p in portfolios]
     except Exception as e:
         logger.error(f"Error getting portfolios: {str(e)}")
@@ -306,12 +310,13 @@ def load_portfolio_data(account_id=None, portfolio_id=None):
 
         company_count = query_db(
             company_check_query, company_check_params, one=True)
-        if not company_count or company_count['count'] == 0:
+        if not company_count or (isinstance(company_count, dict) and company_count.get('count', 0) == 0):
             logger.warning(
                 f"No companies found for the specified filters (account_id={account_id}, portfolio_id={portfolio_id})")
         else:
+            count_value = company_count.get('count', 0) if isinstance(company_count, dict) else 0
             logger.info(
-                f"Found {company_count['count']} companies for the specified filters")
+                f"Found {count_value} companies for the specified filters")
 
         # Build main query
         params = []
@@ -510,9 +515,15 @@ def update_prices(portfolio_items, get_price_function=None):
             sector = price_data.get('sector')
             industry = price_data.get('industry')
 
+            # Validate required numeric values
+            if price is None or price_eur is None:
+                failure_count += 1
+                updated_items.append(item)
+                continue
+
             # Update database
             updated = update_price_in_db(
-                identifier, price, currency, price_eur, country, sector, industry
+                identifier, float(price), currency, float(price_eur), country, sector, industry
             )
 
             if updated:
