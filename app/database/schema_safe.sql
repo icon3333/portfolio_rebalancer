@@ -43,8 +43,7 @@ CREATE TABLE IF NOT EXISTS market_prices (
  last_updated DATETIME,
  country TEXT,
  sector TEXT,
- industry TEXT,
- exchange TEXT
+ industry TEXT
 );
 -- Create expanded_state table
 CREATE TABLE IF NOT EXISTS expanded_state (
@@ -100,4 +99,6 @@ AFTER UPDATE ON background_jobs
 BEGIN
  UPDATE background_jobs SET updated_at = CURRENT_TIMESTAMP
  WHERE id = NEW.id;
-END; 
+END;
+
+ 
