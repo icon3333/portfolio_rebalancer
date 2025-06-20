@@ -780,6 +780,7 @@ def update_portfolio_api():
                                 country=price_data.get('country'),
                                 sector=price_data.get('sector'),
                                 industry=price_data.get('industry'),
+                                exchange=price_data.get('exchange'),
                                 modified_identifier=price_data.get(
                                     'modified_identifier')
                             )

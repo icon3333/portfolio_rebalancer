@@ -43,7 +43,8 @@ CREATE TABLE IF NOT EXISTS market_prices (
  last_updated DATETIME,
  country TEXT,
  sector TEXT,
- industry TEXT
+ industry TEXT,
+ exchange TEXT
 );
 -- Create expanded_state table
 CREATE TABLE IF NOT EXISTS expanded_state (

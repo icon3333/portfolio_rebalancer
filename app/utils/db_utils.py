@@ -59,7 +59,7 @@ def execute_background_db(query, args=()):
         raise
 
 
-def update_price_in_db_background(identifier: str, price: float, currency: str, price_eur: float, country: Optional[str] = None, sector: Optional[str] = None, industry: Optional[str] = None, modified_identifier: Optional[str] = None) -> bool:
+def update_price_in_db_background(identifier: str, price: float, currency: str, price_eur: float, country: Optional[str] = None, sector: Optional[str] = None, industry: Optional[str] = None, exchange: Optional[str] = None, modified_identifier: Optional[str] = None) -> bool:
     """
     Update price in database for a single identifier from background threads.
     This version uses get_background_db() and doesn't require Flask application context.
@@ -72,6 +72,7 @@ def update_price_in_db_background(identifier: str, price: float, currency: str, 
         country: Country of the company
         sector: Sector of the company
         industry: Industry of the company
+        exchange: Exchange where the company is listed
         modified_identifier: If provided, update the company's identifier to this value
 
     Returns:
@@ -113,20 +114,20 @@ def update_price_in_db_background(identifier: str, price: float, currency: str, 
         if existing:
             # Update existing record
             execute_background_db('''
-                UPDATE market_prices 
-                SET price = ?, currency = ?, price_eur = ?, last_updated = ?, 
-                    country = ?, sector = ?, industry = ?
+                UPDATE market_prices
+                SET price = ?, currency = ?, price_eur = ?, last_updated = ?,
+                    country = ?, sector = ?, industry = ?, exchange = ?
                 WHERE identifier = ?
-            ''', [price, currency, price_eur, now, country, sector, industry, identifier])
+            ''', [price, currency, price_eur, now, country, sector, industry, exchange, identifier])
             logger.info(
                 f"Updated existing price record for {identifier} with additional data")
         else:
             # Insert new record
             execute_background_db('''
                 INSERT INTO market_prices 
-                (identifier, price, currency, price_eur, last_updated, country, sector, industry)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ''', [identifier, price, currency, price_eur, now, country, sector, industry])
+                (identifier, price, currency, price_eur, last_updated, country, sector, industry, exchange)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', [identifier, price, currency, price_eur, now, country, sector, industry, exchange])
             logger.info(
                 f"Created new price record for {identifier} with additional data")
 
@@ -142,7 +143,7 @@ def update_price_in_db_background(identifier: str, price: float, currency: str, 
         ''', [now, identifier])
 
         logger.info(
-            f"Successfully updated price for {identifier}: {price} {currency} ({price_eur} EUR) with country={country}, sector={sector}, industry={industry}")
+            f"Successfully updated price for {identifier}: {price} {currency} ({price_eur} EUR) with country={country}, sector={sector}, industry={industry}, exchange={exchange}")
         return True
 
     except Exception as e:
@@ -151,7 +152,7 @@ def update_price_in_db_background(identifier: str, price: float, currency: str, 
         return False
 
 
-def update_price_in_db(identifier: str, price: float, currency: str, price_eur: float, country: Optional[str] = None, sector: Optional[str] = None, industry: Optional[str] = None, modified_identifier: Optional[str] = None) -> bool:
+def update_price_in_db(identifier: str, price: float, currency: str, price_eur: float, country: Optional[str] = None, sector: Optional[str] = None, industry: Optional[str] = None, exchange: Optional[str] = None, modified_identifier: Optional[str] = None) -> bool:
     """
     Update price in database for a single identifier.
 
@@ -163,6 +164,7 @@ def update_price_in_db(identifier: str, price: float, currency: str, price_eur: 
         country: Country of the company
         sector: Sector of the company
         industry: Industry of the company
+        exchange: Exchange where the company is listed
         modified_identifier: If provided, update the company's identifier to this value
 
     Returns:
@@ -204,20 +206,20 @@ def update_price_in_db(identifier: str, price: float, currency: str, price_eur: 
         if existing:
             # Update existing record
             execute_db('''
-                UPDATE market_prices 
-                SET price = ?, currency = ?, price_eur = ?, last_updated = ?, 
-                    country = ?, sector = ?, industry = ?
+                UPDATE market_prices
+                SET price = ?, currency = ?, price_eur = ?, last_updated = ?,
+                    country = ?, sector = ?, industry = ?, exchange = ?
                 WHERE identifier = ?
-            ''', [price, currency, price_eur, now, country, sector, industry, identifier])
+            ''', [price, currency, price_eur, now, country, sector, industry, exchange, identifier])
             logger.info(
                 f"Updated existing price record for {identifier} with additional data")
         else:
             # Insert new record
             execute_db('''
-                INSERT INTO market_prices 
-                (identifier, price, currency, price_eur, last_updated, country, sector, industry)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ''', [identifier, price, currency, price_eur, now, country, sector, industry])
+                INSERT INTO market_prices
+                (identifier, price, currency, price_eur, last_updated, country, sector, industry, exchange)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', [identifier, price, currency, price_eur, now, country, sector, industry, exchange])
             logger.info(
                 f"Created new price record for {identifier} with additional data")
 
@@ -233,7 +235,7 @@ def update_price_in_db(identifier: str, price: float, currency: str, price_eur: 
         ''', [now, identifier])
 
         logger.info(
-            f"Successfully updated price for {identifier}: {price} {currency} ({price_eur} EUR) with country={country}, sector={sector}, industry={industry}")
+            f"Successfully updated price for {identifier}: {price} {currency} ({price_eur} EUR) with country={country}, sector={sector}, industry={industry}, exchange={exchange}")
         return True
 
     except Exception as e:
@@ -326,7 +328,7 @@ def load_portfolio_data(account_id=None, portfolio_id=None):
                 cs.shares, cs.override_share,
                 p.name as portfolio_name, p.id as portfolio_id,
                 mp.price, mp.currency, mp.price_eur, mp.last_updated,
-                mp.country, mp.sector, mp.industry
+                mp.country, mp.sector, mp.industry, mp.exchange
             FROM companies c
             LEFT JOIN company_shares cs ON c.id = cs.company_id
             LEFT JOIN portfolios p ON c.portfolio_id = p.id
@@ -450,6 +452,7 @@ def update_batch_prices_in_db(results):
                     result.get('country'),  # Add country information
                     result.get('sector'),    # Add sector information
                     result.get('industry'),  # Add industry information
+                    result.get('exchange'),  # Add exchange information
                     modified_identifier      # Pass modified_identifier if present
                 )
 
@@ -523,7 +526,7 @@ def update_prices(portfolio_items, get_price_function=None):
 
             # Update database
             updated = update_price_in_db(
-                identifier, float(price), currency, float(price_eur), country, sector, industry
+                identifier, float(price), currency, float(price_eur), country, sector, industry, price_data.get('exchange')
             )
 
             if updated:
