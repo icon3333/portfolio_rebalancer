@@ -56,6 +56,7 @@ def _process_single_identifier(identifier: str) -> Dict[str, Any]:
                     country=data.get('country'),
                     sector=data.get('sector'),
                     industry=data.get('industry'),
+                    exchange=data.get('exchange'),
                     modified_identifier=result.get('modified_identifier')
                 )
                 if update_success:

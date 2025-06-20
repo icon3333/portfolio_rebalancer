@@ -139,13 +139,20 @@ def verify_schema(db):
     if missing_columns:
         logger.warning(f"Missing columns in 'companies' table: {missing_columns}")
 
-    # Check market_prices table structure
+    # Check market_prices table structure and add missing columns if necessary
     market_prices_check = cursor.execute("PRAGMA table_info(market_prices)").fetchall()
     col_names = [col[1] for col in market_prices_check]
-    required_columns = ['identifier', 'price', 'currency', 'price_eur', 'last_updated']
+    required_columns = ['identifier', 'price', 'currency', 'price_eur', 'last_updated', 'exchange']
     missing_columns = [col for col in required_columns if col not in col_names]
     if missing_columns:
         logger.warning(f"Missing columns in 'market_prices' table: {missing_columns}")
+        if 'exchange' in missing_columns:
+            try:
+                cursor.execute("ALTER TABLE market_prices ADD COLUMN exchange TEXT")
+                db.commit()
+                logger.info("Added 'exchange' column to 'market_prices' table")
+            except Exception as e:
+                logger.error(f"Failed to add 'exchange' column: {e}")
 
 def is_database_empty(db):
     """

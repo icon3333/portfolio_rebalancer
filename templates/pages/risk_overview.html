@@ -647,7 +647,8 @@
                         // Include risk analysis fields
                         country: item.country || 'Unknown',
                         sector: item.sector || 'Unknown',
-                        industry: item.industry || 'Unknown'
+                        industry: item.industry || 'Unknown',
+                        exchange: item.exchange || 'Unknown'
                     });
 
                     // Update portfolio totals
@@ -944,6 +945,7 @@
                 company.sector = company.sector || 'Unknown';
                 company.industry = company.industry || 'Unknown';
                 company.category = company.category || 'Unknown';
+                company.exchange = company.exchange || 'Unknown';
 
                 return company;
             });
@@ -965,7 +967,8 @@
                         category: company.category || 'Unknown',
                         country: company.country || 'Unknown',
                         sector: company.sector || 'Unknown',
-                        industry: company.industry || 'Unknown'
+                        industry: company.industry || 'Unknown',
+                        exchange: company.exchange || 'Unknown'
                     };
                 }
 
@@ -1296,6 +1299,22 @@
                         });
                     }
                 });
+            } else if (type === 'exchange') {
+                const exchangeAllocations = {};
+                allCompanies.forEach(company => {
+                    const exchange = company.exchange || 'Unknown';
+                    exchangeAllocations[exchange] = (exchangeAllocations[exchange] || 0) + (company.currentValue || 0);
+                });
+                Object.entries(exchangeAllocations).forEach(([exchange, value]) => {
+                    const percentage = (value / totalValue) * 100;
+                    if (percentage > maxPercentage) {
+                        violations.push({
+                            name: exchange,
+                            currentPercentage: percentage,
+                            maxPercentage: maxPercentage
+                        });
+                    }
+                });
             }
 
             return violations;
@@ -1315,6 +1334,9 @@
             } else if (type === 'country') {
                 const countries = new Set(allCompanies.map(company => company.country || 'Unknown'));
                 return countries.size;
+            } else if (type === 'exchange') {
+                const exchanges = new Set(allCompanies.map(company => company.exchange || 'Unknown'));
+                return exchanges.size;
             }
 
             return 0;
@@ -1507,6 +1529,27 @@
                             name: country,
                             currentPercentage: percentage,
                             maxPercentage: allocationRules.maxPerCountry
+                        });
+                    }
+                });
+            }
+
+            // Check per exchange violations
+            if (allocationRules.maxPerExchange && allocationRules.maxPerExchange > 0) {
+                const exchangeAllocations = {};
+                allCompanies.forEach(company => {
+                    const exchange = company.exchange || 'Unknown';
+                    exchangeAllocations[exchange] = (exchangeAllocations[exchange] || 0) + (company.currentValue || 0);
+                });
+
+                Object.entries(exchangeAllocations).forEach(([exchange, value]) => {
+                    const percentage = (value / totalValue) * 100;
+                    if (percentage > allocationRules.maxPerExchange) {
+                        violations.push({
+                            type: 'Exchange',
+                            name: exchange,
+                            currentPercentage: percentage,
+                            maxPercentage: allocationRules.maxPerExchange
                         });
                     }
                 });

@@ -146,7 +146,8 @@ def get_isin_data(identifier: str) -> Dict[str, Any]:
             'currency': currency,
             'country': data.get('country'),
             'sector': data.get('sector'),
-            'industry': data.get('industry')
+            'industry': data.get('industry'),
+            'exchange': data.get('exchange', 'Unknown')
         },
         'modified_identifier': data.get('modified_identifier')
     }
@@ -184,6 +185,7 @@ def _fetch_yfinance_data_robust(identifier: str) -> Optional[Dict[str, Any]]:
                 'country': info.get('country'),
                 'sector': info.get('sector'),
                 'industry': info.get('industry'),
+                'exchange': info.get('exchange', 'Unknown'),
             }
         else:
             logger.debug(f"No valid price found for '{identifier}'")
