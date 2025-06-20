@@ -746,7 +746,9 @@ class PortfolioTableApp {
                     this.loading = true;
                     try {
                         // Load portfolio items
-                        const response = await fetch('/portfolio/api/portfolio_data');
+                        const response = await fetch('/portfolio/api/portfolio_data', {
+                            cache: 'no-store'
+                        });
                         const data = await response.json();
                         this.portfolioItems = data;
                         console.log('Loaded portfolio items:', this.portfolioItems);
@@ -757,7 +759,9 @@ class PortfolioTableApp {
 
                         // Also refresh the portfolio options from the server but only keep those that are in use
                         try {
-                            const portfoliosResponse = await fetch('/portfolio/api/portfolios');
+                            const portfoliosResponse = await fetch('/portfolio/api/portfolios', {
+                                cache: 'no-store'
+                            });
                             const portfoliosData = await portfoliosResponse.json();
 
                             if (Array.isArray(portfoliosData) && portfoliosData.length > 0) {
@@ -1362,7 +1366,9 @@ class PortfolioTableApp {
 
                 // Always fetch fresh portfolio data from the server
                 console.log('Fetching up-to-date portfolio options from server...');
-                fetch('/portfolio/api/portfolios')
+                fetch('/portfolio/api/portfolios', {
+                    cache: 'no-store'
+                })
                     .then(response => {
                         console.log('Portfolio API response status:', response.status);
                         if (!response.ok) {
