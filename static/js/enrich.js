@@ -5,7 +5,7 @@
 
 // DOM Elements and Utility Functions
 const UpdateAllDataHandler = {
-    init() {
+    async run() {
         const updateAllDataBtn = document.getElementById('update-all-data-btn');
         const progressElement = document.getElementById('price-fetch-progress');
         const progressCount = document.getElementById('progress-count');
@@ -17,11 +17,10 @@ const UpdateAllDataHandler = {
             return;
         }
 
-        updateAllDataBtn.addEventListener('click', async function () {
-            try {
-                // Disable the button to prevent multiple clicks
-                updateAllDataBtn.disabled = true;
-                updateAllDataBtn.classList.add('is-loading');
+        try {
+            // Disable the button to prevent multiple clicks
+            updateAllDataBtn.disabled = true;
+            updateAllDataBtn.classList.add('is-loading');
 
                 // Show the progress indicator
                 progressCount.textContent = '0';
@@ -204,7 +203,6 @@ const UpdateAllDataHandler = {
                 updateAllDataBtn.disabled = false;
                 updateAllDataBtn.classList.remove('is-loading');
             }
-        });
     }
 };
 
@@ -735,7 +733,12 @@ class PortfolioTableApp {
                         } else {
                             console.warn('Company search input element not found with ID: company-search');
                         }
+
                     }, 500); // 500ms delay to ensure DOM is fully loaded
+                },
+
+                updateAllData() {
+                    UpdateAllDataHandler.run();
                 },
 
                 // This function will update the dropdown to only show portfolios that are actually used
@@ -1496,8 +1499,7 @@ const ModalPortfolioManager = {
 
 // Main initialization function
 document.addEventListener('DOMContentLoaded', function () {
-    // Initialize all components
-    UpdateAllDataHandler.init();
+    // Initialize components that are outside of the Vue controlled area first
     FileUploadHandler.init();
     PortfolioManager.init();
     LayoutManager.init();
@@ -1533,4 +1535,6 @@ document.addEventListener('DOMContentLoaded', function () {
         // Log that the app has been initialized
         console.log('PortfolioTableApp initialized globally as window.portfolioTableApp');
     }
+
+    // The update-all button action is now handled via a Vue method
 });
