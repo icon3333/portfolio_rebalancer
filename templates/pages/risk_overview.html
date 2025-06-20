@@ -139,7 +139,7 @@
 
         <!-- Rule Gauges with Contextual Violations -->
         <div class="columns is-multiline mb-4">
-            <div class="column is-3">
+            <div class="column is-4">
                 <div class="gauge-card">
                     <div class="gauge-indicator">
                         <div class="gauge-container">
@@ -158,7 +158,7 @@
                     </div>
                 </div>
             </div>
-            <div class="column is-3">
+            <div class="column is-4">
                 <div class="gauge-card">
                     <div class="gauge-indicator">
                         <div class="gauge-container">
@@ -177,7 +177,7 @@
                     </div>
                 </div>
             </div>
-            <div class="column is-3">
+            <div class="column is-4">
                 <div class="gauge-card">
                     <div class="gauge-indicator">
                         <div class="gauge-container">
@@ -196,25 +196,7 @@
                     </div>
                 </div>
             </div>
-            <div class="column is-3">
-                <div class="gauge-card">
-                    <div class="gauge-indicator">
-                        <div class="gauge-container">
-                            <div class="gauge-chart" id="exchangeGauge"></div>
-                            <div class="gauge-label">
-                                <div class="gauge-title">Exchange Violations</div>
-                                <div class="gauge-count" id="exchangeCount">0</div>
-                                <div class="gauge-subtitle" id="exchangeSubtitle">exchanges over limit</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="gauge-violations-container">
-                        <div class="gauge-violations" id="exchangeViolations">
-                            <!-- Exchange violations will be populated here -->
-                        </div>
-                    </div>
-                </div>
-            </div>
+
         </div>
     </div>
 </div>
@@ -264,8 +246,7 @@
         let allocationRules = {
             maxPerStock: null,
             maxPerCategory: null,
-            maxPerCountry: null,
-            maxPerExchange: null
+            maxPerCountry: null
         };
 
         // Utility functions for formatting
@@ -1213,7 +1194,6 @@
             updateGauge('stock', 'stockGauge', 'stockCount', 'stockSubtitle', allocationRules.maxPerStock);
             updateGauge('category', 'categoryGauge', 'categoryCount', 'categorySubtitle', allocationRules.maxPerCategory);
             updateGauge('country', 'countryGauge', 'countryCount', 'countrySubtitle', allocationRules.maxPerCountry);
-            updateGauge('exchange', 'exchangeGauge', 'exchangeCount', 'exchangeSubtitle', allocationRules.maxPerExchange);
         }
 
         // Update individual gauge
@@ -1299,22 +1279,6 @@
                         });
                     }
                 });
-            } else if (type === 'exchange') {
-                const exchangeAllocations = {};
-                allCompanies.forEach(company => {
-                    const exchange = company.exchange || 'Unknown';
-                    exchangeAllocations[exchange] = (exchangeAllocations[exchange] || 0) + (company.currentValue || 0);
-                });
-                Object.entries(exchangeAllocations).forEach(([exchange, value]) => {
-                    const percentage = (value / totalValue) * 100;
-                    if (percentage > maxPercentage) {
-                        violations.push({
-                            name: exchange,
-                            currentPercentage: percentage,
-                            maxPercentage: maxPercentage
-                        });
-                    }
-                });
             }
 
             return violations;
@@ -1334,9 +1298,6 @@
             } else if (type === 'country') {
                 const countries = new Set(allCompanies.map(company => company.country || 'Unknown'));
                 return countries.size;
-            } else if (type === 'exchange') {
-                const exchanges = new Set(allCompanies.map(company => company.exchange || 'Unknown'));
-                return exchanges.size;
             }
 
             return 0;
@@ -1402,12 +1363,11 @@
 
         // Update contextual violations under each gauge
         function updateContextualViolations() {
-            if (!allocationRules || (!allocationRules.maxPerStock && !allocationRules.maxPerCategory && !allocationRules.maxPerCountry && !allocationRules.maxPerExchange)) {
+            if (!allocationRules || (!allocationRules.maxPerStock && !allocationRules.maxPerCategory && !allocationRules.maxPerCountry)) {
                 // Clear all violation containers
                 document.getElementById('stockViolations').innerHTML = '';
                 document.getElementById('categoryViolations').innerHTML = '';
                 document.getElementById('countryViolations').innerHTML = '';
-                document.getElementById('exchangeViolations').innerHTML = '';
                 return;
             }
 
@@ -1423,15 +1383,13 @@
             const violationsByType = {
                 'Stock': violations.filter(v => v.type === 'Stock'),
                 'Category': violations.filter(v => v.type === 'Category'),
-                'Country': violations.filter(v => v.type === 'Country'),
-                'Exchange': violations.filter(v => v.type === 'Exchange')
+                'Country': violations.filter(v => v.type === 'Country')
             };
 
             // Update each gauge's violations
             updateGaugeViolations('stockViolations', violationsByType['Stock']);
             updateGaugeViolations('categoryViolations', violationsByType['Category']);
             updateGaugeViolations('countryViolations', violationsByType['Country']);
-            updateGaugeViolations('exchangeViolations', violationsByType['Exchange']);
         }
 
         // Update individual gauge violations
@@ -1534,26 +1492,7 @@
                 });
             }
 
-            // Check per exchange violations
-            if (allocationRules.maxPerExchange && allocationRules.maxPerExchange > 0) {
-                const exchangeAllocations = {};
-                allCompanies.forEach(company => {
-                    const exchange = company.exchange || 'Unknown';
-                    exchangeAllocations[exchange] = (exchangeAllocations[exchange] || 0) + (company.currentValue || 0);
-                });
 
-                Object.entries(exchangeAllocations).forEach(([exchange, value]) => {
-                    const percentage = (value / totalValue) * 100;
-                    if (percentage > allocationRules.maxPerExchange) {
-                        violations.push({
-                            type: 'Exchange',
-                            name: exchange,
-                            currentPercentage: percentage,
-                            maxPercentage: allocationRules.maxPerExchange
-                        });
-                    }
-                });
-            }
 
             // Sort violations by severity (highest over-allocation first)
             violations.sort((a, b) => (b.currentPercentage - b.maxPercentage) - (a.currentPercentage - a.maxPercentage));
