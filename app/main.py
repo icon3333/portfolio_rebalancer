@@ -42,6 +42,13 @@ def create_app(config_name='default'):
     # Initialize the database
     from app.database.db_manager import init_db
     init_db(app)
+
+    # Trigger automatic price update on startup if needed
+    try:
+        from app.utils.startup_tasks import auto_update_prices_if_needed
+        auto_update_prices_if_needed()
+    except Exception as e:
+        logger.error(f"Automatic price update failed: {e}")
     
     @app.route('/profile', methods=['POST'])
     def get_profile():
