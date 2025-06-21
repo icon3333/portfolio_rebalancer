@@ -247,3 +247,32 @@
     padding: var(--space-sm) var(--space-md);
   }
 }
+
+/* Placeholder position styling */
+.placeholder-position {
+  font-style: italic;
+  color: #6c757d;
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.placeholder-position:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.missing-positions-category {
+  background-color: rgba(255, 193, 7, 0.1);
+}
+
+.missing-positions-category:hover {
+  background-color: rgba(255, 193, 7, 0.2);
+}
+
+/* Icon styling for placeholder positions */
+.placeholder-position .fa-plus-circle {
+  opacity: 0.6;
+}
+
+/* Tooltip styling for placeholder positions */
+.placeholder-position[title] {
+  cursor: help;
+}

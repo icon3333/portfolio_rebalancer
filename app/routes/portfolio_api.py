@@ -251,19 +251,28 @@ def get_allocate_portfolio_data():
                 except json.JSONDecodeError:
                     logger.error("Failed to parse target allocations JSON")
 
-        # Create a map of position target weights
+        # Create comprehensive builder data maps
         position_target_weights = {}
+        portfolio_builder_data = {}
+        
         for portfolio in target_allocations:
             portfolio_id = portfolio.get('id')
             if not portfolio_id:
                 continue
 
+            # Store complete builder configuration for each portfolio
+            portfolio_builder_data[portfolio_id] = {
+                'minPositions': portfolio.get('minPositions', 0),
+                'allocation': portfolio.get('allocation', 0),
+                'positions': portfolio.get('positions', []),
+                'name': portfolio.get('name', 'Unknown')
+            }
+
             # Store target weights for real positions
             for position in portfolio.get('positions', []):
                 if not position.get('isPlaceholder'):
                     position_key = (portfolio_id, position.get('companyName'))
-                    position_target_weights[position_key] = position.get(
-                        'weight', 0)
+                    position_target_weights[position_key] = position.get('weight', 0)
 
         # Count total positions across all portfolios to determine
         # the flat weight for each position
@@ -361,12 +370,19 @@ def get_allocate_portfolio_data():
                 logger.info(
                     f"Found target weight for portfolio {portfolio_name}: {portfolio_target_weight}%")
 
+            # Get builder data for this portfolio
+            builder_data = portfolio_builder_data.get(portfolio_id, {})
+            
             portfolio_entry = {
                 'name': portfolio_name,
                 'currentValue': pdata['currentValue'],
                 'targetWeight': portfolio_target_weight,
                 'color': '',
-                'categories': []
+                'categories': [],
+                # Add builder configuration data
+                'minPositions': builder_data.get('minPositions', 0),
+                'builderPositions': builder_data.get('positions', []),
+                'builderAllocation': builder_data.get('allocation', 0)
             }
 
             for cat_name, cat_data in pdata['categories'].items():
@@ -377,6 +393,34 @@ def get_allocate_portfolio_data():
                     'positionCount': len(cat_data['positions'])
                 }
                 portfolio_entry['categories'].append(category_entry)
+            
+            # Add placeholder positions based on builder configuration
+            builder_positions = builder_data.get('positions', [])
+            min_positions = builder_data.get('minPositions', 0)
+            
+            # Count current real positions
+            current_positions_count = sum(len(cat_data['positions']) for cat_data in pdata['categories'].values())
+            placeholder_position = next((pos for pos in builder_positions if pos.get('isPlaceholder')), None)
+            
+            if placeholder_position and current_positions_count < min_positions:
+                positions_remaining = min_positions - current_positions_count
+                
+                # Create Missing Positions category if needed
+                missing_positions_category = {
+                    'name': 'Missing Positions',
+                    'positions': [{
+                        'name': f'Position Slot {i+1} (Unfilled)',
+                        'currentValue': 0,
+                        'targetAllocation': placeholder_position.get('weight', 0),
+                        'identifier': None,
+                        'isPlaceholder': True,
+                        'positionSlot': i+1
+                    } for i in range(positions_remaining)],
+                    'currentValue': 0,
+                    'positionCount': positions_remaining,
+                    'isPlaceholder': True
+                }
+                portfolio_entry['categories'].append(missing_positions_category)
 
             portfolio_target_value = (portfolio_target_weight / 100) * total_current_value
             portfolio_entry['targetValue'] = portfolio_target_value
