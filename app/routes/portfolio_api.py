@@ -20,6 +20,7 @@ import time
 import uuid
 import json
 import io
+from typing import Dict, Any, Optional, List
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -41,7 +42,7 @@ def _apply_company_update(cursor, company_id, data, account_id):
             )
             portfolio_id = cursor.lastrowid
         else:
-            portfolio_id = portfolio['id']
+            portfolio_id = portfolio['id'] if isinstance(portfolio, dict) else None
     else:
         # Assign to 'Default' portfolio if no portfolio is specified
         default_portfolio = query_db(
@@ -58,7 +59,7 @@ def _apply_company_update(cursor, company_id, data, account_id):
             logger.info(
                 f"Created 'Default' portfolio for account_id: {account_id}")
         else:
-            portfolio_id = default_portfolio['id']
+            portfolio_id = default_portfolio['id'] if isinstance(default_portfolio, dict) else None
 
     # Build the SET clause dynamically based on what data is provided
     set_clause_parts = []
@@ -131,11 +132,12 @@ def manage_state():
             # Convert to proper data structure
             state_data = {}
             for var in state_vars:
-                var_name = var['variable_name']
-                var_value = var['variable_value']
+                if isinstance(var, dict):
+                    var_name = var['variable_name']
+                    var_value = var['variable_value']
 
-                # Add to state data without conversion (handled by front-end)
-                state_data[var_name] = var_value
+                    # Add to state data without conversion (handled by front-end)
+                    state_data[var_name] = var_value
 
             return jsonify(state_data)
 
@@ -239,14 +241,15 @@ def get_allocate_portfolio_data():
 
         # Parse target allocations if available
         target_allocations = []
-        if target_allocation_data and target_allocation_data['variable_value']:
-            try:
-                target_allocations = json.loads(
-                    target_allocation_data['variable_value'])
-                logger.info(
-                    f"Found target allocations in expanded_state: {len(target_allocations)} portfolios")
-            except json.JSONDecodeError:
-                logger.error("Failed to parse target allocations JSON")
+        if target_allocation_data and isinstance(target_allocation_data, dict):
+            variable_value = target_allocation_data.get('variable_value')
+            if variable_value:
+                try:
+                    target_allocations = json.loads(variable_value)
+                    logger.info(
+                        f"Found target allocations in expanded_state: {len(target_allocations)} portfolios")
+                except json.JSONDecodeError:
+                    logger.error("Failed to parse target allocations JSON")
 
         # Create a map of position target weights
         position_target_weights = {}
@@ -318,26 +321,34 @@ def get_allocate_portfolio_data():
 
         # Group data by portfolio and category
         portfolio_map = {}
-        for row in data:
-            pid = row['portfolio_id']
-            pname = row['portfolio_name']
-            portfolio = portfolio_map.setdefault(
-                pid, {'name': pname, 'categories': {}, 'currentValue': 0})
+        if data:  # Check if data is not None
+            for row in data:
+                if isinstance(row, dict):
+                    pid = row['portfolio_id']
+                    pname = row['portfolio_name']
+                    portfolio = portfolio_map.setdefault(
+                        pid, {'name': pname, 'categories': {}, 'currentValue': 0})
 
-            if row['company_name'] and row['category']:
-                cat = portfolio['categories'].setdefault(
-                    row['category'], {'positions': [], 'currentValue': 0})
-                pos_value = (row['price_eur'] or 0) * (row['shares'] or 0)
-                portfolio['currentValue'] += pos_value
-                cat['currentValue'] += pos_value
-                target_weight = position_target_weights.get(
-                    (pid, row['company_name']), 0)
-                cat['positions'].append({
-                    'name': row['company_name'],
-                    'currentValue': pos_value,
-                    'targetAllocation': target_weight,
-                    'identifier': row['identifier']
-                })
+                    if row['company_name']:
+                        # Use 'Uncategorized' as default category for positions without a category
+                        category_name = row['category'] if row['category'] else 'Uncategorized'
+                        cat = portfolio['categories'].setdefault(
+                            category_name, {'positions': [], 'currentValue': 0})
+                        pos_value = (row['price_eur'] or 0) * (row['shares'] or 0)
+                        portfolio['currentValue'] += pos_value
+                        cat['currentValue'] += pos_value
+                        target_weight = position_target_weights.get(
+                            (pid, row['company_name']), 0)
+                        cat['positions'].append({
+                            'name': row['company_name'],
+                            'currentValue': pos_value,
+                            'targetAllocation': target_weight,
+                            'identifier': row['identifier']
+                        })
+
+        # Calculate total current value across all portfolios
+        total_current_value = sum(pdata['currentValue'] for pdata in portfolio_map.values())
+        logger.info(f"Total current value across all portfolios: {total_current_value}")
 
         for portfolio_id, pdata in portfolio_map.items():
             portfolio_name = pdata['name']
@@ -367,8 +378,7 @@ def get_allocate_portfolio_data():
                 }
                 portfolio_entry['categories'].append(category_entry)
 
-            portfolio_target_value = (portfolio_target_weight / 100) * \
-                pdata['currentValue'] if pdata['currentValue'] > 0 else 0
+            portfolio_target_value = (portfolio_target_weight / 100) * total_current_value
             portfolio_entry['targetValue'] = portfolio_target_value
 
             for cat in portfolio_entry['categories']:
@@ -477,8 +487,10 @@ def get_portfolios_api():
                 ''', [account_id])
 
             # Convert to list of objects with id and name
-            portfolios = [{'id': p['id'], 'name': p['name']}
-                          for p in portfolios_from_table]
+            portfolios = []
+            if portfolios_from_table:
+                portfolios = [{'id': p['id'], 'name': p['name']}
+                              for p in portfolios_from_table if isinstance(p, dict)]
             logger.info(
                 f"Retrieved {len(portfolios)} portfolios with IDs: {portfolios}")
 
@@ -490,7 +502,7 @@ def get_portfolios_api():
                     WHERE account_id = ? AND name = 'Default'
                 ''', [account_id], one=True)
 
-                if default_portfolio:
+                if default_portfolio and isinstance(default_portfolio, dict):
                     portfolios.append(
                         {'id': default_portfolio['id'], 'name': 'Default'})
                     logger.info("Added Default portfolio to the response")
@@ -528,7 +540,9 @@ def get_portfolios_api():
                 ''', [account_id])
 
             # Extract names from the query results - don't filter out any valid names
-            names = [p['name'] for p in portfolios_from_table]
+            names = []
+            if portfolios_from_table:
+                names = [p['name'] for p in portfolios_from_table if isinstance(p, dict)]
             logger.info(
                 f"Retrieved {len(names)} portfolio names from portfolios table: {names}")
 
@@ -630,9 +644,8 @@ def upload_csv():
                         [company_name, account_id],
                         one=True
                     )
-                    if company and company['identifier']:
-                        company_identifiers[company['identifier']
-                                            ] = company_name
+                    if company and isinstance(company, dict) and company.get('identifier'):
+                        company_identifiers[company['identifier']] = company_name
 
                 # Now filter the failed_prices to only those that match our newly added companies
                 session_failed_prices = []
@@ -698,13 +711,17 @@ def update_portfolio_api():
             'SELECT id, name, identifier FROM companies WHERE account_id = ?',
             [account_id]
         )
-        company_map = {row['name']: row for row in company_rows}
+        company_map = {}
+        if company_rows:
+            company_map = {row['name']: row for row in company_rows if isinstance(row, dict)}
 
         portfolio_rows = query_db(
             'SELECT id, name FROM portfolios WHERE account_id = ?',
             [account_id]
         )
-        portfolio_map = {row['name']: row['id'] for row in portfolio_rows}
+        portfolio_map = {}
+        if portfolio_rows:
+            portfolio_map = {row['name']: row['id'] for row in portfolio_rows if isinstance(row, dict)}
 
         share_rows = query_db(
             '''SELECT cs.company_id FROM company_shares cs
@@ -712,7 +729,9 @@ def update_portfolio_api():
                WHERE c.account_id = ?''',
             [account_id]
         )
-        shares_set = {row['company_id'] for row in share_rows}
+        shares_set = set()
+        if share_rows:
+            shares_set = {row['company_id'] for row in share_rows if isinstance(row, dict)}
 
         cursor.execute('BEGIN TRANSACTION')
 
@@ -773,20 +792,34 @@ def update_portfolio_api():
                     try:
                         price_data = get_isin_data(new_identifier)
                         if price_data.get('price_eur') is not None:
-                            update_price_in_db(
-                                identifier=new_identifier,
-                                price=price_data.get('price'),
-                                currency=price_data.get('currency'),
-                                price_eur=price_data.get('price_eur'),
-                                country=price_data.get('country'),
-                                sector=price_data.get('sector'),
-                                industry=price_data.get('industry'),
-                                exchange=price_data.get('exchange'),
-                                modified_identifier=price_data.get(
-                                    'modified_identifier')
-                            )
-                            logger.info(
-                                f"Successfully updated price for {new_identifier}")
+                            # Safely extract values with defaults
+                            price = price_data.get('price', 0.0)
+                            currency = price_data.get('currency', 'EUR')
+                            price_eur = price_data.get('price_eur', 0.0)
+                            country = price_data.get('country')
+                            sector = price_data.get('sector')
+                            industry = price_data.get('industry')
+                            exchange = price_data.get('exchange')
+                            modified_identifier = price_data.get('modified_identifier')
+                            
+                            # Ensure required parameters are not None
+                            if price is not None and currency is not None and price_eur is not None:
+                                update_price_in_db(
+                                    identifier=new_identifier,
+                                    price=float(price),
+                                    currency=str(currency),
+                                    price_eur=float(price_eur),
+                                    country=country,
+                                    sector=sector,
+                                    industry=industry,
+                                    exchange=exchange,
+                                    modified_identifier=modified_identifier
+                                )
+                                logger.info(
+                                    f"Successfully updated price for {new_identifier}")
+                            else:
+                                logger.warning(
+                                    f"Missing required price data for {new_identifier}")
                         else:
                             logger.warning(
                                 f"Failed to fetch price for {new_identifier}: {price_data.get('error')}")
@@ -920,7 +953,7 @@ def manage_portfolios():
                 WHERE p.name = ? AND p.account_id = ?
             ''', [portfolio_name, account_id], one=True)
 
-            if companies and companies['count'] > 0:
+            if companies and isinstance(companies, dict) and companies.get('count', 0) > 0:
                 flash(
                     f'Cannot delete portfolio "{portfolio_name}" because it contains companies', 'error')
                 return redirect(url_for('portfolio.enrich'))

@@ -26,7 +26,7 @@ function parseNumber(string) {
     return parseFloat(string.replace(/,/g, '')) || 0;
 }
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     // Get tab elements
     const globalTab = document.getElementById('global-tab');
     const detailedTab = document.getElementById('detailed-tab');
@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const activeContent = tabId === 'global' ? globalContent : detailedContent;
         activeContent.style.transition = 'opacity 0.3s ease-in-out';
         activeContent.style.opacity = '0';
-        
+
         setTimeout(() => {
             activeContent.style.opacity = '1';
         }, 50);
@@ -74,7 +74,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 tab.style.backgroundColor = '#f8f9fa';
             }
         });
-        
+
         tab.addEventListener('mouseleave', () => {
             if (!tab.classList.contains('active')) {
                 tab.style.backgroundColor = '';
@@ -95,7 +95,7 @@ document.addEventListener('DOMContentLoaded', function() {
         init() {
             this.fetchPortfolioData();
             this.setupEventListeners();
-            
+
             // Initialize tab view
             switchTab('global');
         }
@@ -104,19 +104,19 @@ document.addEventListener('DOMContentLoaded', function() {
             // Add event listener for investment amount input
             const investmentInput = document.getElementById('investment-amount');
             if (investmentInput) {
-                // Add input event listener with debounce
-                investmentInput.addEventListener('input', debounce((e) => {
-                    const amount = parseNumber(e.target.value);
-                    this.investmentAmount = amount;
+                // Combined event listener for formatting and updating calculations
+                investmentInput.addEventListener('input', (e) => {
+                    // Clean and format the input value
+                    const cleanValue = e.target.value.replace(/[^\d.]/g, '');
+                    const number = parseFloat(cleanValue) || 0;
+
+                    // Format the display value
+                    e.target.value = formatNumber(number);
+
+                    // Update the investment amount and trigger calculations immediately
+                    this.investmentAmount = number;
                     this.updateTableCalculations();
                     this.renderDetailedView(); // Update detailed view when investment amount changes
-                }, 500)); // 500ms delay
-                
-                // Format number as user types
-                investmentInput.addEventListener('input', function(e) {
-                    const value = e.target.value.replace(/[^\d.]/g, '');
-                    const number = parseFloat(value) || 0;
-                    e.target.value = formatNumber(number);
                 });
             }
 
@@ -136,12 +136,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
-                
+
                 this.portfolioData = await response.json();
                 if (!this.portfolioData || !this.portfolioData.portfolios) {
                     throw new Error('Invalid portfolio data received');
                 }
-                
+
                 this.renderPortfolioTable();
                 this.populatePortfolioSelect();
                 this.renderDetailedView();
@@ -164,9 +164,9 @@ document.addEventListener('DOMContentLoaded', function() {
             defaultOption.textContent = 'Select a portfolio';
             portfolioSelect.appendChild(defaultOption);
 
-            // Add portfolio options
+            // Add portfolio options - only show portfolios with defined target weights
             this.portfolioData.portfolios.forEach(portfolio => {
-                if (portfolio.currentValue && portfolio.currentValue > 0) {
+                if (portfolio.currentValue && portfolio.currentValue > 0 && portfolio.targetWeight > 0) {
                     const option = document.createElement('option');
                     option.value = portfolio.name;
                     option.textContent = portfolio.name;
@@ -215,9 +215,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            // Filter out portfolios with current value of 0
-            const filteredPortfolios = this.portfolioData.portfolios.filter(portfolio => 
-                portfolio.currentValue !== 0 && portfolio.currentValue !== null
+            // Filter out portfolios with current value of 0 AND only include portfolios with defined target weights
+            const filteredPortfolios = this.portfolioData.portfolios.filter(portfolio =>
+                portfolio.currentValue !== 0 && portfolio.currentValue !== null &&
+                portfolio.targetWeight > 0  // Only include portfolios with target allocation defined in builder
             );
 
             if (filteredPortfolios.length === 0) {
@@ -243,6 +244,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <th>Target Value</th>
                             <th>Actions</th>
                             <th>Value After Action</th>
+                            <th>Allocation After Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -253,44 +255,85 @@ document.addEventListener('DOMContentLoaded', function() {
             let totalAction = 0;
             let totalValueAfter = 0;
 
+            // First pass: normalize target weights and calculate target values for filtered portfolios
+            const totalTargetWeight = filteredPortfolios.reduce((sum, p) => sum + (p.targetWeight || 0), 0);
+
+            // Calculate the new total value after investment
+            const newTotalValue = totalCurrentValue + this.investmentAmount;
+
+            filteredPortfolios.forEach(portfolio => {
+                // Normalize the target weight as a percentage of the total target weight among filtered portfolios
+                const normalizedWeight = totalTargetWeight > 0 ? (portfolio.targetWeight / totalTargetWeight) * 100 : 0;
+                // Calculate target value based on NEW total value (current + investment)
+                portfolio.targetValue = (normalizedWeight / 100) * newTotalValue;
+            });
+
+            // Calculate how much is needed to reach all targets
+            let totalNeeded = 0;
+            filteredPortfolios.forEach(p => {
+                const needed = Math.max(0, p.targetValue - p.currentValue);
+                totalNeeded += needed;
+            });
+
+            // Determine if we have enough to reach all targets
+            const canReachAllTargets = this.investmentAmount >= totalNeeded;
+
             filteredPortfolios.forEach(portfolio => {
                 // Calculate current allocation percentage
-                const currentAllocation = totalCurrentValue > 0 
-                    ? (portfolio.currentValue / totalCurrentValue) * 100 
+                const currentAllocation = totalCurrentValue > 0
+                    ? (portfolio.currentValue / totalCurrentValue) * 100
                     : 0;
-                
-                // Calculate target value
-                const targetValue = portfolio.targetValue || 0;
+
+                // Get target value that was already calculated
+                const targetValue = portfolio.targetValue;
                 totalTargetValue += targetValue;
-                
+
                 // Calculate action (how much to buy)
                 const discrepancy = targetValue - portfolio.currentValue;
                 let action = 0;
-                
-                if (this.investmentAmount > 0 && discrepancy > 0) {
-                    // Calculate proportion based on positive discrepancies only
-                    const totalPositiveDiscrepancy = filteredPortfolios
-                        .filter(p => (p.targetValue || 0) - p.currentValue > 0)
-                        .reduce((sum, p) => sum + ((p.targetValue || 0) - p.currentValue), 0);
-                    
-                    if (totalPositiveDiscrepancy > 0) {
-                        action = (discrepancy / totalPositiveDiscrepancy) * this.investmentAmount;
+
+                if (this.investmentAmount > 0) {
+                    if (canReachAllTargets) {
+                        // If we can reach all targets, allocate exactly what's needed
+                        action = Math.max(0, discrepancy);
+                    } else if (discrepancy > 0 && totalNeeded > 0) {
+                        // Otherwise, allocate proportionally
+                        action = (discrepancy / totalNeeded) * this.investmentAmount;
                     }
                 }
-                
+
                 totalAction += action;
-                
+
                 // Calculate value after action
                 const valueAfterAction = portfolio.currentValue + action;
                 totalValueAfter += valueAfterAction;
 
+                // Store values for second pass
+                portfolio.action = action;
+                portfolio.valueAfterAction = valueAfterAction;
+            });
+
+            // Second pass: Now calculate allocation after action with the correct total
+            const finalTotalValue = totalValueAfter;
+
+            filteredPortfolios.forEach(portfolio => {
+                // Calculate current allocation percentage
+                const currentAllocation = totalCurrentValue > 0
+                    ? (portfolio.currentValue / totalCurrentValue) * 100
+                    : 0;
+
+                // Calculate allocation after action with the actual total
+                const allocationAfterAction = finalTotalValue > 0
+                    ? (portfolio.valueAfterAction / finalTotalValue) * 100
+                    : 0;
+
                 // Determine action class for styling
                 let actionClass = "actions-neutral";
                 let actionText = "No action";
-                
-                if (action > 0) {
+
+                if (portfolio.action > 0) {
                     actionClass = "actions-positive";
-                    actionText = `Buy ${this.formatCurrency(action)}`;
+                    actionText = `Buy ${this.formatCurrency(portfolio.action)}`;
                 }
 
                 // Add row to table
@@ -299,10 +342,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         <td>${portfolio.name}</td>
                         <td class="current-value">${this.formatCurrency(portfolio.currentValue)}</td>
                         <td class="allocation-percentage">${this.formatPercentage(currentAllocation)}</td>
-                        <td class="target-value">${this.formatPercentage(portfolio.targetAllocation || 0)}</td>
-                        <td class="target-value">${this.formatCurrency(targetValue)}</td>
+                        <td class="target-value">${this.formatPercentage(portfolio.targetWeight || 0)}</td>
+                        <td class="target-value">${this.formatCurrency(portfolio.targetValue)}</td>
                         <td class="${actionClass}">${actionText}</td>
-                        <td class="value-after">${this.formatCurrency(valueAfterAction)}</td>
+                        <td class="value-after">${this.formatCurrency(portfolio.valueAfterAction)}</td>
+                        <td class="allocation-after">${this.formatPercentage(allocationAfterAction)}</td>
                     </tr>
                 `;
             });
@@ -317,6 +361,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <td class="target-value"><strong>${this.formatCurrency(totalTargetValue)}</strong></td>
                         <td class="actions-positive"><strong>${this.formatCurrency(totalAction)}</strong></td>
                         <td class="value-after"><strong>${this.formatCurrency(totalValueAfter)}</strong></td>
+                        <td class="allocation-after"><strong>100%</strong></td>
                     </tr>
                 </tbody>
             </table>
@@ -350,7 +395,7 @@ document.addEventListener('DOMContentLoaded', function() {
          */
         renderDetailedView() {
             const detailedContainer = document.getElementById('detailed-portfolio-container');
-            
+
             if (!detailedContainer) return;
             if (!this.portfolioData || !this.portfolioData.portfolios) return;
 
@@ -385,25 +430,66 @@ document.addEventListener('DOMContentLoaded', function() {
                 `;
                 return;
             }
-            
+
+            // Skip portfolios with no target weight defined
+            if (!portfolio.targetWeight || portfolio.targetWeight === 0) {
+                detailedContainer.innerHTML = `
+                    <div class="alert alert-warning mt-4">
+                        This portfolio has no target allocation defined in the builder. Please define a target allocation first.
+                    </div>
+                `;
+                return;
+            }
+
             // Calculate the specific action amount for this portfolio from the global view
             let portfolioActionAmount = 0;
-            
+
             if (this.investmentAmount > 0) {
-                // Filter out portfolios with current value of 0
-                const filteredPortfolios = this.portfolioData.portfolios.filter(p => 
-                    p.currentValue !== 0 && p.currentValue !== null
+                // Filter out portfolios with current value of 0 AND only include portfolios with defined target weights
+                const filteredPortfolios = this.portfolioData.portfolios.filter(p =>
+                    p.currentValue !== 0 && p.currentValue !== null &&
+                    p.targetWeight > 0  // Only include portfolios with target allocation defined in builder
                 );
-                
-                // Calculate total positive discrepancy across all portfolios
-                const totalPositiveDiscrepancy = filteredPortfolios
-                    .filter(p => (p.targetValue || 0) - p.currentValue > 0)
-                    .reduce((sum, p) => sum + ((p.targetValue || 0) - p.currentValue), 0);
-                
-                if (totalPositiveDiscrepancy > 0) {
-                    const portfolioDiscrepancy = (portfolio.targetValue || 0) - portfolio.currentValue;
-                    if (portfolioDiscrepancy > 0) {
-                        portfolioActionAmount = (portfolioDiscrepancy / totalPositiveDiscrepancy) * this.investmentAmount;
+
+                // Calculate total current value
+                const totalCurrentValue = filteredPortfolios.reduce(
+                    (sum, p) => sum + (p.currentValue || 0), 0
+                );
+
+                // Calculate target values for all portfolios - normalize target weights first
+                const totalTargetWeight = filteredPortfolios.reduce((sum, p) => sum + (p.targetWeight || 0), 0);
+                const newTotalValue = totalCurrentValue + this.investmentAmount;
+
+                filteredPortfolios.forEach(p => {
+                    // Normalize the target weight as a percentage of the total target weight among filtered portfolios
+                    const normalizedWeight = totalTargetWeight > 0 ? (p.targetWeight / totalTargetWeight) * 100 : 0;
+                    p.targetValue = (normalizedWeight / 100) * newTotalValue;
+                });
+
+                // Calculate how much is needed to reach all targets
+                let totalNeeded = 0;
+                filteredPortfolios.forEach(p => {
+                    const needed = Math.max(0, p.targetValue - p.currentValue);
+                    totalNeeded += needed;
+                });
+
+                // Determine if we can reach all targets
+                const canReachAllTargets = this.investmentAmount >= totalNeeded;
+
+                // Ensure this portfolio has targetValue calculated
+                if (!portfolio.targetValue) {
+                    const normalizedWeight = totalTargetWeight > 0 ? (portfolio.targetWeight / totalTargetWeight) * 100 : 0;
+                    portfolio.targetValue = (normalizedWeight / 100) * newTotalValue;
+                }
+
+                const portfolioDiscrepancy = portfolio.targetValue - portfolio.currentValue;
+                if (portfolioDiscrepancy > 0) {
+                    if (canReachAllTargets) {
+                        // If we can reach all targets, allocate exactly what's needed
+                        portfolioActionAmount = portfolioDiscrepancy;
+                    } else if (totalNeeded > 0) {
+                        // Otherwise, allocate proportionally
+                        portfolioActionAmount = (portfolioDiscrepancy / totalNeeded) * this.investmentAmount;
                     }
                 }
             }
@@ -423,7 +509,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Create rebalancing table
             const tableResponsive = document.createElement('div');
             tableResponsive.className = 'table-responsive';
-            
+
             const table = document.createElement('table');
             table.className = 'table table-hover';
 
@@ -438,23 +524,24 @@ document.addEventListener('DOMContentLoaded', function() {
                     <th>Target Value</th>
                     <th>Actions</th>
                     <th>Value After Action</th>
+                    <th>Allocation After Action</th>
                 </tr>
             `;
-            
+
             // Table body
             const tbody = document.createElement('tbody');
-            
+
             // Track totals for portfolio summary
             let totalCurrentValue = portfolio.currentValue || 0;
             let portfolioTargetValue = totalCurrentValue + portfolioActionAmount;
             let totalAction = 0;
             let totalValueAfter = 0;
-            
+
             // Count total number of positions and positions with user-defined allocations
             let totalPositionsCount = 0;
             let userDefinedAllocationsCount = 0;
             let sumUserDefinedAllocations = 0;
-            
+
             // First pass: gather position counts and target allocations
             if (portfolio.categories && portfolio.categories.length > 0) {
                 portfolio.categories.forEach(category => {
@@ -476,80 +563,80 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 });
             }
-            
+
             // Calculate default allocation for positions without user-defined allocations
             let defaultAllocation = 0;
             if (sumUserDefinedAllocations < 100) {
                 const remainingAllocation = 100 - sumUserDefinedAllocations;
                 const positionsWithoutUserDefinedAllocation = totalPositionsCount - userDefinedAllocationsCount;
-                defaultAllocation = positionsWithoutUserDefinedAllocation > 0 ? 
+                defaultAllocation = positionsWithoutUserDefinedAllocation > 0 ?
                     remainingAllocation / positionsWithoutUserDefinedAllocation : 0;
             }
-            
+
             // Calculate total positive discrepancy (gap between target and current values)
             let totalPositiveDiscrepancy = 0;
-            
+
             // Second pass: assign target allocations and calculate discrepancies
             if (portfolio.categories && portfolio.categories.length > 0) {
                 portfolio.categories.forEach((category, categoryIndex) => {
                     // Skip categories with no positions
                     if (!category.positions || category.positions.length === 0) return;
-                    
+
                     // Skip "Missing Positions" category temporarily - we'll handle it separately
                     if (category.name === 'Missing Positions') return;
-                    
+
                     // Calculate category metrics
                     let categoryCurrentValue = 0;
                     let categoryTargetAllocation = 0;
-                    
+
                     // Calculate values for each position in the category
                     category.positions.forEach(position => {
                         categoryCurrentValue += (position.currentValue || 0);
-                        
+
                         // Assign target allocation if not already set
                         if (!position.targetAllocation || position.targetAllocation <= 0) {
                             position.targetAllocation = defaultAllocation;
                         }
-                        
+
                         categoryTargetAllocation += position.targetAllocation;
-                        
+
                         // Calculate target value and discrepancy
                         const targetValue = (position.targetAllocation / 100) * portfolioTargetValue;
                         position.calculatedTargetValue = targetValue;
-                        
+
                         const discrepancy = targetValue - (position.currentValue || 0);
                         if (discrepancy > 0) {
                             totalPositiveDiscrepancy += discrepancy;
                         }
                     });
-                    
+
                     // Set category values
                     category.currentValue = categoryCurrentValue;
                     category.targetAllocation = categoryTargetAllocation;
                     category.calculatedTargetValue = (categoryTargetAllocation / 100) * portfolioTargetValue;
                 });
-                
+
                 // Handle missing positions if any
-                const missingPositionsCategory = portfolio.categories.find(cat => 
-                    cat.name === 'Missing Positions' || 
+                const missingPositionsCategory = portfolio.categories.find(cat =>
+                    cat.name === 'Missing Positions' ||
                     cat.positions.some(pos => pos.isPlaceholder));
-                
+
                 // Check if real categories already have 100% allocation
                 let realPositionsHave100Percent = false;
                 if (portfolio.categories) {
-                    const realPositionCategories = portfolio.categories.filter(cat => 
-                        cat.name !== 'Missing Positions' && 
-                        cat.positions && 
+                    const realPositionCategories = portfolio.categories.filter(cat =>
+                        cat.name !== 'Missing Positions' &&
+                        cat.positions &&
                         cat.positions.length > 0
                     );
-                    
+
                     const totalRealPositionsWeight = realPositionCategories.reduce((sum, cat) => {
                         return sum + cat.targetAllocation;
                     }, 0);
-                    
+
                     // If real positions already have 100% allocation, skip missing positions
                     realPositionsHave100Percent = Math.round(totalRealPositionsWeight) >= 100;
-                    
+
                     // Debugging for GME portfolio
                     if (portfolio.name === "GME") {
                         console.log("GME portfolio calculations:", {
@@ -560,7 +647,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         });
                     }
                 }
-                
+
                 // Skip missing positions entirely for GME portfolio
                 if (portfolio.name === "GME" && missingPositionsCategory) {
                     console.log("GME portfolio - setting missing positions to 0");
@@ -570,15 +657,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Handle normal case - show missing positions if needed
                 else if (missingPositionsCategory && sumUserDefinedAllocations < 100 && !realPositionsHave100Percent) {
                     const placeholderPosition = missingPositionsCategory.positions.find(pos => pos.isPlaceholder);
-                    
+
                     if (placeholderPosition) {
                         const positionsRemaining = placeholderPosition.positionsRemaining || 0;
-                        
+
                         // Assign target allocation to missing positions
                         const missingTargetAllocation = positionsRemaining * defaultAllocation;
                         missingPositionsCategory.targetAllocation = missingTargetAllocation;
                         missingPositionsCategory.calculatedTargetValue = (missingTargetAllocation / 100) * portfolioTargetValue;
-                        
+
                         // Always a positive discrepancy as current value is 0
                         totalPositiveDiscrepancy += missingPositionsCategory.calculatedTargetValue;
                     }
@@ -588,58 +675,64 @@ document.addEventListener('DOMContentLoaded', function() {
                     missingPositionsCategory.calculatedTargetValue = 0;
                 }
             }
-            
+
             // Third pass: calculate actions and render
             if (portfolio.categories && portfolio.categories.length > 0) {
                 portfolio.categories.forEach((category, categoryIndex) => {
                     // Skip categories with no positions
                     if (!category.positions || category.positions.length === 0) return;
-                    
+
                     // Skip "Missing Positions" category temporarily
                     if (category.name === 'Missing Positions') return;
-                    
+
                     const categoryId = `${portfolio.name}-${category.name}-${categoryIndex}`;
                     const isExpanded = this.categoriesExpanded.has(categoryId);
-                    
+
                     // Calculate category metrics for rendering
                     let categoryAction = 0;
                     let categoryValueAfter = 0;
-                    
+
                     // Calculate category percentages
-                    const categoryCurrentAllocation = totalCurrentValue > 0 
-                        ? (category.currentValue / totalCurrentValue) * 100 
+                    const categoryCurrentAllocation = totalCurrentValue > 0
+                        ? (category.currentValue / totalCurrentValue) * 100
                         : 0;
-                    
+
                     // Calculate position actions
                     category.positions.forEach(position => {
                         const targetValue = position.calculatedTargetValue;
                         const discrepancy = targetValue - (position.currentValue || 0);
                         let positionAction = 0;
-                        
+
                         if (discrepancy > 0 && portfolioActionAmount > 0 && totalPositiveDiscrepancy > 0) {
                             positionAction = (discrepancy / totalPositiveDiscrepancy) * portfolioActionAmount;
                         }
-                        
+
                         position.action = positionAction;
                         position.valueAfter = (position.currentValue || 0) + positionAction;
-                        
+
                         categoryAction += positionAction;
                         categoryValueAfter += position.valueAfter;
                     });
-                    
+
                     // Determine action class and text for the category
                     let categoryActionClass = "actions-neutral";
                     let categoryActionText = "No action";
-                    
+
                     if (categoryAction > 0) {
                         categoryActionClass = "actions-positive";
                         categoryActionText = `Buy ${this.formatCurrency(categoryAction)}`;
                     }
-                    
+
                     const categoryRow = document.createElement('tr');
                     categoryRow.className = 'table-secondary category-row';
                     categoryRow.style.cursor = 'pointer';
-                    
+
+                    // Calculate allocation after action for category
+                    const totalValueAfterAllActions = totalCurrentValue + portfolioActionAmount;
+                    const categoryAllocationAfterAction = totalValueAfterAllActions > 0
+                        ? (categoryValueAfter / totalValueAfterAllActions) * 100
+                        : 0;
+
                     categoryRow.innerHTML = `
                         <td>
                             <i class="fas ${isExpanded ? 'fa-caret-down' : 'fa-caret-right'} me-2"></i>
@@ -651,36 +744,42 @@ document.addEventListener('DOMContentLoaded', function() {
                         <td class="target-value">${this.formatCurrency(category.calculatedTargetValue)}</td>
                         <td class="${categoryActionClass}">${categoryActionText}</td>
                         <td class="value-after">${this.formatCurrency(categoryValueAfter)}</td>
+                        <td class="allocation-after">${this.formatPercentage(categoryAllocationAfterAction)}</td>
                     `;
-                    
+
                     categoryRow.addEventListener('click', () => {
                         this.toggleCategoryExpand(categoryId);
                     });
-                    
+
                     tbody.appendChild(categoryRow);
-                    
+
                     // Add position rows if category is expanded
                     if (isExpanded) {
                         // Positions in this category
                         category.positions.forEach(position => {
                             // Calculate current allocation
-                            const positionCurrentAllocation = totalCurrentValue > 0 
-                                ? ((position.currentValue || 0) / totalCurrentValue) * 100 
+                            const positionCurrentAllocation = totalCurrentValue > 0
+                                ? ((position.currentValue || 0) / totalCurrentValue) * 100
                                 : 0;
-                            
+
+                            // Calculate allocation after action for position
+                            const positionAllocationAfterAction = totalValueAfterAllActions > 0
+                                ? (position.valueAfter / totalValueAfterAllActions) * 100
+                                : 0;
+
                             // Determine action class and text
                             let actionClass = "actions-neutral";
                             let actionText = "No action";
-                            
+
                             if (position.action > 0) {
                                 actionClass = "actions-positive";
                                 actionText = `Buy ${this.formatCurrency(position.action)}`;
                             }
-                            
+
                             // Position row - indented to show hierarchy
                             const positionRow = document.createElement('tr');
                             positionRow.className = 'position-row';
-                            
+
                             positionRow.innerHTML = `
                                 <td class="position-name">
                                     <span class="ms-4">${position.name}</span>
@@ -691,10 +790,11 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <td class="target-value">${this.formatCurrency(position.calculatedTargetValue)}</td>
                                 <td class="${actionClass}">${actionText}</td>
                                 <td class="value-after">${this.formatCurrency(position.valueAfter)}</td>
+                                <td class="allocation-after">${this.formatPercentage(positionAllocationAfterAction)}</td>
                             `;
-                            
+
                             tbody.appendChild(positionRow);
-                            
+
                             // Add to totals
                             totalAction += position.action;
                             totalValueAfter += position.valueAfter;
@@ -705,12 +805,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         totalValueAfter += categoryValueAfter;
                     }
                 });
-                
+
                 // Handle Missing Positions category separately
-                const missingPositionsCategory = portfolio.categories.find(cat => 
-                    cat.name === 'Missing Positions' || 
+                const missingPositionsCategory = portfolio.categories.find(cat =>
+                    cat.name === 'Missing Positions' ||
                     cat.positions.some(pos => pos.isPlaceholder));
-                
+
                 // Skip missing positions entirely for GME portfolio
                 if (portfolio.name === "GME") {
                     console.log("GME portfolio - not rendering missing positions row");
@@ -718,23 +818,28 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Only show missing positions if they have a non-zero target allocation
                 else if (missingPositionsCategory && missingPositionsCategory.targetAllocation > 0) {
                     const placeholderPosition = missingPositionsCategory.positions.find(pos => pos.isPlaceholder);
-                    
+
                     if (placeholderPosition) {
                         const positionsRemaining = placeholderPosition.positionsRemaining || 0;
-                        
+
                         // Calculate action for missing positions
                         let missingAction = 0;
                         if (portfolioActionAmount > 0 && totalPositiveDiscrepancy > 0) {
                             missingAction = (missingPositionsCategory.calculatedTargetValue / totalPositiveDiscrepancy) * portfolioActionAmount;
                         }
-                        
+
                         // Calculate per position investment amount
                         const perPositionAmount = positionsRemaining > 0 ? missingAction / positionsRemaining : 0;
-                        
+
+                        // Calculate allocation after action for missing positions
+                        const missingAllocationAfterAction = totalValueAfterAllActions > 0
+                            ? (missingAction / totalValueAfterAllActions) * 100
+                            : 0;
+
                         // Missing Positions row (special styling)
                         const missingRow = document.createElement('tr');
                         missingRow.className = 'table-warning missing-positions-row';
-                        
+
                         missingRow.innerHTML = `
                             <td>
                                 <i class="fas fa-exclamation-triangle me-2"></i>
@@ -746,21 +851,22 @@ document.addEventListener('DOMContentLoaded', function() {
                             <td class="target-value">${this.formatCurrency(missingPositionsCategory.calculatedTargetValue)}</td>
                             <td class="actions-positive">Buy ${this.formatCurrency(perPositionAmount)} × ${positionsRemaining}</td>
                             <td class="value-after">${this.formatCurrency(missingAction)}</td>
+                            <td class="allocation-after">${this.formatPercentage(missingAllocationAfterAction)}</td>
                         `;
-                        
+
                         tbody.appendChild(missingRow);
-                        
+
                         // Add to totals
                         totalAction += missingAction;
                         totalValueAfter += missingAction;
                     }
                 }
             }
-            
+
             // Portfolio total row
             const totalRow = document.createElement('tr');
             totalRow.className = 'table-primary fw-bold';
-            
+
             totalRow.innerHTML = `
                 <td>Portfolio Total</td>
                 <td class="current-value">${this.formatCurrency(totalCurrentValue)}</td>
@@ -769,19 +875,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 <td class="target-value">${this.formatCurrency(portfolioTargetValue)}</td>
                 <td>${this.formatCurrency(totalAction)}</td>
                 <td class="value-after">${this.formatCurrency(totalValueAfter)}</td>
+                <td class="allocation-after">100%</td>
             `;
-            
+
             tbody.appendChild(totalRow);
-            
+
             // Assemble table
             table.appendChild(thead);
             table.appendChild(tbody);
             tableResponsive.appendChild(table);
-            
+
             // Add to container
             detailedContainer.appendChild(tableResponsive);
         }
-        
+
         renderDetailedChart() {
             const detailedChartContainer = document.getElementById('detailedChart');
 

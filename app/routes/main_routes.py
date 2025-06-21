@@ -2,6 +2,8 @@ from app.utils.portfolio_utils import get_portfolio_data
 from app.database.db_manager import query_db
 from flask import Blueprint, render_template, redirect, url_for, session, request, flash, jsonify
 import logging
+from typing import Dict, Any, Optional, List
+
 logger = logging.getLogger(__name__)
 
 main_bp = Blueprint('main', __name__)
@@ -21,7 +23,7 @@ def index():
         account = query_db('SELECT * FROM accounts WHERE id = ?',
                            [account_id], one=True)
 
-        if account:
+        if account and isinstance(account, dict):
             logger.info(f"Found account: {account['username']}")
 
             # Get portfolio summary for the account - only count portfolios with value > 0
@@ -55,7 +57,9 @@ def index():
             all_accounts = query_db(
                 'SELECT * FROM accounts WHERE username != "_global" ORDER BY username')
 
-            logger.info(f"Found {len(portfolios)} portfolios with value > 0")
+            # Ensure portfolios is a list for len() function
+            portfolio_count = len(portfolios) if portfolios else 0
+            logger.info(f"Found {portfolio_count} portfolios with value > 0")
             return render_template('pages/index.html',
                                    account=account,
                                    portfolios=portfolios,
@@ -70,7 +74,8 @@ def index():
     # If no account is selected or account not found, show the welcome page
     accounts = query_db(
         'SELECT * FROM accounts WHERE username != "_global" ORDER BY username')
-    logger.info(f"Found {len(accounts)} accounts")
+    account_count = len(accounts) if accounts else 0
+    logger.info(f"Found {account_count} accounts")
     return render_template('pages/index.html', accounts=accounts)
 
 
@@ -82,7 +87,7 @@ def select_account(account_id):
     account = query_db('SELECT * FROM accounts WHERE id = ?',
                        [account_id], one=True)
 
-    if account:
+    if account and isinstance(account, dict):
         session.permanent = True  # Make session permanent
         session['account_id'] = account_id
         session['username'] = account['username']
