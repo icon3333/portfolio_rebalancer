@@ -662,7 +662,6 @@
                 const filteredPortfolios = portfolioData.filter(p => selectedPortfolioIds.includes(p.id));
                 const labels = filteredPortfolios.map(p => p.name);
                 const values = filteredPortfolios.map(p => p.totalValue);
-                const colors = ChartConfig.generateColors(labels.length);
 
                 try {
                     if (typeof ChartConfig !== 'undefined' && ChartConfig.createStandardDoughnutChart) {
@@ -671,7 +670,10 @@
                             labels,
                             values,
                             {
-                                colors: colors
+                                title: 'Portfolio Distribution',
+                                showTotal: true,
+                                height: 350
+                                // Colors will be automatically assigned consistently based on labels
                             }
                         );
                     } else {
@@ -696,7 +698,8 @@
                 const filteredPortfolios = portfolioData.filter(p => selectedPortfolioIds.includes(p.id));
                 const labels = filteredPortfolios.map(p => p.name);
                 const values = filteredPortfolios.map(p => p.totalValue);
-                const colors = ChartConfig.generateColors(labels.length);
+                // Use consistent colors based on labels - don't generate new colors each time
+                const colors = ChartConfig.getConsistentColors(labels);
 
                 try {
                     if (typeof ChartConfig !== 'undefined' && ChartConfig.updateDoughnutChart) {
@@ -722,7 +725,6 @@
 
                 // Sort and prepare chart data
                 const { labels, values } = prepareChartData(companyGroups);
-                const colors = ChartConfig.generateColors(labels.length);
 
                 try {
                     if (typeof ChartConfig !== 'undefined' && ChartConfig.createStandardDoughnutChart) {
@@ -731,7 +733,10 @@
                             labels,
                             values,
                             {
-                                colors: colors
+                                title: 'Company Distribution',
+                                showTotal: true,
+                                height: 350
+                                // Colors will be automatically assigned consistently based on labels
                             }
                         );
                     } else {
@@ -758,7 +763,8 @@
 
                 // Sort and prepare chart data
                 const { labels, values } = prepareChartData(companyGroups);
-                const colors = ChartConfig.generateColors(labels.length);
+                // Use consistent colors based on labels - don't generate new colors each time
+                const colors = ChartConfig.getConsistentColors(labels);
 
                 try {
                     if (typeof ChartConfig !== 'undefined' && ChartConfig.updateDoughnutChart) {
@@ -1195,8 +1201,10 @@
                             labels,
                             values,
                             {
-                                title: 'Companies'
-                                // colors will be automatically assigned based on labels
+                                title: 'Companies',
+                                showTotal: true,
+                                height: 350
+                                // Colors will be automatically assigned consistently based on labels
                             }
                         );
 
@@ -1302,8 +1310,10 @@
                                     categoryLabels,
                                     categoryValues,
                                     {
-                                        title: 'Categories'
-                                        // colors will be automatically assigned based on labels
+                                        title: 'Categories',
+                                        showTotal: true,
+                                        height: 350
+                                        // Colors will be automatically assigned consistently based on labels
                                     }
                                 );
 
@@ -1795,8 +1805,10 @@
                             data.labels,
                             data.values,
                             {
-                                // colors will be automatically assigned based on labels
-                                title: title || ''
+                                title: title || '',
+                                // Colors will be automatically assigned consistently based on labels
+                                showTotal: true,
+                                height: 350
                             }
                         );
 
@@ -1840,8 +1852,10 @@
                         labels,
                         values,
                         {
-                            // colors will be automatically assigned based on labels
-                            title: title || ''
+                            title: title || '',
+                            // Colors will be automatically assigned consistently based on labels
+                            showTotal: true,
+                            height: 350
                         }
                     );
                 } catch (error) {

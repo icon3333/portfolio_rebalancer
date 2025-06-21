@@ -2729,3 +2729,73 @@ p {
     background: linear-gradient(135deg, rgba(35, 209, 96, 0.1) 0%, rgba(35, 209, 96, 0.05) 100%);
   }
 }
+
+/* Standardized Donut Chart Styling */
+.apexcharts-canvas {
+  margin: 0 auto;
+}
+
+/* Ensure consistent chart container sizing */
+.chart-container,
+.overview-chart-container,
+.chart-large-container,
+.chart-medium-container {
+  min-height: 350px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Standardize donut chart labels */
+.apexcharts-datalabel-label {
+  font-size: 12px !important;
+  font-weight: normal !important;
+  fill: #666 !important;
+}
+
+.apexcharts-datalabel-value {
+  font-size: 24px !important;
+  font-weight: 700 !important;
+  fill: #111 !important;
+}
+
+/* Ensure consistent donut hole size and stroke */
+.apexcharts-pie-series path {
+  stroke-width: 0 !important;
+}
+
+/* Consistent tooltip styling */
+.apexcharts-tooltip {
+  background: #fff !important;
+  border: 1px solid #e1e5e9 !important;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
+}
+
+.apexcharts-tooltip-title {
+  background: #f8f9fa !important;
+  border-bottom: 1px solid #e1e5e9 !important;
+  font-weight: 600 !important;
+}
+
+/* Consistent chart title styling */
+.apexcharts-title-text {
+  font-size: 18px !important;
+  font-weight: 600 !important;
+  fill: #333 !important;
+}
+
+/* Responsive chart behavior */
+@media (max-width: 768px) {
+
+  .chart-container,
+  .overview-chart-container,
+  .chart-large-container,
+  .chart-medium-container {
+    min-height: 300px;
+  }
+
+  .apexcharts-datalabel-value {
+    font-size: 20px !important;
+  }
+}

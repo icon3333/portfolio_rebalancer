@@ -49,19 +49,26 @@
              * @param {Array<number>} percentages - Optional array of percentages for display
              */
             function createDoughnutChart(elementId, labels, values, title, colors, percentages) {
-                // Use the standardized chart configuration with minimal overrides
-                const overrides = {};
+                // Use the standardized chart configuration with consistent styling
+                const overrides = {
+                    title: title || '',
+                    showTotal: true,
+                    height: 350
+                    // Colors will be automatically assigned consistently based on labels
+                    // Only override colors if explicitly provided and different from standard mapping
+                };
 
-                // Only add title if provided
-                if (title) {
-                    overrides.title = title;
-                }
-
-                // Only override colors if explicitly provided
+                // Only override colors if explicitly provided and they're custom colors
+                // Otherwise, let ChartConfig.createStandardDoughnutChart use consistent color mapping
                 if (colors && colors.length > 0) {
-                    overrides.colors = colors;
+                    // Check if these are custom colors (not from our standard mapping)
+                    const hasCustomColors = colors.some(color =>
+                        !Object.values(ChartConfig.colorMapping).flat().includes(color)
+                    );
+                    if (hasCustomColors) {
+                        overrides.colors = colors;
+                    }
                 }
-                // Otherwise, let ChartConfig.createStandardDoughnutChart use consistent colors
 
                 // Use the centralized standardized chart configuration
                 return ChartConfig.createStandardDoughnutChart(elementId, labels, values, overrides);
@@ -142,8 +149,10 @@
                     categories.map(cat => cat.name),
                     categoryValues,
                     {
-                        colors: categoryColors,
-                        title: ''
+                        title: 'Category Breakdown',
+                        showTotal: true,
+                        height: 350
+                        // Colors will be automatically assigned consistently based on category names
                     }
                 );
 

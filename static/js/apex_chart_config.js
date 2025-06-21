@@ -51,7 +51,7 @@ const ChartConfig = {
     // Standardized donut chart configuration
     standardDonutConfig: {
         height: 350,
-        showTotal: false,
+        showTotal: true,
         dataLabelFormatter: function (val, opts) {
             const element = document.getElementById(opts.w.config.chart.id || 'chart');
             const labels = opts.w.config.labels || [];
@@ -59,7 +59,14 @@ const ChartConfig = {
             return `${label} ${val.toFixed(1)}%`;
         },
         formatCurrency: v => `€${Math.round(v).toLocaleString()}`,
-        formatPercentage: v => `${v.toFixed(1)}%`
+        formatPercentage: v => `${v.toFixed(1)}%`,
+        // Consistent styling for all donut charts
+        strokeWidth: 0,
+        donutSize: '65%',
+        showLabels: true,
+        showLegend: false,
+        fontSize: '12px',
+        fontWeight: 'normal'
     },
 
     // Centralized color mapping for consistent colors across all donut charts
@@ -223,11 +230,17 @@ const ChartConfig = {
             title = '',
             colors = this.getConsistentColors(labels),
             percentages,
-            formatCurrency = v => `€${Math.round(v).toLocaleString()}`,
-            formatPercentage = v => `${v.toFixed(1)}%`,
-            height = 400,
-            showTotal = true,
-            dataLabelFormatter = null
+            formatCurrency = this.standardDonutConfig.formatCurrency,
+            formatPercentage = this.standardDonutConfig.formatPercentage,
+            height = this.standardDonutConfig.height,
+            showTotal = this.standardDonutConfig.showTotal,
+            dataLabelFormatter = null,
+            strokeWidth = this.standardDonutConfig.strokeWidth,
+            donutSize = this.standardDonutConfig.donutSize,
+            showLabels = this.standardDonutConfig.showLabels,
+            showLegend = this.standardDonutConfig.showLegend,
+            fontSize = this.standardDonutConfig.fontSize,
+            fontWeight = this.standardDonutConfig.fontWeight
         } = options;
 
         // Validate and clean the input values
@@ -240,20 +253,10 @@ const ChartConfig = {
         const calculatedPercentages = cleanedValues.map(v => total > 0 ? (v / total) * 100 : 0);
         const finalPercentages = percentages || calculatedPercentages;
 
-        // Ensure we have valid percentages for all labels
-        const enhancedLabels = labels.map((label, i) => {
-            const percentage = finalPercentages[i];
-            if (percentage !== undefined && !isNaN(percentage)) {
-                return `${label} (${formatPercentage(percentage)})`;
-            } else {
-                return label;
-            }
-        });
-
-        // Create a simpler chart configuration to avoid the error
+        // Create standardized chart configuration
         const chartOptions = {
             series: cleanedValues,
-            labels: labels, // Use simple labels without percentages for now
+            labels: labels,
             chart: {
                 type: 'donut',
                 height: height,
@@ -267,23 +270,24 @@ const ChartConfig = {
             },
             colors: colors,
             stroke: {
-                show: false
+                show: strokeWidth > 0,
+                width: strokeWidth
             },
             plotOptions: {
                 pie: {
                     donut: {
-                        size: '65%',
+                        size: donutSize,
                         labels: {
                             show: showTotal,
                             name: {
-                                show: true,
-                                fontSize: '14px',
-                                fontWeight: 400,
+                                show: showLabels,
+                                fontSize: fontSize,
+                                fontWeight: fontWeight,
                                 color: '#666',
                                 offsetY: -10
                             },
                             value: {
-                                show: true,
+                                show: showTotal,
                                 fontSize: '24px',
                                 fontWeight: 700,
                                 color: '#111',
@@ -293,63 +297,58 @@ const ChartConfig = {
                                 }
                             },
                             total: {
-                                show: true,
-                                showAlways: true,
+                                show: showTotal,
+                                showAlways: false,
                                 label: 'Total',
-                                fontSize: '14px',
-                                fontWeight: 400,
-                                color: '#666',
+                                fontSize: '16px',
+                                fontWeight: 600,
+                                color: '#373d3f',
                                 formatter: function (w) {
+                                    const total = w.globals.seriesTotals.reduce((a, b) => a + b, 0);
                                     return formatCurrency(total);
                                 }
                             }
-                        },
-                        dataLabels: {
-                            offset: 20
                         }
                     }
                 }
             },
             dataLabels: {
-                enabled: true,
+                enabled: showLabels,
                 style: {
-                    fontSize: '12px',
-                    fontWeight: 'bold',
-                    colors: ['#333']
+                    fontSize: fontSize,
+                    fontWeight: fontWeight
                 },
-                formatter: dataLabelFormatter ? dataLabelFormatter : function (val, opts) {
-                    const value = cleanedValues[opts.seriesIndex];
-                    return formatCurrency(value);
+                formatter: dataLabelFormatter || function (val, opts) {
+                    return `${val.toFixed(1)}%`;
                 },
                 dropShadow: {
                     enabled: false
                 }
             },
             tooltip: {
-                enabled: true,
                 theme: 'light',
                 style: {
-                    fontSize: '12px'
+                    fontSize: fontSize
                 },
                 y: {
-                    formatter: function (value) {
-                        return formatCurrency(value);
-                    },
-                    title: {
-                        formatter: function (seriesName) {
-                            return seriesName;
-                        }
+                    formatter: function (val, { seriesIndex, w }) {
+                        const label = w.globals.labels[seriesIndex];
+                        const percentage = finalPercentages[seriesIndex];
+                        return `${label}: ${formatCurrency(val)} (${formatPercentage(percentage)})`;
                     }
                 }
             },
             legend: {
-                show: false
+                show: showLegend
             },
             responsive: [{
                 breakpoint: 480,
                 options: {
                     chart: {
                         width: '100%'
+                    },
+                    legend: {
+                        show: false
                     }
                 }
             }]
@@ -369,7 +368,7 @@ const ChartConfig = {
 
         try {
             // Debug logging
-            console.log(`Creating chart for ${elementId} with:`, {
+            console.log(`Creating standardized donut chart for ${elementId} with:`, {
                 series: cleanedValues,
                 labels: labels,
                 colorsLength: colors.length,
