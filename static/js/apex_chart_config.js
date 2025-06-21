@@ -128,6 +128,13 @@ const ChartConfig = {
     // Chart instances cache
     chartInstances: {},
 
+    // Cache dynamically assigned colors so the same label
+    // always gets the same color across charts
+    labelColorCache: {},
+
+    // Index of the next fallback color to use
+    nextFallbackIndex: 0,
+
     /**
      * Converts HSL color values to hex
      * @param {number} h - Hue (0-360)
@@ -790,54 +797,45 @@ const ChartConfig = {
         console.log('getConsistentColors called with labels:', labels);
 
         const colors = [];
-        const usedFallbackIndices = new Set();
+        const fallbackColors = this.colorMapping.fallback;
 
         labels.forEach((label) => {
-            let colorFound = false;
+            // If we've already assigned a color to this label, reuse it
+            if (this.labelColorCache[label]) {
+                colors.push(this.labelColorCache[label]);
+                return;
+            }
 
-            // First, check for exact match
+            // Exact match in the predefined mapping
             if (this.colorMapping[label]) {
+                this.labelColorCache[label] = this.colorMapping[label];
                 colors.push(this.colorMapping[label]);
-                colorFound = true;
-                console.log(`Exact match found for "${label}": ${this.colorMapping[label]}`);
-            } else {
-                // Try to find a match in the color mapping keys
-                // This handles cases where the label might have extra info like percentages
-                for (const [key, color] of Object.entries(this.colorMapping)) {
-                    // Skip the fallback array
-                    if (key === 'fallback') continue;
+                return;
+            }
 
-                    if (typeof key === 'string' && typeof label === 'string' && typeof color === 'string') {
-                        // Check if the label contains the key or vice versa
-                        if (label.includes(key) || key.includes(label)) {
-                            colors.push(color);
-                            colorFound = true;
-                            console.log(`Partial match found for "${label}" with key "${key}": ${color}`);
-                            break;
-                        }
+            // Partial match search
+            for (const [key, color] of Object.entries(this.colorMapping)) {
+                if (key === 'fallback') continue;
+                if (typeof key === 'string' && typeof label === 'string' && typeof color === 'string') {
+                    if (label.includes(key) || key.includes(label)) {
+                        this.labelColorCache[label] = color;
+                        colors.push(color);
+                        return;
                     }
                 }
             }
 
-            if (!colorFound) {
-                // Use a fallback color that hasn't been used yet
-                let fallbackIndex = 0;
-                while (usedFallbackIndices.has(fallbackIndex) && fallbackIndex < this.colorMapping.fallback.length) {
-                    fallbackIndex++;
-                }
-
-                if (fallbackIndex < this.colorMapping.fallback.length) {
-                    colors.push(this.colorMapping.fallback[fallbackIndex]);
-                    usedFallbackIndices.add(fallbackIndex);
-                    console.log(`Using fallback color for "${label}": ${this.colorMapping.fallback[fallbackIndex]}`);
-                } else {
-                    // If we've used all fallback colors, generate a new one
-                    const hue = (fallbackIndex * 137.508) % 360;
-                    const generatedColor = this.hslToHex(hue, 65, 60);
-                    colors.push(generatedColor);
-                    console.log(`Generated new color for "${label}": ${generatedColor}`);
-                }
+            // No match found, assign the next fallback color or generate one
+            let color;
+            if (this.nextFallbackIndex < fallbackColors.length) {
+                color = fallbackColors[this.nextFallbackIndex];
+            } else {
+                const hue = (this.nextFallbackIndex * 137.508) % 360;
+                color = this.hslToHex(hue, 65, 60);
             }
+            this.labelColorCache[label] = color;
+            this.nextFallbackIndex += 1;
+            colors.push(color);
         });
 
         console.log('Final colors array:', colors);
