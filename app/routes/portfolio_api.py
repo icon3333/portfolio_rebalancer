@@ -690,9 +690,30 @@ def update_portfolio_api():
         # Create backup
         backup_database()
 
-        # Start transaction
         db = get_db()
         cursor = db.cursor()
+
+        # Preload existing data
+        company_rows = query_db(
+            'SELECT id, name, identifier FROM companies WHERE account_id = ?',
+            [account_id]
+        )
+        company_map = {row['name']: row for row in company_rows}
+
+        portfolio_rows = query_db(
+            'SELECT id, name FROM portfolios WHERE account_id = ?',
+            [account_id]
+        )
+        portfolio_map = {row['name']: row['id'] for row in portfolio_rows}
+
+        share_rows = query_db(
+            '''SELECT cs.company_id FROM company_shares cs
+               JOIN companies c ON cs.company_id = c.id
+               WHERE c.account_id = ?''',
+            [account_id]
+        )
+        shares_set = {row['company_id'] for row in share_rows}
+
         cursor.execute('BEGIN TRANSACTION')
 
         updated_count = 0
@@ -700,12 +721,7 @@ def update_portfolio_api():
 
         for item in data:
             try:
-                # Get company ID and original identifier
-                company_result = query_db(
-                    'SELECT id, identifier FROM companies WHERE name = ? AND account_id = ?',
-                    [item['company'], account_id],
-                    one=True
-                )
+                company_result = company_map.get(item['company'])
 
                 if not company_result:
                     failed_items.append({
@@ -718,40 +734,25 @@ def update_portfolio_api():
                 original_identifier = company_result.get('identifier')
                 new_identifier = item.get('identifier', '')
 
-                # Get portfolio ID
-                if item.get('portfolio') and item['portfolio'] != 'None':
-                    portfolio_result = query_db(
-                        'SELECT id FROM portfolios WHERE name = ? AND account_id = ?',
-                        [item['portfolio'], account_id],
-                        one=True
-                    )
-
-                    if not portfolio_result:
-                        # Create portfolio if it doesn't exist
+                portfolio_name = item.get('portfolio')
+                if portfolio_name and portfolio_name != 'None':
+                    portfolio_id = portfolio_map.get(portfolio_name)
+                    if portfolio_id is None:
                         cursor.execute(
                             'INSERT INTO portfolios (name, account_id) VALUES (?, ?)',
-                            [item['portfolio'], account_id]
+                            [portfolio_name, account_id]
                         )
                         portfolio_id = cursor.lastrowid
-                    else:
-                        portfolio_id = portfolio_result['id']
+                        portfolio_map[portfolio_name] = portfolio_id
                 else:
-                    # Get default portfolio
-                    portfolio_result = query_db(
-                        'SELECT id FROM portfolios WHERE name = "-" AND account_id = ?',
-                        [account_id],
-                        one=True
-                    )
-
-                    if not portfolio_result:
-                        # Create default portfolio if doesn't exist
+                    portfolio_id = portfolio_map.get('-')
+                    if portfolio_id is None:
                         cursor.execute(
                             'INSERT INTO portfolios (name, account_id) VALUES (?, ?)',
                             ['-', account_id]
                         )
                         portfolio_id = cursor.lastrowid
-                    else:
-                        portfolio_id = portfolio_result['id']
+                        portfolio_map['-'] = portfolio_id
 
                 # Update company
                 cursor.execute('''
@@ -798,14 +799,7 @@ def update_portfolio_api():
                     shares = item.get('shares')
                     override_share = item.get('override_share')
 
-                    # Check if shares record exists
-                    share_exists = query_db(
-                        'SELECT company_id, shares FROM company_shares WHERE company_id = ?',
-                        [company_id],
-                        one=True
-                    )
-
-                    if share_exists:
+                    if company_id in shares_set:
                         cursor.execute('''
                             UPDATE company_shares
                             SET shares = ?, override_share = ?
@@ -816,6 +810,7 @@ def update_portfolio_api():
                             INSERT INTO company_shares (company_id, shares, override_share)
                             VALUES (?, ?, ?)
                         ''', [company_id, shares, override_share])
+                        shares_set.add(company_id)
 
                 updated_count += 1
 
