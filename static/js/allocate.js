@@ -784,12 +784,12 @@ document.addEventListener('DOMContentLoaded', function() {
         
         renderDetailedChart() {
             const detailedChartContainer = document.getElementById('detailedChart');
-            
+
             if (!detailedChartContainer) return;
             if (!this.portfolioData || !this.portfolioData.portfolios) return;
 
             // Filter out portfolios with current value of 0
-            const filteredPortfolios = this.portfolioData.portfolios.filter(portfolio => 
+            const filteredPortfolios = this.portfolioData.portfolios.filter(portfolio =>
                 portfolio.currentValue !== 0 && portfolio.currentValue !== null
             );
 
@@ -798,82 +798,30 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Prepare data for the detailed chart
             const allCategories = [];
-            const portfolioColors = [
-                'rgba(54, 162, 235, 0.8)',
-                'rgba(255, 99, 132, 0.8)',
-                'rgba(75, 192, 192, 0.8)',
-                'rgba(255, 159, 64, 0.8)',
-                'rgba(153, 102, 255, 0.8)',
-                'rgba(255, 205, 86, 0.8)',
-                'rgba(201, 203, 207, 0.8)'
-            ];
 
-            // Extract categories data for visualization
-            filteredPortfolios.forEach((portfolio, index) => {
-                const color = portfolioColors[index % portfolioColors.length];
-                
+            filteredPortfolios.forEach((portfolio) => {
                 if (portfolio.categories && portfolio.categories.length > 0) {
                     portfolio.categories.forEach(category => {
                         // Skip missing positions in chart
                         if (category.name === 'Missing Positions') return;
-                        
+
                         allCategories.push({
                             portfolio: portfolio.name,
                             category: category.name,
-                            value: category.currentValue || 0,
-                            color: color
+                            value: category.currentValue || 0
                         });
                     });
                 }
             });
 
-            // Create detailed chart
-            if (typeof Chart !== 'undefined' && allCategories.length > 0) {
-                const canvas = document.createElement('canvas');
-                detailedChartContainer.appendChild(canvas);
-                
-                new Chart(canvas, {
-                    type: 'pie',
-                    data: {
-                        labels: allCategories.map(c => `${c.portfolio} - ${c.category}`),
-                        datasets: [{
-                            data: allCategories.map(c => c.value),
-                            backgroundColor: allCategories.map(c => c.color),
-                            borderColor: 'white',
-                            borderWidth: 1
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                position: 'right',
-                                labels: {
-                                    boxWidth: 15,
-                                    font: {
-                                        size: 11
-                                    }
-                                }
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    label: function(tooltipItem) {
-                                        const dataset = tooltipItem.dataset;
-                                        const data = dataset.data[tooltipItem.dataIndex];
-                                        const total = dataset.data.reduce((sum, val) => sum + val, 0);
-                                        const percentage = ((data / total) * 100).toFixed(1);
-                                        return `${tooltipItem.label}: €${data.toLocaleString()} (${percentage}%)`;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                });
+            if (typeof ChartConfig !== 'undefined' && allCategories.length > 0) {
+                const labels = allCategories.map(c => `${c.portfolio} - ${c.category}`);
+                const values = allCategories.map(c => c.value);
+                ChartConfig.createStandardDoughnutChart('detailedChart', labels, values);
             } else {
                 detailedChartContainer.innerHTML = `
                     <div class="alert alert-info">
-                        No detailed category data available or Chart.js library not loaded.
+                        No detailed category data available.
                     </div>
                 `;
             }
