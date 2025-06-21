@@ -1,9 +1,6 @@
 from app.database.db_manager import query_db
-from app.utils.db_utils import (
-    load_portfolio_data, process_portfolio_dataframe
-)
+from app.utils.db_utils import load_portfolio_data
 from app.utils.yfinance_utils import get_isin_data
-import pandas as pd
 import logging
 from .portfolio_processing import process_csv_data
 
@@ -47,72 +44,28 @@ def get_portfolio_data(account_id):
                 f"No portfolio data found for account_id: {account_id} - empty result set")
             return []
 
-        # Convert list of dicts to pandas DataFrame
-        df = pd.DataFrame(df)
-
-        if df.empty:
-            logger.warning(
-                "DataFrame is empty after conversion - result structure may be invalid")
-            return []
-
-        logger.info(f"Raw DataFrame columns: {df.columns.tolist()}")
-        logger.info(f"Raw DataFrame shape: {df.shape}")
-
-        # Process the DataFrame
-        df = process_portfolio_dataframe(df)
-        logger.info(f"Processed DataFrame columns: {df.columns.tolist()}")
-        logger.info(f"Processed DataFrame shape: {df.shape}")
-
-        # Get companies with portfolio names
-        companies = query_db('''
-            SELECT
-                c.id,
-                c.name,
-                c.identifier,
-                c.category,
-                COALESCE(cs.shares, 0) as shares,
-                COALESCE(cs.override_share, 0) as override_share,
-                p.name as portfolio_name
-            FROM companies c
-            LEFT JOIN company_shares cs ON c.id = cs.company_id
-            JOIN portfolios p ON c.portfolio_id = p.id
-            WHERE c.account_id = ?
-        ''', [account_id])
-
-        # Convert DataFrame to dictionary format
+        # Transform raw database rows into output format
         portfolio_data = []
-        for _, row in df.iterrows():
+        for row in df:
             try:
-                # Check all column names for debugging
-                logger.debug(f"Available columns: {row.index.tolist()}")
-
-                # Try both portfolio_name and name variations to be safe
-                portfolio_value = ''
-                if 'portfolio_name' in row:
-                    portfolio_value = row['portfolio_name']
-                elif 'portfolio' in row:
-                    portfolio_value = row['portfolio']
-
-                logger.debug(
-                    f"Portfolio value for {row['name']}: '{portfolio_value}'")
+                portfolio_value = row.get('portfolio_name') or row.get('portfolio') or ''
 
                 item = {
-                    'id': row['id'],  # Add the id field
-                    'company': row['name'],  # Changed from 'company' to 'name'
+                    'id': row['id'],
+                    'company': row['name'],
                     'identifier': row['identifier'],
-                    'portfolio': portfolio_value,  # Use the extracted portfolio value
+                    'portfolio': portfolio_value,
                     'category': row['category'],
-                    'shares': float(row['shares']) if pd.notna(row['shares']) else 0,
-                    'override_share': float(row['override_share']) if pd.notna(row['override_share']) else None,
-                    'price_eur': float(row['price_eur']) if pd.notna(row['price_eur']) else None,
-                    'currency': row['currency'],
-                    'country': row['country'] if 'country' in row and pd.notna(row['country']) else None,
-                    'industry': row['industry'] if 'industry' in row and pd.notna(row['industry']) else None,
-                    'sector': row['sector'] if 'sector' in row and pd.notna(row['sector']) else None,
-                    'total_invested': float(row['total_invested']) if pd.notna(row['total_invested']) else 0,
+                    'shares': float(row['shares']) if row.get('shares') is not None else 0,
+                    'override_share': float(row['override_share']) if row.get('override_share') is not None else None,
+                    'price_eur': float(row['price_eur']) if row.get('price_eur') is not None else None,
+                    'currency': row.get('currency'),
+                    'country': row.get('country'),
+                    'industry': row.get('industry'),
+                    'sector': row.get('sector'),
+                    'total_invested': float(row['total_invested']) if row.get('total_invested') is not None else 0,
                     'last_updated': row['last_updated'] if isinstance(row['last_updated'], str) else
-                    (row['last_updated'].isoformat() if pd.notna(
-                        row['last_updated']) else None)
+                    (row['last_updated'].isoformat() if row.get('last_updated') is not None else None)
                 }
                 portfolio_data.append(item)
             except Exception as e:
