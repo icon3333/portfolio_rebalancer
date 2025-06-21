@@ -39,14 +39,18 @@ def create_app(config_name='default'):
     from app.routes.portfolio_routes import portfolio_bp
     app.register_blueprint(portfolio_bp)
     
+    from app.routes.admin_routes import admin_bp
+    app.register_blueprint(admin_bp)
+    
     # Initialize the database
     from app.database.db_manager import init_db
     init_db(app)
 
     # Trigger automatic price update on startup if needed
     try:
-        from app.utils.startup_tasks import auto_update_prices_if_needed
-        auto_update_prices_if_needed()
+        with app.app_context():
+            from app.utils.startup_tasks import auto_update_prices_if_needed
+            auto_update_prices_if_needed()
     except Exception as e:
         logger.error(f"Automatic price update failed: {e}")
     

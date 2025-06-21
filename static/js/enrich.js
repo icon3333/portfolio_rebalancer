@@ -22,187 +22,187 @@ const UpdateAllDataHandler = {
             updateAllDataBtn.disabled = true;
             updateAllDataBtn.classList.add('is-loading');
 
-                // Show the progress indicator
-                progressCount.textContent = '0';
-                progressTotal.textContent = '0';
-                progressPercentage.textContent = '0%';
-                progressElement.style.display = 'block';
-                progressElement.dataset.processing = 'true';
+            // Show the progress indicator
+            progressCount.textContent = '0';
+            progressTotal.textContent = '0';
+            progressPercentage.textContent = '0%';
+            progressElement.style.display = 'block';
+            progressElement.dataset.processing = 'true';
 
-                // Start progress tracking
-                if (PriceProgressTracker.progressInterval) {
-                    clearInterval(PriceProgressTracker.progressInterval);
+            // Start progress tracking
+            if (PriceProgressTracker.progressInterval) {
+                clearInterval(PriceProgressTracker.progressInterval);
+            }
+
+            PriceProgressTracker.progressInterval = setInterval(() => {
+                PriceProgressTracker.checkProgress(
+                    progressElement,
+                    progressCount,
+                    progressTotal,
+                    progressPercentage
+                );
+            }, 500);
+
+            // Make the API call
+            const response = await fetch('/portfolio/api/update_all_prices', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                // Show success notification
+                if (typeof showNotification === 'function') {
+                    showNotification(result.message || 'Started updating all prices and metadata', 'is-success');
+                } else {
+                    console.log('Success:', result.message || 'Started updating all prices and metadata');
                 }
 
-                PriceProgressTracker.progressInterval = setInterval(() => {
-                    PriceProgressTracker.checkProgress(
-                        progressElement,
-                        progressCount,
-                        progressTotal,
-                        progressPercentage
-                    );
-                }, 500);
+                // If there's a job ID, start polling for status updates
+                if (result.job_id) {
+                    const jobId = result.job_id;
+                    console.log('Job ID:', jobId);
 
-                // Make the API call
-                const response = await fetch('/portfolio/api/update_all_prices', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
-
-                const result = await response.json();
-
-                if (response.ok) {
-                    // Show success notification
-                    if (typeof showNotification === 'function') {
-                        showNotification(result.message || 'Started updating all prices and metadata', 'is-success');
-                    } else {
-                        console.log('Success:', result.message || 'Started updating all prices and metadata');
+                    // Update the progress display immediately from the total_companies info
+                    const totalCompanies = result.total_companies || 0;
+                    if (progressCount && progressTotal && progressPercentage) {
+                        progressCount.textContent = '0';
+                        progressTotal.textContent = totalCompanies.toString();
+                        progressPercentage.textContent = '0%';
                     }
 
-                    // If there's a job ID, start polling for status updates
-                    if (result.job_id) {
-                        const jobId = result.job_id;
-                        console.log('Job ID:', jobId);
+                    // Poll for job status
+                    const statusInterval = setInterval(async () => {
+                        try {
+                            // Try fetching the job status first
+                            const statusResponse = await fetch(`/portfolio/api/price_update_status/${jobId}`);
 
-                        // Update the progress display immediately from the total_companies info
-                        const totalCompanies = result.total_companies || 0;
-                        if (progressCount && progressTotal && progressPercentage) {
-                            progressCount.textContent = '0';
-                            progressTotal.textContent = totalCompanies.toString();
-                            progressPercentage.textContent = '0%';
-                        }
+                            if (statusResponse.ok) {
+                                const statusResult = await statusResponse.json();
+                                console.log('Job status:', statusResult);
 
-                        // Poll for job status
-                        const statusInterval = setInterval(async () => {
-                            try {
-                                // Try fetching the job status first
-                                const statusResponse = await fetch(`/portfolio/api/price_update_status/${jobId}`);
+                                // Update progress display if available
+                                if (progressCount && progressTotal && progressPercentage && statusResult.progress) {
+                                    progressCount.textContent = statusResult.progress.current;
+                                    progressTotal.textContent = statusResult.progress.total;
+                                    progressPercentage.textContent = `${statusResult.progress.percentage}%`;
 
-                                if (statusResponse.ok) {
-                                    const statusResult = await statusResponse.json();
-                                    console.log('Job status:', statusResult);
+                                    // Update progress bar
+                                    const progressBar = document.getElementById('progress-bar');
+                                    if (progressBar) {
+                                        progressBar.value = statusResult.progress.percentage;
+                                    }
+                                }
 
-                                    // Update progress display if available
-                                    if (progressCount && progressTotal && progressPercentage && statusResult.progress) {
-                                        progressCount.textContent = statusResult.progress.current;
-                                        progressTotal.textContent = statusResult.progress.total;
-                                        progressPercentage.textContent = `${statusResult.progress.percentage}%`;
+                                // If job is completed, stop polling and reload data
+                                if (statusResult.status === 'completed' || statusResult.is_complete) {
+                                    clearInterval(statusInterval);
 
-                                        // Update progress bar
-                                        const progressBar = document.getElementById('progress-bar');
-                                        if (progressBar) {
-                                            progressBar.value = statusResult.progress.percentage;
-                                        }
+                                    // Also clear the PriceProgressTracker interval to ensure it stops completely
+                                    if (PriceProgressTracker.progressInterval) {
+                                        clearInterval(PriceProgressTracker.progressInterval);
+                                        PriceProgressTracker.progressInterval = null;
                                     }
 
-                                    // If job is completed, stop polling and reload data
-                                    if (statusResult.status === 'completed' || statusResult.is_complete) {
+                                    // Show completion notification
+                                    if (typeof showNotification === 'function') {
+                                        showNotification(`Price update complete! Updated all companies successfully.`, 'is-success');
+                                    }
+
+                                    // Reset the button state
+                                    updateAllDataBtn.disabled = false;
+                                    updateAllDataBtn.classList.remove('is-loading');
+
+                                    // Hide progress after a short delay
+                                    setTimeout(() => {
+                                        progressElement.style.display = 'none';
+                                        delete progressElement.dataset.processing;
+                                    }, 3000);
+
+                                    // Reload portfolio data to show updated prices
+                                    if (window.portfolioTableApp && window.portfolioTableApp.app && typeof window.portfolioTableApp.app.loadData === 'function') {
+                                        window.portfolioTableApp.app.loadData();
+                                    }
+                                }
+                            } else {
+                                // Fall back to checking the progress endpoint if the status endpoint fails
+                                console.log("Falling back to progress endpoint check");
+                                const progressResponse = await fetch('/portfolio/api/price_fetch_progress');
+
+                                if (progressResponse.ok) {
+                                    const progressData = await progressResponse.json();
+                                    console.log('Progress data:', progressData);
+
+                                    // Update the progress display
+                                    if (progressCount && progressTotal && progressPercentage) {
+                                        progressCount.textContent = progressData.current;
+                                        progressTotal.textContent = progressData.total;
+                                        progressPercentage.textContent = `${progressData.percentage}%`;
+                                    }
+
+                                    // If completed, stop polling
+                                    if (progressData.status === 'completed' || progressData.is_complete) {
                                         clearInterval(statusInterval);
 
-                                        // Also clear the PriceProgressTracker interval to ensure it stops completely
-                                        if (PriceProgressTracker.progressInterval) {
-                                            clearInterval(PriceProgressTracker.progressInterval);
-                                            PriceProgressTracker.progressInterval = null;
-                                        }
-
-                                        // Show completion notification
-                                        if (typeof showNotification === 'function') {
-                                            showNotification(`Price update complete! Updated all companies successfully.`, 'is-success');
-                                        }
-
-                                        // Reset the button state
+                                        // Reset UI and reload data
                                         updateAllDataBtn.disabled = false;
                                         updateAllDataBtn.classList.remove('is-loading');
 
-                                        // Hide progress after a short delay
                                         setTimeout(() => {
                                             progressElement.style.display = 'none';
                                             delete progressElement.dataset.processing;
                                         }, 3000);
 
-                                        // Reload portfolio data to show updated prices
-                                        if (window.portfolioTableApp && typeof window.portfolioTableApp.app.loadData === 'function') {
+                                        // Reload portfolio data
+                                        if (window.portfolioTableApp && window.portfolioTableApp.app && typeof window.portfolioTableApp.app.loadData === 'function') {
                                             window.portfolioTableApp.app.loadData();
                                         }
                                     }
-                                } else {
-                                    // Fall back to checking the progress endpoint if the status endpoint fails
-                                    console.log("Falling back to progress endpoint check");
-                                    const progressResponse = await fetch('/portfolio/api/price_fetch_progress');
-
-                                    if (progressResponse.ok) {
-                                        const progressData = await progressResponse.json();
-                                        console.log('Progress data:', progressData);
-
-                                        // Update the progress display
-                                        if (progressCount && progressTotal && progressPercentage) {
-                                            progressCount.textContent = progressData.current;
-                                            progressTotal.textContent = progressData.total;
-                                            progressPercentage.textContent = `${progressData.percentage}%`;
-                                        }
-
-                                        // If completed, stop polling
-                                        if (progressData.status === 'completed' || progressData.is_complete) {
-                                            clearInterval(statusInterval);
-
-                                            // Reset UI and reload data
-                                            updateAllDataBtn.disabled = false;
-                                            updateAllDataBtn.classList.remove('is-loading');
-
-                                            setTimeout(() => {
-                                                progressElement.style.display = 'none';
-                                                delete progressElement.dataset.processing;
-                                            }, 3000);
-
-                                            // Reload portfolio data
-                                            if (window.portfolioTableApp && typeof window.portfolioTableApp.app.loadData === 'function') {
-                                                window.portfolioTableApp.app.loadData();
-                                            }
-                                        }
-                                    }
                                 }
-                            } catch (statusError) {
-                                console.error('Error checking job status:', statusError);
                             }
-                        }, 2000);
+                        } catch (statusError) {
+                            console.error('Error checking job status:', statusError);
+                        }
+                    }, 2000);
 
-                        // Stop polling after 5 minutes (300000ms) to prevent infinite polling
-                        setTimeout(() => {
-                            clearInterval(statusInterval);
+                    // Stop polling after 5 minutes (300000ms) to prevent infinite polling
+                    setTimeout(() => {
+                        clearInterval(statusInterval);
 
-                            // Also clear the PriceProgressTracker interval
-                            if (PriceProgressTracker.progressInterval) {
-                                clearInterval(PriceProgressTracker.progressInterval);
-                                PriceProgressTracker.progressInterval = null;
-                            }
+                        // Also clear the PriceProgressTracker interval
+                        if (PriceProgressTracker.progressInterval) {
+                            clearInterval(PriceProgressTracker.progressInterval);
+                            PriceProgressTracker.progressInterval = null;
+                        }
 
-                            // Reset UI after timeout
-                            updateAllDataBtn.disabled = false;
-                            updateAllDataBtn.classList.remove('is-loading');
-                            progressElement.style.display = 'none';
-                            delete progressElement.dataset.processing;
-                        }, 300000);
-                    }
-                } else {
-                    // Show error notification
-                    if (typeof showNotification === 'function') {
-                        showNotification(result.error || 'Failed to update prices', 'is-danger');
-                    } else {
-                        console.error('Error:', result.error || 'Failed to update prices');
-                    }
+                        // Reset UI after timeout
+                        updateAllDataBtn.disabled = false;
+                        updateAllDataBtn.classList.remove('is-loading');
+                        progressElement.style.display = 'none';
+                        delete progressElement.dataset.processing;
+                    }, 300000);
                 }
-            } catch (error) {
-                console.error('Error updating all prices:', error);
+            } else {
+                // Show error notification
                 if (typeof showNotification === 'function') {
-                    showNotification('An error occurred while updating prices', 'is-danger');
+                    showNotification(result.error || 'Failed to update prices', 'is-danger');
+                } else {
+                    console.error('Error:', result.error || 'Failed to update prices');
                 }
-            } finally {
-                // Re-enable the button
-                updateAllDataBtn.disabled = false;
-                updateAllDataBtn.classList.remove('is-loading');
             }
+        } catch (error) {
+            console.error('Error updating all prices:', error);
+            if (typeof showNotification === 'function') {
+                showNotification('An error occurred while updating prices', 'is-danger');
+            }
+        } finally {
+            // Re-enable the button
+            updateAllDataBtn.disabled = false;
+            updateAllDataBtn.classList.remove('is-loading');
+        }
     }
 };
 
@@ -352,7 +352,7 @@ const PriceProgressTracker = {
                         this.progressInterval = null;
 
                         // Refresh the portfolio table data if available
-                        if (window.portfolioTableApp && typeof window.portfolioTableApp.app.loadData === 'function') {
+                        if (window.portfolioTableApp && window.portfolioTableApp.app && typeof window.portfolioTableApp.app.loadData === 'function') {
                             window.portfolioTableApp.app.loadData().then(() => {
                                 console.log("Portfolio data refreshed after update");
                             });
@@ -1423,16 +1423,22 @@ class PortfolioTableApp {
 
                 // Ensure the X button and background clicks close the modals properly
                 this.$nextTick(() => {
-                    // For Delete Modal
-                    const deleteModalCloseBtn = document.querySelector('.modal:has(.modal-card-title:contains("Delete Confirmation")) .delete');
-                    if (deleteModalCloseBtn) {
-                        deleteModalCloseBtn.addEventListener('click', this.closeModal.bind(this));
+                    // For Delete Modal - use a simpler, more reliable selector
+                    const deleteModal = document.querySelector('.modal.is-active');
+                    if (deleteModal) {
+                        const deleteModalCloseBtn = deleteModal.querySelector('.delete');
+                        if (deleteModalCloseBtn) {
+                            deleteModalCloseBtn.addEventListener('click', this.closeModal.bind(this));
+                        }
                     }
 
-                    // For Update Price Modal
-                    const updatePriceModalCloseBtn = document.querySelector('.modal:has(.modal-card-title:contains("Update Price")) .delete');
-                    if (updatePriceModalCloseBtn) {
-                        updatePriceModalCloseBtn.addEventListener('click', this.closeModal.bind(this));
+                    // For Update Price Modal - use a simpler, more reliable selector  
+                    const updatePriceModal = document.querySelector('.modal.is-active');
+                    if (updatePriceModal) {
+                        const updatePriceModalCloseBtn = updatePriceModal.querySelector('.delete');
+                        if (updatePriceModalCloseBtn) {
+                            updatePriceModalCloseBtn.addEventListener('click', this.closeModal.bind(this));
+                        }
                     }
                 });
             }

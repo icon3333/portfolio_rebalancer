@@ -829,8 +829,21 @@ def update_portfolio_api():
                     company_id
                 ])
 
-                # If identifier was added or changed, fetch new price
+                # If identifier was added or changed, normalize and fetch new price
                 if new_identifier and new_identifier != original_identifier:
+                    # Import normalization function
+                    from ..utils.identifier_normalization import normalize_identifier
+                    normalized_identifier = normalize_identifier(new_identifier)
+                    if normalized_identifier != new_identifier:
+                        logger.info(f"Normalized identifier for {item['company']}: '{new_identifier}' -> '{normalized_identifier}'")
+                        # Update the database with normalized identifier
+                        cursor.execute('''
+                            UPDATE companies 
+                            SET identifier = ?
+                            WHERE id = ?
+                        ''', [normalized_identifier, company_id])
+                        new_identifier = normalized_identifier
+                    
                     logger.info(
                         f"Identifier for {item['company']} changed to {new_identifier}, fetching price...")
                     try:
@@ -843,7 +856,7 @@ def update_portfolio_api():
                             country = price_data.get('country')
                             sector = price_data.get('sector')
                             industry = price_data.get('industry')
-                            exchange = price_data.get('exchange')
+                
                             modified_identifier = price_data.get('modified_identifier')
                             
                             # Ensure required parameters are not None
@@ -856,7 +869,7 @@ def update_portfolio_api():
                                     country=country,
                                     sector=sector,
                                     industry=industry,
-                                    exchange=exchange,
+        
                                     modified_identifier=modified_identifier
                                 )
                                 logger.info(

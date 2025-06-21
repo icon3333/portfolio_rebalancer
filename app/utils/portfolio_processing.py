@@ -5,6 +5,7 @@ from app.database.db_manager import query_db, execute_db, backup_database, get_d
 from app.utils.db_utils import update_price_in_db
 from app.utils.yfinance_utils import get_isin_data
 from app.utils.data_processing import clear_data_caches
+from app.utils.identifier_normalization import normalize_identifier
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,7 @@ def process_csv_data(account_id, file_content):
             "assettype": ["assettype", "securitytype"],
             "wkn": ["wkn"],
             "currency": ["currency"],
-            "exchange": ["exchange", "market"],
+        
             "date": ["date", "transactiondate", "datetime"],
             "fee": ["fee", "commission", "costs"],
             "tax": ["tax", "taxes"],
@@ -179,7 +180,10 @@ def process_csv_data(account_id, file_content):
                 continue
             shares = round(float(row['shares']), 6)
             price = float(row['price'])
-            identifier = row['identifier']
+            raw_identifier = row['identifier']
+            identifier = normalize_identifier(raw_identifier)
+            if raw_identifier != identifier:
+                logger.info(f"Normalized identifier for {company_name}: '{raw_identifier}' -> '{identifier}'")
             fee = float(row['fee']) if 'fee' in row else 0
             tax = float(row['tax']) if 'tax' in row else 0
             if shares <= 0:
@@ -356,7 +360,7 @@ def process_csv_data(account_id, file_content):
                         industry = result.get('industry')
                         logger.info(
                             f"Updating metadata for {identifier}: Country: {country}, Sector: {sector}, Industry: {industry}")
-                        if not update_price_in_db(identifier, price, currency, price_eur, country, sector, industry, result.get('exchange')):
+                        if not update_price_in_db(identifier, price, currency, price_eur, country, sector, industry):
                             logger.warning(
                                 f"Failed to update price and metadata in database for {identifier}")
                             failed_prices.append(identifier)

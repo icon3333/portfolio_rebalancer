@@ -80,49 +80,26 @@ def _is_likely_crypto(identifier: str) -> bool:
 
 def get_isin_data(identifier: str) -> Dict[str, Any]:
     """
-    Get stock data for a given ISIN or ticker, with a fallback for crypto.
-    Uses the same approach as the working script example.
-    Automatically detects crypto based on identifier characteristics.
+    Get stock/crypto data for a given pre-normalized identifier.
+    
+    Since identifiers are now pre-normalized by the identifier_normalization module,
+    this function is simplified to just fetch data using the exact identifier provided.
     """
-    logger.info(f"Processing identifier: {identifier}")
+    logger.info(f"Processing pre-normalized identifier: {identifier}")
 
-    # Check if this looks like a crypto identifier first
-    if _is_likely_crypto(identifier):
-        logger.info(f"'{identifier}' appears to be cryptocurrency, trying crypto format first")
-        crypto_identifier = f"{identifier}-USD"
-        data = _fetch_yfinance_data_robust(crypto_identifier)
-        if data:
-            # Mark that we used crypto format
-            data['modified_identifier'] = crypto_identifier
-            data['sector'] = 'Cryptocurrency'
-            data['industry'] = 'Digital Currency'
-            data['country'] = 'N/A'
-            logger.info(f"Successfully retrieved crypto data for {identifier} as {crypto_identifier}")
-        else:
-            # If crypto format fails, try standard format as fallback
-            logger.warning(f"Crypto format '{crypto_identifier}' failed, trying standard format")
-            data = _fetch_yfinance_data_robust(identifier)
-    else:
-        # Use the exact same pattern as the working script for non-crypto
-        data = _fetch_yfinance_data_robust(identifier)
-
-        # If the initial fetch fails, try a crypto-specific format as fallback
-        if not data:
-            logger.warning(
-                f"Standard lookup for '{identifier}' failed, trying crypto format.")
-            crypto_identifier = f"{identifier}-USD"
-            data = _fetch_yfinance_data_robust(crypto_identifier)
-            if data:
-                # Mark that we used a fallback
-                data['modified_identifier'] = crypto_identifier
-                data['sector'] = 'Cryptocurrency'
-                data['industry'] = 'Digital Currency'
-                data['country'] = 'N/A'
-
+    # Fetch data using the pre-normalized identifier
+    data = _fetch_yfinance_data_robust(identifier)
+    
     if not data:
-        logger.error(
-            f"Failed to fetch data for '{identifier}' as standard or crypto.")
+        logger.error(f"Failed to fetch data for pre-normalized identifier '{identifier}'")
         return {'success': False, 'error': f"Could not find data for identifier {identifier}."}
+
+    # Set crypto-specific fields if identifier ends with -USD (crypto format)
+    if identifier.endswith('-USD'):
+        data['sector'] = 'Cryptocurrency'
+        data['industry'] = 'Digital Currency'
+        data['country'] = 'N/A'
+        logger.info(f"Detected crypto identifier: {identifier}")
 
     # --- Post-processing and Currency Conversion ---
 
@@ -140,16 +117,13 @@ def get_isin_data(identifier: str) -> Dict[str, Any]:
 
     return {
         'success': True,
-        'data': {
-            'currentPrice': data.get('price'),
-            'priceEUR': data.get('priceEUR'),
-            'currency': currency,
-            'country': data.get('country'),
-            'sector': data.get('sector'),
-            'industry': data.get('industry'),
-            'exchange': data.get('exchange', 'Unknown')
-        },
-        'modified_identifier': data.get('modified_identifier')
+        'price': data.get('price'),
+        'price_eur': data.get('priceEUR'),
+        'currency': currency,
+        'country': data.get('country'),
+        'sector': data.get('sector'),
+        'industry': data.get('industry'),
+
     }
 
 
@@ -185,7 +159,7 @@ def _fetch_yfinance_data_robust(identifier: str) -> Optional[Dict[str, Any]]:
                 'country': info.get('country'),
                 'sector': info.get('sector'),
                 'industry': info.get('industry'),
-                'exchange': info.get('exchange', 'Unknown'),
+        
             }
         else:
             logger.debug(f"No valid price found for '{identifier}'")

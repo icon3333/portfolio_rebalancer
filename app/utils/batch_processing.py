@@ -43,20 +43,20 @@ def _process_single_identifier(identifier: str) -> Dict[str, Any]:
         result = get_isin_data(identifier)
 
         if result.get('success'):
-            data = result.get('data', {})
-            price = data.get('currentPrice')
+            # get_isin_data returns data directly, not nested in a 'data' field
+            price = result.get('price')
+            price_eur = result.get('price_eur')
 
             if price is not None:
                 # Update the price in the main database using background-specific function
                 update_success = update_price_in_db_background(
                     identifier,
                     price,
-                    data.get('currency'),
-                    data.get('priceEUR'),
-                    country=data.get('country'),
-                    sector=data.get('sector'),
-                    industry=data.get('industry'),
-                    exchange=data.get('exchange'),
+                    result.get('currency', 'USD'),
+                    price_eur or price,  # Use original price if EUR conversion failed
+                    country=result.get('country'),
+                    sector=result.get('sector'),
+                    industry=result.get('industry'),
                     modified_identifier=result.get('modified_identifier')
                 )
                 if update_success:

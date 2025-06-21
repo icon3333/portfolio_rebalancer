@@ -55,7 +55,7 @@ def update_price_api(company_id: int):
             country=data.get('country'),
             sector=data.get('sector'),
             industry=data.get('industry'),
-            exchange=data.get('exchange'),
+            
             modified_identifier=modified_identifier
         ):
             return jsonify({
