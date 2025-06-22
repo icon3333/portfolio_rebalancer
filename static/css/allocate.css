@@ -63,6 +63,41 @@
   white-space: nowrap;
 }
 
+/* Expand/Collapse Buttons */
+.btn-outline-primary {
+  border: 1px solid var(--primary);
+  color: var(--primary);
+  background: transparent;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--border-radius);
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all var(--transition-speed) var(--transition-func);
+  cursor: pointer;
+}
+
+.btn-outline-primary:hover {
+  background: var(--primary);
+  color: white;
+}
+
+.btn-outline-secondary {
+  border: 1px solid var(--text-muted);
+  color: var(--text-muted);
+  background: transparent;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--border-radius);
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all var(--transition-speed) var(--transition-func);
+  cursor: pointer;
+}
+
+.btn-outline-secondary:hover {
+  background: var(--text-muted);
+  color: var(--bg);
+}
+
 /* Category and Position Row Styling */
 .category-row {
   background-color: var(--darker-bg) !important;

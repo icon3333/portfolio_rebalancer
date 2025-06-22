@@ -93,6 +93,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         init() {
+            this.hideExpandCollapseButtons(); // Hide buttons initially
             this.fetchPortfolioData();
             this.setupEventListeners();
 
@@ -126,6 +127,21 @@ document.addEventListener('DOMContentLoaded', function () {
                 portfolioSelect.addEventListener('change', (e) => {
                     this.selectedPortfolio = e.target.value;
                     this.renderDetailedView();
+                });
+            }
+
+            // Add expand/collapse all buttons event listeners
+            const expandAllBtn = document.getElementById('expand-all-btn');
+            if (expandAllBtn) {
+                expandAllBtn.addEventListener('click', () => {
+                    this.expandAllCategories();
+                });
+            }
+
+            const collapseAllBtn = document.getElementById('collapse-all-btn');
+            if (collapseAllBtn) {
+                collapseAllBtn.addEventListener('click', () => {
+                    this.collapseAllCategories();
                 });
             }
         }
@@ -212,6 +228,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     </div>
                 `;
             }
+            this.hideExpandCollapseButtons();
         }
 
         formatCurrency(value) {
@@ -434,6 +451,60 @@ document.addEventListener('DOMContentLoaded', function () {
             this.renderDetailedView();
         }
 
+        expandAllCategories() {
+            if (!this.selectedPortfolio || !this.portfolioData) return;
+
+            const portfolio = this.portfolioData.portfolios.find(p => p.name === this.selectedPortfolio);
+            if (!portfolio || !portfolio.categories) return;
+
+            // Add all category IDs to the expanded set
+            portfolio.categories.forEach((category, categoryIndex) => {
+                if (category.positions && category.positions.length > 0) {
+                    const categoryId = category.name === 'Missing Positions'
+                        ? `${portfolio.name}-Missing-Positions`
+                        : `${portfolio.name}-${category.name}-${categoryIndex}`;
+                    this.categoriesExpanded.add(categoryId);
+                }
+            });
+
+            console.log('Expanded all categories:', Array.from(this.categoriesExpanded));
+            this.renderDetailedView();
+        }
+
+        collapseAllCategories() {
+            if (!this.selectedPortfolio || !this.portfolioData) return;
+
+            const portfolio = this.portfolioData.portfolios.find(p => p.name === this.selectedPortfolio);
+            if (!portfolio || !portfolio.categories) return;
+
+            // Remove all category IDs for this portfolio from the expanded set
+            portfolio.categories.forEach((category, categoryIndex) => {
+                if (category.positions && category.positions.length > 0) {
+                    const categoryId = category.name === 'Missing Positions'
+                        ? `${portfolio.name}-Missing-Positions`
+                        : `${portfolio.name}-${category.name}-${categoryIndex}`;
+                    this.categoriesExpanded.delete(categoryId);
+                }
+            });
+
+            console.log('Collapsed all categories:', Array.from(this.categoriesExpanded));
+            this.renderDetailedView();
+        }
+
+        showExpandCollapseButtons() {
+            const expandBtn = document.getElementById('expand-all-btn');
+            const collapseBtn = document.getElementById('collapse-all-btn');
+            if (expandBtn) expandBtn.style.display = 'inline-block';
+            if (collapseBtn) collapseBtn.style.display = 'inline-block';
+        }
+
+        hideExpandCollapseButtons() {
+            const expandBtn = document.getElementById('expand-all-btn');
+            const collapseBtn = document.getElementById('collapse-all-btn');
+            if (expandBtn) expandBtn.style.display = 'none';
+            if (collapseBtn) collapseBtn.style.display = 'none';
+        }
+
         /**
          * Render the detailed view according to the rebalancing actions table plan
          */
@@ -456,6 +527,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         Please select a portfolio to view its details.
                     </div>
                 `;
+                this.hideExpandCollapseButtons();
                 return;
             }
 
@@ -475,6 +547,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         No data available for the selected portfolio.
                     </div>
                 `;
+                this.hideExpandCollapseButtons();
                 return;
             }
 
@@ -485,6 +558,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         This portfolio has no target allocation defined in the builder. Please define a target allocation first.
                     </div>
                 `;
+                this.hideExpandCollapseButtons();
                 return;
             }
 
@@ -1057,6 +1131,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // Add to container
             detailedContainer.appendChild(tableResponsive);
+
+            // Show expand/collapse buttons since we have valid data
+            this.showExpandCollapseButtons();
         }
 
         renderDetailedChart() {

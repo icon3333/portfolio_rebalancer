@@ -4,7 +4,8 @@
 
 {% block head_extras %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}?v={{ range(1000, 9999) | random }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/build-allocation.css') }}?v={{ range(1000, 9999) | random }}">
+<link rel="stylesheet"
+  href="{{ url_for('static', filename='css/build-allocation.css') }}?v={{ range(1000, 9999) | random }}">
 {% endblock %}
 
 {% block content %}
@@ -21,10 +22,9 @@
           <div class="field">
             <label class="label">Total Net Worth</label>
             <div class="control">
-              <input class="input" type="text" id="totalNetWorth" 
-                     placeholder="Enter total net worth" 
-                     :value="formatNumber(budgetData.totalNetWorth)" 
-                     @input="budgetData.totalNetWorth = parseFloat($event.target.value.replace(/,/g, '')); updateBudgetData()">
+              <input class="input" type="text" id="totalNetWorth" placeholder="Enter total net worth"
+                :value="formatNumber(budgetData.totalNetWorth)"
+                @input="budgetData.totalNetWorth = parseFloat($event.target.value.replace(/,/g, '')); updateBudgetData()">
             </div>
           </div>
         </div>
@@ -32,10 +32,9 @@
           <div class="field">
             <label class="label">Already Invested</label>
             <div class="control">
-              <input class="input" type="text" id="alreadyInvested" 
-                     placeholder="Enter amount already invested" 
-                     :value="formatNumber(budgetData.alreadyInvested)" 
-                     @input="budgetData.alreadyInvested = parseFloat($event.target.value.replace(/,/g, '')); updateBudgetData()">
+              <input class="input" type="text" id="alreadyInvested" placeholder="Enter amount already invested"
+                :value="formatNumber(budgetData.alreadyInvested)"
+                @input="budgetData.alreadyInvested = parseFloat($event.target.value.replace(/,/g, '')); updateBudgetData()">
             </div>
           </div>
         </div>
@@ -43,15 +42,14 @@
           <div class="field">
             <label class="label">Emergency Fund</label>
             <div class="control">
-              <input class="input" type="text" id="emergencyFund" 
-                     placeholder="Enter emergency fund amount" 
-                     :value="formatNumber(budgetData.emergencyFund)" 
-                     @input="budgetData.emergencyFund = parseFloat($event.target.value.replace(/,/g, '')); updateBudgetData()">
+              <input class="input" type="text" id="emergencyFund" placeholder="Enter emergency fund amount"
+                :value="formatNumber(budgetData.emergencyFund)"
+                @input="budgetData.emergencyFund = parseFloat($event.target.value.replace(/,/g, '')); updateBudgetData()">
             </div>
           </div>
         </div>
       </div>
-      
+
       <!-- Results Row -->
       <div class="budget-results">
         <div class="columns is-variable is-4">
@@ -87,13 +85,13 @@
           <div class="rule-input">
             <div class="field">
               <div class="control">
-                <input class="input" type="number" min="0" max="100" 
-                       placeholder="Enter max %" v-model.number="rules.maxPerStock">
+                <input class="input" type="number" min="0" max="100" placeholder="Enter max %"
+                  v-model.number="rules.maxPerStock">
               </div>
             </div>
           </div>
         </div>
-        
+
         <!-- Maximum % per Category -->
         <div class="rule-item">
           <div class="rule-description">
@@ -103,13 +101,13 @@
           <div class="rule-input">
             <div class="field">
               <div class="control">
-                <input class="input" type="number" min="0" max="100" 
-                       placeholder="Enter max %" v-model.number="rules.maxPerCategory">
+                <input class="input" type="number" min="0" max="100" placeholder="Enter max %"
+                  v-model.number="rules.maxPerCategory">
               </div>
             </div>
           </div>
         </div>
-        
+
         <!-- Maximum % per Country -->
         <div class="rule-item">
           <div class="rule-description">
@@ -119,34 +117,20 @@
           <div class="rule-input">
             <div class="field">
               <div class="control">
-                <input class="input" type="number" min="0" max="100" 
-                       placeholder="Enter max %" v-model.number="rules.maxPerCountry">
+                <input class="input" type="number" min="0" max="100" placeholder="Enter max %"
+                  v-model.number="rules.maxPerCountry">
               </div>
             </div>
           </div>
         </div>
-        
-        <!-- Maximum % per Exchange -->
-        <div class="rule-item">
-          <div class="rule-description">
-            <h4 class="rule-title">Maximum % per Exchange</h4>
-            <p class="rule-subtitle">Limits the maximum percentage allocation for companies from any single exchange</p>
-          </div>
-          <div class="rule-input">
-            <div class="field">
-              <div class="control">
-                <input class="input" type="number" min="0" max="100" 
-                       placeholder="Enter max %" v-model.number="rules.maxPerExchange">
-              </div>
-            </div>
-          </div>
-        </div>
+
+
       </div>
     </div>
 
     <!-- Portfolio Allocation -->
     <h2 class="section-title">Portfolio Allocation</h2>
-    
+
     <!-- Allocation Status Indicator -->
     <div class="notification" :class="{
         'is-success': isAllocationValid, 
@@ -157,7 +141,7 @@
         ${ allocationStatusMessage }
       </p>
     </div>
-    
+
     <!-- Portfolio List -->
     <div v-if="portfolios.length > 0">
       <div v-for="(portfolio, index) in portfolios" :key="index" class="compact-box">
@@ -169,26 +153,22 @@
           <div class="column is-3">
             <div class="field">
               <label class="label">Allocation %</label>
-              <input class="input" type="text" 
-                     :value="parseFloat(portfolio.allocation).toFixed(0)" 
-                     @change="$event.target.value && $event.target.value.length > 0 ? portfolio.allocation = parseFloat($event.target.value) : null; updateAllocations()"
-                     @focus="$event.target.select()">
+              <input class="input" type="text" :value="parseFloat(portfolio.allocation).toFixed(0)"
+                @change="$event.target.value && $event.target.value.length > 0 ? portfolio.allocation = parseFloat($event.target.value) : null; updateAllocations()"
+                @focus="$event.target.select()">
             </div>
           </div>
           <div class="column is-3">
             <div class="field">
               <label class="label">Amount</label>
-              <input class="input" type="text" 
-                     :value="formatCurrency(calculateAllocationAmount(portfolio.allocation))" 
-                     readonly>
+              <input class="input" type="text" :value="formatCurrency(calculateAllocationAmount(portfolio.allocation))"
+                readonly>
             </div>
           </div>
           <div class="column is-2">
             <div class="field">
               <label class="label">Min Positions</label>
-              <input class="input" type="text" 
-                     :value="portfolio.minPositions.toFixed(2)" 
-                     readonly>
+              <input class="input" type="text" :value="portfolio.minPositions.toFixed(2)" readonly>
             </div>
           </div>
           <div class="column is-1 has-text-centered">
@@ -199,13 +179,12 @@
         </div>
 
         <!-- Position Management (collapsible) -->
-        <div v-if="isPortfolioExpanded(index)" class="mt-5">                      
+        <div v-if="isPortfolioExpanded(index)" class="mt-5">
           <div class="columns is-variable is-4">
             <div class="column is-4">
               <div class="field">
                 <label class="checkbox">
-                  <input type="checkbox" v-model="portfolio.evenSplit" 
-                         @change="updatePositionAllocations(index)">
+                  <input type="checkbox" v-model="portfolio.evenSplit" @change="updatePositionAllocations(index)">
                   <span class="ml-2">Distribute evenly across positions</span>
                 </label>
               </div>
@@ -213,9 +192,8 @@
             <div class="column is-4">
               <div class="field">
                 <label class="label">Maximum Weight per Position</label>
-                <input class="input" type="text" 
-                       :value="(100 / Math.max(1, Math.ceil(portfolio.minPositions))).toFixed(0) + '%'" 
-                       readonly>
+                <input class="input" type="text"
+                  :value="(100 / Math.max(1, Math.ceil(portfolio.minPositions))).toFixed(0) + '%'" readonly>
               </div>
             </div>
           </div>
@@ -229,26 +207,23 @@
                     <div class="select is-fullwidth">
                       <select v-model="portfolio.selectedPosition">
                         <option value="">Select a position to add</option>
-                        <option v-for="company in availableCompaniesForPortfolio(portfolio.id)" 
-                                :value="company.id"
-                                :key="company.id">
+                        <option v-for="company in availableCompaniesForPortfolio(portfolio.id)" :value="company.id"
+                          :key="company.id">
                           ${ company.name }
                         </option>
                       </select>
                     </div>
                   </div>
                   <div class="control">
-                    <button class="button is-primary" 
-                            @click="addSelectedPosition(index)"
-                            :disabled="!portfolio.selectedPosition">
+                    <button class="button is-primary" @click="addSelectedPosition(index)"
+                      :disabled="!portfolio.selectedPosition">
                       Add Position
                     </button>
                   </div>
                 </div>
               </div>
               <div class="column is-4">
-                <div v-if="getRemainingPositionsCount(index) > 0" 
-                     class="notification is-warning py-3">
+                <div v-if="getRemainingPositionsCount(index) > 0" class="notification is-warning py-3">
                   <span class="has-text-weight-medium">
                     ${ getRemainingPositionsCount(index) } positions remaining to meet minimum
                   </span>
@@ -269,8 +244,8 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(position, pIndex) in sortedPositions(portfolio.positions)" :key="pIndex" 
-                    :class="{'placeholder-position': position.isPlaceholder}">
+                <tr v-for="(position, pIndex) in sortedPositions(portfolio.positions)" :key="pIndex"
+                  :class="{'placeholder-position': position.isPlaceholder}">
                   <td>
                     <div v-if="position.isPlaceholder" class="remaining-positions-text">
                       ${ position.companyName }
@@ -280,23 +255,18 @@
                     </div>
                   </td>
                   <td>
-                    <input class="input" type="text" 
-                           :value="(position.weight || 0).toFixed(0)"
-                           @change="updateManualWeight(index, pIndex, $event.target.value)"
-                           @focus="$event.target.select()"
-                           :disabled="portfolio.evenSplit">
+                    <input class="input" type="text" :value="(position.weight || 0).toFixed(0)"
+                      @change="updateManualWeight(index, pIndex, $event.target.value)" @focus="$event.target.select()"
+                      :disabled="portfolio.evenSplit">
                   </td>
                   <td>
-                    <input class="input" type="text" 
-                           :value="formatCurrency(calculatePositionAmount(index, pIndex))" 
-                           readonly>
+                    <input class="input" type="text" :value="formatCurrency(calculatePositionAmount(index, pIndex))"
+                      readonly>
                   </td>
                   <td class="has-text-centered">
-                    <button v-if="!position.isPlaceholder" 
-                            class="button is-danger is-small is-rounded" 
-                            style="width: 36px; height: 36px; padding: 0;"
-                            @click="removePosition(index, pIndex)"
-                            title="Remove position">
+                    <button v-if="!position.isPlaceholder" class="button is-danger is-small is-rounded"
+                      style="width: 36px; height: 36px; padding: 0;" @click="removePosition(index, pIndex)"
+                      title="Remove position">
                       <i class="fas fa-times"></i>
                     </button>
                   </td>
@@ -325,7 +295,7 @@
 
     <!-- Allocation Summary -->
     <h2 class="section-title">Allocation Summary</h2>
-    
+
     <!-- Summary Table -->
     <div class="table-responsive">
       <table class="table is-fullwidth">
@@ -354,11 +324,10 @@
                 ${ formatCurrency(calculateAllocationAmount(portfolio.allocation)) }
               </td>
             </tr>
-            
+
             <!-- Position rows -->
-            <tr v-for="group in groupPositionsByWeight(portfolio.positions, portfolio)" 
-                v-if="group.weight > 0"
-                :class="{'placeholder-position': group.isPlaceholder}">
+            <tr v-for="group in groupPositionsByWeight(portfolio.positions, portfolio)" v-if="group.weight > 0"
+              :class="{'placeholder-position': group.isPlaceholder}">
               <td></td>
               <td>
                 ${ group.companyName }

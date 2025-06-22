@@ -73,10 +73,15 @@
           </div>
         </div>
 
-        <p class="has-text-muted mb-4">
-          <i class="fas fa-info-circle mr-1"></i> Click on a category to expand/collapse its positions.
-          Missing positions are highlighted.
-        </p>
+        <!-- Expand/Collapse buttons -->
+        <div class="mb-3">
+          <button type="button" class="btn btn-outline-primary btn-sm me-2" id="expand-all-btn">
+            <i class="fas fa-expand-arrows-alt me-1"></i>Expand All
+          </button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="collapse-all-btn">
+            <i class="fas fa-compress-arrows-alt me-1"></i>Collapse All
+          </button>
+        </div>
 
         <!-- Single portfolio table will be rendered here -->
         <div id="detailed-portfolio-container">
