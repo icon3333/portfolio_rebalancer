@@ -6,6 +6,7 @@ from app.database.db_manager import query_db, execute_db, backup_database, get_d
 import sqlite3
 import logging
 from datetime import datetime
+from typing import Dict, Any, Optional
 
 logger = logging.getLogger('app.routes.account')
 
@@ -60,15 +61,16 @@ def create_account():
             one=True
         )
 
-        if new_account:
+        if new_account and isinstance(new_account, dict):
+            account_id = new_account.get('id')
             # Create default portfolio for the account
             execute_db(
                 'INSERT INTO portfolios (name, account_id) VALUES (?, ?)',
-                ['-', new_account['id']]
+                ['-', account_id]
             )
 
             # Update session to use the new account
-            session['account_id'] = new_account['id']
+            session['account_id'] = account_id
             session['username'] = username
 
             flash(f'Account "{username}" created successfully', 'success')

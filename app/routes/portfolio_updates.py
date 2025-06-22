@@ -10,10 +10,14 @@ logger = logging.getLogger(__name__)
 
 def update_price_api(company_id: int):
     """API endpoint to update a company's price by its ID."""
+    logger.info(f"Price update requested for company_id: {company_id}")
+    
     if 'account_id' not in session:
+        logger.warning(f"Authentication failed for price update request - no account_id in session")
         return jsonify({'error': 'Not authenticated'}), 401
 
     account_id = session['account_id']
+    logger.info(f"Processing price update for company_id: {company_id}, account_id: {account_id}")
 
     try:
         # Fetch the identifier for the given company_id, ensuring it belongs to the current user
@@ -24,20 +28,22 @@ def update_price_api(company_id: int):
         )
 
         if not company:
+            logger.warning(f"Company {company_id} not found or access denied for account {account_id}")
             return jsonify({'error': 'Company not found or access denied'}), 404
 
-        identifier = company['identifier']
+        identifier = company['identifier'] if isinstance(company, dict) else None
         if not identifier:
+            logger.warning(f"Company {company_id} has no identifier set")
             return jsonify({'error': 'Company has no identifier set'}), 400
 
-        logger.info(
-            f"Updating price for company {company_id} with identifier {identifier}")
+        logger.info(f"Forcing price update for company {company_id} with identifier '{identifier}' (bypassing 24h rule)")
 
         # backup_database()  # Consider if this is needed for single updates
 
         result = get_stock_info(identifier)
         if not result.get('success'):
             error_msg = result.get('error', 'Unknown error')
+            logger.error(f"Failed to fetch price for {identifier}: {error_msg}")
             return jsonify({'error': f"Failed to fetch price for {identifier}: {error_msg}"}), 400
 
         data = result.get('data', {})
@@ -47,17 +53,20 @@ def update_price_api(company_id: int):
         modified_identifier = result.get('modified_identifier')
 
         if price is None:
+            logger.error(f"No price data returned for {identifier}")
             return jsonify({'error': f'Failed to fetch price for {identifier}'}), 400
 
-        # Update price and other metadata in the database
+        logger.info(f"Successfully fetched price for {identifier}: {price} {currency} ({price_eur} EUR)")
+
+        # Update price and other metadata in the database (this always updates, ignoring any timing rules)
         if update_price_in_db(
             identifier, price, currency, price_eur,
             country=data.get('country'),
             sector=data.get('sector'),
             industry=data.get('industry'),
-            
             modified_identifier=modified_identifier
         ):
+            logger.info(f"Successfully updated price in database for {identifier}")
             return jsonify({
                 'success': True,
                 'data': {
@@ -69,11 +78,11 @@ def update_price_api(company_id: int):
                 'message': f"Price for {identifier} updated successfully."
             })
 
+        logger.error(f"Failed to update price in database for {identifier}")
         return jsonify({'error': f'Failed to update price in database for {identifier}'}), 500
 
     except Exception as e:
-        logger.error(
-            f"Error updating price for company {company_id}: {str(e)}")
+        logger.error(f"Error updating price for company {company_id}: {str(e)}")
         return jsonify({'error': 'An unexpected error occurred.'}), 500
 
 
@@ -246,16 +255,17 @@ def get_portfolio_companies(portfolio_id):
             ORDER BY c.name
         ''', [account_id, portfolio_id])
         result = []
-        for company in companies:
-            result.append({
-                'id': company['id'],
-                'name': company['name'],
-                'identifier': company['identifier'],
-                'category': company['category'],
-                'shares': company['shares'],
-                'price_eur': company['price_eur'],
-                'value_eur': company['price_eur'] * company['shares'] if company['price_eur'] and company['shares'] else 0
-            })
+        if companies:
+            for company in companies:
+                result.append({
+                    'id': company['id'],
+                    'name': company['name'],
+                    'identifier': company['identifier'],
+                    'category': company['category'],
+                    'shares': company['shares'],
+                    'price_eur': company['price_eur'],
+                    'value_eur': company['price_eur'] * company['shares'] if company['price_eur'] and company['shares'] else 0
+                })
         return jsonify(result)
     except Exception as e:
         logger.error(f"Error getting companies for portfolio: {str(e)}")
