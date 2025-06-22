@@ -5,27 +5,28 @@
 {% set show_sidebar = session.account_id is defined and session.account_id %}
 
 {% block head_extras %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}?v={{ range(1000, 9999) | random }}">
 <style>
     .hover-card {
         transition: transform 0.3s ease, box-shadow 0.3s ease;
     }
-    
+
     .hover-card:hover {
         transform: translateY(-5px);
-        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
     }
-    
+
     .feature-list li {
         margin-bottom: 10px;
     }
-    
+
     .section-title {
         font-size: 1.5rem;
         margin-bottom: 1.5rem;
         position: relative;
         display: inline-block;
     }
-    
+
     .section-title:after {
         content: '';
         position: absolute;
@@ -35,126 +36,251 @@
         bottom: -10px;
         left: 0;
     }
-    
+
     .stat-box {
         padding: 10px;
         border-radius: 6px;
         background-color: #f8f9fa;
     }
-    
+
     .stat-box .heading {
         font-size: 0.9rem;
         font-weight: 600;
         color: #777;
         text-transform: uppercase;
     }
+
+    /* Risk indicators specific styles */
+    .risk-overview-section {
+        margin-top: 2rem;
+    }
+
+    /* Override the gradient background for minimalist design */
+    .portfolio-health-card {
+        background: var(--card-bg) !important;
+        border: 1px solid var(--border-color);
+        border-radius: var(--border-radius);
+        padding: 1rem;
+        margin-bottom: 1rem;
+        box-shadow: var(--shadow);
+    }
+
+    .portfolio-health-card::before {
+        display: none !important;
+        /* Remove any gradient overlay */
+    }
+
+    /* Make violation lists taller */
+    .gauge-violations {
+        max-height: 200px !important;
+        /* Double the original height */
+        min-height: 100px;
+    }
+
+    /* Ensure consistent styling with the rest of the page */
+    .gauge-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: var(--border-radius);
+        box-shadow: var(--shadow);
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-    {% if session.account_id %}
-        <!-- Logged in state - Dashboard with portfolio info -->
-        <div class="container">
-            <!-- Account Overview Section -->
-            <div class="box mb-4">
-                <div class="columns is-vcentered">
-                    <div class="column is-8">
-                        <h1 class="title is-4 mb-3">Welcome, {{ account.username }}</h1>
-                        <p class="subtitle is-6 mt-2">Your portfolio at a glance</p>
-                        
-                        <!-- Portfolio Summary Info -->
-                        <div class="columns mt-4">
-                            <div class="column is-3">
-                                <div class="stat-box">
-                                    <p class="heading">Total Value</p>
-                                    <p class="title is-5">
-                                        € {{ '{:,.2f}'.format(total_value|float) }}
+{% if session.account_id %}
+<!-- Logged in state - Dashboard with portfolio info -->
+<div class="container">
+    <!-- Account Overview Section -->
+    <div class="box mb-4">
+        <div class="columns is-vcentered">
+            <div class="column is-8">
+                <h1 class="title is-4 mb-3">Welcome, {{ account.username }}</h1>
+                <p class="subtitle is-6 mt-2">Your portfolio at a glance</p>
+
+                <!-- Portfolio Summary Info -->
+                <div class="columns mt-4">
+                    <div class="column is-3">
+                        <div class="stat-box">
+                            <p class="heading">Total Value</p>
+                            <p class="title is-5">
+                                € {{ '{:,.2f}'.format(total_value|float) }}
+                            </p>
+                        </div>
+                    </div>
+                    <div class="column is-3">
+                        <div class="stat-box">
+                            <p class="heading">Portfolios</p>
+                            <p class="title is-5">{{ portfolios|length }}</p>
+                        </div>
+                    </div>
+                    <div class="column is-3">
+                        <div class="stat-box">
+                            <p class="heading">Assets</p>
+                            <p class="title is-5">{{ total_assets }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="column is-4 has-text-right">
+                <!-- Account controls removed -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Risk Overview Section -->
+    <div class="risk-overview-section">
+        <h2 class="title is-4 mb-4">Risk Overview</h2>
+
+        <!-- Loading indicator -->
+        <div id="riskLoadingIndicator" class="has-text-centered my-4" style="display: none;">
+            <p class="mb-3">Loading risk analysis...</p>
+            <progress class="progress is-info" max="100"></progress>
+        </div>
+
+        <!-- Portfolio Health Card -->
+        <div class="columns mb-4">
+            <div class="column">
+                <div class="portfolio-health-card" id="portfolioHealthCard">
+                    <div class="health-indicator">
+                        <span class="health-icon" id="healthIcon">⚠️</span>
+                        <div class="health-text">
+                            <div class="health-title" id="healthTitle">No Rules Configured</div>
+                            <div class="health-subtitle" id="healthSubtitle">Set allocation rules to monitor portfolio
+                                risk</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Risk Indicators -->
+        <div class="columns is-multiline mb-4">
+            <div class="column is-4">
+                <div class="gauge-card">
+                    <div class="gauge-indicator">
+                        <div class="gauge-container">
+                            <div class="gauge-chart" id="stockGauge"></div>
+                            <div class="gauge-label">
+                                <div class="gauge-title">Stock Violations</div>
+                                <div class="gauge-count" id="stockCount">0</div>
+                                <div class="gauge-subtitle" id="stockSubtitle">no rules set</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="gauge-violations-container">
+                        <div class="gauge-violations" id="stockViolations">
+                            <!-- Stock violations will be populated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="column is-4">
+                <div class="gauge-card">
+                    <div class="gauge-indicator">
+                        <div class="gauge-container">
+                            <div class="gauge-chart" id="categoryGauge"></div>
+                            <div class="gauge-label">
+                                <div class="gauge-title">Category Violations</div>
+                                <div class="gauge-count" id="categoryCount">0</div>
+                                <div class="gauge-subtitle" id="categorySubtitle">no rules set</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="gauge-violations-container">
+                        <div class="gauge-violations" id="categoryViolations">
+                            <!-- Category violations will be populated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="column is-4">
+                <div class="gauge-card">
+                    <div class="gauge-indicator">
+                        <div class="gauge-container">
+                            <div class="gauge-chart" id="countryGauge"></div>
+                            <div class="gauge-label">
+                                <div class="gauge-title">Country Violations</div>
+                                <div class="gauge-count" id="countryCount">0</div>
+                                <div class="gauge-subtitle" id="countrySubtitle">no rules set</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="gauge-violations-container">
+                        <div class="gauge-violations" id="countryViolations">
+                            <!-- Country violations will be populated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+<!-- Not logged in state - Account selection with minimalist design -->
+<div class="container">
+    <div class="columns is-centered">
+        <div class="column is-8 has-text-centered">
+            <h1 class="title is-2">Portfolio Rebalancer</h1>
+            <h2 class="subtitle is-4 mb-6">Keep your investments aligned with your goals.</h2>
+
+            {% if accounts %}
+            <div class="box">
+                <h2 class="title is-4 mb-4 has-text-left">
+                    <i class="fas fa-users mr-2"></i> Your Accounts
+                </h2>
+
+                <div class="columns is-multiline">
+                    {% for account in accounts %}
+                    <div class="column is-4">
+                        <div class="card has-background-light hover-card">
+                            <div class="card-content">
+                                <div class="content has-text-centered">
+                                    <span class="icon is-large has-text-info">
+                                        <i class="fas fa-user-circle fa-3x"></i>
+                                    </span>
+                                    <p class="title is-4 mt-3">{{ account.username }}</p>
+                                    <p class="subtitle is-6">
+                                        Created: {{ account.created_at.split(' ')[0] if account.created_at else 'N/A' }}
                                     </p>
                                 </div>
                             </div>
-                            <div class="column is-3">
-                                <div class="stat-box">
-                                    <p class="heading">Portfolios</p>
-                                    <p class="title is-5">{{ portfolios|length }}</p>
-                                </div>
-                            </div>
-                            <div class="column is-3">
-                                <div class="stat-box">
-                                    <p class="heading">Assets</p>
-                                    <p class="title is-5">{{ total_assets }}</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="column is-4 has-text-right">
-                        <!-- Account controls removed -->
-                    </div>
-                </div>
-            </div>
-        </div>
-    {% else %}
-        <!-- Not logged in state - Account selection with minimalist design -->
-        <div class="container">
-            <div class="columns is-centered">
-                <div class="column is-8 has-text-centered">
-                    <h1 class="title is-2">Portfolio Rebalancer</h1>
-                    <h2 class="subtitle is-4 mb-6">Keep your investments aligned with your goals.</h2>
-                    
-                    {% if accounts %}
-                        <div class="box">
-                            <h2 class="title is-4 mb-4 has-text-left">
-                                <i class="fas fa-users mr-2"></i> Your Accounts
-                            </h2>
-                            
-                            <div class="columns is-multiline">
-                                {% for account in accounts %}
-                                    <div class="column is-4">
-                                        <div class="card has-background-light hover-card">
-                                            <div class="card-content">
-                                                <div class="content has-text-centered">
-                                                    <span class="icon is-large has-text-info">
-                                                        <i class="fas fa-user-circle fa-3x"></i>
-                                                    </span>
-                                                    <p class="title is-4 mt-3">{{ account.username }}</p>
-                                                    <p class="subtitle is-6">
-                                                        Created: {{ account.created_at.split(' ')[0] if account.created_at else 'N/A' }}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <footer class="card-footer">
-                                                <a href="{{ url_for('main.select_account', account_id=account.id) }}" class="card-footer-item button is-info is-light is-fullwidth">
-                                                    <span class="icon">
-                                                        <i class="fas fa-sign-in-alt"></i>
-                                                    </span>
-                                                    <span>Access Portfolio</span>
-                                                </a>
-                                            </footer>
-                                        </div>
-                                    </div>
-                                {% endfor %}
-                            </div>
-                        </div>
-                    {% else %}
-                        <div class="notification is-info is-light">
-                            <div class="content">
-                                <h3><i class="fas fa-info-circle mr-2"></i> Welcome to Portfolio Rebalancer!</h3>
-                                <p>Create your first account to start tracking and optimizing your investments.</p>
-                                <button class="button is-info mt-3 js-modal-trigger" data-target="create-account-modal">
+                            <footer class="card-footer">
+                                <a href="{{ url_for('main.select_account', account_id=account.id) }}"
+                                    class="card-footer-item button is-info is-light is-fullwidth">
                                     <span class="icon">
-                                        <i class="fas fa-user-plus"></i>
+                                        <i class="fas fa-sign-in-alt"></i>
                                     </span>
-                                    <span>Create Your First Account</span>
-                                </button>
-                            </div>
+                                    <span>Access Portfolio</span>
+                                </a>
+                            </footer>
                         </div>
-                    {% endif %}
+                    </div>
+                    {% endfor %}
                 </div>
             </div>
+            {% else %}
+            <div class="notification is-info is-light">
+                <div class="content">
+                    <h3><i class="fas fa-info-circle mr-2"></i> Welcome to Portfolio Rebalancer!</h3>
+                    <p>Create your first account to start tracking and optimizing your investments.</p>
+                    <button class="button is-info mt-3 js-modal-trigger" data-target="create-account-modal">
+                        <span class="icon">
+                            <i class="fas fa-user-plus"></i>
+                        </span>
+                        <span>Create Your First Account</span>
+                    </button>
+                </div>
+            </div>
+            {% endif %}
         </div>
-    {% endif %}
+    </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/apex_chart_config.js') }}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', () => {
         // Handle notification delete button
@@ -165,6 +291,442 @@
                 notification.remove();
             });
         });
+
+        // Initialize risk overview if user is logged in
+        {% if session.account_id %}
+        initializeRiskOverview();
+        {% endif %}
     });
+
+    {% if session.account_id %}
+    function initializeRiskOverview() {
+        // Check if required dependencies are loaded
+        if (typeof ApexCharts === 'undefined') {
+            console.error('ApexCharts is not loaded');
+            return;
+        }
+
+        if (typeof ChartConfig === 'undefined') {
+            console.error('ChartConfig module not loaded');
+            return;
+        }
+
+        let allocationRules = {
+            maxPerStock: null,
+            maxPerCategory: null,
+            maxPerCountry: null
+        };
+
+        // Utility functions for formatting
+        window.formatCurrency = function (value) {
+            if (typeof value !== 'number' || isNaN(value)) return '€0';
+            return '€' + value.toLocaleString('en-US', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            });
+        };
+
+        window.formatPercentage = function (value) {
+            if (typeof value !== 'number' || isNaN(value)) return '0%';
+            return value.toFixed(1) + '%';
+        };
+
+        // Load data and initialize
+        Promise.all([
+            fetchAllocationRules(),
+            fetchPortfolioData()
+        ]).then(([rules, portfolioData]) => {
+            allocationRules = rules || allocationRules;
+            updateAllocationWarnings(portfolioData);
+        }).catch(error => {
+            console.error('Error loading risk data:', error);
+            updatePortfolioHealthCard(true, []);
+        });
+
+        // Fetch allocation rules from the server
+        async function fetchAllocationRules() {
+            try {
+                const response = await fetch('/portfolio/api/state?page=build');
+                if (!response.ok) {
+                    return null;
+                }
+                const data = await response.json();
+                if (data && data.rules) {
+                    const rules = JSON.parse(data.rules);
+                    return rules;
+                }
+                return null;
+            } catch (error) {
+                console.log('No allocation rules found (this is normal if none have been set)');
+                return null;
+            }
+        }
+
+        // Fetch portfolio data
+        async function fetchPortfolioData() {
+            try {
+                const response = await fetch('/portfolio/api/portfolio_data');
+                if (!response.ok) {
+                    throw new Error('Failed to fetch portfolio data');
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('Error fetching portfolio data:', error);
+                return [];
+            }
+        }
+
+        // Update allocation warnings based on current portfolio data and rules
+        function updateAllocationWarnings(portfolioData) {
+            updatePortfolioHealthCard(false, portfolioData);
+            updateRuleGauges(portfolioData);
+            updateContextualViolations(portfolioData);
+        }
+
+        // Update the main portfolio health card
+        function updatePortfolioHealthCard(hasError = false, portfolioData = []) {
+            const healthIcon = document.getElementById('healthIcon');
+            const healthTitle = document.getElementById('healthTitle');
+            const healthSubtitle = document.getElementById('healthSubtitle');
+
+            if (hasError) {
+                healthIcon.textContent = '⚠️';
+                healthTitle.textContent = 'Analysis Error';
+                healthSubtitle.textContent = 'Unable to calculate risk metrics';
+                return;
+            }
+
+            if (!allocationRules || (!allocationRules.maxPerStock && !allocationRules.maxPerCategory && !allocationRules.maxPerCountry)) {
+                healthIcon.textContent = '🔧';
+                healthTitle.textContent = 'No Rules Configured';
+                healthSubtitle.textContent = 'Set allocation rules to monitor portfolio risk';
+                return;
+            }
+
+            let violations = [];
+            try {
+                violations = calculateAllocationViolations(portfolioData);
+            } catch (error) {
+                console.error('Error calculating allocation violations:', error);
+                healthIcon.textContent = '⚠️';
+                healthTitle.textContent = 'Analysis Error';
+                healthSubtitle.textContent = 'Unable to calculate risk metrics';
+                return;
+            }
+
+            if (violations.length === 0) {
+                healthIcon.textContent = '✅';
+                healthTitle.textContent = 'Low Risk';
+                healthSubtitle.textContent = 'All allocation rules are being followed';
+            } else if (violations.length <= 3) {
+                healthIcon.textContent = '⚠️';
+                healthTitle.textContent = 'Medium Risk';
+                healthSubtitle.textContent = `${violations.length} rule${violations.length > 1 ? 's' : ''} violated`;
+            } else {
+                healthIcon.textContent = '🚨';
+                healthTitle.textContent = 'High Risk';
+                healthSubtitle.textContent = `${violations.length} rules violated`;
+            }
+        }
+
+        // Update the rule gauges
+        function updateRuleGauges(portfolioData) {
+            updateGauge('stock', 'stockGauge', 'stockCount', 'stockSubtitle', allocationRules.maxPerStock, portfolioData);
+            updateGauge('category', 'categoryGauge', 'categoryCount', 'categorySubtitle', allocationRules.maxPerCategory, portfolioData);
+            updateGauge('country', 'countryGauge', 'countryCount', 'countrySubtitle', allocationRules.maxPerCountry, portfolioData);
+        }
+
+        // Update individual gauge
+        function updateGauge(type, gaugeId, countId, subtitleId, maxPercentage, portfolioData) {
+            if (!maxPercentage || maxPercentage <= 0) {
+                // No rule set for this type
+                document.getElementById(countId).textContent = '0';
+                document.getElementById(subtitleId).textContent = 'no rules set';
+
+                // Clear gauge chart
+                document.getElementById(gaugeId).innerHTML = '';
+                return;
+            }
+
+            const violations = getViolationsForType(type, maxPercentage, portfolioData);
+            const violationCount = violations.length;
+            const totalItems = getTotalItemsForType(type, portfolioData);
+
+            document.getElementById(countId).textContent = violationCount.toString();
+            document.getElementById(subtitleId).textContent = violationCount === 0 ? 'all within limits' : `${violationCount} violations`;
+
+            // Create gauge chart
+            const percentage = totalItems > 0 ? Math.min(100, (violationCount / totalItems) * 100) : 0;
+            createViolationGauge(gaugeId, percentage, violationCount);
+        }
+
+        // Get violations for a specific type
+        function getViolationsForType(type, maxPercentage, portfolioData) {
+            if (!portfolioData || portfolioData.length === 0) return [];
+
+            const totalValue = portfolioData.reduce((sum, item) => sum + ((item.price_eur || 0) * (item.shares || 0)), 0);
+            if (totalValue === 0) return [];
+
+            const violations = [];
+
+            if (type === 'stock') {
+                const stockAllocations = groupCompaniesByName(portfolioData);
+                stockAllocations.forEach(stock => {
+                    const percentage = (stock.currentValue / totalValue) * 100;
+                    if (percentage > maxPercentage) {
+                        violations.push({
+                            name: stock.name,
+                            currentPercentage: percentage,
+                            maxPercentage: maxPercentage
+                        });
+                    }
+                });
+            } else if (type === 'category') {
+                const categoryAllocations = {};
+                portfolioData.forEach(item => {
+                    const category = item.category || 'Unknown';
+                    const value = (item.price_eur || 0) * (item.shares || 0);
+                    categoryAllocations[category] = (categoryAllocations[category] || 0) + value;
+                });
+                Object.entries(categoryAllocations).forEach(([category, value]) => {
+                    const percentage = (value / totalValue) * 100;
+                    if (percentage > maxPercentage) {
+                        violations.push({
+                            name: category,
+                            currentPercentage: percentage,
+                            maxPercentage: maxPercentage
+                        });
+                    }
+                });
+            } else if (type === 'country') {
+                const countryAllocations = {};
+                portfolioData.forEach(item => {
+                    const country = item.country || 'Unknown';
+                    const value = (item.price_eur || 0) * (item.shares || 0);
+                    countryAllocations[country] = (countryAllocations[country] || 0) + value;
+                });
+                Object.entries(countryAllocations).forEach(([country, value]) => {
+                    const percentage = (value / totalValue) * 100;
+                    if (percentage > maxPercentage) {
+                        violations.push({
+                            name: country,
+                            currentPercentage: percentage,
+                            maxPercentage: maxPercentage
+                        });
+                    }
+                });
+            }
+
+            return violations;
+        }
+
+        // Group companies by name for stock analysis
+        function groupCompaniesByName(portfolioData) {
+            const companyMap = {};
+
+            portfolioData.forEach(item => {
+                const name = item.company || item.name || 'Unknown';
+                if (!companyMap[name]) {
+                    companyMap[name] = {
+                        name: name,
+                        currentValue: 0,
+                        category: item.category || 'Unknown',
+                        country: item.country || 'Unknown'
+                    };
+                }
+                companyMap[name].currentValue += (item.price_eur || 0) * (item.shares || 0);
+            });
+
+            return Object.values(companyMap).sort((a, b) => b.currentValue - a.currentValue);
+        }
+
+        // Get total number of items for a type
+        function getTotalItemsForType(type, portfolioData) {
+            if (!portfolioData || portfolioData.length === 0) return 0;
+
+            if (type === 'stock') {
+                const stocks = new Set(portfolioData.map(item => item.company || item.name || 'Unknown'));
+                return stocks.size;
+            } else if (type === 'category') {
+                const categories = new Set(portfolioData.map(item => item.category || 'Unknown'));
+                return categories.size;
+            } else if (type === 'country') {
+                const countries = new Set(portfolioData.map(item => item.country || 'Unknown'));
+                return countries.size;
+            }
+
+            return 0;
+        }
+
+        // Create violation gauge chart using ApexCharts - UPDATED to match list design
+        function createViolationGauge(chartId, percentage, violationCount) {
+            const element = document.getElementById(chartId);
+            if (!element) return;
+
+            // Clear existing chart
+            element.innerHTML = '';
+
+            // Determine color based on violation count
+            let color = '#23d160'; // Green for no violations
+            if (violationCount > 0) {
+                color = violationCount <= 2 ? '#ffdd57' : '#ff3860'; // Yellow for few, red for many
+            }
+
+            const options = {
+                series: [percentage],
+                chart: {
+                    height: 120,
+                    type: 'radialBar',
+                    toolbar: { show: false }
+                },
+                plotOptions: {
+                    radialBar: {
+                        hollow: { size: '60%' },
+                        track: {
+                            background: '#f1f1f1',
+                            strokeWidth: '100%'
+                        },
+                        dataLabels: {
+                            show: true,
+                            name: { show: false },
+                            value: {
+                                show: true,
+                                fontSize: '16px',
+                                fontWeight: 600,
+                                color: '#ffffff', // White text to match list design
+                                formatter: function () {
+                                    return violationCount;
+                                }
+                            }
+                        }
+                    }
+                },
+                fill: {
+                    colors: [color]
+                },
+                stroke: {
+                    lineCap: 'round'
+                }
+            };
+
+            const chart = new ApexCharts(element, options);
+            chart.render();
+        }
+
+        // Update contextual violations lists
+        function updateContextualViolations(portfolioData) {
+            const violationsByType = {
+                'Stock': getViolationsForType('stock', allocationRules.maxPerStock, portfolioData),
+                'Category': getViolationsForType('category', allocationRules.maxPerCategory, portfolioData),
+                'Country': getViolationsForType('country', allocationRules.maxPerCountry, portfolioData)
+            };
+
+            updateGaugeViolations('stockViolations', violationsByType['Stock']);
+            updateGaugeViolations('categoryViolations', violationsByType['Category']);
+            updateGaugeViolations('countryViolations', violationsByType['Country']);
+        }
+
+        // Update individual gauge violations - MODIFIED to remove "over limit" text
+        function updateGaugeViolations(containerId, violations) {
+            const container = document.getElementById(containerId);
+
+            if (!violations || violations.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+
+            // Sort by severity (highest excess first)
+            violations.sort((a, b) => (b.currentPercentage - b.maxPercentage) - (a.currentPercentage - a.maxPercentage));
+
+            let violationsHtml = '';
+            violations.forEach(violation => {
+                const excessPercentage = violation.currentPercentage - violation.maxPercentage;
+                violationsHtml += `
+                    <div class="gauge-violation-item">
+                        <div class="gauge-violation-name" title="${violation.name}">${violation.name}</div>
+                        <div class="gauge-violation-excess">+${excessPercentage.toFixed(1)}%</div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = violationsHtml;
+        }
+
+        // Calculate allocation rule violations for all portfolios
+        function calculateAllocationViolations(portfolioData) {
+            if (!portfolioData || portfolioData.length === 0) return [];
+
+            const totalValue = portfolioData.reduce((sum, item) => sum + ((item.price_eur || 0) * (item.shares || 0)), 0);
+            if (totalValue === 0) return [];
+
+            let violations = [];
+
+            // Check per stock violations
+            if (allocationRules.maxPerStock && allocationRules.maxPerStock > 0) {
+                const stockAllocations = groupCompaniesByName(portfolioData);
+                stockAllocations.forEach(stock => {
+                    const percentage = (stock.currentValue / totalValue) * 100;
+                    if (percentage > allocationRules.maxPerStock) {
+                        violations.push({
+                            type: 'Stock',
+                            name: stock.name,
+                            currentPercentage: percentage,
+                            maxPercentage: allocationRules.maxPerStock
+                        });
+                    }
+                });
+            }
+
+            // Check per category violations
+            if (allocationRules.maxPerCategory && allocationRules.maxPerCategory > 0) {
+                const categoryAllocations = {};
+                portfolioData.forEach(item => {
+                    const category = item.category || 'Unknown';
+                    const value = (item.price_eur || 0) * (item.shares || 0);
+                    categoryAllocations[category] = (categoryAllocations[category] || 0) + value;
+                });
+
+                Object.entries(categoryAllocations).forEach(([category, value]) => {
+                    const percentage = (value / totalValue) * 100;
+                    if (percentage > allocationRules.maxPerCategory) {
+                        violations.push({
+                            type: 'Category',
+                            name: category,
+                            currentPercentage: percentage,
+                            maxPercentage: allocationRules.maxPerCategory
+                        });
+                    }
+                });
+            }
+
+            // Check per country violations
+            if (allocationRules.maxPerCountry && allocationRules.maxPerCountry > 0) {
+                const countryAllocations = {};
+                portfolioData.forEach(item => {
+                    const country = item.country || 'Unknown';
+                    const value = (item.price_eur || 0) * (item.shares || 0);
+                    countryAllocations[country] = (countryAllocations[country] || 0) + value;
+                });
+
+                Object.entries(countryAllocations).forEach(([country, value]) => {
+                    const percentage = (value / totalValue) * 100;
+                    if (percentage > allocationRules.maxPerCountry) {
+                        violations.push({
+                            type: 'Country',
+                            name: country,
+                            currentPercentage: percentage,
+                            maxPercentage: allocationRules.maxPerCountry
+                        });
+                    }
+                });
+            }
+
+            // Sort violations by severity (highest over-allocation first)
+            violations.sort((a, b) => (b.currentPercentage - b.maxPercentage) - (a.currentPercentage - a.maxPercentage));
+
+            return violations;
+        }
+    }
+    {% endif %}
 </script>
 {% endblock %}
