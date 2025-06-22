@@ -390,33 +390,7 @@
                         <p class="help">Upload a CSV file with your portfolio data.</p>
                     </div>
 
-                    <div class="field mt-4">
-                        <div class="control">
-                            <button type="submit" class="button is-primary">
-                                <span class="icon">
-                                    <i class="fas fa-upload"></i>
-                                </span>
-                                <span>Upload</span>
-                            </button>
-                        </div>
-                    </div>
                 </form>
-
-                <!-- Progress tracker -->
-                <div id="price-fetch-progress" style="display: none;" class="mt-4">
-                    <div class="is-flex is-align-items-center mb-2">
-                        <span class="icon mr-2 has-text-info">
-                            <i class="fas fa-sync fa-spin"></i>
-                        </span>
-                        <span class="has-text-weight-medium">Processing Portfolio Data</span>
-                    </div>
-                    <div class="is-flex is-justify-content-space-between is-align-items-center mb-1">
-                        <span>Fetching prices:</span>
-                        <span class="has-text-weight-bold"><span id="progress-count">0</span>/<span
-                                id="progress-total">0</span> (<span id="progress-percentage">0%</span>)</span>
-                    </div>
-                    <progress id="progress-bar" class="progress is-info" value="0" max="100"></progress>
-                </div>
             </div>
         </div>
     </div>
@@ -535,6 +509,10 @@
     <div id="portfolio-editor" class="portfolio-editor">
         <!-- Vue.js component will be mounted here -->
         <div id="portfolio-table-app" v-cloak>
+            <div id="price-fetch-progress" style="display: none;" class="mb-4">
+                <progress id="progress-bar" class="progress is-info" value="0" max="100"></progress>
+                <p id="progress-percentage" class="has-text-centered has-text-weight-semibold mt-1">0%</p>
+            </div>
             <div class="portfolio-controls-container mb-4">
                 <div class="controls-and-metrics-row">
                     <!-- Controls moved to the left -->
