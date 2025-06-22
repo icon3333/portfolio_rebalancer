@@ -195,6 +195,25 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
 
+        showNoPositionsMessage() {
+            const container = document.getElementById('portfolio-table-container');
+            if (container) {
+                container.innerHTML = `
+                    <div class="alert alert-info">
+                        No stock or crypto positions found. Please add positions on the Enrich tab.
+                    </div>
+                `;
+            }
+            const detailed = document.getElementById('detailed-portfolio-container');
+            if (detailed) {
+                detailed.innerHTML = `
+                    <div class="alert alert-info mt-4">
+                        No stock or crypto positions found. Please add positions on the Enrich tab.
+                    </div>
+                `;
+            }
+        }
+
         formatCurrency(value) {
             return new Intl.NumberFormat('en-US', {
                 style: 'currency',
@@ -222,7 +241,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         renderPortfolioTable() {
             if (!this.portfolioData || !this.portfolioData.portfolios || this.portfolioData.portfolios.length === 0) {
-                this.showError('No portfolio data available');
+                this.showNoPositionsMessage();
                 return;
             }
 
@@ -422,7 +441,10 @@ document.addEventListener('DOMContentLoaded', function () {
             const detailedContainer = document.getElementById('detailed-portfolio-container');
 
             if (!detailedContainer) return;
-            if (!this.portfolioData || !this.portfolioData.portfolios) return;
+            if (!this.portfolioData || !this.portfolioData.portfolios || this.portfolioData.portfolios.length === 0) {
+                this.showNoPositionsMessage();
+                return;
+            }
 
             // Clear the container
             detailedContainer.innerHTML = '';
