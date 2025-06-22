@@ -23,8 +23,8 @@
             <label class="label">Total Net Worth</label>
             <div class="control">
               <input class="input" type="text" id="totalNetWorth" placeholder="Enter total net worth"
-                :value="formatNumber(budgetData.totalNetWorth)"
-                @input="budgetData.totalNetWorth = parseFloat($event.target.value.replace(/,/g, '')); updateBudgetData()">
+                :value="getInputDisplayValue('totalNetWorth')" @input="budgetData.totalNetWorth = $event.target.value"
+                @focus="handleInputFocus('totalNetWorth')" @blur="handleInputBlur('totalNetWorth')">
             </div>
           </div>
         </div>
@@ -33,8 +33,9 @@
             <label class="label">Already Invested</label>
             <div class="control">
               <input class="input" type="text" id="alreadyInvested" placeholder="Enter amount already invested"
-                :value="formatNumber(budgetData.alreadyInvested)"
-                @input="budgetData.alreadyInvested = parseFloat($event.target.value.replace(/,/g, '')); updateBudgetData()">
+                :value="getInputDisplayValue('alreadyInvested')"
+                @input="budgetData.alreadyInvested = $event.target.value" @focus="handleInputFocus('alreadyInvested')"
+                @blur="handleInputBlur('alreadyInvested')">
             </div>
           </div>
         </div>
@@ -43,8 +44,8 @@
             <label class="label">Emergency Fund</label>
             <div class="control">
               <input class="input" type="text" id="emergencyFund" placeholder="Enter emergency fund amount"
-                :value="formatNumber(budgetData.emergencyFund)"
-                @input="budgetData.emergencyFund = parseFloat($event.target.value.replace(/,/g, '')); updateBudgetData()">
+                :value="getInputDisplayValue('emergencyFund')" @input="budgetData.emergencyFund = $event.target.value"
+                @focus="handleInputFocus('emergencyFund')" @blur="handleInputBlur('emergencyFund')">
             </div>
           </div>
         </div>

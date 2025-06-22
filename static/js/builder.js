@@ -21,6 +21,12 @@ document.addEventListener('DOMContentLoaded', function () {
         availableToInvest: 0,
         totalInvestableCapital: 0
       },
+      // Track editing state for number inputs
+      editingFields: {
+        totalNetWorth: false,
+        alreadyInvested: false,
+        emergencyFund: false
+      },
       rules: {
         maxPerStock: 5,
         maxPerCategory: 25,
@@ -361,6 +367,11 @@ document.addEventListener('DOMContentLoaded', function () {
       },
 
       updateBudgetData() {
+        // Ensure numeric values
+        this.budgetData.totalNetWorth = this.parseNumericValue(this.budgetData.totalNetWorth);
+        this.budgetData.alreadyInvested = this.parseNumericValue(this.budgetData.alreadyInvested);
+        this.budgetData.emergencyFund = this.parseNumericValue(this.budgetData.emergencyFund);
+
         // First calculate Total Investable Capital from Total Net Worth and Emergency Fund
         this.calculateTotalInvestableCapital();
 
@@ -369,6 +380,48 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Trigger auto-save
         this.debouncedSave();
+      },
+
+      // Parse numeric value from input (handles commas and invalid input)
+      parseNumericValue(value) {
+        if (value === null || value === undefined || value === '') {
+          return 0;
+        }
+
+        // If it's already a number, return it
+        if (typeof value === 'number') {
+          return isNaN(value) ? 0 : value;
+        }
+
+        // If it's a string, remove commas and parse
+        const cleanValue = String(value).replace(/,/g, '');
+        const parsed = parseFloat(cleanValue);
+        return isNaN(parsed) ? 0 : parsed;
+      },
+
+      // Handle input focus (start editing)
+      handleInputFocus(fieldName) {
+        this.editingFields[fieldName] = true;
+      },
+
+      // Handle input blur (stop editing)
+      handleInputBlur(fieldName) {
+        this.editingFields[fieldName] = false;
+        this.updateBudgetData();
+      },
+
+      // Get display value for input (formatted when not editing, raw when editing)
+      getInputDisplayValue(fieldName) {
+        const value = this.budgetData[fieldName];
+        if (this.editingFields[fieldName]) {
+          // When editing, show raw number without formatting
+          if (value === 0 || value === null || value === undefined) return '';
+          return String(value);
+        } else {
+          // When not editing, show formatted number
+          if (value === 0 || value === null || value === undefined) return '';
+          return this.formatNumber(value);
+        }
       },
 
       // Portfolio management
@@ -887,8 +940,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
       // Format number with thousand separators
       formatNumber(value) {
-        if (value === null || value === undefined) return '0';
-        return parseFloat(value).toLocaleString('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 2 });
+        if (value === null || value === undefined || value === 0 || value === '') return '';
+        const numValue = parseFloat(value);
+        if (isNaN(numValue) || numValue === 0) return '';
+        return numValue.toLocaleString('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 0 });
       },
 
       // Format percentage without decimal places

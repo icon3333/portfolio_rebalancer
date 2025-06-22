@@ -2,11 +2,119 @@ from app.utils.portfolio_utils import get_portfolio_data
 from app.database.db_manager import query_db
 from flask import Blueprint, render_template, redirect, url_for, session, request, flash, jsonify
 import logging
+import json
+import math
 from typing import Dict, Any, Optional, List
 
 logger = logging.getLogger(__name__)
 
 main_bp = Blueprint('main', __name__)
+
+
+def calculate_missing_positions(account_id: int, portfolios) -> Dict[str, Any]:
+    """Calculate missing positions for each portfolio using rebalancer data"""
+    try:
+        # Import here to avoid circular imports
+        from app.routes.portfolio_api import get_allocate_portfolio_data
+        from flask import session
+        
+        # Temporarily set session for the API call
+        original_account_id = session.get('account_id')
+        session['account_id'] = account_id
+        
+        try:
+            # Get rebalancer data which has the correct missing positions logic
+            response = get_allocate_portfolio_data()
+            # Handle different response types
+            if isinstance(response, tuple):
+                # Error response
+                return {
+                    'portfolios_with_missing': [],
+                    'total_missing': 0,
+                    'total_portfolios_checked': 0
+                }
+            elif hasattr(response, 'get_json'):
+                rebalancer_data = response.get_json()
+            else:
+                rebalancer_data = response
+        except Exception as e:
+            logger.error(f"Error getting rebalancer data: {e}")
+            return {
+                'portfolios_with_missing': [],
+                'total_missing': 0,
+                'total_portfolios_checked': 0
+            }
+        finally:
+            # Restore original session
+            if original_account_id:
+                session['account_id'] = original_account_id
+            elif 'account_id' in session:
+                del session['account_id']
+        
+        missing_data = {
+            'portfolios_with_missing': [],
+            'total_missing': 0,
+            'total_portfolios_checked': 0
+        }
+        
+        if not rebalancer_data or not isinstance(rebalancer_data, dict) or 'portfolios' not in rebalancer_data:
+            return missing_data
+        
+        # Check each portfolio in the rebalancer data
+        portfolios_list = rebalancer_data.get('portfolios', [])
+        for portfolio in portfolios_list:
+            if not isinstance(portfolio, dict):
+                continue
+                
+            portfolio_name = portfolio.get('name', 'Unknown')
+            missing_data['total_portfolios_checked'] += 1
+            
+            # Look for "Missing Positions" category
+            categories = portfolio.get('categories', [])
+            missing_positions_category = None
+            
+            for category in categories:
+                if category.get('name') == 'Missing Positions':
+                    missing_positions_category = category
+                    break
+            
+            if missing_positions_category:
+                # Count missing positions from the category
+                missing_positions = missing_positions_category.get('positions', [])
+                missing_count = len(missing_positions)
+                
+                # Only include if there are actual missing positions with target allocation > 0
+                has_missing_with_allocation = any(
+                    pos.get('targetAllocation', 0) > 0 for pos in missing_positions
+                )
+                
+                if missing_count > 0 and has_missing_with_allocation:
+                    # Count current positions (all categories except Missing Positions)
+                    current_positions = 0
+                    for cat in categories:
+                        if cat.get('name') != 'Missing Positions':
+                            current_positions += len(cat.get('positions', []))
+                    
+                    # Calculate min positions (current + missing)
+                    min_positions = current_positions + missing_count
+                    
+                    missing_data['portfolios_with_missing'].append({
+                        'name': portfolio_name,
+                        'missing_count': missing_count,
+                        'current_positions': current_positions,
+                        'min_positions': min_positions
+                    })
+                    missing_data['total_missing'] += missing_count
+        
+        return missing_data
+        
+    except Exception as e:
+        logger.error(f"Error calculating missing positions: {e}")
+        return {
+            'portfolios_with_missing': [],
+            'total_missing': 0,
+            'total_portfolios_checked': 0
+        }
 
 
 @main_bp.route('/')
@@ -53,6 +161,9 @@ def index():
             total_assets = sum(1 for item in portfolio_data if (
                 item['shares'] or 0) > 0 and (item['price_eur'] or 0) > 0)
 
+            # Calculate missing positions for each portfolio
+            missing_positions_data = calculate_missing_positions(account_id, portfolios)
+
             # Get all accounts for account switcher
             all_accounts = query_db(
                 'SELECT * FROM accounts WHERE username != "_global" ORDER BY username')
@@ -65,6 +176,7 @@ def index():
                                    portfolios=portfolios,
                                    total_value=total_value,
                                    total_assets=total_assets,
+                                   missing_positions_data=missing_positions_data,
                                    all_accounts=all_accounts)
         else:
             logger.warning(f"Account {account_id} not found")
