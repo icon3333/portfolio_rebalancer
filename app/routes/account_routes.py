@@ -122,6 +122,30 @@ def update_account():
     return redirect(url_for('account.index'))
 
 
+@account_bp.route('/reset-settings', methods=['POST'])
+def reset_account_settings():
+    """Reset all saved settings for the current account."""
+    if 'account_id' not in session:
+        flash('Please select an account first', 'warning')
+        return redirect(url_for('main.index'))
+
+    account_id = session['account_id']
+
+    try:
+        # Create backup before making changes
+        backup_database()
+
+        # Remove all expanded_state entries for this account
+        execute_db('DELETE FROM expanded_state WHERE account_id = ?', [account_id])
+
+        flash('Account settings have been reset', 'success')
+    except Exception as e:
+        logger.error(f"Error resetting account settings: {str(e)}")
+        flash(f'Error resetting account settings: {str(e)}', 'error')
+
+    return redirect(url_for('account.index'))
+
+
 @account_bp.route('/delete', methods=['POST'])
 def delete_account():
     """Delete an account and all associated data"""
