@@ -8,8 +8,6 @@ const UpdateAllDataHandler = {
     async run() {
         const updateAllDataBtn = document.getElementById('update-all-data-btn');
         const progressElement = document.getElementById('price-fetch-progress');
-        const progressCount = document.getElementById('progress-count');
-        const progressTotal = document.getElementById('progress-total');
         const progressPercentage = document.getElementById('progress-percentage');
 
         if (!updateAllDataBtn) {
@@ -23,8 +21,6 @@ const UpdateAllDataHandler = {
             updateAllDataBtn.classList.add('is-loading');
 
             // Show the progress indicator
-            progressCount.textContent = '0';
-            progressTotal.textContent = '0';
             progressPercentage.textContent = '0%';
             progressElement.style.display = 'block';
             progressElement.dataset.processing = 'true';
@@ -37,8 +33,6 @@ const UpdateAllDataHandler = {
             PriceProgressTracker.progressInterval = setInterval(() => {
                 PriceProgressTracker.checkProgress(
                     progressElement,
-                    progressCount,
-                    progressTotal,
                     progressPercentage
                 );
             }, 500);
@@ -67,12 +61,7 @@ const UpdateAllDataHandler = {
                     console.log('Job ID:', jobId);
 
                     // Update the progress display immediately from the total_companies info
-                    const totalCompanies = result.total_companies || 0;
-                    if (progressCount && progressTotal && progressPercentage) {
-                        progressCount.textContent = '0';
-                        progressTotal.textContent = totalCompanies.toString();
-                        progressPercentage.textContent = '0%';
-                    }
+                    progressPercentage.textContent = '0%';
 
                     // Poll for job status
                     const statusInterval = setInterval(async () => {
@@ -85,9 +74,7 @@ const UpdateAllDataHandler = {
                                 console.log('Job status:', statusResult);
 
                                 // Update progress display if available
-                                if (progressCount && progressTotal && progressPercentage && statusResult.progress) {
-                                    progressCount.textContent = statusResult.progress.current;
-                                    progressTotal.textContent = statusResult.progress.total;
+                                if (statusResult.progress) {
                                     progressPercentage.textContent = `${statusResult.progress.percentage}%`;
 
                                     // Update progress bar
@@ -137,11 +124,7 @@ const UpdateAllDataHandler = {
                                     console.log('Progress data:', progressData);
 
                                     // Update the progress display
-                                    if (progressCount && progressTotal && progressPercentage) {
-                                        progressCount.textContent = progressData.current;
-                                        progressTotal.textContent = progressData.total;
-                                        progressPercentage.textContent = `${progressData.percentage}%`;
-                                    }
+                                    progressPercentage.textContent = `${progressData.percentage}%`;
 
                                     // If completed, stop polling
                                     if (progressData.status === 'completed' || progressData.is_complete) {
@@ -211,8 +194,6 @@ const FileUploadHandler = {
         const fileInput = document.querySelector('.file-input');
         const fileLabel = document.querySelector('.file-name');
         const progressElement = document.getElementById('price-fetch-progress');
-        const progressCount = document.getElementById('progress-count');
-        const progressTotal = document.getElementById('progress-total');
         const progressPercentage = document.getElementById('progress-percentage');
         const uploadForm = document.querySelector('form[action*="upload"]');
 
@@ -222,8 +203,6 @@ const FileUploadHandler = {
         }
 
         // Initialize progress display
-        progressCount.textContent = '0';
-        progressTotal.textContent = '0';
         progressPercentage.textContent = '0%';
         progressElement.style.display = 'none';
 
@@ -233,8 +212,6 @@ const FileUploadHandler = {
                 fileLabel.textContent = fileInput.files[0].name;
 
                 // Show the progress indicator immediately
-                progressCount.textContent = '0';
-                progressTotal.textContent = '0';
                 progressPercentage.textContent = '0%';
                 progressElement.style.display = 'block';
                 progressElement.dataset.processing = 'true';
@@ -247,8 +224,6 @@ const FileUploadHandler = {
                 PriceProgressTracker.progressInterval = setInterval(() => {
                     PriceProgressTracker.checkProgress(
                         progressElement,
-                        progressCount,
-                        progressTotal,
                         progressPercentage
                     );
                 }, 500);
@@ -256,8 +231,6 @@ const FileUploadHandler = {
                 // Run once immediately
                 PriceProgressTracker.checkProgress(
                     progressElement,
-                    progressCount,
-                    progressTotal,
                     progressPercentage
                 );
 
@@ -276,8 +249,6 @@ const FileUploadHandler = {
                 console.log("Form submitted, starting progress tracking");
 
                 // Reset progress indicators
-                progressCount.textContent = '0';
-                progressTotal.textContent = '0';
                 progressPercentage.textContent = '0%';
 
                 // Show the progress indicator immediately when the form is submitted
@@ -293,8 +264,6 @@ const FileUploadHandler = {
                 PriceProgressTracker.progressInterval = setInterval(() => {
                     PriceProgressTracker.checkProgress(
                         progressElement,
-                        progressCount,
-                        progressTotal,
                         progressPercentage
                     );
                 }, 500);
@@ -302,8 +271,6 @@ const FileUploadHandler = {
                 // Also run once immediately
                 PriceProgressTracker.checkProgress(
                     progressElement,
-                    progressCount,
-                    progressTotal,
                     progressPercentage
                 );
             });
@@ -314,7 +281,7 @@ const FileUploadHandler = {
 const PriceProgressTracker = {
     progressInterval: null,
 
-    checkProgress(progressElement, progressCount, progressTotal, progressPercentage) {
+    checkProgress(progressElement, progressPercentage) {
         fetch('/portfolio/api/price_fetch_progress')
             .then(response => {
                 if (!response.ok) {
@@ -324,10 +291,6 @@ const PriceProgressTracker = {
             })
             .then(data => {
                 console.log("Progress data:", data);
-
-                // Update the progress display
-                progressCount.textContent = data.current || 0;
-                progressTotal.textContent = data.total || 0;
 
                 // Use percentage directly from the server
                 const percentage = data.percentage || 0;
