@@ -9,10 +9,12 @@
 <style>
     /* Apple-inspired welcome page styling */
     .welcome-hero {
-        background: linear-gradient(135deg, var(--bg) 0%, var(--section-bg) 100%);
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
         padding: var(--space-xxl) 0;
         border-radius: var(--border-radius-lg);
         margin-bottom: var(--space-xl);
+        box-shadow: var(--shadow);
     }
 
     .welcome-title {
@@ -94,28 +96,13 @@
         letter-spacing: 0.5px;
     }
 
-    /* Warning section styling */
-    .warning-section {
-        background: rgba(255, 221, 87, 0.1);
-        border: 1px solid rgba(255, 221, 87, 0.3);
-        border-radius: var(--border-radius-lg);
-        padding: var(--space-lg);
-        margin-bottom: var(--space-xl);
-    }
 
-    .warning-title {
-        display: flex;
-        align-items: center;
-        font-size: var(--font-size-xl);
-        font-weight: 600;
-        margin-bottom: var(--space-md);
-        color: var(--text-color);
-    }
 
     .warning-pills {
         display: flex;
         flex-wrap: wrap;
         gap: var(--space-md);
+        margin-top: var(--space-md);
     }
 
     .warning-pill {
@@ -123,11 +110,13 @@
         align-items: center;
         justify-content: space-between;
         padding: var(--space-md);
-        background: rgba(255, 221, 87, 0.2);
-        border-radius: 12px;
+        background: rgba(255, 221, 87, 0.1);
+        border: 1px solid rgba(255, 221, 87, 0.3);
+        border-radius: var(--border-radius);
         border-left: 4px solid #ffdd57;
         min-width: 280px;
         flex: 1;
+        box-shadow: var(--shadow-sm);
     }
 
     .warning-pill-content h3 {
@@ -160,7 +149,7 @@
     .risk-section h2 {
         font-size: var(--font-size-xl);
         font-weight: 600;
-        margin-bottom: var(--space-lg);
+        margin-bottom: 0;
         color: var(--text-color);
     }
 
@@ -314,6 +303,17 @@
         .welcome-title {
             font-size: 2rem;
         }
+
+        /* Stack title and button on mobile */
+        .accounts-header-flex {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: var(--space-md);
+        }
+
+        .accounts-header-flex .button {
+            align-self: flex-end;
+        }
     }
 
     /* Dark mode support */
@@ -377,11 +377,18 @@
 
     <!-- Stocks Missing Section -->
     {% if missing_positions_data and missing_positions_data.total_missing > 0 %}
-    <div class="warning-section">
-        <h2 class="warning-title">
-            <i class="fas fa-exclamation-triangle mr-2"></i>
-            Stocks Missing
-        </h2>
+    <div class="risk-section">
+        <div class="is-flex is-justify-content-space-between is-align-items-center mb-4">
+            <h2>
+                Stocks Missing
+            </h2>
+            <a href="{{ url_for('portfolio.build') }}" class="button is-primary">
+                <span class="icon">
+                    <i class="fas fa-hammer"></i>
+                </span>
+                <span>Go to Builder</span>
+            </a>
+        </div>
         <p class="subtitle">Some portfolios need more positions to meet their allocation requirements.</p>
 
         <div class="warning-pills">
@@ -406,7 +413,15 @@
 
     <!-- Risk Overview Section -->
     <div class="risk-section">
-        <h2>Risk Overview</h2>
+        <div class="is-flex is-justify-content-space-between is-align-items-center mb-4">
+            <h2>Risk Overview</h2>
+            <a href="{{ url_for('portfolio.risk_overview') }}" class="button is-primary">
+                <span class="icon">
+                    <i class="fas fa-chart-line"></i>
+                </span>
+                <span>View Details</span>
+            </a>
+        </div>
 
         <!-- Loading indicator -->
         <div id="riskLoadingIndicator" class="has-text-centered my-4" style="display: none;">
@@ -501,9 +516,17 @@
     {% if accounts %}
     <div class="columns is-centered">
         <div class="column is-10">
-            <h2 class="title is-4 mb-4 has-text-left">
-                <i class="fas fa-users mr-2"></i> Your Accounts
-            </h2>
+            <div class="is-flex is-justify-content-space-between is-align-items-center mb-4 accounts-header-flex">
+                <h2 class="title is-4 mb-0 has-text-left">
+                    <i class="fas fa-users mr-2"></i> Your Accounts
+                </h2>
+                <button class="button is-primary js-modal-trigger" data-target="create-account-modal">
+                    <span class="icon">
+                        <i class="fas fa-plus"></i>
+                    </span>
+                    <span>Create Account</span>
+                </button>
+            </div>
 
             <div class="columns is-multiline">
                 {% for account in accounts %}

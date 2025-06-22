@@ -13,18 +13,7 @@
         </div>
 
         <div class="navbar-end">
-            <div class="navbar-item">
-                <div class="buttons">
-                    {% if not session.account_id %}
-                    <button class="button is-primary js-modal-trigger" data-target="create-account-modal">
-                        <span class="icon">
-                            <i class="fas fa-plus"></i>
-                        </span>
-                        <span>Create Account</span>
-                    </button>
-                    {% endif %}
-                </div>
-            </div>
+            <!-- Create Account button moved to landing page -->
             {% if session.account_id %}
             <div class="navbar-item has-dropdown is-hoverable">
                 <a class="navbar-link">
