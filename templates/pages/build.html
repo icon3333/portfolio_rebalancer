@@ -351,6 +351,9 @@
               </td>
               <td v-if="group.isPlaceholder">
                 ${ formatCurrency(calculateAllocationAmount(portfolio.allocation) * group.weight * group.count / 100) }
+                <br>
+                <small class="has-text-grey">(${ formatCurrency(calculateAllocationAmount(portfolio.allocation) *
+                  group.weight / 100) } each)</small>
               </td>
               <td v-else>
                 ${ formatCurrency(calculateAllocationAmount(portfolio.allocation) * group.weight / 100) }
