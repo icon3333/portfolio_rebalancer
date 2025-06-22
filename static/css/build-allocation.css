@@ -162,6 +162,25 @@
   margin-top: var(--space-lg);
 }
 
+/* Custom styling for the remaining positions notification */
+.add-position-section .notification.is-warning {
+  padding: 0;
+  margin: 0;
+  height: 2.5rem;
+  /* Match input/select height */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-width: auto;
+  border-radius: var(--border-radius);
+}
+
+.add-position-section .notification.is-warning .has-text-weight-medium {
+  padding: 0 var(--space-md);
+  white-space: nowrap;
+}
+
 /* Placeholder Position Styling */
 .placeholder-position {
   background-color: var(--primary-light);
@@ -201,7 +220,8 @@
   background-color: var(--primary-light);
 }
 
-.table th, .table td {
+.table th,
+.table td {
   padding: 0.75rem 1rem;
 }
 
@@ -215,15 +235,15 @@
   .budget-results {
     background-color: rgba(255, 255, 255, 0.03);
   }
-  
+
   .add-position-section {
     background-color: rgba(255, 255, 255, 0.03);
   }
-  
+
   .table tr {
     background-color: rgba(255, 255, 255, 0.02);
   }
-  
+
   .table tr:hover {
     background-color: rgba(255, 255, 255, 0.04);
   }
@@ -234,38 +254,38 @@
   .budget-card .columns {
     flex-direction: column;
   }
-  
+
   .budget-results {
     padding: var(--space-md);
   }
-  
+
   .result-item {
     margin-bottom: var(--space-md);
   }
-  
+
   .result-value {
     font-size: 1.25rem;
   }
-  
+
   .compact-box {
     padding: var(--space-md);
   }
-  
+
   .add-position-section {
     padding: var(--space-md);
   }
-  
+
   /* Allocation Rules responsive adjustments */
   .rule-item {
     flex-direction: column;
     align-items: flex-start;
     gap: var(--space-md);
   }
-  
+
   .rule-description {
     margin-right: 0;
   }
-  
+
   .rule-input {
     width: 100%;
     max-width: 200px;

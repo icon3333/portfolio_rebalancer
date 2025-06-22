@@ -1030,7 +1030,7 @@ document.addEventListener('DOMContentLoaded', function () {
         realPositions.forEach(position => {
           const company = this.portfolioCompanies[portfolio.id]?.find(c => c.id === position.companyId);
           result.push({
-            companyName: company ? company.name : 'Unknown',
+            companyName: company ? company.name : (position.companyName || 'Unknown'),
             weight: parseFloat(position.weight),
             count: 1
           });
