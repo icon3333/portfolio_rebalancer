@@ -247,10 +247,17 @@ def process_csv_data(account_id, file_content):
                 company['total_invested'] - investment_reduction, 2)
 
         existing_companies = query_db(
-            'SELECT id, name, identifier, total_invested FROM companies WHERE account_id = ?',
+            'SELECT id, name, identifier, total_invested, portfolio_id FROM companies WHERE account_id = ?',
             [account_id]
         )
         existing_company_map = {c['name']: c for c in existing_companies}
+
+        # Get existing override shares to preserve them
+        existing_overrides = query_db(
+            'SELECT cs.company_id, cs.override_share FROM company_shares cs JOIN companies c ON cs.company_id = c.id WHERE c.account_id = ?',
+            [account_id]
+        )
+        override_map = {row['company_id']: row['override_share'] for row in existing_overrides if row['override_share'] is not None}
 
         default_portfolio = query_db(
             'SELECT id FROM portfolios WHERE account_id = ? AND name = "-"',
@@ -276,24 +283,39 @@ def process_csv_data(account_id, file_content):
         for company_name, position in company_positions.items():
             current_shares = position['total_shares']
             total_invested = position['total_invested']
+            
+            # Skip companies with zero or negative shares
+            if current_shares <= 0:
+                logger.info(f"Skipping company {company_name} with {current_shares} shares (zero or negative)")
+                continue
+                
             if company_name in existing_company_map:
                 company_id = existing_company_map[company_name]['id']
+                existing_portfolio_id = existing_company_map[company_name]['portfolio_id']
+                
+                # Preserve existing portfolio assignment unless it's being moved from a non-existent portfolio
+                final_portfolio_id = existing_portfolio_id if existing_portfolio_id else default_portfolio_id
+                
                 cursor.execute(
                     'UPDATE companies SET identifier = ?, portfolio_id = ?, total_invested = ? WHERE id = ?',
-                    [position['identifier'], default_portfolio_id,
+                    [position['identifier'], final_portfolio_id,
                         total_invested, company_id],
                 )
+                
+                # Preserve existing override_share if it exists
+                existing_override = override_map.get(company_id)
+                
                 share_row = query_db('SELECT shares FROM company_shares WHERE company_id = ?', [
                                      company_id], one=True)
                 if share_row:
                     cursor.execute(
-                        'UPDATE company_shares SET shares = ? WHERE company_id = ?',
-                        [current_shares, company_id],
+                        'UPDATE company_shares SET shares = ?, override_share = ? WHERE company_id = ?',
+                        [current_shares, existing_override, company_id],
                     )
                 else:
                     cursor.execute(
-                        'INSERT INTO company_shares (company_id, shares) VALUES (?, ?)',
-                        [company_id, current_shares],
+                        'INSERT INTO company_shares (company_id, shares, override_share) VALUES (?, ?, ?)',
+                        [company_id, current_shares, existing_override],
                     )
                 positions_updated.append(company_name)
             else:

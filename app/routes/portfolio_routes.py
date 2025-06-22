@@ -67,17 +67,17 @@ def enrich():
     # Extract portfolio names without filtering out any valid names
     portfolios = [{'name': p['name']} for p in portfolios_from_table] if portfolios_from_table else []
 
-    # Ensure Default is in the list
-    has_default = any(p['name'] == 'Default' for p in portfolios)
+    # Ensure '-' is in the list
+    has_default = any(p['name'] == '-' for p in portfolios)
     if not has_default:
         default_exists = query_db('''
             SELECT 1 FROM portfolios
-            WHERE account_id = ? AND name = 'Default'
+            WHERE account_id = ? AND name = '-'
         ''', [account_id], one=True)
 
         if default_exists:
-            portfolios.append({'name': 'Default'})
-            logger.info("Added Default portfolio to the enrich page data")
+            portfolios.append({'name': '-'})
+            logger.info("Added '-' portfolio to the enrich page data")
 
     logger.info(
         f"Retrieved {len(portfolios)} portfolios from the portfolios table: {[p['name'] for p in portfolios]}")

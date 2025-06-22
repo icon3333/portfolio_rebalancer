@@ -44,22 +44,42 @@ def _apply_company_update(cursor, company_id, data, account_id):
         else:
             portfolio_id = portfolio['id'] if isinstance(portfolio, dict) else None
     else:
-        # Assign to 'Default' portfolio if no portfolio is specified
+        # Assign to '-' portfolio if no portfolio is specified (consistent with CSV processing)
         default_portfolio = query_db(
             'SELECT id FROM portfolios WHERE name = ? AND account_id = ?',
-            ['Default', account_id], one=True)
+            ['-', account_id], one=True)
 
         if not default_portfolio:
-            # Create 'Default' portfolio if it doesn't exist
+            # Create '-' portfolio if it doesn't exist
             cursor.execute(
                 'INSERT INTO portfolios (name, account_id) VALUES (?, ?)',
-                ['Default', account_id]
+                ['-', account_id]
             )
             portfolio_id = cursor.lastrowid
             logger.info(
-                f"Created 'Default' portfolio for account_id: {account_id}")
+                f"Created '-' portfolio for account_id: {account_id}")
         else:
             portfolio_id = default_portfolio['id'] if isinstance(default_portfolio, dict) else None
+
+    # Check if identifier is being changed to trigger price update
+    identifier_changed = False
+    new_identifier = None
+    if 'identifier' in data:
+        new_identifier = data.get('identifier', '').strip()
+        if new_identifier:  # Only if not empty
+            # Get current identifier to check if it's changing
+            current_company = query_db(
+                'SELECT identifier FROM companies WHERE id = ? AND account_id = ?',
+                [company_id, account_id], one=True
+            )
+            if current_company:
+                if isinstance(current_company, dict):
+                    current_identifier = current_company.get('identifier')
+                else:
+                    current_identifier = None
+            else:
+                current_identifier = None
+            identifier_changed = (new_identifier != current_identifier)
 
     # Build the SET clause dynamically based on what data is provided
     set_clause_parts = []
@@ -73,9 +93,10 @@ def _apply_company_update(cursor, company_id, data, account_id):
         set_clause_parts.append('category = ?')
         params.append(data.get('category', ''))
     
-    # Always update portfolio_id since this is called for portfolio changes
-    set_clause_parts.append('portfolio_id = ?')
-    params.append(portfolio_id)
+    # Only update portfolio_id if portfolio is being changed
+    if 'portfolio' in data:
+        set_clause_parts.append('portfolio_id = ?')
+        params.append(portfolio_id)
     
     # Add the company_id for the WHERE clause
     params.append(company_id)
@@ -83,6 +104,56 @@ def _apply_company_update(cursor, company_id, data, account_id):
     if set_clause_parts:
         set_clause = ', '.join(set_clause_parts)
         cursor.execute(f'UPDATE companies SET {set_clause} WHERE id = ?', params)
+
+    # If identifier was changed, fetch and update price from yfinance
+    if identifier_changed and new_identifier:
+        logger.info(f"Identifier changed for company {company_id} to '{new_identifier}', fetching price...")
+        try:
+            # Normalize the identifier first
+            from ..utils.identifier_normalization import normalize_identifier
+            normalized_identifier = normalize_identifier(new_identifier)
+            
+            if normalized_identifier != new_identifier:
+                logger.info(f"Normalized identifier: '{new_identifier}' -> '{normalized_identifier}'")
+                # Update the database with normalized identifier
+                cursor.execute('''
+                    UPDATE companies 
+                    SET identifier = ?
+                    WHERE id = ?
+                ''', [normalized_identifier, company_id])
+                new_identifier = normalized_identifier
+
+            # Fetch price data from yfinance
+            price_data = get_isin_data(new_identifier)
+            if price_data.get('success') and price_data.get('price_eur') is not None:
+                # Extract price information
+                price = price_data.get('price', 0.0)
+                currency = price_data.get('currency', 'EUR')
+                price_eur = price_data.get('price_eur', 0.0)
+                country = price_data.get('country')
+                sector = price_data.get('sector')
+                industry = price_data.get('industry')
+                modified_identifier = price_data.get('modified_identifier')
+                
+                # Ensure required parameters are not None
+                if price is not None and currency is not None and price_eur is not None:
+                    update_price_in_db(
+                        identifier=new_identifier,
+                        price=float(price),
+                        currency=str(currency),
+                        price_eur=float(price_eur),
+                        country=country,
+                        sector=sector,
+                        industry=industry,
+                        modified_identifier=modified_identifier
+                    )
+                    logger.info(f"Successfully updated price for '{new_identifier}': {price_eur} EUR")
+                else:
+                    logger.warning(f"Missing required price data for '{new_identifier}'")
+            else:
+                logger.warning(f"Failed to fetch price for '{new_identifier}': {price_data.get('error', 'Unknown error')}")
+        except Exception as e:
+            logger.error(f"Error fetching price for '{new_identifier}': {str(e)}")
 
     if 'shares' in data or 'override_share' in data:
         shares = data.get('shares')
@@ -538,28 +609,28 @@ def get_portfolios_api():
             logger.info(
                 f"Retrieved {len(portfolios)} portfolios with IDs: {portfolios}")
 
-            # Ensure we're not missing the Default portfolio if it has companies or if we're not filtering
-            has_default = any(p['name'] == 'Default' for p in portfolios)
+            # Ensure we're not missing the '-' portfolio if it has companies or if we're not filtering
+            has_default = any(p['name'] == '-' for p in portfolios)
             if not has_default and (not has_companies or has_companies_in_default(account_id)):
                 default_portfolio = query_db('''
                     SELECT id FROM portfolios
-                    WHERE account_id = ? AND name = 'Default'
+                    WHERE account_id = ? AND name = '-'
                 ''', [account_id], one=True)
 
                 if default_portfolio and isinstance(default_portfolio, dict):
                     portfolios.append(
-                        {'id': default_portfolio['id'], 'name': 'Default'})
-                    logger.info("Added Default portfolio to the response")
+                        {'id': default_portfolio['id'], 'name': '-'})
+                    logger.info("Added '-' portfolio to the response")
                 else:
-                    # Create Default portfolio if it doesn't exist
+                    # Create '-' portfolio if it doesn't exist
                     portfolio_id = execute_db('''
                         INSERT INTO portfolios (account_id, name)
-                        VALUES (?, 'Default')
+                        VALUES (?, '-')
                     ''', [account_id])
 
-                    portfolios.append({'id': portfolio_id, 'name': 'Default'})
+                    portfolios.append({'id': portfolio_id, 'name': '-'})
                     logger.info(
-                        "Created and added Default portfolio to the response")
+                        "Created and added '-' portfolio to the response")
 
             json_response = jsonify(portfolios)
         else:
@@ -590,26 +661,26 @@ def get_portfolios_api():
             logger.info(
                 f"Retrieved {len(names)} portfolio names from portfolios table: {names}")
 
-            # Ensure Default is in the list if it has companies or if we're not filtering
-            if 'Default' not in names and (not has_companies or has_companies_in_default(account_id)):
+            # Ensure '-' is in the list if it has companies or if we're not filtering
+            if '-' not in names and (not has_companies or has_companies_in_default(account_id)):
                 default_exists = query_db('''
                     SELECT 1 FROM portfolios
-                    WHERE account_id = ? AND name = 'Default'
+                    WHERE account_id = ? AND name = '-'
                 ''', [account_id], one=True)
 
                 if default_exists:
-                    names.append('Default')
-                    logger.info("Added Default portfolio name to the response")
+                    names.append('-')
+                    logger.info("Added '-' portfolio name to the response")
                 else:
-                    # Create Default portfolio if it doesn't exist
+                    # Create '-' portfolio if it doesn't exist
                     execute_db('''
                         INSERT INTO portfolios (account_id, name)
-                        VALUES (?, 'Default')
+                        VALUES (?, '-')
                     ''', [account_id])
 
-                    names.append('Default')
+                    names.append('-')
                     logger.info(
-                        "Created and added Default portfolio name to the response")
+                        "Created and added '-' portfolio name to the response")
 
             json_response = jsonify(names)
 

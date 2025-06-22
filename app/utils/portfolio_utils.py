@@ -81,10 +81,10 @@ def get_portfolio_data(account_id):
 
 
 def has_companies_in_default(account_id):
-    """Check if the Default portfolio has any companies with shares"""
+    """Check if the '-' portfolio has any companies with shares"""
     default_portfolio = query_db('''
         SELECT id FROM portfolios
-        WHERE account_id = ? AND name = 'Default'
+        WHERE account_id = ? AND name = '-'
     ''', [account_id], one=True)
 
     if default_portfolio:

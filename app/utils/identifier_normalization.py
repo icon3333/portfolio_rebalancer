@@ -95,10 +95,10 @@ def _resolve_ambiguous_identifier(identifier: str) -> str:
     2. Test crypto format: yfinance.Ticker(f"{identifier}-USD").info
     3. Apply resolution logic based on results
     
-    Resolution Logic Matrix:
+    Resolution Logic Matrix (Updated for Crypto Priority):
     | Stock Works | Crypto Works | Decision | Rationale |
     |-------------|--------------|----------|-----------|
-    | ✅ Yes      | ✅ Yes       | Use Stock| Stock tickers more common |
+    | ✅ Yes      | ✅ Yes       | Use Crypto| Crypto format more reliable for crypto assets |
     | ✅ Yes      | ❌ No        | Use Stock| Clear stock ticker |
     | ❌ No       | ✅ Yes       | Use Crypto| Clear crypto symbol |
     | ❌ No       | ❌ No        | Use Original| Preserve input, log warning |
@@ -121,11 +121,11 @@ def _resolve_ambiguous_identifier(identifier: str) -> str:
     
     logger.info(f"Format test results - stock: {stock_works}, crypto: {crypto_works}")
     
-    # Apply resolution logic
+    # Apply resolution logic - prefer crypto format when both work
     if stock_works and crypto_works:
-        # Both work - prefer stock (more common, user likely intended stock)
-        logger.info(f"Both formats work for '{identifier}', choosing stock format: '{stock_format}'")
-        return stock_format
+        # Both work - prefer crypto (more reliable for crypto assets, avoids dual format issues)
+        logger.info(f"Both formats work for '{identifier}', choosing crypto format: '{crypto_format}'")
+        return crypto_format
     elif stock_works and not crypto_works:
         # Only stock works - clear stock ticker
         logger.info(f"Only stock format works for '{identifier}': '{stock_format}'")
@@ -424,8 +424,8 @@ TEST_CASES = [
     ("ETH", "ETH-USD"),               # Ethereum (expected)
     ("ATOM", "ATOM-USD"),             # Cosmos (expected)
     
-    # Ambiguous cases - will be tested to determine correct format
-    ("AAPL", "AAPL"),                 # Stock ticker (expected)
+    # Ambiguous cases - will be tested to determine correct format (now preferring crypto)
+    ("AAPL", "AAPL-USD"),             # Could be stock or crypto - prefer crypto format if both work
     ("LINK", "LINK-USD"),             # Crypto symbol (expected)
     
     # Edge cases
