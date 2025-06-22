@@ -96,8 +96,6 @@ def get_isin_data(identifier: str) -> Dict[str, Any]:
 
     # Set crypto-specific fields if identifier ends with -USD (crypto format)
     if identifier.endswith('-USD'):
-        data['sector'] = 'Cryptocurrency'
-        data['industry'] = 'Digital Currency'
         data['country'] = 'N/A'
         logger.info(f"Detected crypto identifier: {identifier}")
 
@@ -121,9 +119,6 @@ def get_isin_data(identifier: str) -> Dict[str, Any]:
         'price_eur': data.get('priceEUR'),
         'currency': currency,
         'country': data.get('country'),
-        'sector': data.get('sector'),
-        'industry': data.get('industry'),
-
     }
 
 
@@ -157,9 +152,6 @@ def _fetch_yfinance_data_robust(identifier: str) -> Optional[Dict[str, Any]]:
                 'price': price,
                 'currency': info.get('currency'),
                 'country': info.get('country'),
-                'sector': info.get('sector'),
-                'industry': info.get('industry'),
-        
             }
         else:
             logger.debug(f"No valid price found for '{identifier}'")

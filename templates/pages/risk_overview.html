@@ -90,33 +90,6 @@
                     </div>
                 </div>
 
-                <div class="column is-6">
-                    <div class="gauge-card">
-                        <div class="gauge-indicator">
-                            <div class="overview-chart-header">
-                                <div class="overview-chart-title">Sector Analysis</div>
-                                <div class="overview-chart-subtitle" id="sectorCountSubtitle">Sector diversity</div>
-                            </div>
-                            <div class="overview-chart-container">
-                                <div id="sectorDistributionChart" style="min-height: 300px;"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="column is-6">
-                    <div class="gauge-card">
-                        <div class="gauge-indicator">
-                            <div class="overview-chart-header">
-                                <div class="overview-chart-title">Industry Focus</div>
-                                <div class="overview-chart-subtitle" id="industryCountSubtitle">Industry breakdown</div>
-                            </div>
-                            <div class="overview-chart-container">
-                                <div id="industryDistributionChart" style="min-height: 300px;"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
 
@@ -665,16 +638,16 @@
             const companyCountEl = document.getElementById('companyCountSubtitle');
             const countryCountEl = document.getElementById('countryCountSubtitle');
             const categoryCountEl = document.getElementById('categoryCountSubtitle');
-            const sectorCountEl = document.getElementById('sectorCountSubtitle');
-            const industryCountEl = document.getElementById('industryCountSubtitle');
+            const sectorCountEl = null;
+            const industryCountEl = null;
 
             if (filteredPortfolios.length === 0) {
                 portfolioCountEl.textContent = 'No portfolios selected';
                 companyCountEl.textContent = 'Select portfolios to view';
                 countryCountEl.textContent = '';
                 categoryCountEl.textContent = '';
-                sectorCountEl.textContent = '';
-                industryCountEl.textContent = '';
+                if (sectorCountEl) sectorCountEl.textContent = '';
+                if (industryCountEl) industryCountEl.textContent = '';
                 return;
             }
 
@@ -694,8 +667,8 @@
 
             countryCountEl.textContent = `${countries.size} countries`;
             categoryCountEl.textContent = `${categories.size} categories`;
-            sectorCountEl.textContent = `${sectors.size} sectors`;
-            industryCountEl.textContent = `${industries.size} industries`;
+            if (sectorCountEl) sectorCountEl.textContent = `${sectors.size} sectors`;
+            if (industryCountEl) industryCountEl.textContent = `${industries.size} industries`;
         }
 
         function showEmptyStates() {
@@ -703,9 +676,7 @@
                 'portfolioAllocationsChart',
                 'companyAllocationsChart',
                 'countryDistributionChart',
-                'categoryDistributionChart',
-                'sectorDistributionChart',
-                'industryDistributionChart'
+                'categoryDistributionChart'
             ];
 
             chartIds.forEach(chartId => {
@@ -1018,8 +989,6 @@
         function updateDistributionCharts() {
             updateDistributionChart('country', 'countryDistributionChart');
             updateDistributionChart('category', 'categoryDistributionChart');
-            updateDistributionChart('sector', 'sectorDistributionChart');
-            updateDistributionChart('industry', 'industryDistributionChart');
         }
 
         function updateDistributionChart(field, chartId) {

@@ -61,8 +61,6 @@ def get_portfolio_data(account_id):
                     'price_eur': float(row['price_eur']) if row.get('price_eur') is not None else None,
                     'currency': row.get('currency'),
                     'country': row.get('country'),
-                    'industry': row.get('industry'),
-                    'sector': row.get('sector'),
                     'total_invested': float(row['total_invested']) if row.get('total_invested') is not None else 0,
                     'last_updated': row['last_updated'] if isinstance(row['last_updated'], str) else
                     (row['last_updated'].isoformat() if row.get('last_updated') is not None else None)
@@ -115,9 +113,7 @@ def get_stock_info(identifier):
                     'currentPrice': stock_data.get('currentPrice'),
                     'currency': stock_data.get('currency', 'USD'),
                     'priceEUR': stock_data.get('priceEUR'),
-                    'country': stock_data.get('country'),
-                    'sector': stock_data.get('sector'),
-                    'industry': stock_data.get('industry')
+                    'country': stock_data.get('country')
                 },
                 'modified_identifier': result.get('modified_identifier')
             }

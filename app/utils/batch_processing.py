@@ -53,10 +53,8 @@ def _process_single_identifier(identifier: str) -> Dict[str, Any]:
                     identifier,
                     price,
                     result.get('currency', 'USD'),
-                    price_eur or price,  # Use original price if EUR conversion failed
+                    price_eur or price,
                     country=result.get('country'),
-                    sector=result.get('sector'),
-                    industry=result.get('industry'),
                     modified_identifier=result.get('modified_identifier')
                 )
                 if update_success:

@@ -19,8 +19,6 @@ def test_update_prices_conversion(monkeypatch):
             'currency': 'USD',
             'price_eur': 5.0,
             'country': None,
-            'sector': None,
-            'industry': None,
         }
 
     monkeypatch.setattr(db_utils, 'update_price_in_db', lambda *args, **kwargs: True)

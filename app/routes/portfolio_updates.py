@@ -62,8 +62,6 @@ def update_price_api(company_id: int):
         if update_price_in_db(
             identifier, price, currency, price_eur,
             country=data.get('country'),
-            sector=data.get('sector'),
-            industry=data.get('industry'),
             modified_identifier=modified_identifier
         ):
             logger.info(f"Successfully updated price in database for {identifier}")

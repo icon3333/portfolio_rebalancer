@@ -378,11 +378,9 @@ def process_csv_data(account_id, file_content):
                         currency = result.get('currency', 'USD')
                         price_eur = result.get('price_eur', price)
                         country = result.get('country')
-                        sector = result.get('sector')
-                        industry = result.get('industry')
                         logger.info(
-                            f"Updating metadata for {identifier}: Country: {country}, Sector: {sector}, Industry: {industry}")
-                        if not update_price_in_db(identifier, price, currency, price_eur, country, sector, industry):
+                            f"Updating metadata for {identifier}: Country: {country}")
+                        if not update_price_in_db(identifier, price, currency, price_eur, country):
                             logger.warning(
                                 f"Failed to update price and metadata in database for {identifier}")
                             failed_prices.append(identifier)
