@@ -131,8 +131,6 @@ def _apply_company_update(cursor, company_id, data, account_id):
                 currency = price_data.get('currency', 'EUR')
                 price_eur = price_data.get('price_eur', 0.0)
                 country = price_data.get('country')
-                sector = price_data.get('sector')
-                industry = price_data.get('industry')
                 modified_identifier = price_data.get('modified_identifier')
                 
                 # Ensure required parameters are not None
@@ -143,8 +141,6 @@ def _apply_company_update(cursor, company_id, data, account_id):
                         currency=str(currency),
                         price_eur=float(price_eur),
                         country=country,
-                        sector=sector,
-                        industry=industry,
                         modified_identifier=modified_identifier
                     )
                     logger.info(f"Successfully updated price for '{new_identifier}': {price_eur} EUR")
@@ -925,8 +921,6 @@ def update_portfolio_api():
                             currency = price_data.get('currency', 'EUR')
                             price_eur = price_data.get('price_eur', 0.0)
                             country = price_data.get('country')
-                            sector = price_data.get('sector')
-                            industry = price_data.get('industry')
                 
                             modified_identifier = price_data.get('modified_identifier')
                             
@@ -938,9 +932,6 @@ def update_portfolio_api():
                                     currency=str(currency),
                                     price_eur=float(price_eur),
                                     country=country,
-                                    sector=sector,
-                                    industry=industry,
-        
                                     modified_identifier=modified_identifier
                                 )
                                 logger.info(
