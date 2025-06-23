@@ -755,7 +755,6 @@
                                         <i :class="sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down'"></i>
                                     </span>
                                 </th>
-                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -812,17 +811,6 @@
                                 </td>
                                 <td>
                                     <span v-text="formatDateAgo(item.last_updated)"></span>
-                                </td>
-                                <td>
-                                    <div class="buttons is-right">
-                                        <button class="button is-small is-danger" @click="confirmDelete(item)"
-                                            :class="{'is-loading': isDeleting && selectedItem.id === item.id}"
-                                            :disabled="isDeleting">
-                                            <span class="icon is-small">
-                                                <i class="fas fa-trash"></i>
-                                            </span>
-                                        </button>
-                                    </div>
                                 </td>
                             </tr>
                         </tbody>

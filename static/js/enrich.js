@@ -460,9 +460,7 @@ class PortfolioTableApp {
                     portfolioOptions: portfolios,
                     selectedItem: {},
                     showUpdatePriceModal: false,
-                    showDeleteModal: false,
                     isUpdating: false,
-                    isDeleting: false,
                     loading: false,
                     metrics: {
                         total: 0,
@@ -868,14 +866,10 @@ class PortfolioTableApp {
                     this.updatePrice();
                 },
 
-                confirmDelete(item) {
-                    this.selectedItem = item;
-                    this.showDeleteModal = true;
-                },
+
 
                 closeModal() {
                     this.showUpdatePriceModal = false;
-                    this.showDeleteModal = false;
                     this.selectedItem = {};
 
                     // Reload data when modal is closed to ensure table has latest data
@@ -931,45 +925,7 @@ class PortfolioTableApp {
                     }
                 },
 
-                async deleteItem() {
-                    if (!this.selectedItem.id) return;
 
-                    this.isDeleting = true;
-                    try {
-                        const response = await fetch(`/portfolio/api/company/${this.selectedItem.id}`, {
-                            method: 'DELETE'
-                        });
-
-                        const result = await response.json();
-
-                        if (response.ok) {
-                            // Refresh the data
-                            await this.loadData();
-
-                            // Show success notification
-                            if (typeof showNotification === 'function') {
-                                showNotification(result.message || 'Company deleted successfully', 'is-success');
-                            } else {
-                                console.log('Success:', result.message || 'Company deleted successfully');
-                            }
-                        } else {
-                            // Show error notification
-                            if (typeof showNotification === 'function') {
-                                showNotification(result.error || 'Failed to delete company', 'is-danger');
-                            } else {
-                                console.error('Error:', result.error || 'Failed to delete company');
-                            }
-                        }
-                    } catch (error) {
-                        console.error('Error deleting item:', error);
-                        if (typeof showNotification === 'function') {
-                            showNotification('An error occurred while deleting the company', 'is-danger');
-                        }
-                    } finally {
-                        this.isDeleting = false;
-                        this.closeModal();
-                    }
-                },
 
                 async savePortfolioChange(item) {
                     console.log('savePortfolioChange called with item:', item);
