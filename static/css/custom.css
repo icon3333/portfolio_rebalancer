@@ -371,7 +371,7 @@ p {
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-semibold);
   margin-top: var(--space-xl);
-  margin-bottom: var(--space-md);
+  margin-bottom: var(--space-sm);
   padding-bottom: var(--space-xs);
   border-bottom: 2px solid var(--primary-light);
   color: var(--text-color);

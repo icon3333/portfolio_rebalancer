@@ -1135,6 +1135,329 @@ document.addEventListener('DOMContentLoaded', function () {
         portfolioManager.showNotification('Allocation summary exported successfully!', 'is-success');
       },
 
+      // Export allocation summary to PDF
+      exportToPDF() {
+        try {
+          // Initialize jsPDF
+          const { jsPDF } = window.jspdf;
+          const doc = new jsPDF();
+
+          // Set document properties
+          doc.setProperties({
+            title: 'Portfolio Allocation Summary',
+            creator: 'Portfolio Rebalancer'
+          });
+
+          // Colors (minimal palette)
+          const colors = {
+            primary: [33, 37, 41],      // Dark gray
+            secondary: [108, 117, 125], // Medium gray
+            light: [248, 249, 250],     // Light gray
+            accent: [0, 123, 255]       // Blue accent
+          };
+
+          // Header section with clean styling
+          doc.setFillColor(...colors.primary);
+          doc.rect(0, 0, 210, 35, 'F');
+
+          // Title
+          doc.setTextColor(255, 255, 255);
+          doc.setFontSize(24);
+          doc.setFont('helvetica', 'normal');
+          doc.text('Portfolio Allocation Summary', 20, 22);
+
+          // Date in header
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'normal');
+          const today = new Date().toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          });
+          doc.text(`Generated ${today}`, 20, 30);
+
+          // Reset text color
+          doc.setTextColor(...colors.primary);
+
+          // Budget overview section with cards
+          let yPosition = 45;
+          doc.setFontSize(16);
+          doc.setFont('helvetica', 'normal');
+          doc.text('Investment Overview', 20, yPosition);
+          yPosition += 10;
+
+          // Budget cards in a grid
+          const cardWidth = 42;
+          const cardHeight = 25;
+          const cardSpacing = 5;
+          const startX = 20;
+
+          const budgetItems = [
+            { label: 'Net Worth', value: this.formatCurrency(this.budgetData.totalNetWorth) },
+            { label: 'Invested', value: this.formatCurrency(this.budgetData.alreadyInvested) },
+            { label: 'Emergency', value: this.formatCurrency(this.budgetData.emergencyFund) },
+            { label: 'Available', value: this.formatCurrency(this.budgetData.availableToInvest) }
+          ];
+
+          budgetItems.forEach((item, index) => {
+            const x = startX + (index * (cardWidth + cardSpacing));
+
+            // Card background
+            doc.setFillColor(...colors.light);
+            doc.roundedRect(x, yPosition, cardWidth, cardHeight, 2, 2, 'F');
+
+            // Card border
+            doc.setDrawColor(...colors.secondary);
+            doc.setLineWidth(0.2);
+            doc.roundedRect(x, yPosition, cardWidth, cardHeight, 2, 2, 'S');
+
+            // Label
+            doc.setTextColor(...colors.secondary);
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'normal');
+            doc.text(item.label, x + 3, yPosition + 8);
+
+            // Value
+            doc.setTextColor(...colors.primary);
+            doc.setFontSize(11);
+            doc.setFont('helvetica', 'bold');
+            const textWidth = doc.getTextWidth(item.value);
+            doc.text(item.value, x + cardWidth - textWidth - 3, yPosition + 18);
+          });
+
+          yPosition += cardHeight + 15;
+
+          // Allocation table with modern styling
+          doc.setTextColor(...colors.primary);
+          doc.setFontSize(16);
+          doc.setFont('helvetica', 'normal');
+          doc.text('Portfolio Allocations', 20, yPosition);
+          yPosition += 10;
+
+          // Table setup
+          const tableStartY = yPosition;
+          const tableWidth = 170;
+          const rowHeight = 8;
+          const headerHeight = 12;
+
+          // Column configuration
+          const columns = [
+            { header: 'Portfolio', width: 40, align: 'left' },
+            { header: 'Position', width: 50, align: 'left' },
+            { header: 'Global %', width: 20, align: 'right' },
+            { header: 'Portfolio %', width: 22, align: 'right' },
+            { header: 'Amount', width: 38, align: 'right' }
+          ];
+
+          // Table header
+          doc.setFillColor(...colors.primary);
+          doc.rect(20, yPosition, tableWidth, headerHeight, 'F');
+
+          doc.setTextColor(255, 255, 255);
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'bold');
+
+          let xPos = 20;
+          columns.forEach(col => {
+            const textX = col.align === 'right' ? xPos + col.width - 3 : xPos + 3;
+            doc.text(col.header, textX, yPosition + 8, { align: col.align });
+            xPos += col.width;
+          });
+
+          yPosition += headerHeight;
+          let rowIndex = 0;
+
+          // Table content
+          this.portfolios.forEach(portfolio => {
+            // Check for page break
+            if (yPosition > 260) {
+              doc.addPage();
+              yPosition = 30;
+              rowIndex = 0;
+            }
+
+            // Portfolio row with subtle background
+            const bgColor = rowIndex % 2 === 0 ? [255, 255, 255] : colors.light;
+            doc.setFillColor(...bgColor);
+            doc.rect(20, yPosition, tableWidth, rowHeight + 2, 'F');
+
+            // Portfolio data
+            doc.setTextColor(...colors.primary);
+            doc.setFontSize(9);
+            doc.setFont('helvetica', 'bold');
+
+            const portfolioRow = [
+              this.getPortfolioName(portfolio.id),
+              '',
+              `${parseFloat(portfolio.allocation).toFixed(1)}%`,
+              '100%',
+              this.formatCurrency(this.calculateAllocationAmount(portfolio.allocation))
+            ];
+
+            xPos = 20;
+            portfolioRow.forEach((data, colIndex) => {
+              const textX = columns[colIndex].align === 'right' ? xPos + columns[colIndex].width - 3 : xPos + 3;
+              doc.text(data, textX, yPosition + 6, { align: columns[colIndex].align });
+              xPos += columns[colIndex].width;
+            });
+
+            yPosition += rowHeight + 2;
+            rowIndex++;
+
+            // Position rows
+            const groups = this.groupPositionsByWeight(portfolio.positions, portfolio);
+            groups.forEach(group => {
+              if (group.weight > 0) {
+                // Check for page break
+                if (yPosition > 260) {
+                  doc.addPage();
+                  yPosition = 30;
+                  rowIndex = 0;
+                }
+
+                // Row background
+                const bgColor = rowIndex % 2 === 0 ? [255, 255, 255] : colors.light;
+                doc.setFillColor(...bgColor);
+                doc.rect(20, yPosition, tableWidth, rowHeight, 'F');
+
+                doc.setTextColor(...colors.secondary);
+                doc.setFontSize(8);
+                doc.setFont('helvetica', 'normal');
+
+                let positionRow;
+                let hasSecondLine = false;
+                let secondLineData = null;
+
+                if (group.isPlaceholder) {
+                  const totalAmount = this.calculateAllocationAmount(portfolio.allocation) * group.weight * group.count / 100;
+                  const eachAmount = this.calculateAllocationAmount(portfolio.allocation) * group.weight / 100;
+                  positionRow = [
+                    '',
+                    group.companyName.length > 30 ? group.companyName.substring(0, 27) + '...' : group.companyName,
+                    `${((portfolio.allocation * group.weight * group.count) / 100).toFixed(1)}%`,
+                    `${(parseFloat(group.weight) * group.count).toFixed(1)}%`,
+                    this.formatCurrency(totalAmount)
+                  ];
+
+                  // Second line for "(each)" information
+                  hasSecondLine = true;
+                  secondLineData = [
+                    '',
+                    '',
+                    '',
+                    '',
+                    `(${this.formatCurrency(eachAmount)} each)`
+                  ];
+                } else {
+                  positionRow = [
+                    '',
+                    group.companyName.length > 30 ? group.companyName.substring(0, 27) + '...' : group.companyName,
+                    `${((portfolio.allocation * group.weight) / 100).toFixed(1)}%`,
+                    `${parseFloat(group.weight).toFixed(1)}%`,
+                    this.formatCurrency(this.calculateAllocationAmount(portfolio.allocation) * group.weight / 100)
+                  ];
+                }
+
+                xPos = 20;
+                positionRow.forEach((data, colIndex) => {
+                  const textX = columns[colIndex].align === 'right' ? xPos + columns[colIndex].width - 3 : xPos + 3;
+                  doc.text(data, textX, yPosition + 5, { align: columns[colIndex].align });
+                  xPos += columns[colIndex].width;
+                });
+
+                yPosition += rowHeight;
+                rowIndex++;
+
+                // Add second line for placeholder positions
+                if (hasSecondLine && secondLineData) {
+                  // Check for page break again
+                  if (yPosition > 260) {
+                    doc.addPage();
+                    yPosition = 30;
+                    rowIndex = 0;
+                  }
+
+                  // Row background for second line
+                  const bgColor = rowIndex % 2 === 0 ? [255, 255, 255] : colors.light;
+                  doc.setFillColor(...bgColor);
+                  doc.rect(20, yPosition, tableWidth, rowHeight, 'F');
+
+                  doc.setTextColor(...colors.secondary);
+                  doc.setFontSize(7);
+                  doc.setFont('helvetica', 'italic');
+
+                  xPos = 20;
+                  secondLineData.forEach((data, colIndex) => {
+                    const textX = columns[colIndex].align === 'right' ? xPos + columns[colIndex].width - 3 : xPos + 3;
+                    doc.text(data, textX, yPosition + 5, { align: columns[colIndex].align });
+                    xPos += columns[colIndex].width;
+                  });
+
+                  yPosition += rowHeight;
+                  rowIndex++;
+
+                  // Reset font for next row
+                  doc.setTextColor(...colors.secondary);
+                  doc.setFontSize(8);
+                  doc.setFont('helvetica', 'normal');
+                }
+              }
+            });
+
+            yPosition += 2; // Small gap between portfolios
+          });
+
+          // Total row with emphasis
+          if (yPosition > 260) {
+            doc.addPage();
+            yPosition = 30;
+          }
+
+          yPosition += 5;
+
+          // Total row background
+          doc.setFillColor(...colors.accent);
+          doc.rect(20, yPosition, tableWidth, rowHeight + 2, 'F');
+
+          doc.setTextColor(255, 255, 255);
+          doc.setFontSize(9);
+          doc.setFont('helvetica', 'bold');
+
+          const totalRow = [
+            'TOTAL ALLOCATION',
+            '',
+            `${this.calculateTotalAllocation().toFixed(1)}%`,
+            '—',
+            this.formatCurrency(this.calculateTotalAllocatedAmount())
+          ];
+
+          xPos = 20;
+          totalRow.forEach((data, colIndex) => {
+            const textX = columns[colIndex].align === 'right' ? xPos + columns[colIndex].width - 3 : xPos + 3;
+            doc.text(data, textX, yPosition + 6, { align: columns[colIndex].align });
+            xPos += columns[colIndex].width;
+          });
+
+          // Footer
+          const pageHeight = doc.internal.pageSize.height;
+          doc.setTextColor(...colors.secondary);
+          doc.setFontSize(8);
+          doc.setFont('helvetica', 'normal');
+          doc.text('Generated by Portfolio Rebalancer', 20, pageHeight - 10);
+
+          // Save the PDF
+          const filename = `allocation_summary_${new Date().toISOString().slice(0, 10)}.pdf`;
+          doc.save(filename);
+
+          // Show success notification
+          portfolioManager.showNotification('Allocation summary PDF downloaded successfully!', 'is-success');
+
+        } catch (error) {
+          console.error('Error generating PDF:', error);
+          portfolioManager.showNotification('Failed to generate PDF. Please try again.', 'is-danger');
+        }
+      },
+
       // Save allocation state
       async saveAllocation() {
         try {
