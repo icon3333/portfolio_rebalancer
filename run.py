@@ -13,4 +13,4 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Run the application with the specified port
-    app.run(host='0.0.0.0', port=args.port, debug=True)
+    app.run(host='0.0.0.0', port=args.port)

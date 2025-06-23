@@ -2,10 +2,12 @@ from flask import Flask, render_template, request, jsonify
 import logging
 import os
 from datetime import datetime
+from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 
 def create_app(config_name='default'):
+    load_dotenv()
     logging.basicConfig(level=logging.INFO)
     app = Flask(__name__,
                 template_folder='../templates',
