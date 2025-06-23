@@ -1,7 +1,7 @@
 # Flask and core dependencies
 Flask==3.0.0
 Flask-SQLAlchemy==3.1.1
-Werkzeug==3.0.1
+Werkzeug>=3.0.6
 
 # Data processing
 pandas==2.1.4
@@ -9,14 +9,14 @@ numpy==1.26.2
 
 # Financial data
 yfinance==0.2.28
-requests==2.31.0
+requests>=2.32.4
 
 # Security
-cryptography==41.0.8
+cryptography>=43.0.1
 bcrypt==4.1.2
 
 # Production server (optional)
-gunicorn==21.2.0
+gunicorn>=23.0.0
 
 # Development and testing
 pytest==7.4.3
