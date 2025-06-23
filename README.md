@@ -164,7 +164,11 @@ python run.py --port 5000 --skip-setup
 
 1. **Start the application**
    ```bash
+   # Development
    python run.py --port 5000
+   
+   # Production
+   python run.py --port 8000
    ```
 
 2. **Access the dashboard** at `http://localhost:5000`
@@ -261,7 +265,7 @@ server {
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License.
 
 ## 🆘 Support
 
