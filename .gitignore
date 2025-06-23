@@ -30,10 +30,13 @@ instance/
 *.sqlite
 *.sqlite3
 app/database/backups/
+*.sql.backup
+*.dump
 
 # Virtual Environment
 venv/
 .env
+.env.*
 
 # IDE specific files
 .idea/
@@ -53,10 +56,11 @@ logs/
 .coverage
 htmlcov/
 .pytest_cache/
+
 # Secret key
 secret_key
 
-# SSH keys
+# SSH keys and certificates
 github_ssh
 github_ssh.pub
 id_rsa
@@ -67,3 +71,29 @@ id_ecdsa
 id_ecdsa.pub
 *.pem
 *.key
+*.crt
+*.p12
+*.pfx
+
+# Additional security files
+.aws/
+.docker/
+.kube/
+*.credentials
+config.ini
+settings.ini
+.secrets
+secrets.json
+.env.local
+.env.production
+.env.staging
+
+# Backup files
+*.backup
+*.bak
+*.tmp
+*~
+
+# Production files
+docker-compose.prod.yml
+*.prod.env

@@ -4,8 +4,10 @@ from datetime import timedelta
 
 class Config:
     """Base configuration class."""
-    SECRET_KEY = os.environ.get(
-        'SECRET_KEY') or 'dev-key-please-change-in-production'
+    SECRET_KEY = os.environ.get('SECRET_KEY')
+    if not SECRET_KEY:
+        raise ValueError("SECRET_KEY environment variable must be set")
+    
     SQLALCHEMY_DATABASE_URI = os.environ.get(
         'DATABASE_URL') or 'sqlite:///app/database/portfolio.db'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
@@ -16,6 +18,9 @@ class Config:
 
     # Session configuration
     PERMANENT_SESSION_LIFETIME = timedelta(days=1)
+    SESSION_COOKIE_SECURE = True  # Only send cookies over HTTPS
+    SESSION_COOKIE_HTTPONLY = True  # Prevent XSS attacks
+    SESSION_COOKIE_SAMESITE = 'Lax'  # CSRF protection
 
     # Cache settings
     CACHE_TYPE = 'SimpleCache'
@@ -42,6 +47,10 @@ class DevelopmentConfig(Config):
     """Development configuration."""
     DEBUG = True
     SQLALCHEMY_ECHO = True
+    SESSION_COOKIE_SECURE = False  # Allow HTTP in development
+    
+    # Allow fallback secret key only in development
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-key-please-change-in-production'
 
 
 class TestingConfig(Config):
@@ -49,12 +58,19 @@ class TestingConfig(Config):
     TESTING = True
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
     WTF_CSRF_ENABLED = False
+    SESSION_COOKIE_SECURE = False  # Allow HTTP in testing
+    
+    # Allow fallback secret key only in testing
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'test-key'
 
 
 class ProductionConfig(Config):
     """Production configuration."""
-    # Override in instance/config.py or with environment variables
-    pass
+    # Ensure HTTPS in production
+    SESSION_COOKIE_SECURE = True
+    
+    # Additional production security headers
+    SEND_FILE_MAX_AGE_DEFAULT = timedelta(hours=1)
 
 
 # Configuration dictionary
