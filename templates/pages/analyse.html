@@ -294,6 +294,40 @@
                     // Initialize expandable heatmap sections
                     initializeHeatmapSectionToggle();
 
+                    // Ensure all sections start collapsed by default
+                    setTimeout(() => {
+                        console.log('Running collapse check...');
+                        const allSections = document.querySelectorAll('.portfolio-section');
+                        console.log(`Found ${allSections.length} portfolio sections to collapse`);
+
+                        allSections.forEach((section, index) => {
+                            const content = section.querySelector('.portfolio-content');
+                            const icon = section.querySelector('.toggle-portfolio i');
+
+                            console.log(`Section ${index}: content display = ${content ? content.style.display : 'no content'}, icon classes = ${icon ? icon.className : 'no icon'}`);
+
+                            if (content) {
+                                content.style.display = 'none';
+                                console.log(`Collapsed section ${index}`);
+                            }
+                            if (icon) {
+                                icon.classList.remove('fa-chevron-up');
+                                icon.classList.add('fa-chevron-down');
+                                console.log(`Updated icon for section ${index} to chevron-down`);
+                            }
+                        });
+                        console.log('All sections collapsed by default');
+                    }, 200);
+
+                    // Additional safety: programmatically trigger collapse all after everything is loaded
+                    setTimeout(() => {
+                        const collapseAllBtn = document.getElementById('collapseAllPortfolios');
+                        if (collapseAllBtn) {
+                            console.log('Programmatically triggering collapse all button...');
+                            collapseAllBtn.click();
+                        }
+                    }, 300);
+
                     console.log('UI initialization completed successfully');
                 } catch (error) {
                     console.error('Error during data processing or UI initialization:', error);
@@ -1807,6 +1841,20 @@
                     // Only handle sections that don't have data-portfolio-id (i.e., heatmap sections)
                     if (!header.closest('[data-portfolio-id]')) {
                         header.style.cursor = 'pointer';
+
+                        // Ensure heatmap sections start collapsed by default
+                        const section = header.closest('.portfolio-section');
+                        const content = section.querySelector('.portfolio-content');
+                        const icon = section.querySelector('.toggle-portfolio i');
+
+                        if (content) {
+                            content.style.display = 'none';
+                        }
+                        if (icon) {
+                            icon.classList.remove('fa-chevron-up');
+                            icon.classList.add('fa-chevron-down');
+                        }
+
                         header.addEventListener('click', function () {
                             const section = this.closest('.portfolio-section');
                             const content = section.querySelector('.portfolio-content');

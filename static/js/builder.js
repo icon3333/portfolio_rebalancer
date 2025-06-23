@@ -1063,6 +1063,78 @@ document.addEventListener('DOMContentLoaded', function () {
         return result.sort((a, b) => b.weight - a.weight);
       },
 
+      // Export allocation summary to CSV
+      exportToCSV() {
+        const csvData = [];
+
+        // Add header row
+        csvData.push(['Portfolio', 'Position', 'Global %', 'Portfolio %', 'To Be Invested']);
+
+        // Process each portfolio
+        this.portfolios.forEach(portfolio => {
+          // Add portfolio row
+          csvData.push([
+            this.getPortfolioName(portfolio.id),
+            '',
+            `${parseFloat(portfolio.allocation).toFixed(1)}%`,
+            '100%',
+            this.formatCurrency(this.calculateAllocationAmount(portfolio.allocation))
+          ]);
+
+          // Add position rows
+          const groups = this.groupPositionsByWeight(portfolio.positions, portfolio);
+          groups.forEach(group => {
+            if (group.weight > 0) {
+              if (group.isPlaceholder) {
+                csvData.push([
+                  '',
+                  group.companyName,
+                  `${((portfolio.allocation * group.weight * group.count) / 100).toFixed(1)}%`,
+                  `${(parseFloat(group.weight) * group.count).toFixed(1)}%`,
+                  `${this.formatCurrency(this.calculateAllocationAmount(portfolio.allocation) * group.weight * group.count / 100)} (${this.formatCurrency(this.calculateAllocationAmount(portfolio.allocation) * group.weight / 100)} each)`
+                ]);
+              } else {
+                csvData.push([
+                  '',
+                  group.companyName,
+                  `${((portfolio.allocation * group.weight) / 100).toFixed(1)}%`,
+                  `${parseFloat(group.weight).toFixed(1)}%`,
+                  this.formatCurrency(this.calculateAllocationAmount(portfolio.allocation) * group.weight / 100)
+                ]);
+              }
+            }
+          });
+        });
+
+        // Add total row
+        csvData.push([
+          'Total',
+          '',
+          `${this.calculateTotalAllocation().toFixed(1)}%`,
+          '-',
+          this.formatCurrency(this.calculateTotalAllocatedAmount())
+        ]);
+
+        // Convert to CSV string
+        const csvContent = csvData.map(row =>
+          row.map(cell => `"${cell.toString().replace(/"/g, '""')}"`).join(',')
+        ).join('\n');
+
+        // Create and download file
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `allocation_summary_${new Date().toISOString().slice(0, 10)}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        // Show success notification
+        portfolioManager.showNotification('Allocation summary exported successfully!', 'is-success');
+      },
+
       // Save allocation state
       async saveAllocation() {
         try {

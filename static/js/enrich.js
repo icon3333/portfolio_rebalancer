@@ -471,7 +471,6 @@ class PortfolioTableApp {
                         lastUpdate: null
                     },
                     selectedPortfolio: defaultPortfolio,
-                    showOnlyMissingPrices: false,
                     companySearchQuery: '',
                     sortColumn: '',
                     sortDirection: 'asc',
@@ -495,7 +494,7 @@ class PortfolioTableApp {
                     return 'is-danger';
                 },
                 filteredPortfolioItems() {
-                    console.log(`Computing filtered items with portfolio=${this.selectedPortfolio}, showMissing=${this.showOnlyMissingPrices}, companySearch=${this.companySearchQuery}`);
+                    console.log(`Computing filtered items with portfolio=${this.selectedPortfolio}, companySearch=${this.companySearchQuery}`);
 
                     // First filter by selected portfolio
                     let filtered = this.selectedPortfolio
@@ -503,12 +502,6 @@ class PortfolioTableApp {
                         : this.portfolioItems;
 
                     console.log(`After portfolio filter: ${filtered.length} items`);
-
-                    // Then filter by missing prices if checkbox is checked
-                    if (this.showOnlyMissingPrices) {
-                        filtered = filtered.filter(item => !item.price_eur || item.price_eur === 0 || item.price_eur === null);
-                        console.log(`After missing prices filter: ${filtered.length} items`);
-                    }
 
                     // Filter by company name if search query is provided
                     if (this.companySearchQuery && this.companySearchQuery.trim() !== '') {
@@ -593,11 +586,6 @@ class PortfolioTableApp {
                 }
             },
             watch: {
-                showOnlyMissingPrices() {
-                    // Update metrics only if we're showing filtered data
-                    console.log('showOnlyMissingPrices changed:', this.showOnlyMissingPrices);
-                    this.updateFilteredMetrics();
-                },
                 selectedPortfolio() {
                     // Update metrics when portfolio selection changes
                     console.log('selectedPortfolio changed:', this.selectedPortfolio);
@@ -636,30 +624,6 @@ class PortfolioTableApp {
                             });
                         } else {
                             console.warn('Portfolio dropdown element not found with ID: filter-portfolio');
-                        }
-
-                        // Setup two-way binding with missing prices checkbox
-                        const missingPricesCheckbox = document.getElementById('show-only-missing-prices');
-                        if (missingPricesCheckbox) {
-                            console.log('Found missing prices checkbox element');
-                            // Initial value from Vue to DOM
-                            missingPricesCheckbox.checked = this.showOnlyMissingPrices;
-
-                            // DOM to Vue binding
-                            missingPricesCheckbox.addEventListener('change', () => {
-                                console.log('Missing prices checkbox changed to:', missingPricesCheckbox.checked);
-                                this.showOnlyMissingPrices = missingPricesCheckbox.checked;
-                                // Force update filtered list
-                                this.updateFilteredMetrics();
-                            });
-
-                            // Vue to DOM binding
-                            this.$watch('showOnlyMissingPrices', (newVal) => {
-                                console.log('showOnlyMissingPrices changed in Vue:', newVal);
-                                missingPricesCheckbox.checked = newVal;
-                            });
-                        } else {
-                            console.warn('Missing prices checkbox element not found with ID: show-only-missing-prices');
                         }
 
                         // Setup two-way binding with company search input
@@ -702,6 +666,92 @@ class PortfolioTableApp {
 
                 updateAllData() {
                     UpdateAllDataHandler.run();
+                },
+
+                downloadCSV() {
+                    // Use the current filtered items for CSV export
+                    const dataToExport = this.filteredPortfolioItems;
+
+                    if (dataToExport.length === 0) {
+                        if (typeof showNotification === 'function') {
+                            showNotification('No data available to export', 'is-warning');
+                        } else {
+                            alert('No data available to export');
+                        }
+                        return;
+                    }
+
+                    // Create CSV content
+                    const headers = [
+                        'Identifier',
+                        'Company',
+                        'Portfolio',
+                        'Category',
+                        'Shares',
+                        'Price (EUR)',
+                        'Total Value',
+                        'Total Invested',
+                        'Last Updated'
+                    ];
+
+                    const csvRows = [headers.join(',')];
+
+                    dataToExport.forEach(item => {
+                        const row = [
+                            this.escapeCSVField(item.identifier || ''),
+                            this.escapeCSVField(item.company || ''),
+                            this.escapeCSVField(item.portfolio || ''),
+                            this.escapeCSVField(item.category || ''),
+                            item.shares || 0,
+                            item.price_eur || 0,
+                            (item.price_eur || 0) * (item.shares || 0),
+                            item.total_invested || 0,
+                            this.escapeCSVField(item.last_updated || '')
+                        ];
+                        csvRows.push(row.join(','));
+                    });
+
+                    // Create and download file
+                    const csvContent = csvRows.join('\n');
+                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                    const link = document.createElement('a');
+
+                    if (link.download !== undefined) {
+                        const url = URL.createObjectURL(blob);
+                        link.setAttribute('href', url);
+
+                        // Generate filename with current date
+                        const now = new Date();
+                        const dateStr = now.toISOString().split('T')[0];
+                        const portfolioFilter = this.selectedPortfolio ? `_${this.selectedPortfolio}` : '';
+                        link.setAttribute('download', `portfolio_data${portfolioFilter}_${dateStr}.csv`);
+
+                        link.style.visibility = 'hidden';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+
+                        if (typeof showNotification === 'function') {
+                            showNotification(`CSV file downloaded with ${dataToExport.length} records`, 'is-success');
+                        }
+                    }
+                },
+
+                escapeCSVField(field) {
+                    // Handle null/undefined values
+                    if (field === null || field === undefined) {
+                        return '';
+                    }
+
+                    // Convert to string
+                    const str = String(field);
+
+                    // If field contains comma, quote, or newline, wrap in quotes and escape quotes
+                    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                        return '"' + str.replace(/"/g, '""') + '"';
+                    }
+
+                    return str;
                 },
 
                 // This function will update the dropdown to only show portfolios that are actually used
@@ -770,7 +820,7 @@ class PortfolioTableApp {
                         }
 
                         // Update metrics based on whether we're filtering
-                        if (this.showOnlyMissingPrices || this.selectedPortfolio) {
+                        if (this.selectedPortfolio) {
                             this.updateFilteredMetrics();
                         } else {
                             this.updateMetrics();
@@ -809,7 +859,7 @@ class PortfolioTableApp {
                     // Force Vue to re-render the filtered list
                     this.$forceUpdate();
                     console.log(`Updated metrics: ${this.metrics.total} items`);
-                    console.log(`Filtering conditions: portfolio=${this.selectedPortfolio}, show missing only=${this.showOnlyMissingPrices}`);
+                    console.log(`Filtering conditions: portfolio=${this.selectedPortfolio}`);
                 },
 
                 confirmPriceUpdate(item) {

@@ -522,7 +522,7 @@
                             <!-- Portfolio Filter -->
                             <div class="control has-icons-left">
                                 <div class="select is-small">
-                                    <select id="filter-portfolio">
+                                    <select id="filter-portfolio" style="height: 2em;">
                                         <option value="">All Portfolios</option>
                                         {% for portfolio in portfolios %}
                                         <option value="{{ portfolio }}">{{ portfolio }}</option>
@@ -538,13 +538,13 @@
                             <div class="field has-addons mb-0">
                                 <div class="control has-icons-left">
                                     <input type="text" class="input is-small" id="company-search"
-                                        placeholder="Search company...">
+                                        placeholder="Search company..." style="height: 2em;">
                                     <span class="icon is-small is-left">
                                         <i class="fas fa-search"></i>
                                     </span>
                                 </div>
                                 <div class="control">
-                                    <button class="button is-small" id="clear-company-search">
+                                    <button class="button is-small" id="clear-company-search" style="height: 2em;">
                                         <span class="icon is-small">
                                             <i class="fas fa-times"></i>
                                         </span>
@@ -552,21 +552,20 @@
                                 </div>
                             </div>
 
-                            <!-- No Price Checkbox -->
-                            <div class="control">
-                                <label class="checkbox is-flex is-align-items-center" style="height: 2em;">
-                                    <input type="checkbox" id="show-only-missing-prices">
-                                    <span class="ml-2">No price</span>
-                                </label>
-                            </div>
-
                             <!-- Action buttons with consistent styling -->
                             <div class="buttons are-small mb-0">
-                                <button class="button is-primary" id="update-all-data-btn" @click="updateAllData">
+                                <button class="button is-primary" id="update-all-data-btn" @click="updateAllData"
+                                    style="height: 2em;">
                                     <span class="icon is-small">
                                         <i class="fas fa-sync-alt"></i>
                                     </span>
                                     <span>Update all data</span>
+                                </button>
+                                <button class="button is-info" @click="downloadCSV" style="height: 2em;">
+                                    <span class="icon is-small">
+                                        <i class="fas fa-download"></i>
+                                    </span>
+                                    <span>Download as CSV</span>
                                 </button>
                             </div>
                         </div>
@@ -574,7 +573,6 @@
                         <!-- Hidden controls for Vue binding -->
                         <div class="is-hidden">
                             <select v-model="selectedPortfolio" id="vue-portfolio-select"></select>
-                            <input type="checkbox" v-model="showOnlyMissingPrices" id="vue-missing-prices-checkbox">
                         </div>
                     </div>
 
