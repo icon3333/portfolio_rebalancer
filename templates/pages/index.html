@@ -585,14 +585,19 @@
                 notification.remove();
             });
         });
-
-        // Initialize risk overview if user is logged in
-        {% if session.account_id %}
-        initializeRiskOverview();
-        {% endif %}
     });
+</script>
 
-    {% if session.account_id %}
+{% if session.account_id %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        initializeRiskOverview();
+    });
+</script>
+{% endif %}
+
+{% if session.account_id %}
+<script>
     function initializeRiskOverview() {
         // Check if required dependencies are loaded
         if (typeof ApexCharts === 'undefined') {
@@ -1009,6 +1014,6 @@
             return violations;
         }
     }
-    {% endif %}
 </script>
+{% endif %}
 {% endblock %}
