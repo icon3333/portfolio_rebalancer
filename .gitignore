@@ -97,13 +97,3 @@ secrets.json
 # Production files
 docker-compose.prod.yml
 *.prod.env
-
-# Environment variables
-#
-# In general, .env files should not be committed to your repo.
-.env
-*.env
-.env.*
-
-# Editor directories and files
-.vscode/

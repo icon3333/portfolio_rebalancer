@@ -1,5 +1,9 @@
 import os
 from datetime import timedelta
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 class Config:
@@ -7,9 +11,19 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY')
     if not SECRET_KEY:
         raise ValueError("SECRET_KEY environment variable must be set")
+    if SECRET_KEY in ['CHANGE_THIS_SECRET_KEY', 'your-secret-key-here']:
+        raise ValueError("SECRET_KEY must be changed from the default placeholder value")
     
-    SQLALCHEMY_DATABASE_URI = os.environ.get(
-        'DATABASE_URL') or 'sqlite:///app/database/portfolio.db'
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
+    if not SQLALCHEMY_DATABASE_URI:
+        raise ValueError("DATABASE_URL environment variable must be set")
+    if SQLALCHEMY_DATABASE_URI in ['CHANGE_THIS_DATABASE_URL']:
+        raise ValueError("DATABASE_URL must be changed from the default placeholder value")
+    
+    # Validate FLASK_ENV
+    FLASK_ENV = os.environ.get('FLASK_ENV', 'development')
+    if FLASK_ENV == 'CHANGE_THIS_ENVIRONMENT':
+        raise ValueError("FLASK_ENV must be changed from the default placeholder value")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # Application settings
@@ -48,20 +62,23 @@ class DevelopmentConfig(Config):
     DEBUG = True
     SQLALCHEMY_ECHO = True
     SESSION_COOKIE_SECURE = False  # Allow HTTP in development
-    
-    # Allow fallback secret key only in development
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-key-please-change-in-production'
 
 
 class TestingConfig(Config):
     """Testing configuration."""
     TESTING = True
+    # Override database for testing (use in-memory SQLite)
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
     WTF_CSRF_ENABLED = False
     SESSION_COOKIE_SECURE = False  # Allow HTTP in testing
     
-    # Allow fallback secret key only in testing
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'test-key'
+    # Override parent class validation for testing
+    def __init__(self):
+        # Set required environment variables for testing if not present
+        if not os.environ.get('SECRET_KEY'):
+            os.environ['SECRET_KEY'] = 'test-secret-key-do-not-use-in-production'
+        if not os.environ.get('DATABASE_URL'):
+            os.environ['DATABASE_URL'] = 'sqlite:///:memory:'
 
 
 class ProductionConfig(Config):

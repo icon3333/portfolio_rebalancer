@@ -4,10 +4,13 @@
 
 ### Environment Variables (REQUIRED)
 ```bash
-export SECRET_KEY="your-secure-random-secret-key-here"
+# Generate a secure secret key
+export SECRET_KEY="$(python -c 'import secrets; print(secrets.token_hex(32))')"
 export DATABASE_URL="your-production-database-url"
 export FLASK_ENV="production"
 ```
+
+⚠️ **CRITICAL SECURITY**: The application will refuse to start with placeholder or default values. All environment variables must be properly configured.
 
 ### Secret Key Generation
 Generate a secure secret key:

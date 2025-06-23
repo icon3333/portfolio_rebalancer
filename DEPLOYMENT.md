@@ -17,11 +17,42 @@ python -c "import secrets; print(secrets.token_hex(32))"
 ```
 
 ### 2. Set Environment Variables
+
+#### Option A: Automatic Setup
+```bash
+# Development setup (automatic, no prompts)
+python run.py --port 8000
+
+# Or manual setup:
+# Development environment
+python setup_env.py
+
+# Production environment
+python setup_env.py --production
+
+# Interactive setup (advanced users)
+python setup_env.py --interactive
+```
+
+#### Option B: Manual Environment Setup
 ```bash
 export SECRET_KEY="your-generated-secret-key"
 export DATABASE_URL="postgresql://user:pass@localhost/portfolio_db"  # or SQLite for small deployments
 export FLASK_ENV="production"
 ```
+
+#### Option C: Use .env File (Recommended for Production)
+```bash
+# Generate a secure secret key
+SECRET_KEY="$(python -c 'import secrets; print(secrets.token_hex(32))')"
+
+# Create .env file with your production values
+echo "SECRET_KEY=$SECRET_KEY" > .env
+echo "DATABASE_URL=postgresql://user:pass@localhost/portfolio_db" >> .env
+echo "FLASK_ENV=production" >> .env
+```
+
+⚠️ **CRITICAL**: Never use placeholder values in production! The app will refuse to start with default/placeholder values.
 
 ### 3. Install Dependencies
 ```bash
@@ -38,7 +69,7 @@ gunicorn -w 4 -b 0.0.0.0:8000 run:app
 ### Option 2: Docker Deployment
 Create `Dockerfile`:
 ```dockerfile
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 COPY requirements.txt .

@@ -41,12 +41,13 @@ cd portfolio-rebalancing-flask
 # Install dependencies
 pip install -r requirements.txt
 
-# Set environment variables
-export SECRET_KEY="$(python -c 'import secrets; print(secrets.token_hex(32))')"
-
-# Run the application
+# Run the application (will automatically set up environment if needed)
 python run.py --port 5000
 ```
+
+The app will automatically detect if you need environment setup and run the interactive configuration on first launch!
+
+⚠️ **IMPORTANT**: This is now a production-ready application that requires proper environment configuration. No fallback values are used - all environment variables must be explicitly set.
 
 Visit `http://localhost:5000` to access the application.
 
@@ -87,25 +88,75 @@ Visit `http://localhost:5000` to access the application.
 
 ### Environment Variables
 
-Set these environment variables before running:
+The application uses python-dotenv to automatically load environment variables from a `.env` file.
+
+#### Option 1: Automatic Setup (Recommended)
 
 ```bash
-# Required for production
+# Just run the app - it will automatically set up environment if needed
+python run.py --port 5000
+```
+
+Or run setup manually with different options:
+```bash
+# Default setup (development, SQLite, auto-generated secret)
+python setup_env.py
+
+# Production setup (production, SQLite, auto-generated secret)
+python setup_env.py --production
+
+# Interactive setup (prompts for all options)
+python setup_env.py --interactive
+```
+
+**Default automatic setup provides:**
+- ✅ Secure auto-generated SECRET_KEY
+- ✅ SQLite database (good for development/small deployments)
+- ✅ Development environment settings
+- ✅ No user interaction required
+
+#### Option 2: Manual Setup
+
+1. Copy the example file:
+```bash
+cp .env.example .env
+```
+
+2. **IMPORTANT**: Edit `.env` and replace ALL placeholder values:
+```bash
+# REQUIRED: Generate a secure secret key (replace CHANGE_THIS_SECRET_KEY)
+SECRET_KEY="$(python -c 'import secrets; print(secrets.token_hex(32))')"
+
+# REQUIRED: Database configuration (replace CHANGE_THIS_DATABASE_URL)
+DATABASE_URL="sqlite:///app/database/portfolio.db"
+# Or for PostgreSQL: DATABASE_URL="postgresql://user:pass@localhost/portfolio_db"
+
+# REQUIRED: Flask environment (replace CHANGE_THIS_ENVIRONMENT)
+FLASK_ENV="development"  # or "production"
+```
+
+⚠️ **The app will NOT start if any placeholder values remain unchanged!**
+
+#### Option 3: Traditional Export (Not Recommended)
+
+```bash
+# Set environment variables manually (required each time)
 export SECRET_KEY="your-secure-secret-key-here"
+export DATABASE_URL="sqlite:///app/database/portfolio.db"
+export FLASK_ENV="development"
 
-# Optional - Database configuration
-export DATABASE_URL="sqlite:///app/database/portfolio.db"  # Default
-# Or for PostgreSQL: export DATABASE_URL="postgresql://user:pass@localhost/portfolio_db"
-
-# Optional - Environment
-export FLASK_ENV="development"  # or "production"
+# Run with skip flag to avoid automatic setup check
+python run.py --port 5000 --skip-setup
 ```
 
-### Generate Secure Secret Key
+### Benefits of Using .env File
 
-```bash
-python -c "import secrets; print(secrets.token_hex(32))"
-```
+- ✅ No need to set variables every time you run the app
+- ✅ Different settings for different environments
+- ✅ Automatically loaded by the application
+- ✅ Gitignored - won't accidentally commit secrets
+- ✅ Easy to share configuration templates
+- ✅ **NEW**: Automatic setup on first run!
 
 ## 🎯 Usage
 

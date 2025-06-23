@@ -2,29 +2,32 @@ from flask import Flask, render_template, request, jsonify
 import logging
 import os
 from datetime import datetime
-from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 
-def create_app(config_name='default'):
-    load_dotenv()
+def create_app(config_name=None):
     logging.basicConfig(level=logging.INFO)
     app = Flask(__name__,
                 template_folder='../templates',
                 static_folder='../static')
     logger.info("Logger initialized at INFO level")
     
-    # Configure app
-    secret_key = os.environ.get('SECRET_KEY')
-    if not secret_key:
-        secret_key = os.urandom(24)
-
-    app.config.update(
-        SECRET_KEY=secret_key,
-        SQLALCHEMY_DATABASE_URI='sqlite:///app/database/portfolio.db',
-        TEMPLATES_AUTO_RELOAD=True,
-        JSON_SORT_KEYS=False
-    )
+    # Load configuration from config.py
+    from config import config
+    
+    # Determine config name from environment or parameter
+    if config_name is None:
+        config_name = os.environ.get('FLASK_ENV', 'development')
+    
+    # Load the appropriate configuration
+    app.config.from_object(config.get(config_name, config['development']))
+    
+    # Override with additional settings for development
+    if config_name == 'development':
+        app.config.update(
+            TEMPLATES_AUTO_RELOAD=True,
+            JSON_SORT_KEYS=False
+        )
     
     # Add context processor for datetime
     @app.context_processor
