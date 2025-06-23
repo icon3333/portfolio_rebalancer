@@ -19,17 +19,17 @@ A Flask web application for tracking and analyzing investment portfolios with au
 
 ## 📋 Table of Contents
 
-- [Quick Start](#quick-start)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Usage](#usage)
-- [Deployment](#deployment)
-- [Security](#security)
-- [Development](#development)
-- [Testing](#testing)
-- [Contributing](#contributing)
-- [License](#license)
-- [Support](#support)
+- [Quick Start](#-quick-start)
+- [Installation](#-installation)
+- [Configuration](#️-configuration)
+- [Usage](#-usage)
+- [Deployment](#-deployment)
+- [Security](#-security)
+- [Development](#️-development)
+- [Testing](#-testing)
+- [Contributing](#-contributing)
+- [License](#-license)
+- [Support](#-support)
 
 ## 🚀 Quick Start
 
@@ -146,7 +146,9 @@ TSLA,25,25.0
 
 ## 🚀 Deployment
 
-### Production Deployment Options
+> **📖 Complete deployment guide**: See [DEPLOYMENT.md](DEPLOYMENT.md) for comprehensive production deployment instructions.
+
+### Quick Deployment Options
 
 #### Option 1: Gunicorn (Recommended)
 ```bash
@@ -203,6 +205,8 @@ server {
 ```
 
 ## 🔒 Security
+
+> **🔐 Complete security guide**: See [SECURITY.md](SECURITY.md) for detailed security guidelines and implementation checklist.
 
 ### Production Security Checklist
 
