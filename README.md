@@ -1,11 +1,28 @@
-# Portfolio Rebalancer 📈
+# Portfolio Rebalancer for Parqet 📈
 
-A Flask web application for tracking and analyzing investment portfolios with automated rebalancing calculations and market data integration.
+A Flask web application designed as a companion tool for [Parqet.com](https://parqet.com) users - helping with portfolio tracking, analysis, and automated rebalancing calculations with real-time market data integration.
 
 [![Python](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![Flask](https://img.shields.io/badge/flask-latest-green.svg)](https://flask.palletsprojects.com/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Security](https://img.shields.io/badge/security-production%20ready-green.svg)](#security)
+
+## 🎯 About This Project
+
+This tool was born out of **necessity** during my journey as a Parqet user. Over several months, I found myself constantly struggling with portfolio allocation decisions and rebalancing calculations. What started as a simple frustration turned into a coding adventure!
+
+### The Backstory 📖
+
+- **Problem**: Managing multiple portfolios on Parqet and calculating optimal rebalancing was becoming tedious
+- **Solution**: "How hard could it be to build a tool for this?" (famous last words 😅)
+- **Reality**: Months of learning, experimenting, and having way too much fun coding
+- **Result**: This experimental portfolio rebalancer that actually works!
+
+### Fair Warning ⚠️
+
+This is an **experimental** project, built through **vibe coding** by someone with **little formal coding knowledge** who just wanted to solve a problem and ended up falling in love with the process. It's rough around the edges, probably overengineered in some places and underengineered in others, but it gets the job done!
+
+**I'm completely open to input, suggestions, criticism, and contributions!** If you see something that could be better (which is probably everything), please don't hesitate to reach out or open an issue. Learning is the goal here! 🚀
 
 ## 🚀 Features
 
@@ -16,6 +33,7 @@ A Flask web application for tracking and analyzing investment portfolios with au
 - **Bulk Operations**: Import/export portfolios via CSV files
 - **Responsive UI**: Modern, mobile-friendly web interface
 - **Security First**: Production-ready with comprehensive security measures
+- **Parqet Integration**: Designed with Parqet workflows in mind
 
 ## 📋 Table of Contents
 
@@ -267,12 +285,35 @@ server {
 
 This project is licensed under the MIT License.
 
-## 🆘 Support
+## 🤝 Contributing & Feedback
+
+This project thrives on community input! Whether you're a seasoned developer or just getting started like I was, your perspective is valuable.
+
+### Ways to Contribute
+
+- 🐛 **Found a bug?** Open an issue - no bug is too small!
+- 💡 **Have an idea?** Share it in discussions or issues
+- 🔧 **Want to code?** Pull requests are welcome (no matter how small)
+- 📚 **Improve docs?** Documentation PRs are especially appreciated
+- 🎨 **UI/UX ideas?** The interface could definitely use some love
+- 🔍 **Code review?** Point out bad practices - I want to learn!
+
+### What I'm Looking For
+
+- Better error handling (I'm sure I missed edge cases)
+- Performance optimizations (probably doing things inefficiently)
+- Security improvements (more eyes = better security)
+- UI/UX enhancements (design is not my strong suit)
+- Code organization suggestions (refactoring ideas welcome)
+- Testing improvements (always room for more tests)
+
+## 🆘 Support & Questions
 
 ### Getting Help
 
-- **Issues**: [GitHub Issues](https://github.com/your-username/portfolio-rebalancing-flask/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-username/portfolio-rebalancing-flask/discussions)
+- **Issues**: [GitHub Issues](https://github.com/your-username/portfolio-rebalancing-flask/issues) - Don't hesitate to ask questions!
+- **Discussions**: [GitHub Discussions](https://github.com/your-username/portfolio-rebalancing-flask/discussions) - For broader conversations
+- **Direct Feedback**: Always open to direct messages about improvements
 - **Security**: Report security issues privately via email
 
 ### Common Issues
@@ -295,8 +336,19 @@ Check your internet connection and Yahoo Finance API availability.
 Verify CSV format matches the expected schema with proper headers.
 </details>
 
+### Learning Together 🎓
+
+If you're new to coding like I was when I started this, feel free to:
+- Ask questions about any part of the code
+- Suggest improvements (even if you're not sure they're right)
+- Share your own learning journey
+- Contribute documentation improvements
+
+Remember: **Every expert was once a beginner!** 
+
 ---
 
-⭐ **If you find this project helpful, please give it a star!**
+⭐ **If you find this project helpful, please give it a star!**  
+🗣️ **Even better - tell me what could be improved!**
 
-**Repository Status**: ✅ Production Ready | ✅ Security Audited | ✅ Safe for Public Release
+**Repository Status**: ✅ Experimental & Learning | ✅ Production Tested | ✅ Open to Feedback
