@@ -197,34 +197,35 @@ def _apply_company_update(cursor, company_id, data, account_id):
         is_user_edit = data.get('is_user_edit', False)  # Flag to indicate user vs system edit
         
         exists = query_db(
-            'SELECT company_id, shares, is_manually_edited FROM company_shares WHERE company_id = ?',
+            'SELECT company_id, shares, override_share, is_manually_edited FROM company_shares WHERE company_id = ?',
             [company_id], one=True)
         
         if exists:
-            if is_user_edit and 'shares' in data:
-                # User is manually editing shares - track this
+            if is_user_edit and 'override_share' in data:
+                # User is manually editing shares - store in override_share column
                 cursor.execute('''
                     UPDATE company_shares 
-                    SET shares = ?, override_share = ?, 
+                    SET override_share = ?, 
                         manual_edit_date = CURRENT_TIMESTAMP, 
                         is_manually_edited = 1,
                         csv_modified_after_edit = 0
                     WHERE company_id = ?
-                ''', [shares, override, company_id])
+                ''', [override, company_id])
             else:
-                # System update (e.g., CSV import) - preserve manual edit flags
+                # System update (e.g., CSV import) - update shares, preserve override_share if it exists
+                current_override = exists.get('override_share') if exists.get('is_manually_edited') else None
                 cursor.execute(
                     'UPDATE company_shares SET shares = ?, override_share = ? WHERE company_id = ?',
-                    [shares, override, company_id]
+                    [shares, current_override or override, company_id]
                 )
         else:
-            if is_user_edit and 'shares' in data:
-                # New entry with user edit
+            if is_user_edit and 'override_share' in data:
+                # New entry with user edit - set override_share
                 cursor.execute('''
                     INSERT INTO company_shares 
                     (company_id, shares, override_share, manual_edit_date, is_manually_edited, csv_modified_after_edit) 
                     VALUES (?, ?, ?, CURRENT_TIMESTAMP, 1, 0)
-                ''', [company_id, shares, override])
+                ''', [company_id, shares or 0, override])
             else:
                 # New entry from system
                 cursor.execute(
@@ -450,7 +451,9 @@ def get_allocate_portfolio_data():
         data = query_db('''
             SELECT p.id AS portfolio_id, p.name AS portfolio_name,
                    c.category, c.name AS company_name, c.identifier,
-                   cs.shares, mp.price_eur
+                   cs.shares, cs.override_share,
+                   COALESCE(cs.override_share, cs.shares, 0) as effective_shares,
+                   mp.price_eur
             FROM portfolios p
             LEFT JOIN companies c ON c.portfolio_id = p.id AND c.account_id = p.account_id
             LEFT JOIN company_shares cs ON c.id = cs.company_id
@@ -474,7 +477,7 @@ def get_allocate_portfolio_data():
                         category_name = row['category'] if row['category'] else 'Uncategorized'
                         cat = portfolio['categories'].setdefault(
                             category_name, {'positions': [], 'currentValue': 0})
-                        pos_value = (row['price_eur'] or 0) * (row['shares'] or 0)
+                        pos_value = (row['price_eur'] or 0) * (row['effective_shares'] or 0)
                         portfolio['currentValue'] += pos_value
                         cat['currentValue'] += pos_value
                         target_weight = position_target_weights.get(
@@ -756,8 +759,16 @@ def upload_csv():
     """Upload and process CSV data"""
     logger.info(f"CSV upload attempt - session content: {dict(session)}")
     
+    # Determine if this is an AJAX request by checking Accept header or presence of certain headers
+    # Modern fetch() requests don't set X-Requested-With, so we check if JSON is accepted
+    accept_header = request.headers.get('Accept', '')
+    is_ajax = ('application/json' in accept_header or 
+               request.headers.get('X-Requested-With') == 'XMLHttpRequest')
+
     if 'account_id' not in session:
         logger.warning("CSV upload failed - no account_id in session")
+        if is_ajax:
+            return jsonify({'success': False, 'message': 'Please select an account first'}), 401
         flash('Please select an account first', 'warning')
         return redirect(url_for('portfolio.enrich'))
 
@@ -767,6 +778,8 @@ def upload_csv():
     # Check if file was uploaded
     if 'csv_file' not in request.files:
         logger.warning("CSV upload failed - no csv_file in request.files")
+        if is_ajax:
+            return jsonify({'success': False, 'message': 'No file uploaded'}), 400
         flash('No file uploaded', 'error')
         return redirect(url_for('portfolio.enrich'))
 
@@ -776,6 +789,8 @@ def upload_csv():
     # Check if file is empty
     if file.filename == '':
         logger.warning("CSV upload failed - empty filename")
+        if is_ajax:
+            return jsonify({'success': False, 'message': 'No file selected'}), 400
         flash('No file selected', 'error')
         return redirect(url_for('portfolio.enrich'))
 
@@ -805,8 +820,12 @@ def upload_csv():
                 message_parts.append(
                     f"Removed {len(result['removed'])} positions with zero shares")
 
-            flash(
-                f"CSV data imported successfully. {' | '.join(message_parts)}", 'success')
+            success_message = f"CSV data imported successfully. {' | '.join(message_parts)}"
+            
+            if is_ajax:
+                return jsonify({'success': True, 'message': success_message})
+            else:
+                flash(success_message, 'success')
 
             # Show warnings if any
             warnings = []
@@ -853,23 +872,34 @@ def upload_csv():
                 ) and session_failed_prices else 0
                 prices_updated_count = added_count - failure_count
                 if prices_updated_count > 0:
-                    flash(
-                        f"Successfully updated prices for {prices_updated_count} out of {added_count} newly added companies", 'success')
+                    if not is_ajax:
+                        flash(
+                            f"Successfully updated prices for {prices_updated_count} out of {added_count} newly added companies", 'success')
 
-            if warnings:
+            if warnings and not is_ajax:
                 flash(' | '.join(warnings), 'warning')
 
             # Set session variable to indicate we should use "-" as the default portfolio
             session['use_default_portfolio'] = True
             
         else:
-            flash(message, 'error')
+            if is_ajax:
+                return jsonify({'success': False, 'message': message})
+            else:
+                flash(message, 'error')
 
     except Exception as e:
         logger.error(f"Error processing CSV: {str(e)}", exc_info=True)
-        flash(f'Error processing CSV: {str(e)}', 'error')
+        error_message = f'Error processing CSV: {str(e)}'
+        if is_ajax:
+            return jsonify({'success': False, 'message': error_message})
+        else:
+            flash(error_message, 'error')
 
-    return redirect(url_for('portfolio.enrich'))
+    if is_ajax:
+        return jsonify({'success': True, 'message': 'CSV uploaded successfully'})
+    else:
+        return redirect(url_for('portfolio.enrich'))
 
 
 def update_portfolio_api():
@@ -1030,12 +1060,12 @@ def update_portfolio_api():
                         if is_user_edit:
                             cursor.execute('''
                                 UPDATE company_shares
-                                SET shares = ?, override_share = ?, 
+                                SET override_share = ?, 
                                     manual_edit_date = CURRENT_TIMESTAMP, 
                                     is_manually_edited = 1,
                                     csv_modified_after_edit = 0
                                 WHERE company_id = ?
-                            ''', [shares, override_share, company_id])
+                            ''', [override_share, company_id])
                         else:
                             cursor.execute('''
                                 UPDATE company_shares
@@ -1048,7 +1078,7 @@ def update_portfolio_api():
                                 INSERT INTO company_shares 
                                 (company_id, shares, override_share, manual_edit_date, is_manually_edited, csv_modified_after_edit) 
                                 VALUES (?, ?, ?, CURRENT_TIMESTAMP, 1, 0)
-                            ''', [company_id, shares, override_share])
+                            ''', [company_id, shares or 0, override_share])
                         else:
                             cursor.execute('''
                                 INSERT INTO company_shares (company_id, shares, override_share)

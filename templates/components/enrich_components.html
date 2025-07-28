@@ -822,15 +822,17 @@
                                     <input class="input is-small" :class="{ 
                                                'shares-user-edited': item.is_manually_edited && !item.csv_modified_after_edit,
                                                'shares-csv-modified': item.is_manually_edited && item.csv_modified_after_edit
-                                           }" type="text" :value="formatNumber(item.shares)"
-                                        @blur="(e) => { item.shares = parseFloat(e.target.value) || 0; saveSharesChange(item); }"
-                                        :title="getSharesTitle(item)">
+                                           }" type="text" :value="formatNumber(item.effective_shares)" @blur="(e) => { 
+                                               const newShares = parseFloat(e.target.value) || 0; 
+                                               item.effective_shares = newShares;
+                                               saveSharesChange(item, newShares); 
+                                           }" :title="getSharesTitle(item)">
                                 </td>
                                 <td :class="{'has-text-danger': !item.price_eur}">
                                     <span v-text="item.price_eur ? formatCurrency(item.price_eur) : 'No price'"></span>
                                 </td>
                                 <td>
-                                    <span v-text="formatCurrency(item.price_eur * item.shares)"></span>
+                                    <span v-text="formatCurrency(item.price_eur * item.effective_shares)"></span>
                                 </td>
                                 <td>
                                     <span v-text="formatCurrency(item.total_invested)"></span>

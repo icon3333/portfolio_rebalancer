@@ -245,7 +245,10 @@ def get_portfolio_companies(portfolio_id):
         if not portfolio_id:
             return jsonify({'error': 'No portfolio ID provided'}), 400
         companies = query_db('''
-            SELECT c.id, c.name, c.identifier, c.category, cs.shares, mp.price_eur
+            SELECT c.id, c.name, c.identifier, c.category, 
+                   cs.shares, cs.override_share,
+                   COALESCE(cs.override_share, cs.shares, 0) as effective_shares,
+                   mp.price_eur
             FROM companies c
             LEFT JOIN company_shares cs ON c.id = cs.company_id
             LEFT JOIN market_prices mp ON c.identifier = mp.identifier
@@ -261,8 +264,10 @@ def get_portfolio_companies(portfolio_id):
                     'identifier': company['identifier'],
                     'category': company['category'],
                     'shares': company['shares'],
+                    'override_share': company['override_share'],
+                    'effective_shares': company['effective_shares'],
                     'price_eur': company['price_eur'],
-                    'value_eur': company['price_eur'] * company['shares'] if company['price_eur'] and company['shares'] else 0
+                    'value_eur': company['price_eur'] * company['effective_shares'] if company['price_eur'] and company['effective_shares'] else 0
                 })
         return jsonify(result)
     except Exception as e:

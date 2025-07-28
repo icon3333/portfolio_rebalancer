@@ -609,3 +609,30 @@ def calculate_portfolio_composition(portfolio_data):
             'holdings_by_currency': {},
             'holdings_by_type': {}
         }
+
+
+def get_effective_shares_sql():
+    """
+    Return SQL expression to calculate effective shares.
+    Uses override_share if not null, otherwise uses shares.
+    """
+    return "COALESCE(cs.override_share, cs.shares, 0)"
+
+
+def get_effective_shares_value(row):
+    """
+    Calculate effective shares from a database row.
+    Uses override_share if not null, otherwise uses shares.
+    
+    Args:
+        row: Database row dict with 'override_share' and 'shares' keys
+        
+    Returns:
+        float: Effective shares value
+    """
+    override_share = row.get('override_share')
+    shares = row.get('shares', 0)
+    
+    if override_share is not None:
+        return float(override_share)
+    return float(shares) if shares is not None else 0.0

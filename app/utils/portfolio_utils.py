@@ -58,6 +58,7 @@ def get_portfolio_data(account_id):
                     'category': row['category'],
                     'shares': float(row['shares']) if row.get('shares') is not None else 0,
                     'override_share': float(row['override_share']) if row.get('override_share') is not None else None,
+                    'effective_shares': float(row['override_share']) if row.get('override_share') is not None else (float(row['shares']) if row.get('shares') is not None else 0),
                     'manual_edit_date': row.get('manual_edit_date'),
                     'is_manually_edited': bool(row.get('is_manually_edited', False)),
                     'csv_modified_after_edit': bool(row.get('csv_modified_after_edit', False)),

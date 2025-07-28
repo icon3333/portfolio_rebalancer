@@ -501,7 +501,7 @@
                 if (portfolioMap[portfolioName]) {
                     // Calculate current value
                     const price = item.price_eur || 0;
-                    const shares = item.shares || 0;
+                    const shares = item.effective_shares || 0;
                     const currentValue = price * shares;
                     const totalInvested = item.total_invested || 0;
 
@@ -814,7 +814,7 @@
             return companies.map(company => {
                 // Calculate currentValue if not already present
                 if (typeof company.currentValue === 'undefined') {
-                    company.currentValue = (company.price_eur || 0) * (company.shares || 0);
+                    company.currentValue = (company.price_eur || 0) * (company.effective_shares || 0);
                 }
 
                 // Ensure metadata fields exist

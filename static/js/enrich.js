@@ -363,17 +363,8 @@ const FileUploadHandler = {
                 uploadCard.classList.add('is-processing');
                 console.log('Added is-processing class to upload card');
 
-                // Submit form immediately
-                console.log('Submitting CSV upload form...');
-                console.log('Form action before submit:', uploadForm.action);
-                console.log('Form method before submit:', uploadForm.method);
-
-                try {
-                    uploadForm.submit();
-                    console.log('Form submit() called successfully');
-                } catch (error) {
-                    console.error('Error during form submission:', error);
-                }
+                // Submit file via AJAX instead of form submission
+                FileUploadHandler.submitFileAjax(fileInput.files[0], uploadForm.action);
             } else {
                 fileLabel.textContent = 'No file selected';
                 console.log('No file selected');
@@ -388,6 +379,62 @@ const FileUploadHandler = {
                 uploadCard.classList.remove('is-processing');
             }
         });
+    },
+
+    async submitFileAjax(file, actionUrl) {
+        try {
+            console.log('Submitting CSV file via AJAX...');
+
+            const formData = new FormData();
+            formData.append('csv_file', file);
+
+            const response = await fetch(actionUrl, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                console.log('CSV upload successful:', result.message);
+                // Success messages will be shown via flash messages after page reload
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                console.error('CSV upload failed:', result.message);
+                ProgressManager.complete();
+                this.showErrorMessage(result.message);
+            }
+        } catch (error) {
+            console.error('Error during AJAX CSV upload:', error);
+            ProgressManager.complete();
+            this.showErrorMessage('Error uploading file. Please try again.');
+        }
+    },
+
+    showErrorMessage(message) {
+        // Create a simple error notification
+        const notification = document.createElement('div');
+        notification.className = 'notification is-danger is-light';
+        notification.innerHTML = `
+            <button class="delete" onclick="this.parentElement.remove()"></button>
+            ${message}
+        `;
+
+        // Insert at the top of the page
+        const container = document.querySelector('.container') || document.body;
+        container.insertBefore(notification, container.firstChild);
+
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.remove();
+            }
+        }, 5000);
     }
 };
 
@@ -561,8 +608,8 @@ class PortfolioTableApp {
                         filtered = [...filtered].sort((a, b) => {
                             // Handle special cases for calculated fields
                             if (this.sortColumn === 'total_value') {
-                                const aValue = (a.price_eur || 0) * (a.shares || 0);
-                                const bValue = (b.price_eur || 0) * (b.shares || 0);
+                                const aValue = (a.price_eur || 0) * (a.effective_shares || 0);
+                                const bValue = (b.price_eur || 0) * (b.effective_shares || 0);
                                 return direction * (aValue - bValue);
                             }
 
@@ -744,9 +791,9 @@ class PortfolioTableApp {
                             this.escapeCSVField(item.company || ''),
                             this.escapeCSVField(item.portfolio || ''),
                             this.escapeCSVField(item.category || ''),
-                            item.shares || 0,
+                            item.effective_shares || 0,
                             item.price_eur || 0,
-                            (item.price_eur || 0) * (item.shares || 0),
+                            (item.price_eur || 0) * (item.effective_shares || 0),
                             item.total_invested || 0,
                             this.escapeCSVField(item.last_updated || '')
                         ];
@@ -880,7 +927,7 @@ class PortfolioTableApp {
                     this.metrics = {
                         total: items.length,
                         health: items.length ? Math.round(((items.length - missingPriceItems.length) / items.length) * 100) : 100,
-                        totalValue: items.reduce((sum, item) => sum + ((item.price_eur || 0) * (item.shares || 0)), 0),
+                        totalValue: items.reduce((sum, item) => sum + ((item.price_eur || 0) * (item.effective_shares || 0)), 0),
                         lastUpdate: items.reduce((latest, item) => !latest || (item.last_updated && item.last_updated > latest) ? item.last_updated : latest, null)
                     };
                 },
@@ -894,7 +941,7 @@ class PortfolioTableApp {
                     this.metrics = {
                         total: filteredItems.length,
                         health: filteredItems.length ? Math.round(((filteredItems.length - missingPriceItems.length) / filteredItems.length) * 100) : 100,
-                        totalValue: filteredItems.reduce((sum, item) => sum + ((item.price_eur || 0) * (item.shares || 0)), 0),
+                        totalValue: filteredItems.reduce((sum, item) => sum + ((item.price_eur || 0) * (item.effective_shares || 0)), 0),
                         lastUpdate: filteredItems.reduce((latest, item) => !latest || (item.last_updated && item.last_updated > latest) ? item.last_updated : latest, null)
                     };
 
@@ -1112,7 +1159,7 @@ class PortfolioTableApp {
 
 
                 // Save shares changes to the database
-                async saveSharesChange(item) {
+                async saveSharesChange(item, newShares) {
                     if (!item || !item.id) {
                         console.error('Invalid item for shares change');
                         return;
@@ -1120,7 +1167,7 @@ class PortfolioTableApp {
 
                     try {
                         // Ensure shares is a valid number
-                        const shares = parseFloat(item.shares);
+                        const shares = parseFloat(newShares);
                         if (isNaN(shares)) {
                             if (typeof showNotification === 'function') {
                                 showNotification('Shares must be a valid number', 'is-warning');
@@ -1128,14 +1175,14 @@ class PortfolioTableApp {
                             return;
                         }
 
-                        console.log('Sending shares update request for item ID:', item.id, 'Shares:', shares);
+                        console.log('Sending shares update request for item ID:', item.id, 'Override shares:', shares);
                         const response = await fetch(`/portfolio/api/update_portfolio/${item.id}`, {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json'
                             },
                             body: JSON.stringify({
-                                shares: shares,
+                                override_share: shares,  // Store user edit in override_share column
                                 is_user_edit: true  // Flag to indicate this is a manual user edit
                             })
                         });
@@ -1155,12 +1202,14 @@ class PortfolioTableApp {
                             item.is_manually_edited = true;
                             item.manual_edit_date = new Date().toISOString();
                             item.csv_modified_after_edit = false;
+                            item.override_share = shares;
+                            item.effective_shares = shares;
 
-                            // If the response includes the updated shares value, update the item
-                            if (result.data && result.data.shares !== undefined) {
-                                // Format the shares value to ensure it's displayed correctly
-                                item.shares = result.data.shares;
-                                console.log('Updated shares value from server:', item.shares);
+                            // If the response includes updated data, use it
+                            if (result.data && result.data.override_share !== undefined) {
+                                item.override_share = result.data.override_share;
+                                item.effective_shares = result.data.override_share;
+                                console.log('Updated override_share value from server:', item.override_share);
                             }
 
                             // Update the total value display
@@ -1215,12 +1264,23 @@ class PortfolioTableApp {
 
                 // Get tooltip title for shares based on edit status
                 getSharesTitle(item) {
-                    if (item.is_manually_edited && item.csv_modified_after_edit) {
-                        return `User edited, then modified by CSV import. Last edit: ${this.formatDateAgo(item.manual_edit_date)}`;
-                    } else if (item.is_manually_edited) {
-                        return `Manually edited by user on ${this.formatDateAgo(item.manual_edit_date)}`;
+                    let tooltip = '';
+
+                    // Always show original shares value
+                    if (item.shares !== undefined && item.shares !== null) {
+                        tooltip += `Original shares: ${this.formatNumber(item.shares)}`;
                     }
-                    return 'Original shares from CSV import';
+
+                    // Add edit status information
+                    if (item.is_manually_edited && item.csv_modified_after_edit) {
+                        tooltip += `\nUser edited, then modified by CSV import. Last edit: ${this.formatDateAgo(item.manual_edit_date)}`;
+                    } else if (item.is_manually_edited) {
+                        tooltip += `\nManually edited by user on ${this.formatDateAgo(item.manual_edit_date)}`;
+                    } else {
+                        tooltip += '\nShares from CSV import';
+                    }
+
+                    return tooltip;
                 },
 
                 // Sort table by column

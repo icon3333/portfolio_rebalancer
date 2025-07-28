@@ -298,7 +298,7 @@ def process_csv_data(account_id, file_content):
 
         # Get existing user edit data to handle transactions after manual edits
         user_edit_data = query_db('''
-            SELECT cs.company_id, cs.shares, cs.manual_edit_date, cs.is_manually_edited, cs.csv_modified_after_edit, c.name
+            SELECT cs.company_id, cs.shares, cs.override_share, cs.manual_edit_date, cs.is_manually_edited, cs.csv_modified_after_edit, c.name
             FROM company_shares cs 
             JOIN companies c ON cs.company_id = c.id 
             WHERE c.account_id = ? AND cs.is_manually_edited = 1
@@ -308,7 +308,8 @@ def process_csv_data(account_id, file_content):
         for row in user_edit_data:
             user_edit_map[row['name']] = {
                 'company_id': row['company_id'],
-                'manual_shares': row['shares'],
+                'original_shares': row['shares'],  # Original CSV shares
+                'manual_shares': row['override_share'],  # User-edited shares
                 'manual_edit_date': row['manual_edit_date'],
                 'csv_modified_after_edit': row['csv_modified_after_edit']
             }
@@ -394,10 +395,11 @@ def process_csv_data(account_id, file_content):
                                     elif transaction_type in ['sell', 'transferout']:
                                         net_change -= shares
                                 
-                                # Apply the net change to user-edited shares
-                                final_shares = round(manual_shares + net_change, 6)
+                                # Apply the net change to BOTH original CSV shares and user-edited shares
+                                final_csv_shares = round(current_shares, 6)  # Update shares with new CSV calculation
+                                final_override_shares = round(manual_shares + net_change, 6)  # Update override with net change applied to user edit
                                 
-                                logger.info(f"User-edited shares for {company_name}: manual={manual_shares}, net_change_from_newer_transactions={net_change}, final={final_shares}")
+                                logger.info(f"User-edited shares for {company_name}: csv_shares={final_csv_shares}, manual={manual_shares}, net_change_from_newer_transactions={net_change}, final_override={final_override_shares}")
                                 
                                 share_row = query_db('SELECT shares FROM company_shares WHERE company_id = ?', [company_id], one=True)
                                 if share_row:
@@ -405,25 +407,26 @@ def process_csv_data(account_id, file_content):
                                         UPDATE company_shares 
                                         SET shares = ?, override_share = ?, csv_modified_after_edit = 1 
                                         WHERE company_id = ?
-                                    ''', [final_shares, existing_override, company_id])
+                                    ''', [final_csv_shares, final_override_shares, company_id])
                                 else:
                                     cursor.execute('''
                                         INSERT INTO company_shares 
                                         (company_id, shares, override_share, is_manually_edited, csv_modified_after_edit) 
                                         VALUES (?, ?, ?, 1, 1)
-                                    ''', [company_id, final_shares, existing_override])
+                                    ''', [company_id, final_csv_shares, final_override_shares])
                             else:
-                                # No newer transactions - keep user-edited shares as is
-                                logger.info(f"No newer transactions for user-edited {company_name}, keeping manual shares: {manual_shares}")
+                                # No newer transactions - update CSV shares but keep user-edited override as is
+                                final_csv_shares = round(current_shares, 6)
+                                logger.info(f"No newer transactions for user-edited {company_name}, updating CSV shares to: {final_csv_shares}, keeping override: {manual_shares}")
                                 share_row = query_db('SELECT shares FROM company_shares WHERE company_id = ?', [company_id], one=True)
                                 if share_row:
                                     cursor.execute(
                                         'UPDATE company_shares SET shares = ?, override_share = ? WHERE company_id = ?',
-                                        [manual_shares, existing_override, company_id])
+                                        [final_csv_shares, manual_shares, company_id])
                                 else:
                                     cursor.execute(
-                                        'INSERT INTO company_shares (company_id, shares, override_share) VALUES (?, ?, ?)',
-                                        [company_id, manual_shares, existing_override])
+                                        'INSERT INTO company_shares (company_id, shares, override_share, is_manually_edited) VALUES (?, ?, ?, 1)',
+                                        [company_id, final_csv_shares, manual_shares])
                         except Exception as e:
                             logger.error(f"Error parsing manual edit date for {company_name}: {e}")
                             # Fallback to normal CSV processing

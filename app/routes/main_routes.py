@@ -138,14 +138,14 @@ def index():
             portfolios = query_db('''
                 SELECT p.id, p.name, 
                        COUNT(DISTINCT c.id) as company_count,
-                       SUM(cs.shares * mp.price_eur) as total_value
+                       SUM(COALESCE(cs.override_share, cs.shares, 0) * mp.price_eur) as total_value
                 FROM portfolios p
                 LEFT JOIN companies c ON p.id = c.portfolio_id
                 LEFT JOIN company_shares cs ON c.id = cs.company_id
                 LEFT JOIN market_prices mp ON c.identifier = mp.identifier
                 WHERE p.account_id = ?
                 GROUP BY p.id, p.name
-                HAVING SUM(cs.shares * mp.price_eur) > 0
+                HAVING SUM(COALESCE(cs.override_share, cs.shares, 0) * mp.price_eur) > 0
             ''', [account_id])
 
             # Get portfolio data to calculate total value consistently with enrich page
@@ -153,13 +153,13 @@ def index():
 
             # Calculate total value the same way as in enrich page
             total_value = sum(
-                (item['price_eur'] or 0) * (item['shares'] or 0)
+                (item['price_eur'] or 0) * (item['effective_shares'] or 0)
                 for item in portfolio_data
             )
 
             # Count total assets (positions) with actual shares and prices
             total_assets = sum(1 for item in portfolio_data if (
-                item['shares'] or 0) > 0 and (item['price_eur'] or 0) > 0)
+                item['effective_shares'] or 0) > 0 and (item['price_eur'] or 0) > 0)
 
             # Calculate missing positions for each portfolio
             missing_positions_data = calculate_missing_positions(account_id, portfolios)
