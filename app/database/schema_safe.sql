@@ -32,6 +32,9 @@ CREATE TABLE IF NOT EXISTS company_shares (
  company_id INTEGER PRIMARY KEY,
  shares REAL,
  override_share REAL,
+ manual_edit_date DATETIME,
+ is_manually_edited BOOLEAN DEFAULT 0,
+ csv_modified_after_edit BOOLEAN DEFAULT 0,
  FOREIGN KEY (company_id) REFERENCES companies (id)
 );
 -- Create market_prices table

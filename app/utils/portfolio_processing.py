@@ -296,6 +296,23 @@ def process_csv_data(account_id, file_content):
         )
         override_map = {row['company_id']: row['override_share'] for row in existing_overrides if row['override_share'] is not None}
 
+        # Get existing user edit data to handle transactions after manual edits
+        user_edit_data = query_db('''
+            SELECT cs.company_id, cs.shares, cs.manual_edit_date, cs.is_manually_edited, cs.csv_modified_after_edit, c.name
+            FROM company_shares cs 
+            JOIN companies c ON cs.company_id = c.id 
+            WHERE c.account_id = ? AND cs.is_manually_edited = 1
+        ''', [account_id])
+        
+        user_edit_map = {}
+        for row in user_edit_data:
+            user_edit_map[row['name']] = {
+                'company_id': row['company_id'],
+                'manual_shares': row['shares'],
+                'manual_edit_date': row['manual_edit_date'],
+                'csv_modified_after_edit': row['csv_modified_after_edit']
+            }
+
         default_portfolio = query_db(
             'SELECT id FROM portfolios WHERE account_id = ? AND name = "-"',
             [account_id],
@@ -348,18 +365,100 @@ def process_csv_data(account_id, file_content):
                 # Preserve existing override_share if it exists
                 existing_override = override_map.get(company_id)
                 
-                share_row = query_db('SELECT shares FROM company_shares WHERE company_id = ?', [
-                                     company_id], one=True)
-                if share_row:
-                    cursor.execute(
-                        'UPDATE company_shares SET shares = ?, override_share = ? WHERE company_id = ?',
-                        [current_shares, existing_override, company_id],
-                    )
+                # Handle user-edited shares - apply CSV changes as differences
+                if company_name in user_edit_map:
+                    user_edit_info = user_edit_map[company_name]
+                    manual_edit_date = user_edit_info['manual_edit_date']
+                    manual_shares = user_edit_info['manual_shares']
+                    
+                    # Parse manual edit date for comparison
+                    if manual_edit_date:
+                        try:
+                            manual_edit_datetime = pd.to_datetime(manual_edit_date)
+                            
+                            # Find transactions after the manual edit date
+                            newer_transactions = df[
+                                (df['holdingname'] == company_name) & 
+                                (df['parsed_date'] > manual_edit_datetime)
+                            ]
+                            
+                            if not newer_transactions.empty:
+                                # Calculate net change from newer transactions
+                                net_change = 0
+                                for _, transaction in newer_transactions.iterrows():
+                                    transaction_type = transaction['type']
+                                    shares = float(transaction['shares'])
+                                    
+                                    if transaction_type in ['buy', 'transferin']:
+                                        net_change += shares
+                                    elif transaction_type in ['sell', 'transferout']:
+                                        net_change -= shares
+                                
+                                # Apply the net change to user-edited shares
+                                final_shares = round(manual_shares + net_change, 6)
+                                
+                                logger.info(f"User-edited shares for {company_name}: manual={manual_shares}, net_change_from_newer_transactions={net_change}, final={final_shares}")
+                                
+                                share_row = query_db('SELECT shares FROM company_shares WHERE company_id = ?', [company_id], one=True)
+                                if share_row:
+                                    cursor.execute('''
+                                        UPDATE company_shares 
+                                        SET shares = ?, override_share = ?, csv_modified_after_edit = 1 
+                                        WHERE company_id = ?
+                                    ''', [final_shares, existing_override, company_id])
+                                else:
+                                    cursor.execute('''
+                                        INSERT INTO company_shares 
+                                        (company_id, shares, override_share, is_manually_edited, csv_modified_after_edit) 
+                                        VALUES (?, ?, ?, 1, 1)
+                                    ''', [company_id, final_shares, existing_override])
+                            else:
+                                # No newer transactions - keep user-edited shares as is
+                                logger.info(f"No newer transactions for user-edited {company_name}, keeping manual shares: {manual_shares}")
+                                share_row = query_db('SELECT shares FROM company_shares WHERE company_id = ?', [company_id], one=True)
+                                if share_row:
+                                    cursor.execute(
+                                        'UPDATE company_shares SET shares = ?, override_share = ? WHERE company_id = ?',
+                                        [manual_shares, existing_override, company_id])
+                                else:
+                                    cursor.execute(
+                                        'INSERT INTO company_shares (company_id, shares, override_share) VALUES (?, ?, ?)',
+                                        [company_id, manual_shares, existing_override])
+                        except Exception as e:
+                            logger.error(f"Error parsing manual edit date for {company_name}: {e}")
+                            # Fallback to normal CSV processing
+                            share_row = query_db('SELECT shares FROM company_shares WHERE company_id = ?', [company_id], one=True)
+                            if share_row:
+                                cursor.execute(
+                                    'UPDATE company_shares SET shares = ?, override_share = ? WHERE company_id = ?',
+                                    [current_shares, existing_override, company_id])
+                            else:
+                                cursor.execute(
+                                    'INSERT INTO company_shares (company_id, shares, override_share) VALUES (?, ?, ?)',
+                                    [company_id, current_shares, existing_override])
+                    else:
+                        # No manual edit date - fallback to normal processing
+                        share_row = query_db('SELECT shares FROM company_shares WHERE company_id = ?', [company_id], one=True)
+                        if share_row:
+                            cursor.execute(
+                                'UPDATE company_shares SET shares = ?, override_share = ? WHERE company_id = ?',
+                                [current_shares, existing_override, company_id])
+                        else:
+                            cursor.execute(
+                                'INSERT INTO company_shares (company_id, shares, override_share) VALUES (?, ?, ?)',
+                                [company_id, current_shares, existing_override])
                 else:
-                    cursor.execute(
-                        'INSERT INTO company_shares (company_id, shares, override_share) VALUES (?, ?, ?)',
-                        [company_id, current_shares, existing_override],
-                    )
+                    # No user edit for this company - normal CSV processing
+                    share_row = query_db('SELECT shares FROM company_shares WHERE company_id = ?', [company_id], one=True)
+                    if share_row:
+                        cursor.execute(
+                            'UPDATE company_shares SET shares = ?, override_share = ? WHERE company_id = ?',
+                            [current_shares, existing_override, company_id])
+                    else:
+                        cursor.execute(
+                            'INSERT INTO company_shares (company_id, shares, override_share) VALUES (?, ?, ?)',
+                            [company_id, current_shares, existing_override])
+                
                 positions_updated.append(company_name)
             else:
                 cursor.execute(
@@ -422,6 +521,7 @@ def process_csv_data(account_id, file_content):
                 all_identifiers.add(company['identifier'])
 
         if all_identifiers:
+            update_csv_progress(80, 100, "Updating prices and metadata...", "processing")
             logger.info(
                 f"Updating prices and metadata for {len(all_identifiers)} companies")
             for identifier in all_identifiers:
@@ -449,6 +549,8 @@ def process_csv_data(account_id, file_content):
                         f"Error updating price for {identifier}: {str(e)}")
                     failed_prices.append(identifier)
 
+        update_csv_progress(100, 100, "CSV import completed successfully!", "completed")
+        
         message = "CSV data imported successfully with simple add/subtract calculation"
         if positions_removed:
             removed_details = ', '.join(positions_removed)
@@ -465,6 +567,7 @@ def process_csv_data(account_id, file_content):
 
     except Exception as e:
         logger.error(f"Error processing CSV: {str(e)}", exc_info=True)
+        update_csv_progress(0, 100, f"Error: {str(e)}", "failed")
         if db:
             db.rollback()
         return False, str(e), {}

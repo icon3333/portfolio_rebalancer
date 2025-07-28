@@ -288,6 +288,29 @@ def execute_db(query, args=()):
         logger.error(f"Args were: {args}")
         raise
 
+def migrate_database():
+    """Run database migrations"""
+    db = get_db()
+    cursor = db.cursor()
+    
+    try:
+        # Check if we need to add the new columns for tracking user-edited shares
+        try:
+            cursor.execute("SELECT manual_edit_date FROM company_shares LIMIT 1")
+        except Exception:
+            # Columns don't exist, add them
+            logger.info("Adding user-edited shares tracking columns to company_shares table")
+            cursor.execute("ALTER TABLE company_shares ADD COLUMN manual_edit_date DATETIME")
+            cursor.execute("ALTER TABLE company_shares ADD COLUMN is_manually_edited BOOLEAN DEFAULT 0")
+            cursor.execute("ALTER TABLE company_shares ADD COLUMN csv_modified_after_edit BOOLEAN DEFAULT 0")
+            db.commit()
+            logger.info("Successfully added user-edited shares tracking columns")
+    
+    except Exception as e:
+        logger.error(f"Error during database migration: {e}")
+        db.rollback()
+        raise
+
 @click.command('init-db')
 @with_appcontext
 def init_db_command():

@@ -240,6 +240,20 @@
         max-width: 90px;
     }
 
+    /* Styling for user-edited shares */
+    .shares-user-edited {
+        color: #ff7f00 !important;
+        /* Orange color for user-edited shares */
+        font-weight: 600;
+    }
+
+    /* Styling for shares modified by CSV after user edit */
+    .shares-csv-modified {
+        color: #dc3545 !important;
+        /* Red color for CSV-modified after user edit */
+        font-weight: 600;
+    }
+
     /* Modal styling improvements */
     .modal-card-head {
         background-color: var(--section-bg);
@@ -785,15 +799,14 @@
                                 </td>
                                 <td>
                                     <input class="input is-small" type="text" v-model="item.identifier"
-                                        @input="debouncedSaveIdentifierChange(item)"
-                                        @change="saveIdentifierChange(item)">
+                                        @blur="saveIdentifierChange(item)">
                                 </td>
                                 <td>
                                     <span v-text="item.company"></span>
                                 </td>
                                 <td class="input-column">
                                     <div class="select is-small">
-                                        <select v-model="item.portfolio" @change="debouncedSavePortfolioChange(item)">
+                                        <select v-model="item.portfolio" @change="savePortfolioChange(item)">
                                             <!-- Special handling for the default portfolio value '-' -->
                                             {% for portfolio in portfolios %}
                                             <option value="{{ portfolio }}">{{ portfolio }}</option>
@@ -803,12 +816,15 @@
                                 </td>
                                 <td class="input-column">
                                     <input class="input is-small" type="text" v-model="item.category"
-                                        @input="debouncedSaveCategoryChange(item)" @change="saveCategoryChange(item)">
+                                        @blur="saveCategoryChange(item)">
                                 </td>
                                 <td class="input-column">
-                                    <input class="input is-small" type="text" :value="formatNumber(item.shares)"
-                                        @input="(e) => { item.shares = parseFloat(e.target.value); debouncedSaveSharesChange(item); }"
-                                        @change="saveSharesChange(item)">
+                                    <input class="input is-small" :class="{ 
+                                               'shares-user-edited': item.is_manually_edited && !item.csv_modified_after_edit,
+                                               'shares-csv-modified': item.is_manually_edited && item.csv_modified_after_edit
+                                           }" type="text" :value="formatNumber(item.shares)"
+                                        @blur="(e) => { item.shares = parseFloat(e.target.value) || 0; saveSharesChange(item); }"
+                                        :title="getSharesTitle(item)">
                                 </td>
                                 <td :class="{'has-text-danger': !item.price_eur}">
                                     <span v-text="item.price_eur ? formatCurrency(item.price_eur) : 'No price'"></span>

@@ -48,8 +48,15 @@ def create_app(config_name=None):
     app.register_blueprint(admin_bp)
     
     # Initialize the database
-    from app.database.db_manager import init_db
+    from app.database.db_manager import init_db, migrate_database
     init_db(app)
+    
+    # Run database migrations
+    try:
+        with app.app_context():
+            migrate_database()
+    except Exception as e:
+        logger.error(f"Database migration failed: {e}")
 
     # Trigger automatic price update on startup if needed
     try:

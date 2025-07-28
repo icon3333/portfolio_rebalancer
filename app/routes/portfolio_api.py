@@ -194,19 +194,43 @@ def _apply_company_update(cursor, company_id, data, account_id):
     if 'shares' in data or 'override_share' in data:
         shares = data.get('shares')
         override = data.get('override_share')
+        is_user_edit = data.get('is_user_edit', False)  # Flag to indicate user vs system edit
+        
         exists = query_db(
-            'SELECT company_id FROM company_shares WHERE company_id = ?',
+            'SELECT company_id, shares, is_manually_edited FROM company_shares WHERE company_id = ?',
             [company_id], one=True)
+        
         if exists:
-            cursor.execute(
-                'UPDATE company_shares SET shares = ?, override_share = ? WHERE company_id = ?',
-                [shares, override, company_id]
-            )
+            if is_user_edit and 'shares' in data:
+                # User is manually editing shares - track this
+                cursor.execute('''
+                    UPDATE company_shares 
+                    SET shares = ?, override_share = ?, 
+                        manual_edit_date = CURRENT_TIMESTAMP, 
+                        is_manually_edited = 1,
+                        csv_modified_after_edit = 0
+                    WHERE company_id = ?
+                ''', [shares, override, company_id])
+            else:
+                # System update (e.g., CSV import) - preserve manual edit flags
+                cursor.execute(
+                    'UPDATE company_shares SET shares = ?, override_share = ? WHERE company_id = ?',
+                    [shares, override, company_id]
+                )
         else:
-            cursor.execute(
-                'INSERT INTO company_shares (company_id, shares, override_share) VALUES (?, ?, ?)',
-                [company_id, shares, override]
-            )
+            if is_user_edit and 'shares' in data:
+                # New entry with user edit
+                cursor.execute('''
+                    INSERT INTO company_shares 
+                    (company_id, shares, override_share, manual_edit_date, is_manually_edited, csv_modified_after_edit) 
+                    VALUES (?, ?, ?, CURRENT_TIMESTAMP, 1, 0)
+                ''', [company_id, shares, override])
+            else:
+                # New entry from system
+                cursor.execute(
+                    'INSERT INTO company_shares (company_id, shares, override_share) VALUES (?, ?, ?)',
+                    [company_id, shares, override]
+                )
 
 # API endpoint to get and save state data
 
@@ -1000,18 +1024,36 @@ def update_portfolio_api():
                 if 'shares' in item or 'override_share' in item:
                     shares = item.get('shares')
                     override_share = item.get('override_share')
+                    is_user_edit = item.get('is_user_edit', False)  # Flag to indicate user vs system edit
 
                     if company_id in shares_set:
-                        cursor.execute('''
-                            UPDATE company_shares
-                            SET shares = ?, override_share = ?
-                            WHERE company_id = ?
-                        ''', [shares, override_share, company_id])
+                        if is_user_edit:
+                            cursor.execute('''
+                                UPDATE company_shares
+                                SET shares = ?, override_share = ?, 
+                                    manual_edit_date = CURRENT_TIMESTAMP, 
+                                    is_manually_edited = 1,
+                                    csv_modified_after_edit = 0
+                                WHERE company_id = ?
+                            ''', [shares, override_share, company_id])
+                        else:
+                            cursor.execute('''
+                                UPDATE company_shares
+                                SET shares = ?, override_share = ?
+                                WHERE company_id = ?
+                            ''', [shares, override_share, company_id])
                     else:
-                        cursor.execute('''
-                            INSERT INTO company_shares (company_id, shares, override_share)
-                            VALUES (?, ?, ?)
-                        ''', [company_id, shares, override_share])
+                        if is_user_edit:
+                            cursor.execute('''
+                                INSERT INTO company_shares 
+                                (company_id, shares, override_share, manual_edit_date, is_manually_edited, csv_modified_after_edit) 
+                                VALUES (?, ?, ?, CURRENT_TIMESTAMP, 1, 0)
+                            ''', [company_id, shares, override_share])
+                        else:
+                            cursor.execute('''
+                                INSERT INTO company_shares (company_id, shares, override_share)
+                                VALUES (?, ?, ?)
+                            ''', [company_id, shares, override_share])
                         shares_set.add(company_id)
 
                 updated_count += 1

@@ -1016,9 +1016,7 @@ class PortfolioTableApp {
                     }
                 },
 
-                debouncedSavePortfolioChange: _.debounce(function (item) {
-                    this.savePortfolioChange(item);
-                }, 500),
+
 
                 // Save identifier changes to the database
                 async saveIdentifierChange(item) {
@@ -1066,11 +1064,6 @@ class PortfolioTableApp {
                     }
                 },
 
-                // Debounced version of saveIdentifierChange for input events
-                debouncedSaveIdentifierChange: _.debounce(function (item) {
-                    this.saveIdentifierChange(item);
-                }, 500),
-
                 async saveCategoryChange(item) {
                     console.log('saveCategoryChange called with item:', item);
                     if (!item || !item.id) {
@@ -1116,10 +1109,7 @@ class PortfolioTableApp {
                     }
                 },
 
-                // Debounced version of saveCategoryChange for input events
-                debouncedSaveCategoryChange: _.debounce(function (item) {
-                    this.saveCategoryChange(item);
-                }, 500),
+
 
                 // Save shares changes to the database
                 async saveSharesChange(item) {
@@ -1145,7 +1135,8 @@ class PortfolioTableApp {
                                 'Content-Type': 'application/json'
                             },
                             body: JSON.stringify({
-                                shares: shares
+                                shares: shares,
+                                is_user_edit: true  // Flag to indicate this is a manual user edit
                             })
                         });
 
@@ -1159,6 +1150,11 @@ class PortfolioTableApp {
                             } else {
                                 console.log('Shares updated successfully');
                             }
+
+                            // Update the item to reflect manual edit status
+                            item.is_manually_edited = true;
+                            item.manual_edit_date = new Date().toISOString();
+                            item.csv_modified_after_edit = false;
 
                             // If the response includes the updated shares value, update the item
                             if (result.data && result.data.shares !== undefined) {
@@ -1185,10 +1181,7 @@ class PortfolioTableApp {
                     }
                 },
 
-                // Debounced version of saveSharesChange for input events
-                debouncedSaveSharesChange: _.debounce(function (item) {
-                    this.saveSharesChange(item);
-                }, 500),
+
 
                 formatCurrency(value) {
                     if (!value) return '€0.00';
@@ -1218,6 +1211,16 @@ class PortfolioTableApp {
                     if (percentage >= 100) return 'health-green';
                     if (percentage >= 70) return 'health-orange';
                     return 'health-red';
+                },
+
+                // Get tooltip title for shares based on edit status
+                getSharesTitle(item) {
+                    if (item.is_manually_edited && item.csv_modified_after_edit) {
+                        return `User edited, then modified by CSV import. Last edit: ${this.formatDateAgo(item.manual_edit_date)}`;
+                    } else if (item.is_manually_edited) {
+                        return `Manually edited by user on ${this.formatDateAgo(item.manual_edit_date)}`;
+                    }
+                    return 'Original shares from CSV import';
                 },
 
                 // Sort table by column
