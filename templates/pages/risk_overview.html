@@ -851,7 +851,7 @@
 
                 // Sum up values
                 companyMap[name].currentValue += company.currentValue || 0;
-                companyMap[name].shares += company.shares || 0;
+                companyMap[name].shares += company.effective_shares || 0;
                 companyMap[name].totalInvested += company.totalInvested || 0;
             });
 

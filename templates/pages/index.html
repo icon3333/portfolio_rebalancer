@@ -766,7 +766,7 @@
         function getViolationsForType(type, maxPercentage, portfolioData) {
             if (!portfolioData || portfolioData.length === 0) return [];
 
-            const totalValue = portfolioData.reduce((sum, item) => sum + ((item.price_eur || 0) * (item.shares || 0)), 0);
+            const totalValue = portfolioData.reduce((sum, item) => sum + ((item.price_eur || 0) * (item.effective_shares || 0)), 0);
             if (totalValue === 0) return [];
 
             const violations = [];
@@ -787,7 +787,7 @@
                 const categoryAllocations = {};
                 portfolioData.forEach(item => {
                     const category = item.category || 'Unknown';
-                    const value = (item.price_eur || 0) * (item.shares || 0);
+                    const value = (item.price_eur || 0) * (item.effective_shares || 0);
                     categoryAllocations[category] = (categoryAllocations[category] || 0) + value;
                 });
                 Object.entries(categoryAllocations).forEach(([category, value]) => {
@@ -804,7 +804,7 @@
                 const countryAllocations = {};
                 portfolioData.forEach(item => {
                     const country = item.country || 'Unknown';
-                    const value = (item.price_eur || 0) * (item.shares || 0);
+                    const value = (item.price_eur || 0) * (item.effective_shares || 0);
                     countryAllocations[country] = (countryAllocations[country] || 0) + value;
                 });
                 Object.entries(countryAllocations).forEach(([country, value]) => {
@@ -836,7 +836,7 @@
                         country: item.country || 'Unknown'
                     };
                 }
-                companyMap[name].currentValue += (item.price_eur || 0) * (item.shares || 0);
+                companyMap[name].currentValue += (item.price_eur || 0) * (item.effective_shares || 0);
             });
 
             return Object.values(companyMap).sort((a, b) => b.currentValue - a.currentValue);
@@ -943,7 +943,7 @@
         function calculateAllocationViolations(portfolioData) {
             if (!portfolioData || portfolioData.length === 0) return [];
 
-            const totalValue = portfolioData.reduce((sum, item) => sum + ((item.price_eur || 0) * (item.shares || 0)), 0);
+            const totalValue = portfolioData.reduce((sum, item) => sum + ((item.price_eur || 0) * (item.effective_shares || 0)), 0);
             if (totalValue === 0) return [];
 
             let violations = [];
@@ -969,7 +969,7 @@
                 const categoryAllocations = {};
                 portfolioData.forEach(item => {
                     const category = item.category || 'Unknown';
-                    const value = (item.price_eur || 0) * (item.shares || 0);
+                    const value = (item.price_eur || 0) * (item.effective_shares || 0);
                     categoryAllocations[category] = (categoryAllocations[category] || 0) + value;
                 });
 
@@ -991,7 +991,7 @@
                 const countryAllocations = {};
                 portfolioData.forEach(item => {
                     const country = item.country || 'Unknown';
-                    const value = (item.price_eur || 0) * (item.shares || 0);
+                    const value = (item.price_eur || 0) * (item.effective_shares || 0);
                     countryAllocations[country] = (countryAllocations[country] || 0) + value;
                 });
 

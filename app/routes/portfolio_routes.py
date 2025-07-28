@@ -91,7 +91,7 @@ def enrich():
     last_updates = [item['last_updated']
                     for item in portfolio_data if item['last_updated'] is not None]
     total_value = sum(
-        (item['price_eur'] or 0) * (item['shares'] or 0)
+        (item['price_eur'] or 0) * (item['effective_shares'] or 0)
         for item in portfolio_data
     )
     missing_prices = sum(1 for item in portfolio_data if not item['price_eur'])
