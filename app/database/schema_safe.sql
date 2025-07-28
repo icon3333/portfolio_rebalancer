@@ -55,6 +55,18 @@ CREATE TABLE IF NOT EXISTS expanded_state (
  FOREIGN KEY (account_id) REFERENCES accounts (id),
  UNIQUE (account_id, page_name, variable_name)
 );
+-- Create identifier_mappings table
+CREATE TABLE IF NOT EXISTS identifier_mappings (
+ id INTEGER PRIMARY KEY,
+ account_id INTEGER NOT NULL,
+ csv_identifier TEXT NOT NULL,
+ preferred_identifier TEXT NOT NULL,
+ company_name TEXT,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ FOREIGN KEY (account_id) REFERENCES accounts (id),
+ UNIQUE (account_id, csv_identifier)
+);
 -- Create background_jobs table
 CREATE TABLE IF NOT EXISTS background_jobs (
  id TEXT PRIMARY KEY,
@@ -74,6 +86,10 @@ CREATE INDEX IF NOT EXISTS idx_market_prices_identifier ON market_prices(identif
 CREATE INDEX IF NOT EXISTS idx_state_lookup ON expanded_state(account_id, page_name, variable_name);
 CREATE INDEX IF NOT EXISTS idx_state_type ON expanded_state(variable_type);
 CREATE INDEX IF NOT EXISTS idx_state_updated ON expanded_state(last_updated);
+-- Create indexes for identifier_mappings
+CREATE INDEX IF NOT EXISTS idx_identifier_mappings_account ON identifier_mappings(account_id);
+CREATE INDEX IF NOT EXISTS idx_identifier_mappings_csv_id ON identifier_mappings(csv_identifier);
+CREATE INDEX IF NOT EXISTS idx_identifier_mappings_preferred ON identifier_mappings(preferred_identifier);
 -- Indexes for portfolio data query performance
 CREATE INDEX IF NOT EXISTS idx_companies_account_id ON companies(account_id);
 CREATE INDEX IF NOT EXISTS idx_company_shares_company_id ON company_shares(company_id);
@@ -88,6 +104,14 @@ CREATE TRIGGER IF NOT EXISTS update_state_timestamp
 AFTER UPDATE ON expanded_state
 BEGIN
  UPDATE expanded_state SET last_updated = CURRENT_TIMESTAMP
+ WHERE id = NEW.id;
+END;
+
+-- Create trigger for identifier_mappings (only if it doesn't exist)
+CREATE TRIGGER IF NOT EXISTS update_identifier_mappings_timestamp
+AFTER UPDATE ON identifier_mappings
+BEGIN
+ UPDATE identifier_mappings SET updated_at = CURRENT_TIMESTAMP
  WHERE id = NEW.id;
 END;
 

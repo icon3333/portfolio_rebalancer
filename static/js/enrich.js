@@ -3,12 +3,218 @@
  * Handles file uploads, portfolio management, and data visualization
  */
 
+// Centralized Progress Manager - handles all progress tracking
+const ProgressManager = {
+    elements: {
+        progressElement: null,
+        progressPercentage: null,
+        progressBar: null,
+        uploadPercentage: null // Added for CSV upload percentage
+    },
+
+    currentJob: {
+        type: null, // 'csv_upload', 'price_fetch'
+        interval: null,
+        startTime: null
+    },
+
+    init() {
+        // Initialize elements based on job type
+        this.elements.priceProgressElement = document.getElementById('price-fetch-progress');
+        this.elements.priceProgressPercentage = document.getElementById('progress-percentage');
+        this.elements.priceProgressBar = document.getElementById('progress-bar');
+
+        this.elements.csvUploadIndicator = document.getElementById('csv-upload-indicator');
+        this.elements.uploadPercentage = document.getElementById('upload-percentage'); // Get the percentage element
+
+        if (!this.elements.priceProgressElement && !this.elements.csvUploadIndicator) {
+            console.warn('No progress or indicator elements found - some features may be disabled');
+            return false;
+        }
+
+        this.hide();
+        return true;
+    },
+
+    show(jobType = 'price_fetch') {
+        this.currentJob.type = jobType;
+        this.currentJob.startTime = Date.now();
+
+        console.log(`ProgressManager: Showing progress for ${jobType}`);
+
+        if (jobType === 'csv_upload' && this.elements.csvUploadIndicator) {
+            console.log('ProgressManager: Displaying CSV upload indicator');
+            this.elements.csvUploadIndicator.style.display = 'block';
+        } else if (jobType === 'price_fetch' && this.elements.priceProgressElement) {
+            console.log('ProgressManager: Displaying price fetch progress element');
+            this.elements.priceProgressElement.style.display = 'block';
+            this.elements.priceProgressElement.dataset.processing = 'true';
+        }
+
+        this.setProgress(0, 'Initializing...');
+    },
+
+    hide() {
+        if (this.elements.csvUploadIndicator) {
+            this.elements.csvUploadIndicator.style.display = 'none';
+        }
+        if (this.elements.priceProgressElement) {
+            this.elements.priceProgressElement.style.display = 'none';
+            delete this.elements.priceProgressElement.dataset.processing;
+        }
+        this.stopTracking();
+    },
+
+    setProgress(percentage, message = null) {
+        const jobType = this.currentJob.type;
+
+        console.log(`ProgressManager: Setting progress ${percentage}% for ${jobType}${message ? ` - ${message}` : ''}`);
+
+        if (jobType === 'csv_upload') {
+            // Updated to handle percentage display
+            if (this.elements.uploadPercentage) {
+                this.elements.uploadPercentage.textContent = `${Math.round(percentage)}%`;
+            }
+            return;
+        } else if (jobType === 'price_fetch') {
+            if (this.elements.priceProgressPercentage) {
+                this.elements.priceProgressPercentage.textContent = `${Math.round(percentage)}%`;
+            }
+            if (this.elements.priceProgressBar) {
+                this.elements.priceProgressBar.value = percentage;
+            }
+        }
+    },
+
+    startTracking(jobType = 'price_fetch', checkInterval = 500) {
+        this.stopTracking(); // Clear any existing interval
+        this.show(jobType);
+
+        if (jobType === 'csv_upload') {
+            // Start polling for CSV upload progress
+            this.startCsvUploadProgress(checkInterval);
+        } else if (jobType === 'price_fetch') {
+            this.startPriceFetchProgress(checkInterval);
+        }
+    },
+
+    stopTracking() {
+        if (this.currentJob.interval) {
+            clearInterval(this.currentJob.interval);
+            this.currentJob.interval = null;
+        }
+        this.currentJob.type = null;
+        this.currentJob.startTime = null;
+    },
+
+    startPriceFetchProgress(checkInterval = 500) {
+        this.currentJob.interval = setInterval(() => {
+            this.checkPriceFetchProgress();
+        }, checkInterval);
+
+        // Run once immediately
+        this.checkPriceFetchProgress();
+    },
+
+    startCsvUploadProgress(checkInterval = 500) {
+        this.currentJob.interval = setInterval(() => {
+            this.checkCsvProgress();
+        }, checkInterval);
+
+        // Run once immediately
+        this.checkCsvProgress();
+    },
+
+    async checkPriceFetchProgress() {
+        try {
+            const response = await fetch('/portfolio/api/price_fetch_progress');
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log("Price fetch progress:", data);
+
+            const percentage = data.percentage || 0;
+            this.setProgress(percentage);
+
+            // Check completion
+            if (data.status === 'completed' || data.status === 'idle' || percentage >= 100) {
+                this.complete();
+            }
+        } catch (error) {
+            console.error('Error checking price fetch progress:', error);
+            this.setProgress(0);
+        }
+    },
+
+    async checkCsvProgress() {
+        try {
+            const response = await fetch('/portfolio/api/csv_upload_progress');
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log("CSV upload progress:", data);
+
+            const percentage = data.percentage || 0;
+            const message = data.message || 'Processing...';
+            this.setProgress(percentage, message);
+
+            // Check completion
+            if (data.status === 'completed' || data.status === 'failed') {
+                if (data.status === 'completed') {
+                    this.setProgress(100, 'Upload completed successfully!');
+                } else {
+                    this.setProgress(0, 'Upload failed');
+                }
+
+                // Ensure minimum display time before hiding
+                const timeRemaining = this.currentJob.minimumDisplayTime ?
+                    Math.max(0, this.currentJob.minimumDisplayTime - Date.now()) : 1500;
+
+                setTimeout(() => {
+                    this.complete();
+                    // Clear the progress from session after completion
+                    fetch('/portfolio/api/csv_upload_progress', { method: 'DELETE' }).catch(() => { });
+
+                    // Reload the page to show updated data
+                    if (data.status === 'completed') {
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1000);
+                    }
+                }, Math.max(timeRemaining, 1500));
+            }
+        } catch (error) {
+            console.error('Error checking CSV upload progress:', error);
+            this.setProgress(0, 'Error checking progress');
+        }
+    },
+
+    complete(finalPercentage = 100) {
+        this.setProgress(finalPercentage);
+
+        // Show completion briefly before hiding
+        setTimeout(() => {
+            this.hide();
+        }, 1000);
+    },
+
+    error(message = 'Operation failed') {
+        console.error('Progress error:', message);
+        this.elements.progressPercentage.textContent = 'Error';
+        setTimeout(() => {
+            this.hide();
+        }, 2000);
+    }
+};
+
 // DOM Elements and Utility Functions
 const UpdateAllDataHandler = {
     async run() {
         const updateAllDataBtn = document.getElementById('update-all-data-btn');
-        const progressElement = document.getElementById('price-fetch-progress');
-        const progressPercentage = document.getElementById('progress-percentage');
 
         if (!updateAllDataBtn) {
             console.error('Update all data button not found');
@@ -20,22 +226,8 @@ const UpdateAllDataHandler = {
             updateAllDataBtn.disabled = true;
             updateAllDataBtn.classList.add('is-loading');
 
-            // Show the progress indicator
-            progressPercentage.textContent = '0%';
-            progressElement.style.display = 'block';
-            progressElement.dataset.processing = 'true';
-
-            // Start progress tracking
-            if (PriceProgressTracker.progressInterval) {
-                clearInterval(PriceProgressTracker.progressInterval);
-            }
-
-            PriceProgressTracker.progressInterval = setInterval(() => {
-                PriceProgressTracker.checkProgress(
-                    progressElement,
-                    progressPercentage
-                );
-            }, 500);
+            // Start progress tracking for price fetch
+            ProgressManager.startTracking('price_fetch');
 
             // Make the API call
             const response = await fetch('/portfolio/api/update_all_prices', {
@@ -60,9 +252,6 @@ const UpdateAllDataHandler = {
                     const jobId = result.job_id;
                     console.log('Job ID:', jobId);
 
-                    // Update the progress display immediately from the total_companies info
-                    progressPercentage.textContent = '0%';
-
                     // Poll for job status
                     const statusInterval = setInterval(async () => {
                         try {
@@ -75,109 +264,47 @@ const UpdateAllDataHandler = {
 
                                 // Update progress display if available
                                 if (statusResult.progress) {
-                                    progressPercentage.textContent = `${statusResult.progress.percentage}%`;
-
-                                    // Update progress bar
-                                    const progressBar = document.getElementById('progress-bar');
-                                    if (progressBar) {
-                                        progressBar.value = statusResult.progress.percentage;
-                                    }
+                                    ProgressManager.setProgress(statusResult.progress.percentage);
                                 }
 
                                 // If job is completed, stop polling and reload data
                                 if (statusResult.status === 'completed' || statusResult.is_complete) {
                                     clearInterval(statusInterval);
-
-                                    // Also clear the PriceProgressTracker interval to ensure it stops completely
-                                    if (PriceProgressTracker.progressInterval) {
-                                        clearInterval(PriceProgressTracker.progressInterval);
-                                        PriceProgressTracker.progressInterval = null;
-                                    }
+                                    ProgressManager.complete();
 
                                     // Show completion notification
                                     if (typeof showNotification === 'function') {
                                         showNotification(`Price update complete! Updated all companies successfully.`, 'is-success');
                                     }
 
-                                    // Reset the button state
-                                    updateAllDataBtn.disabled = false;
-                                    updateAllDataBtn.classList.remove('is-loading');
-
-                                    // Hide progress after a short delay
-                                    setTimeout(() => {
-                                        progressElement.style.display = 'none';
-                                        delete progressElement.dataset.processing;
-                                    }, 3000);
-
-                                    // Reload portfolio data to show updated prices
-                                    if (window.portfolioTableApp && window.portfolioTableApp.app && typeof window.portfolioTableApp.app.loadData === 'function') {
-                                        window.portfolioTableApp.app.loadData();
+                                    // Reload the data
+                                    if (window.portfolioTableApp && typeof window.portfolioTableApp.loadData === 'function') {
+                                        await window.portfolioTableApp.loadData();
+                                        console.log('Portfolio data reloaded after price update completion');
+                                    } else {
+                                        console.warn('portfolioTableApp.loadData is not available, reloading page instead');
+                                        window.location.reload();
                                     }
                                 }
                             } else {
                                 // Fall back to checking the progress endpoint if the status endpoint fails
                                 console.log("Falling back to progress endpoint check");
-                                const progressResponse = await fetch('/portfolio/api/price_fetch_progress');
-
-                                if (progressResponse.ok) {
-                                    const progressData = await progressResponse.json();
-                                    console.log('Progress data:', progressData);
-
-                                    // Update the progress display
-                                    progressPercentage.textContent = `${progressData.percentage}%`;
-
-                                    // If completed, stop polling
-                                    if (progressData.status === 'completed' || progressData.is_complete) {
-                                        clearInterval(statusInterval);
-
-                                        // Reset UI and reload data
-                                        updateAllDataBtn.disabled = false;
-                                        updateAllDataBtn.classList.remove('is-loading');
-
-                                        setTimeout(() => {
-                                            progressElement.style.display = 'none';
-                                            delete progressElement.dataset.processing;
-                                        }, 3000);
-
-                                        // Reload portfolio data
-                                        if (window.portfolioTableApp && window.portfolioTableApp.app && typeof window.portfolioTableApp.app.loadData === 'function') {
-                                            window.portfolioTableApp.app.loadData();
-                                        }
-                                    }
-                                }
+                                // ProgressManager will handle this automatically
                             }
-                        } catch (statusError) {
-                            console.error('Error checking job status:', statusError);
+                        } catch (error) {
+                            console.error('Error checking job status:', error);
+                            clearInterval(statusInterval);
+                            ProgressManager.error();
                         }
-                    }, 2000);
-
-                    // Stop polling after 5 minutes (300000ms) to prevent infinite polling
-                    setTimeout(() => {
-                        clearInterval(statusInterval);
-
-                        // Also clear the PriceProgressTracker interval
-                        if (PriceProgressTracker.progressInterval) {
-                            clearInterval(PriceProgressTracker.progressInterval);
-                            PriceProgressTracker.progressInterval = null;
-                        }
-
-                        // Reset UI after timeout
-                        updateAllDataBtn.disabled = false;
-                        updateAllDataBtn.classList.remove('is-loading');
-                        progressElement.style.display = 'none';
-                        delete progressElement.dataset.processing;
-                    }, 300000);
+                    }, 1000);
                 }
             } else {
-                // Show error notification
-                if (typeof showNotification === 'function') {
-                    showNotification(result.error || 'Failed to update prices', 'is-danger');
-                } else {
-                    console.error('Error:', result.error || 'Failed to update prices');
-                }
+                ProgressManager.error();
+                throw new Error(result.message || 'Failed to start price update');
             }
         } catch (error) {
             console.error('Error updating all prices:', error);
+            ProgressManager.error();
             if (typeof showNotification === 'function') {
                 showNotification('An error occurred while updating prices', 'is-danger');
             }
@@ -193,157 +320,74 @@ const FileUploadHandler = {
     init() {
         const fileInput = document.querySelector('.file-input');
         const fileLabel = document.querySelector('.file-name');
-        const progressElement = document.getElementById('price-fetch-progress');
-        const progressPercentage = document.getElementById('progress-percentage');
         const uploadForm = document.querySelector('form[action*="upload"]');
+        const uploadCard = document.getElementById('upload-card');
 
-        if (!fileInput || !fileLabel) {
+        console.log('FileUploadHandler: Debugging elements found:');
+        console.log('  fileInput:', fileInput);
+        console.log('  fileLabel:', fileLabel);
+        console.log('  uploadForm:', uploadForm);
+        console.log('  uploadCard:', uploadCard);
+
+        if (!fileInput || !fileLabel || !uploadForm || !uploadCard) {
             console.error('Required file upload elements not found');
+            console.error('Missing elements:', {
+                fileInput: !fileInput,
+                fileLabel: !fileLabel,
+                uploadForm: !uploadForm,
+                uploadCard: !uploadCard
+            });
             return;
         }
 
-        // Initialize progress display
-        progressPercentage.textContent = '0%';
-        progressElement.style.display = 'none';
+        console.log('FileUploadHandler: Initializing CSV upload handler');
+        console.log('Upload form action:', uploadForm.action);
+        console.log('Upload form method:', uploadForm.method);
 
         // File selection handler
         fileInput.addEventListener('change', function () {
+            console.log('File input change event triggered');
+            console.log('Files length:', fileInput.files.length);
+
             if (fileInput.files.length > 0) {
-                fileLabel.textContent = fileInput.files[0].name;
+                const fileName = fileInput.files[0].name;
+                const fileSize = fileInput.files[0].size;
+                fileLabel.textContent = fileName;
+                console.log(`File selected: ${fileName}, size: ${fileSize} bytes`);
 
-                // Show the progress indicator immediately
-                progressPercentage.textContent = '0%';
-                progressElement.style.display = 'block';
-                progressElement.dataset.processing = 'true';
+                // Show loading indicator and start tracking
+                console.log('Starting progress tracking for csv_upload');
+                ProgressManager.startTracking('csv_upload');
 
-                // Start progress tracking
-                if (PriceProgressTracker.progressInterval) {
-                    clearInterval(PriceProgressTracker.progressInterval);
-                }
+                // Add a class to the card to indicate processing
+                uploadCard.classList.add('is-processing');
+                console.log('Added is-processing class to upload card');
 
-                PriceProgressTracker.progressInterval = setInterval(() => {
-                    PriceProgressTracker.checkProgress(
-                        progressElement,
-                        progressPercentage
-                    );
-                }, 500);
+                // Submit form immediately
+                console.log('Submitting CSV upload form...');
+                console.log('Form action before submit:', uploadForm.action);
+                console.log('Form method before submit:', uploadForm.method);
 
-                // Run once immediately
-                PriceProgressTracker.checkProgress(
-                    progressElement,
-                    progressPercentage
-                );
-
-                // Automatically submit the form
-                if (uploadForm) {
+                try {
                     uploadForm.submit();
+                    console.log('Form submit() called successfully');
+                } catch (error) {
+                    console.error('Error during form submission:', error);
                 }
             } else {
                 fileLabel.textContent = 'No file selected';
+                console.log('No file selected');
             }
         });
 
-        // Form submission handler
-        if (uploadForm) {
-            uploadForm.addEventListener('submit', function () {
-                console.log("Form submitted, starting progress tracking");
-
-                // Reset progress indicators
-                progressPercentage.textContent = '0%';
-
-                // Show the progress indicator immediately when the form is submitted
-                progressElement.style.display = 'block';
-                progressElement.dataset.processing = 'true';
-
-                // Clear any existing interval and start a new one - use PriceProgressTracker consistently
-                if (PriceProgressTracker.progressInterval) {
-                    clearInterval(PriceProgressTracker.progressInterval);
-                }
-
-                // Create a new interval with more frequent updates during processing
-                PriceProgressTracker.progressInterval = setInterval(() => {
-                    PriceProgressTracker.checkProgress(
-                        progressElement,
-                        progressPercentage
-                    );
-                }, 500);
-
-                // Also run once immediately
-                PriceProgressTracker.checkProgress(
-                    progressElement,
-                    progressPercentage
-                );
-            });
-        }
-    }
-};
-
-const PriceProgressTracker = {
-    progressInterval: null,
-
-    checkProgress(progressElement, progressPercentage) {
-        fetch('/portfolio/api/price_fetch_progress')
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log("Progress data:", data);
-
-                // Use percentage directly from the server
-                const percentage = data.percentage || 0;
-                progressPercentage.textContent = percentage + '%';
-
-                // Update progress bar
-                const progressBar = document.getElementById('progress-bar');
-                if (progressBar) {
-                    // Update the value attribute instead of the width style
-                    progressBar.value = percentage;
-                }
-
-                // Only show the progress indicator if there's actual progress happening
-                // or if we're in processing mode (set by form submission)
-                if (data.total > 0 || progressElement.dataset.processing === 'true') {
-                    progressElement.style.display = 'block';
-
-                    // If we're done, hide after a delay and refresh the portfolio table
-                    if (data.current >= data.total && data.total > 0) {
-                        console.log("Process complete, refreshing data and hiding indicator");
-                        clearInterval(this.progressInterval);
-                        this.progressInterval = null;
-
-                        // Refresh the portfolio table data if available
-                        if (window.portfolioTableApp && window.portfolioTableApp.app && typeof window.portfolioTableApp.app.loadData === 'function') {
-                            window.portfolioTableApp.app.loadData().then(() => {
-                                console.log("Portfolio data refreshed after update");
-                            });
-                        }
-
-                        // Reset button state
-                        const updateAllDataBtn = document.getElementById('update-all-data-btn');
-                        if (updateAllDataBtn) {
-                            updateAllDataBtn.disabled = false;
-                            updateAllDataBtn.classList.remove('is-loading');
-                        }
-
-                        setTimeout(() => {
-                            progressElement.style.display = 'none';
-                            // Clear processing flag
-                            delete progressElement.dataset.processing;
-                        }, 3000);
-                    }
-                } else {
-                    // Check if we should keep showing while processing
-                    if (!progressElement.dataset.processing) {
-                        progressElement.style.display = 'none';
-                    }
-                }
-            })
-            .catch(error => {
-                console.error('Error checking price fetch progress:', error);
-            });
+        // Hide indicator on page load in case of back navigation
+        window.addEventListener('pageshow', function (event) {
+            // If the page is reloaded from cache, hide the indicator
+            if (event.persisted) {
+                ProgressManager.hide();
+                uploadCard.classList.remove('is-processing');
+            }
+        });
     }
 };
 
@@ -1449,6 +1493,11 @@ const ModalPortfolioManager = {
 
 // Main initialization function
 document.addEventListener('DOMContentLoaded', function () {
+    // Initialize the centralized progress manager first
+    if (!ProgressManager.init()) {
+        console.warn('ProgressManager initialization failed - some features may not work');
+    }
+
     // Initialize components that are outside of the Vue controlled area first
     FileUploadHandler.init();
     PortfolioManager.init();

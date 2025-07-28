@@ -61,24 +61,29 @@ def _apply_company_update(cursor, company_id, data, account_id):
         else:
             portfolio_id = default_portfolio['id'] if isinstance(default_portfolio, dict) else None
 
-    # Check if identifier is being changed to trigger price update
+    # Check if identifier is being changed to trigger price update and mapping storage
     identifier_changed = False
     new_identifier = None
+    current_company_data = None
+    
     if 'identifier' in data:
         new_identifier = data.get('identifier', '').strip()
         if new_identifier:  # Only if not empty
-            # Get current identifier to check if it's changing
-            current_company = query_db(
-                'SELECT identifier FROM companies WHERE id = ? AND account_id = ?',
+            # Get current company data including name for mapping
+            current_company_data = query_db(
+                'SELECT identifier, name FROM companies WHERE id = ? AND account_id = ?',
                 [company_id, account_id], one=True
             )
-            if current_company:
-                if isinstance(current_company, dict):
-                    current_identifier = current_company.get('identifier')
+            if current_company_data:
+                if isinstance(current_company_data, dict):
+                    current_identifier = current_company_data.get('identifier')
+                    current_company_name = current_company_data.get('name')
                 else:
                     current_identifier = None
+                    current_company_name = None
             else:
                 current_identifier = None
+                current_company_name = None
             identifier_changed = (new_identifier != current_identifier)
 
     # Build the SET clause dynamically based on what data is provided
@@ -105,9 +110,44 @@ def _apply_company_update(cursor, company_id, data, account_id):
         set_clause = ', '.join(set_clause_parts)
         cursor.execute(f'UPDATE companies SET {set_clause} WHERE id = ?', params)
 
-    # If identifier was changed, fetch and update price from yfinance
-    if identifier_changed and new_identifier:
-        logger.info(f"Identifier changed for company {company_id} to '{new_identifier}', fetching price...")
+    # If identifier was changed, store mapping and fetch price
+    if identifier_changed and new_identifier and current_company_data:
+        current_identifier = current_company_data.get('identifier') if isinstance(current_company_data, dict) else None
+        current_company_name = current_company_data.get('name') if isinstance(current_company_data, dict) else None
+        
+        logger.info(f"Identifier changed for company {company_id} to '{new_identifier}', storing mapping and fetching price...")
+        
+        # NEW: Try to detect and store identifier mapping
+        if current_identifier and current_company_name:
+            from ..utils.identifier_mapping import store_identifier_mapping
+            from ..utils.identifier_normalization import normalize_identifier
+            
+            # Try to reverse-engineer what the original CSV identifier might have been
+            # This is a best-effort approach for creating mappings
+            possible_csv_identifier = None
+            
+            # Check if current identifier looks like a normalized crypto identifier
+            if current_identifier.endswith('-USD'):
+                # Likely came from a crypto symbol like "BTC" -> "BTC-USD"
+                possible_csv_identifier = current_identifier.replace('-USD', '')
+            elif current_identifier.upper() == current_identifier and len(current_identifier) <= 10:
+                # Likely a stock ticker that wasn't changed during normalization
+                possible_csv_identifier = current_identifier
+            
+            if possible_csv_identifier:
+                # Store the mapping from the probable CSV identifier to the user's preferred identifier
+                success = store_identifier_mapping(
+                    account_id=account_id,
+                    csv_identifier=possible_csv_identifier,
+                    preferred_identifier=new_identifier,
+                    company_name=current_company_name
+                )
+                
+                if success:
+                    logger.info(f"Stored identifier mapping: {possible_csv_identifier} -> {new_identifier} for {current_company_name}")
+                else:
+                    logger.warning(f"Failed to store identifier mapping for {current_company_name}")
+        
         try:
             # Normalize the identifier first
             from ..utils.identifier_normalization import normalize_identifier
@@ -690,31 +730,40 @@ def get_portfolios_api():
 
 def upload_csv():
     """Upload and process CSV data"""
+    logger.info(f"CSV upload attempt - session content: {dict(session)}")
+    
     if 'account_id' not in session:
+        logger.warning("CSV upload failed - no account_id in session")
         flash('Please select an account first', 'warning')
         return redirect(url_for('portfolio.enrich'))
 
     account_id = session['account_id']
+    logger.info(f"CSV upload for account_id: {account_id}")
 
     # Check if file was uploaded
     if 'csv_file' not in request.files:
+        logger.warning("CSV upload failed - no csv_file in request.files")
         flash('No file uploaded', 'error')
         return redirect(url_for('portfolio.enrich'))
 
     file = request.files['csv_file']
+    logger.info(f"CSV file received: {file.filename}, size: {file.content_length if hasattr(file, 'content_length') else 'unknown'}")
 
     # Check if file is empty
     if file.filename == '':
+        logger.warning("CSV upload failed - empty filename")
         flash('No file selected', 'error')
         return redirect(url_for('portfolio.enrich'))
 
     # Process the file
     try:
+        logger.info("Starting CSV file processing...")
         # Create backup
         backup_database()
 
         # Read file content
         file_content = file.read().decode('utf-8')
+        logger.info(f"CSV file content length: {len(file_content)} characters")
 
         # Try to process the data
         success, message, result = process_csv_data(account_id, file_content)
@@ -788,6 +837,7 @@ def upload_csv():
 
             # Set session variable to indicate we should use "-" as the default portfolio
             session['use_default_portfolio'] = True
+            
         else:
             flash(message, 'error')
 
@@ -1090,3 +1140,33 @@ def manage_portfolios():
         flash(f'Error managing portfolios: {str(e)}', 'error')
 
     return redirect(url_for('portfolio.enrich'))
+
+
+def csv_upload_progress():
+    """API endpoint to get/clear progress of CSV upload operation"""
+    if 'account_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    try:
+        if request.method == 'GET':
+            # Check if there's any CSV upload progress in session
+            progress_data = session.get('csv_upload_progress', {
+                'current': 0,
+                'total': 0,
+                'percentage': 0,
+                'status': 'idle',
+                'message': 'No active upload'
+            })
+            return jsonify(progress_data)
+        
+        elif request.method == 'DELETE':
+            # Clear CSV upload progress from session
+            if 'csv_upload_progress' in session:
+                del session['csv_upload_progress']
+            return jsonify({'message': 'CSV upload progress cleared'})
+    
+    except Exception as e:
+        logger.error(f"Error handling CSV upload progress: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+    return jsonify({'error': 'Method not allowed'}), 405

@@ -71,6 +71,21 @@ def init_db(app):
         with app.open_resource('database/schema_safe.sql', mode='r') as f:
             db.cursor().executescript(f.read())
         
+        # Add the identifier_mappings table if it doesn't exist
+        db.execute('''
+            CREATE TABLE IF NOT EXISTS identifier_mappings (
+                id INTEGER PRIMARY KEY,
+                account_id INTEGER NOT NULL,
+                csv_identifier TEXT NOT NULL,
+                preferred_identifier TEXT NOT NULL,
+                company_name TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (account_id) REFERENCES accounts (id),
+                UNIQUE (account_id, csv_identifier)
+            )
+        ''')
+        
         # Add the background_jobs table if it doesn't exist
         db.execute('''
             CREATE TABLE IF NOT EXISTS background_jobs (
@@ -122,7 +137,7 @@ def verify_schema(db):
     """
     required_tables = [
         'accounts', 'portfolios', 'companies', 'company_shares',
-        'market_prices', 'expanded_state'
+        'market_prices', 'expanded_state', 'identifier_mappings'
     ]
     cursor = db.cursor()
     for table in required_tables:
@@ -146,6 +161,14 @@ def verify_schema(db):
     missing_columns = [col for col in required_columns if col not in col_names]
     if missing_columns:
         logger.warning(f"Missing columns in 'market_prices' table: {missing_columns}")
+
+    # Check identifier_mappings table structure
+    identifier_mappings_check = cursor.execute("PRAGMA table_info(identifier_mappings)").fetchall()
+    col_names = [col[1] for col in identifier_mappings_check]
+    required_columns = ['id', 'account_id', 'csv_identifier', 'preferred_identifier', 'company_name', 'created_at', 'updated_at']
+    missing_columns = [col for col in required_columns if col not in col_names]
+    if missing_columns:
+        logger.warning(f"Missing columns in 'identifier_mappings' table: {missing_columns}")
 
 def is_database_empty(db):
     """

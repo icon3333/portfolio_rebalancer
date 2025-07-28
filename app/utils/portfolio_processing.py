@@ -1,13 +1,28 @@
 import pandas as pd
 import logging
 import io
+from flask import session
 from app.database.db_manager import query_db, execute_db, backup_database, get_db
 from app.utils.db_utils import update_price_in_db
 from app.utils.yfinance_utils import get_isin_data
 from app.utils.data_processing import clear_data_caches
 from app.utils.identifier_normalization import normalize_identifier
+from app.utils.identifier_mapping import get_preferred_identifier
 
 logger = logging.getLogger(__name__)
+
+
+def update_csv_progress(current, total, message="Processing...", status="processing"):
+    """Update CSV upload progress in session"""
+    percentage = int((current / total) * 100) if total > 0 else 0
+    session['csv_upload_progress'] = {
+        'current': current,
+        'total': total,
+        'percentage': percentage,
+        'status': status,
+        'message': message
+    }
+    session.modified = True
 
 
 def process_csv_data(account_id, file_content):
@@ -15,15 +30,22 @@ def process_csv_data(account_id, file_content):
     db = None
     cursor = None
     try:
+        # Initialize progress tracking
+        update_csv_progress(0, 100, "Starting CSV processing...", "processing")
+        
         db = get_db()
         cursor = db.cursor()
         backup_database()
+        
+        update_csv_progress(10, 100, "Reading CSV file...", "processing")
 
         df = pd.read_csv(io.StringIO(file_content),
                          delimiter=';',
                          decimal=',',
                          thousands='.')
         df.columns = df.columns.str.lower()
+        
+        update_csv_progress(20, 100, "Validating CSV columns...", "processing")
 
         essential_columns = {
             "identifier": ["identifier", "isin", "symbol"],
@@ -58,6 +80,7 @@ def process_csv_data(account_id, file_content):
                 missing_columns.append(required_col)
         if missing_columns:
             logger.warning(f"Missing essential columns: {missing_columns}")
+            update_csv_progress(0, 100, f"Missing required columns: {', '.join(missing_columns)}", "failed")
             return False, f"Missing required columns: {', '.join(missing_columns)}", {}
 
         for opt_col, alternatives in optional_columns.items():
@@ -68,6 +91,8 @@ def process_csv_data(account_id, file_content):
                     break
 
         df = df.rename(columns=column_mapping)
+        
+        update_csv_progress(30, 100, "Preparing data...", "processing")
 
         if 'currency' not in df.columns:
             df['currency'] = 'EUR'
@@ -168,6 +193,8 @@ def process_csv_data(account_id, file_content):
 
         company_positions = {}
 
+        update_csv_progress(40, 100, "Processing buy transactions...", "processing")
+        
         logger.info("FIRST PASS: Processing buy and transferin transactions")
         for idx, row in df.iterrows():
             company_name = row['holdingname']
@@ -181,9 +208,17 @@ def process_csv_data(account_id, file_content):
             shares = round(float(row['shares']), 6)
             price = float(row['price'])
             raw_identifier = row['identifier']
-            identifier = normalize_identifier(raw_identifier)
-            if raw_identifier != identifier:
-                logger.info(f"Normalized identifier for {company_name}: '{raw_identifier}' -> '{identifier}'")
+            
+            # NEW: Check for user's preferred identifier mapping first
+            preferred_identifier = get_preferred_identifier(account_id, raw_identifier)
+            if preferred_identifier:
+                identifier = preferred_identifier
+                logger.info(f"Using mapped identifier for {company_name}: '{raw_identifier}' -> '{identifier}'")
+            else:
+                # Fall back to standard normalization
+                identifier = normalize_identifier(raw_identifier)
+                if raw_identifier != identifier:
+                    logger.info(f"Normalized identifier for {company_name}: '{raw_identifier}' -> '{identifier}'")
             fee = float(row['fee']) if 'fee' in row else 0
             tax = float(row['tax']) if 'tax' in row else 0
             if shares <= 0:
@@ -205,6 +240,8 @@ def process_csv_data(account_id, file_content):
             logger.info(
                 f"Buy/TransferIn: {company_name}, +{shares} @ {price}, total shares: {company['total_shares']}, total invested: {company['total_invested']:.2f}")
 
+        update_csv_progress(50, 100, "Processing sell transactions...", "processing")
+        
         logger.info("SECOND PASS: Processing sell and transferout transactions")
         for idx, row in df.iterrows():
             company_name = row['holdingname']
@@ -279,14 +316,20 @@ def process_csv_data(account_id, file_content):
         failed_prices = []
 
         csv_company_names = set(df['holdingname'])
+        
+        update_csv_progress(60, 100, "Updating database...", "processing")
+        
+        # Track companies that should be removed (either not in CSV or have zero shares)
+        companies_with_zero_shares = set()
 
         for company_name, position in company_positions.items():
             current_shares = position['total_shares']
             total_invested = position['total_invested']
             
-            # Skip companies with zero or negative shares
-            if current_shares <= 0:
-                logger.info(f"Skipping company {company_name} with {current_shares} shares (zero or negative)")
+            # Track companies with zero or negative shares for removal (including tiny amounts from floating point precision)
+            if current_shares <= 1e-6:
+                logger.info(f"Company {company_name} has {current_shares} shares (zero or negative) - will be removed from database")
+                companies_with_zero_shares.add(company_name)
                 continue
                 
             if company_name in existing_company_map:
@@ -332,12 +375,23 @@ def process_csv_data(account_id, file_content):
                 positions_added.append(company_name)
 
         db_company_names = {company['name'] for company in existing_companies}
-        companies_to_remove = db_company_names - csv_company_names
+        
+        # Companies to remove: existing DB companies not in CSV OR existing DB companies with zero shares
+        companies_not_in_csv = db_company_names - csv_company_names
+        existing_companies_with_zero_shares = companies_with_zero_shares & db_company_names
+        companies_to_remove = companies_not_in_csv | existing_companies_with_zero_shares
+        
         for company_name in companies_to_remove:
             company_id = existing_company_map[company_name]['id']
             identifier = existing_company_map[company_name]['identifier']
-            logger.info(
-                f"Removing company {company_name} (not present in CSV)")
+            
+            # Determine removal reason for logging
+            if company_name in existing_companies_with_zero_shares:
+                removal_reason = "has zero shares"
+            else:
+                removal_reason = "not present in CSV"
+            
+            logger.info(f"Removing company {company_name} ({removal_reason})")
             cursor.execute(
                 'DELETE FROM company_shares WHERE company_id = ?', [company_id])
             cursor.execute('DELETE FROM companies WHERE id = ?', [company_id])

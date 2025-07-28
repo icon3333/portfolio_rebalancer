@@ -354,7 +354,8 @@
 
 {% macro upload_section(url_for) %}
 <div class="column is-6">
-    <div class="card mb-5" style="height: 100%; min-height: 250px; display: flex; flex-direction: column;">
+    <div id="upload-card" class="card mb-5"
+        style="height: 100%; min-height: 250px; display: flex; flex-direction: column;">
         <header class="card-header">
             <p class="card-header-title">
                 <span class="icon-text">
@@ -388,6 +389,15 @@
                             </label>
                         </div>
                         <p class="help">Upload a CSV file with your portfolio data.</p>
+                    </div>
+
+                    <!-- Simplified loading indicator -->
+                    <div id="csv-upload-indicator" style="display: none;" class="has-text-centered mt-4">
+                        <div class="loading-container">
+                            <span id="upload-percentage"
+                                class="is-size-4 has-text-weight-semibold has-text-primary">0%</span>
+                            <p class="is-size-7 has-text-grey mt-2">Processing file, please wait...</p>
+                        </div>
                     </div>
 
                 </form>
