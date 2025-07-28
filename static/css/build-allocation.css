@@ -291,3 +291,24 @@
     max-width: 200px;
   }
 }
+
+/* Portfolio Value Hint Styles */
+.portfolio-value-hint {
+  color: var(--primary);
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  margin-left: var(--space-xs);
+}
+
+.portfolio-value-hint:hover {
+  color: var(--primary-dark);
+  text-decoration: underline;
+  transform: scale(1.02);
+}
+
+.portfolio-value-hint:active {
+  transform: scale(0.98);
+}

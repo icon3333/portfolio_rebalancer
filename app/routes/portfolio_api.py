@@ -1242,3 +1242,41 @@ def csv_upload_progress():
         return jsonify({'error': str(e)}), 500
 
     return jsonify({'error': 'Method not allowed'}), 405
+
+
+def get_portfolio_metrics():
+    """Get portfolio metrics including total value"""
+    try:
+        if 'account_id' not in session:
+            return jsonify({'error': 'No account selected'}), 400
+        
+        account_id = session['account_id']
+        
+        # Get portfolio data using the same method as enrich page
+        from app.utils.portfolio_utils import get_portfolio_data
+        portfolio_data = get_portfolio_data(account_id)
+        
+        # Calculate total value the same way as in enrich page
+        total_value = sum(
+            (item['price_eur'] or 0) * (item['effective_shares'] or 0)
+            for item in portfolio_data
+        )
+        
+        # Count items and missing prices for additional metrics
+        missing_prices = sum(1 for item in portfolio_data if not item['price_eur'])
+        total_items = len(portfolio_data)
+        health = int(((total_items - missing_prices) / total_items * 100) if total_items > 0 else 100)
+        
+        last_updates = [item['last_updated'] for item in portfolio_data if item['last_updated'] is not None]
+        
+        return jsonify({
+            'total_value': total_value,
+            'total_items': total_items,
+            'health': health,
+            'missing_prices': missing_prices,
+            'last_update': max(last_updates) if last_updates else None
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting portfolio metrics: {str(e)}")
+        return jsonify({'error': 'Failed to get portfolio metrics'}), 500

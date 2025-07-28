@@ -30,7 +30,13 @@
         </div>
         <div class="column">
           <div class="field">
-            <label class="label">Already Invested</label>
+            <label class="label">
+              Already Invested
+              <span v-if="portfolioMetrics.total_value > 0" class="portfolio-value-hint"
+                @click="populateAlreadyInvested()" title="Click to use current portfolio value">
+                (${ formatCurrency(portfolioMetrics.total_value) })
+              </span>
+            </label>
             <div class="control">
               <input class="input" type="text" id="alreadyInvested" placeholder="Enter amount already invested"
                 :value="getInputDisplayValue('alreadyInvested')"

@@ -43,7 +43,14 @@ document.addEventListener('DOMContentLoaded', function () {
       },
       expandedPortfolios: {},
       expandedAllocations: {},
-      isEditingWeight: false
+      isEditingWeight: false,
+      portfolioMetrics: {
+        total_value: 0,
+        total_items: 0,
+        health: 100,
+        missing_prices: 0,
+        last_update: null
+      }
     },
     computed: {
       isAllocationValid() {
@@ -90,6 +97,10 @@ document.addEventListener('DOMContentLoaded', function () {
           // Load available portfolios
           await this.loadAvailablePortfolios();
           console.log("Available portfolios loaded:", this.availablePortfolios);
+
+          // Load portfolio metrics
+          await this.loadPortfolioMetrics();
+          console.log("Portfolio metrics loaded:", this.portfolioMetrics);
 
           // Load saved state if available
           await this.loadSavedState();
@@ -323,6 +334,18 @@ document.addEventListener('DOMContentLoaded', function () {
         }
       },
 
+      // Load portfolio metrics
+      async loadPortfolioMetrics() {
+        try {
+          const response = await axios.get('/portfolio/api/portfolio_metrics');
+          this.portfolioMetrics = response.data;
+          console.log('Loaded portfolio metrics:', this.portfolioMetrics);
+        } catch (error) {
+          console.error('Error loading portfolio metrics:', error);
+          portfolioManager.showNotification('Failed to load portfolio metrics', 'is-danger');
+        }
+      },
+
       // Load companies for a specific portfolio
       async loadPortfolioCompanies(portfolioId) {
         try {
@@ -421,6 +444,23 @@ document.addEventListener('DOMContentLoaded', function () {
           // When not editing, show formatted number
           if (value === 0 || value === null || value === undefined) return '';
           return this.formatNumber(value);
+        }
+      },
+
+      // Handle clicking on total portfolio value to populate "Already Invested"
+      populateAlreadyInvested() {
+        // Round the value the same way it's displayed (consistent with formatCurrency)
+        const roundedValue = this.portfolioMetrics.total_value >= 100
+          ? Math.round(this.portfolioMetrics.total_value)
+          : Math.round(this.portfolioMetrics.total_value * 100) / 100;
+
+        this.budgetData.alreadyInvested = roundedValue;
+        this.updateBudgetData();
+        // Flash the input field to show it was updated
+        const inputField = document.getElementById('alreadyInvested');
+        if (inputField) {
+          inputField.focus();
+          inputField.select();
         }
       },
 

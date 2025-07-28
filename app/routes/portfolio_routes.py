@@ -6,7 +6,7 @@ import logging
 from app.database.db_manager import query_db
 from app.routes.portfolio_api import (
     get_portfolios_api, get_portfolio_data_api, manage_state,
-    get_allocate_portfolio_data, update_portfolio_api, upload_csv, manage_portfolios, csv_upload_progress
+    get_allocate_portfolio_data, update_portfolio_api, upload_csv, manage_portfolios, csv_upload_progress, get_portfolio_metrics
 )
 from app.routes.portfolio_updates import update_price_api, update_single_portfolio_api, bulk_update, get_portfolio_companies, update_all_prices, price_fetch_progress, price_update_status
 from app.utils.data_processing import clear_data_caches
@@ -265,3 +265,5 @@ portfolio_bp.add_url_rule('/api/csv_upload_progress',
                           view_func=csv_upload_progress, methods=['GET', 'DELETE'])
 portfolio_bp.add_url_rule('/api/price_update_status/<string:job_id>',
                           view_func=price_update_status, methods=['GET'])
+portfolio_bp.add_url_rule('/api/portfolio_metrics',
+                          view_func=get_portfolio_metrics, methods=['GET'])

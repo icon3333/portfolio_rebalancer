@@ -960,17 +960,49 @@
                     colors: colors
                 },
                 tooltip: {
-                    fillSeriesColor: true,
-                    x: {
-                        show: false
-                    },
-                    y: {
-                        formatter: function (val, { dataPointIndex, w }) {
+                    custom: function ({ series, seriesIndex, dataPointIndex, w }) {
+                        try {
                             const label = w.globals.labels[dataPointIndex];
-                            return `${label} ${val.toFixed(1)}%`;
-                        },
-                        title: {
-                            formatter: () => ''
+                            const value = series[seriesIndex][dataPointIndex];
+
+                            // Get company details for this category
+                            const companies = options.companyDetails?.[label] || [];
+
+                            let companyList = '';
+                            if (companies.length > 0) {
+                                // Show up to 10 companies, sorted by value
+                                const displayCount = Math.min(companies.length, 10);
+                                companyList = companies.slice(0, displayCount).map(company =>
+                                    `<div style="margin: 2px 0; display: flex; justify-content: space-between;">
+                                        <span style="margin-right: 8px;">${company.name}</span>
+                                        <span style="font-weight: bold;">${company.percentage.toFixed(2)}%</span>
+                                    </div>`
+                                ).join('');
+
+                                if (companies.length > displayCount) {
+                                    companyList += `<div style="margin-top: 4px; font-style: italic; color: #888;">... and ${companies.length - displayCount} more</div>`;
+                                }
+                            } else {
+                                companyList = '<div style="font-style: italic; color: #888;">No companies in this category</div>';
+                            }
+
+                            return `<div style="padding: 12px; background: rgba(0,0,0,0.85); color: white; border-radius: 8px; font-size: 12px; max-width: 300px;">
+                                <div style="font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.3); padding-bottom: 4px;">
+                                    ${label}
+                                </div>
+                                <div style="margin-bottom: 8px;">
+                                    <strong>Total Allocation: ${value.toFixed(2)}%</strong>
+                                </div>
+                                <div style="margin-bottom: 4px; font-weight: bold;">Companies (${companies.length}):</div>
+                                <div style="max-height: 200px; overflow-y: auto;">
+                                    ${companyList}
+                                </div>
+                            </div>`;
+                        } catch (error) {
+                            console.error('Tooltip error:', error);
+                            const label = w.globals.labels[dataPointIndex];
+                            const value = series[seriesIndex][dataPointIndex];
+                            return `<div style="padding: 8px;">${label}: ${value.toFixed(1)}%</div>`;
                         }
                     }
                 },
@@ -986,6 +1018,18 @@
             return chart;
         }
 
+        // Helper function to get display country for geographic spread
+        function getDisplayCountry(company) {
+            // Check if this is a cryptocurrency based on sector field
+            const sector = company.sector || '';
+            if (sector === 'Cryptocurrency') {
+                return 'Crypto';
+            }
+
+            // For non-crypto assets, use existing logic
+            return (company.country || '').trim() || 'Unknown';
+        }
+
         function updateDistributionCharts() {
             updateDistributionChart('country', 'countryDistributionChart');
             updateDistributionChart('category', 'categoryDistributionChart');
@@ -993,14 +1037,31 @@
 
         function updateDistributionChart(field, chartId) {
             const distributions = {};
+            const companyDetails = {}; // Track companies in each category
 
             // Get all companies from selected portfolios
             const allCompanies = getAllCompaniesFromSelectedPortfolios();
 
             allCompanies.forEach(company => {
                 const value = company.currentValue || 0;
-                const key = company[field] || 'Unknown';
+
+                // Use helper function for country field to handle crypto display
+                let key;
+                if (field === 'country') {
+                    key = getDisplayCountry(company);
+                } else {
+                    key = company[field] || 'Unknown';
+                }
+
                 distributions[key] = (distributions[key] || 0) + value;
+
+                // Track company details for tooltips
+                if (!companyDetails[key]) companyDetails[key] = [];
+                companyDetails[key].push({
+                    name: company.name,
+                    value: value,
+                    percentage: 0 // Will be calculated later
+                });
             });
 
             const distributionData = Object.entries(distributions)
@@ -1019,8 +1080,16 @@
             const distributionTotal = distributionData.reduce((sum, item) => sum + item.value, 0);
             const distributionPercentages = distributionData.map(item => distributionTotal > 0 ? (item.value / distributionTotal) * 100 : 0);
 
+            // Calculate individual company percentages and sort by value
+            for (const key in companyDetails) {
+                companyDetails[key].forEach(company => {
+                    company.percentage = distributionTotal > 0 ? (company.value / distributionTotal) * 100 : 0;
+                });
+                companyDetails[key].sort((a, b) => b.value - a.value);
+            }
+
             try {
-                // Create bar chart with rotated labels for better visibility
+                // Create bar chart with enhanced tooltips
                 createBarChart(chartId,
                     distributionData.map(item => item.name),
                     distributionData.map(item => item.value), {
@@ -1029,7 +1098,8 @@
                     percentages: distributionPercentages,
                     total: distributionTotal,
                     formatPercentage: window.formatPercentage || (v => `${v.toFixed(1)}%`),
-                    height: 300
+                    height: 300,
+                    companyDetails: companyDetails // Pass company details for tooltips
                 });
             } catch (error) {
                 console.error(`Error creating ${field} distribution chart:`, error);

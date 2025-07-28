@@ -1445,6 +1445,18 @@
 
             // New Risk Breakdown Functions
 
+            // Helper function to get display country for geographic spread
+            function getDisplayCountry(company) {
+                // Check if this is a cryptocurrency based on sector field
+                const sector = company.sector || '';
+                if (sector === 'Cryptocurrency') {
+                    return 'Crypto';
+                }
+
+                // For non-crypto assets, use existing logic
+                return (company.country || '').trim() || 'Unknown';
+            }
+
             // Calculate exposure data for heatmap with intelligent filtering
             function calculateExposureData(selectedPortfolioIds, dimension) {
                 const allCompanies = getAllCompaniesFromSelectedPortfolios();
@@ -1456,6 +1468,7 @@
                         countries: [],
                         dims: [],
                         z: [],
+                        companyDetails: {}, // Add company tracking
                         metadata: {
                             totalValue: 0,
                             countryPercentages: {},
@@ -1469,11 +1482,12 @@
                 const exposure = {};
                 const countryTotals = {}; // Track total per country for filtering
                 const dimensionTotals = {}; // Track total per dimension for filtering
+                const companyDetails = {}; // Track companies in each country×dimension cell
 
                 // First pass: Collect all data points
                 allCompanies.forEach(company => {
                     // Handle unknown values gracefully
-                    const country = (company.country || '').trim() || 'Unknown';
+                    const country = getDisplayCountry(company);
                     const dimValue = (company[dimension] || '').trim() || 'Unknown';
 
                     // Initialize if needed
@@ -1482,11 +1496,22 @@
                     if (!countryTotals[country]) countryTotals[country] = 0;
                     if (!dimensionTotals[dimValue]) dimensionTotals[dimValue] = 0;
 
+                    // Initialize company tracking
+                    if (!companyDetails[country]) companyDetails[country] = {};
+                    if (!companyDetails[country][dimValue]) companyDetails[country][dimValue] = [];
+
                     // Accumulate values
                     const value = company.currentValue || 0;
                     exposure[country][dimValue] += value;
                     countryTotals[country] += value;
                     dimensionTotals[dimValue] += value;
+
+                    // Track company details for tooltip
+                    companyDetails[country][dimValue].push({
+                        name: company.name,
+                        value: value,
+                        percentage: 0 // Will be calculated later
+                    });
                 });
 
                 // Handle edge case: if no valid exposure data was collected
@@ -1496,6 +1521,7 @@
                         countries: [],
                         dims: [],
                         z: [],
+                        companyDetails: {}, // Add company tracking
                         metadata: {
                             totalValue,
                             countryPercentages: {},
@@ -1524,6 +1550,17 @@
                 for (const dim in dimensionTotals) {
                     dimensionPercentages[dim] = totalValue > 0 ?
                         (dimensionTotals[dim] / totalValue) * 100 : 0;
+                }
+
+                // Calculate individual company percentages for tooltips
+                for (const country in companyDetails) {
+                    for (const dim in companyDetails[country]) {
+                        companyDetails[country][dim].forEach(company => {
+                            company.percentage = totalValue > 0 ? (company.value / totalValue) * 100 : 0;
+                        });
+                        // Sort companies by value (descending)
+                        companyDetails[country][dim].sort((a, b) => b.value - a.value);
+                    }
                 }
 
                 // Filter out insignificant countries and dimensions (< 1% of portfolio)
@@ -1587,6 +1624,7 @@
                         countries: [],
                         dims: [],
                         z: [],
+                        companyDetails: {}, // Add company tracking
                         metadata: {
                             totalValue,
                             countryPercentages,
@@ -1600,6 +1638,7 @@
                     countries: sortedCountries,
                     dims: sortedDimensions,
                     z,
+                    companyDetails, // Include company details
                     // Additional metadata for tooltips
                     metadata: {
                         totalValue,
@@ -1709,12 +1748,48 @@
                         }
                     },
                     tooltip: {
-                        y: {
-                            formatter: function (value) {
-                                if (typeof value === 'number') {
-                                    return value.toFixed(2) + "%";
+                        custom: function ({ series, seriesIndex, dataPointIndex, w }) {
+                            try {
+                                const country = data.countries[seriesIndex] || 'Unknown';
+                                const dimension = data.dims[dataPointIndex] || 'Unknown';
+                                const value = series[seriesIndex][dataPointIndex] || 0;
+
+                                // Get company details for this cell
+                                const companies = data.companyDetails?.[country]?.[dimension] || [];
+
+                                let companyList = '';
+                                if (companies.length > 0) {
+                                    // Show up to 10 companies, sorted by value
+                                    const displayCount = Math.min(companies.length, 10);
+                                    companyList = companies.slice(0, displayCount).map(company =>
+                                        `<div style="margin: 2px 0; display: flex; justify-content: space-between;">
+                                            <span style="margin-right: 8px;">${company.name}</span>
+                                            <span style="font-weight: bold;">${company.percentage.toFixed(2)}%</span>
+                                        </div>`
+                                    ).join('');
+
+                                    if (companies.length > displayCount) {
+                                        companyList += `<div style="margin-top: 4px; font-style: italic; color: #888;">... and ${companies.length - displayCount} more</div>`;
+                                    }
+                                } else {
+                                    companyList = '<div style="font-style: italic; color: #888;">No companies in this category</div>';
                                 }
-                                return value;
+
+                                return `<div style="padding: 12px; background: rgba(0,0,0,0.85); color: white; border-radius: 8px; font-size: 12px; max-width: 300px;">
+                                    <div style="font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.3); padding-bottom: 4px;">
+                                        ${country} × ${dimension}
+                                    </div>
+                                    <div style="margin-bottom: 8px;">
+                                        <strong>Total Allocation: ${Number(value).toFixed(2)}%</strong>
+                                    </div>
+                                    <div style="margin-bottom: 4px; font-weight: bold;">Companies (${companies.length}):</div>
+                                    <div style="max-height: 200px; overflow-y: auto;">
+                                        ${companyList}
+                                    </div>
+                                </div>`;
+                            } catch (error) {
+                                console.error('Tooltip error:', error);
+                                return '<div style="padding: 8px;">Data unavailable</div>';
                             }
                         }
                     }
