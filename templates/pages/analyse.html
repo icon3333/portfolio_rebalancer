@@ -1886,7 +1886,67 @@
 
             // Add event listeners to toggle category companies
             document.addEventListener('click', function (e) {
-                // Implementation of event listener for toggling category companies
+                // Check if click was on or inside a toggle-companies element
+                const toggleIcon = e.target.closest('.toggle-companies');
+                if (!toggleIcon) return;
+
+                const categoryName = toggleIcon.dataset.category;
+                const portfolioId = toggleIcon.dataset.portfolioId;
+
+                // Find the category row
+                const categoryRow = toggleIcon.closest('.category-row');
+
+                // Toggle icon
+                const icon = toggleIcon.querySelector('i');
+                const isExpanding = icon.classList.contains('fa-plus-circle');
+
+                if (isExpanding) {
+                    icon.classList.remove('fa-plus-circle');
+                    icon.classList.add('fa-minus-circle');
+
+                    // Highlight the row when expanded
+                    categoryRow.classList.add('is-selected');
+                } else {
+                    icon.classList.remove('fa-minus-circle');
+                    icon.classList.add('fa-plus-circle');
+
+                    // Remove highlight when collapsed
+                    categoryRow.classList.remove('is-selected');
+                }
+
+                // Toggle company rows with animation
+                const companyRows = document.querySelectorAll(
+                    `.category-companies[data-parent-category="${categoryName}"][data-portfolio-id="${portfolioId}"]`
+                );
+
+                companyRows.forEach(row => {
+                    if (isExpanding) {
+                        // First make it visible but with 0 height
+                        row.classList.remove('is-hidden');
+                        row.style.maxHeight = '0';
+                        row.style.opacity = '0';
+
+                        // Force a reflow
+                        void row.offsetHeight;
+
+                        // Then animate to full height
+                        row.style.transition = 'max-height 0.3s ease, opacity 0.3s ease';
+                        row.style.maxHeight = '100px';
+                        row.style.opacity = '1';
+                    } else {
+                        // Animate to 0 height
+                        row.style.transition = 'max-height 0.3s ease, opacity 0.3s ease';
+                        row.style.maxHeight = '0';
+                        row.style.opacity = '0';
+
+                        // After animation, hide it
+                        setTimeout(() => {
+                            row.classList.add('is-hidden');
+                            row.style.maxHeight = '';
+                            row.style.opacity = '';
+                        }, 300);
+                    }
+                });
             });
         });
     </script>
