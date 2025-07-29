@@ -768,6 +768,15 @@ def get_portfolios_api():
 
 def upload_csv():
     """Upload and process CSV data"""
+    # Apply rate limiting in production
+    from flask import current_app
+    if hasattr(current_app, 'limiter'):
+        try:
+            current_app.limiter.check_request_limits("10 per hour")
+        except Exception:
+            from flask import jsonify
+            return jsonify({'success': False, 'message': 'Rate limit exceeded. Please try again later.'}), 429
+    
     logger.info(f"CSV upload attempt - session content: {dict(session)}")
     
     # Determine if this is an AJAX request by checking Accept header or presence of certain headers

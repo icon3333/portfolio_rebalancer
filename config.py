@@ -83,6 +83,9 @@ class TestingConfig(Config):
 
 class ProductionConfig(Config):
     """Production configuration."""
+    # Explicitly disable debug mode in production
+    DEBUG = False
+    
     # Ensure HTTPS in production
     SESSION_COOKIE_SECURE = True
     

@@ -53,4 +53,6 @@ if __name__ == '__main__':
         check_and_setup_environment()
     
     # Run the application with the specified port
-    app.run(host='0.0.0.0', port=args.port, debug=True)
+    # Debug mode should be controlled by FLASK_ENV, not hardcoded
+    debug_mode = os.environ.get('FLASK_ENV', 'development') == 'development'
+    app.run(host='0.0.0.0', port=args.port, debug=debug_mode)
