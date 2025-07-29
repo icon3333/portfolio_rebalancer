@@ -111,9 +111,6 @@ with app.app_context():
 # Check logs
 docker-compose logs
 
-# Common issue: "Failed to find attribute 'app' in 'run'"
-# This has been fixed in the latest version
-
 # Check environment
 cat .env
 

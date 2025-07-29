@@ -36,5 +36,5 @@ EXPOSE 8065
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8065/health || exit 1
 
-# Start application with gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:8065", "--workers", "4", "--timeout", "120", "--max-requests", "1000", "run:app"] 
+# Start application with gunicorn using configuration file
+CMD ["gunicorn", "--config", "gunicorn.conf.py", "run:app"] 
