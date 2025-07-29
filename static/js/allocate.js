@@ -782,39 +782,39 @@ document.addEventListener('DOMContentLoaded', function () {
                     );
 
                     const totalRealPositionsWeight = realPositionCategories.reduce((sum, cat) => {
-                        return sum + cat.targetAllocation;
+                        // Sum up the targetAllocation of all positions in this category
+                        const catAllocation = cat.positions.reduce((catSum, pos) => {
+                            return catSum + (pos.targetAllocation || 0);
+                        }, 0);
+                        return sum + catAllocation;
                     }, 0);
 
                     // If real positions already have 100% allocation, skip missing positions
                     realPositionsHave100Percent = Math.round(totalRealPositionsWeight) >= 100;
 
-                    // Debugging for GME portfolio
-                    if (portfolio.name === "GME") {
-                        console.log("GME portfolio calculations:", {
+                    // Debug logging for troubleshooting
+                    if (portfolio.name === "GME" || portfolio.name.includes("GameStop") || portfolio.name.includes("Gamestop")) {
+                        console.log(`DEBUG ${portfolio.name}:`, {
                             realPositionCategories,
                             totalRealPositionsWeight,
                             realPositionsHave100Percent,
-                            sumUserDefinedAllocations
+                            builderPositions: portfolio.builderPositions
                         });
                     }
+
+
                 }
 
-                // Skip missing positions entirely for GME portfolio
-                if (portfolio.name === "GME" && missingPositionsCategory) {
-                    console.log("GME portfolio - setting missing positions to 0");
-                    missingPositionsCategory.targetAllocation = 0;
-                    missingPositionsCategory.calculatedTargetValue = 0;
-                }
-                // Handle normal case - show missing positions based on builder configuration
-                else if (missingPositionsCategory && !realPositionsHave100Percent) {
+                // Handle case - show missing positions based on builder configuration
+                if (missingPositionsCategory && !realPositionsHave100Percent) {
                     // Check if portfolio has minPositions defined
                     const minPositions = portfolio.minPositions || 0;
                     const currentPositionsCount = portfolio.categories
                         .filter(cat => cat.name !== 'Missing Positions')
                         .reduce((sum, cat) => sum + (cat.positions ? cat.positions.length : 0), 0);
 
-                    // Only show missing positions if we haven't reached minimum positions
-                    if (currentPositionsCount < minPositions) {
+                    // Only show missing positions if we haven't reached minimum positions AND real positions don't sum to 100%
+                    if (currentPositionsCount < minPositions && !realPositionsHave100Percent) {
                         let missingTargetAllocation = 0;
                         let missingCalculatedValue = 0;
 
@@ -835,7 +835,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         missingPositionsCategory.targetAllocation = missingTargetAllocation;
                         missingPositionsCategory.calculatedTargetValue = missingCalculatedValue;
                     } else {
-                        // If we have enough positions, set missing positions to 0
+                        // If we have enough positions OR real positions sum to 100%, set missing positions to 0
                         missingPositionsCategory.targetAllocation = 0;
                         missingPositionsCategory.calculatedTargetValue = 0;
 

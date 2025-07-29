@@ -1,0 +1,53 @@
+# Git and documentation
+.git
+.gitignore
+README.md
+DEPLOYMENT.md
+USER_EDITED_SHARES_FEATURE.md
+
+# Environment files
+.env
+.env.*
+env.example
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.coverage
+htmlcov/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Database files (will be in /data)
+*.db
+*.sqlite
+*.sqlite3
+app/database/*.db
+app/database/backups/
+
+# Instance directory
+instance/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.backup
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test files
+test_upload.csv 

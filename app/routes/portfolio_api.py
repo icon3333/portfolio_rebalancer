@@ -536,7 +536,18 @@ def get_allocate_portfolio_data():
             current_positions_count = sum(len(cat_data['positions']) for cat_data in pdata['categories'].values())
             placeholder_position = next((pos for pos in builder_positions if pos.get('isPlaceholder')), None)
             
-            if placeholder_position and current_positions_count < min_positions:
+            # Check if real positions in builder already sum to 100%
+            real_builder_positions = [pos for pos in builder_positions if not pos.get('isPlaceholder', False)]
+            total_real_weight = sum(pos.get('weight', 0) for pos in real_builder_positions)
+            real_positions_have_100_percent = round(total_real_weight) >= 100
+            
+            # Log for debugging
+            logger.info(f"Portfolio {pname}: current_positions={current_positions_count}, min_positions={min_positions}, "
+                       f"total_real_weight={total_real_weight}, real_positions_have_100_percent={real_positions_have_100_percent}")
+            logger.info(f"Portfolio {pname}: builder_positions={builder_positions}")
+            logger.info(f"Portfolio {pname}: real_builder_positions={real_builder_positions}")
+            
+            if placeholder_position and current_positions_count < min_positions and not real_positions_have_100_percent:
                 positions_remaining = min_positions - current_positions_count
                 
                 # Create Missing Positions category if needed

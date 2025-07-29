@@ -66,6 +66,27 @@ def create_app(config_name=None):
     except Exception as e:
         logger.error(f"Automatic price update failed: {e}")
     
+    @app.route('/health')
+    def health_check():
+        """Health check endpoint for Docker and load balancers."""
+        try:
+            # Check database connectivity
+            from app.database.db_manager import query_db
+            query_db("SELECT 1", one=True)
+            
+            return jsonify({
+                'status': 'healthy',
+                'timestamp': datetime.utcnow().isoformat(),
+                'database': 'connected'
+            }), 200
+        except Exception as e:
+            logger.error(f"Health check failed: {e}")
+            return jsonify({
+                'status': 'unhealthy',
+                'timestamp': datetime.utcnow().isoformat(),
+                'error': str(e)
+            }), 503
+
     @app.route('/profile', methods=['POST'])
     def get_profile():
         data = request.get_json() if request.is_json else request.form
