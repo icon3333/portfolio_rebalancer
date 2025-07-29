@@ -77,8 +77,8 @@ def create_app(config_name=None):
         
         # Add rate limiting
         limiter = Limiter(
-            app,
             key_func=get_remote_address,
+            app=app,
             default_limits=["200 per hour", "50 per minute"],
             storage_uri="memory://",  # Use memory storage for single-user app
             strategy="fixed-window"
