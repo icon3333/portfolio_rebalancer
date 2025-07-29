@@ -34,7 +34,7 @@ That's it! The script handles everything automatically.
 ```
 
 ### 🔧 Container Configuration
-- **Port**: 8000 (configurable)
+- **Port**: 8065 (configurable)
 - **Database**: SQLite in `/data/database/portfolio.db`
 - **Persistence**: All data stored in `/data` directory
 - **Health Check**: Automatic monitoring at `/health`
@@ -44,7 +44,7 @@ That's it! The script handles everything automatically.
 
 ### Custom Port
 ```bash
-./deploy.sh --port 8001
+./deploy.sh --port 8066
 ```
 
 ### Custom Data Directory
@@ -71,7 +71,7 @@ docker ps | grep portfolio
 docker-compose logs -f
 
 # Check health
-curl http://localhost:8000/health
+curl http://localhost:8065/health
 ```
 
 ### Control Application
@@ -168,8 +168,8 @@ docker-compose restart
 
 Since you have nginx/reverse proxy already configured:
 
-1. **Point your reverse proxy to**: `http://localhost:8000`
-2. **Health check endpoint**: `http://localhost:8000/health` 
+1. **Point your reverse proxy to**: `http://localhost:8065`
+2. **Health check endpoint**: `http://localhost:8065/health` 
 3. **Static files**: Can be served by your existing nginx if needed
 4. **SSL**: Handled by your existing infrastructure
 
@@ -194,7 +194,7 @@ echo "Full backup created: portfolio_full_$DATE.tar.gz"
 ### Health Check Integration
 ```bash
 # Add to your monitoring system
-curl -f http://localhost:8000/health || alert_admin
+curl -f http://localhost:8065/health || alert_admin
 ```
 
 ### Log Monitoring

@@ -6,7 +6,7 @@ services:
     container_name: portfolio_rebalancer
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "8065:8065"
     volumes:
       # Mount local /data directory for persistence
       - /data:/data

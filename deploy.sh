@@ -15,7 +15,7 @@ NC='\033[0m' # No Color
 # Configuration
 APP_NAME="portfolio_rebalancer"
 CONTAINER_NAME="portfolio_rebalancer"
-PORT="8000"
+PORT="8065"
 DATA_DIR="/data"
 BACKUP_DIR="/data/backups"
 
@@ -47,7 +47,14 @@ check_dependencies() {
         exit 1
     fi
     
-    if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
+    # Detect docker compose command (new vs old syntax)
+    if docker compose version &> /dev/null; then
+        DOCKER_COMPOSE_CMD="docker compose"
+        log_info "Using new Docker Compose syntax: docker compose"
+    elif command -v docker-compose &> /dev/null; then
+        DOCKER_COMPOSE_CMD="docker-compose"
+        log_info "Using legacy Docker Compose syntax: docker-compose"
+    else
         log_error "Docker Compose is not installed. Please install Docker Compose first."
         exit 1
     fi
@@ -140,7 +147,7 @@ stop_existing_container() {
     
     if docker ps -q -f name="$CONTAINER_NAME" | grep -q .; then
         log_warning "Stopping existing container: $CONTAINER_NAME"
-        docker-compose down || docker stop "$CONTAINER_NAME" || true
+        $DOCKER_COMPOSE_CMD down || docker stop "$CONTAINER_NAME" || true
         log_success "Existing container stopped"
     fi
 }
@@ -151,11 +158,11 @@ deploy_application() {
     
     # Build the Docker image
     log_info "Building Docker image..."
-    docker-compose build --no-cache
+    $DOCKER_COMPOSE_CMD build --no-cache
     
     # Start the application
     log_info "Starting application..."
-    docker-compose up -d
+    $DOCKER_COMPOSE_CMD up -d
     
     # Wait for application to be ready
     log_info "Waiting for application to start..."
@@ -164,11 +171,11 @@ deploy_application() {
     # Check if container is running
     if docker ps -q -f name="$CONTAINER_NAME" | grep -q .; then
         log_success "Container is running"
-    else
-        log_error "Container failed to start"
-        docker-compose logs
-        exit 1
-    fi
+            else
+            log_error "Container failed to start"
+            $DOCKER_COMPOSE_CMD logs
+            exit 1
+        fi
 }
 
 # Verify deployment
@@ -185,7 +192,7 @@ verify_deployment() {
             break
         elif [[ $i -eq 10 ]]; then
             log_error "Health check failed after 10 attempts"
-            docker-compose logs --tail=50
+            $DOCKER_COMPOSE_CMD logs --tail=50
             exit 1
         else
             log_info "Health check attempt $i/10..."
@@ -204,17 +211,17 @@ verify_deployment() {
     echo "  - Data Directory: $DATA_DIR"
     echo
     echo "🔧 Management Commands:"
-    echo "  - View logs: docker-compose logs -f"
-    echo "  - Stop app: docker-compose down"
-    echo "  - Restart: docker-compose restart"
-    echo "  - Update: git pull && docker-compose build && docker-compose up -d"
+    echo "  - View logs: $DOCKER_COMPOSE_CMD logs -f"
+    echo "  - Stop app: $DOCKER_COMPOSE_CMD down"
+    echo "  - Restart: $DOCKER_COMPOSE_CMD restart"
+    echo "  - Update: git pull && $DOCKER_COMPOSE_CMD build && $DOCKER_COMPOSE_CMD up -d"
 }
 
 # Display usage information
 show_usage() {
     echo "Usage: $0 [options]"
     echo "Options:"
-    echo "  --port PORT     Use custom port (default: 8000)"
+    echo "  --port PORT     Use custom port (default: 8065)"
     echo "  --data-dir DIR  Use custom data directory (default: /data)"
     echo "  --help          Show this help message"
     exit 0
