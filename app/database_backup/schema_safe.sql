@@ -23,6 +23,9 @@ CREATE TABLE IF NOT EXISTS companies (
  portfolio_id INTEGER NOT NULL,
  account_id INTEGER NOT NULL,
  total_invested REAL DEFAULT 0,
+ override_country TEXT,
+ country_manually_edited BOOLEAN DEFAULT 0,
+ country_manual_edit_date DATETIME,
  FOREIGN KEY (portfolio_id) REFERENCES portfolios (id),
  FOREIGN KEY (account_id) REFERENCES accounts (id),
  UNIQUE (account_id, name)
